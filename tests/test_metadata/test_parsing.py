@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from pxmodrim._compat.utils import find_about_xml
 from pxmodrim.models.metadata.parsing import (
-    _find_about_xml,
     create_about_mod,
     create_listed_mod_from_path,
     value_extractor,
@@ -64,12 +64,12 @@ class TestCreateAboutMod:
 
 class TestFindAboutXml:
     def test_valid_mod(self) -> None:
-        about_path = _find_about_xml(TEST_DATA / "valid_mod")
+        about_path = find_about_xml(TEST_DATA / "valid_mod")
         assert about_path is not None
         assert about_path.name == "About.xml"
 
     def test_nonexistent(self) -> None:
-        result = _find_about_xml(TEST_DATA / "nonexistent")
+        result = find_about_xml(TEST_DATA / "nonexistent")
         assert result is None
 
 

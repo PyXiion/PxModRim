@@ -6,7 +6,7 @@
 - **Incremental rewrite**: algorithms extracted from `rimsort-original/`, adapted and rewritten in new structure.
 
 ## Toolchain
-- **uv** (not pip) — `uv sync --dev`, never `pip install`
+- **uv** — `uv sync --dev`
 - **just** — task runner, run `just` to list recipes
 - **ruff** lint+format — `just ruff-fix` (runs `ruff check --fix && ruff format`)
 - **mypy** + **pyright** — `just typecheck` / `just pyright`
@@ -14,8 +14,7 @@
 - Python **3.12 only**
 
 ## Entrypoints
-- `just run` — GUI (PySide6 + qasync)
-- No CLI mode yet
+- `just run`
 
 ## Architecture (`src/pxmodrim/`)
 - `models/metadata/` — data models (`structures.py`, compiled msgspec dataclasses) and `parsing.py` (About.xml → objects)
@@ -25,11 +24,22 @@
 - `_app.py` — bootstrap, QEventLoop wiring
 - `__main__.py` — entry point
 
-## Async rules
-- Event loop: `qasync.QEventLoop` set in `_app.py`
+## Rules
 - Signal-connected async methods **must** have `@asyncSlot()` from qasync, or the coroutine is silently dropped
 - Long blocking work → `await asyncio.to_thread(target)`
 - No fire-and-forget helpers yet (add when needed)
+- Do not write smelly code.
+
+## Prohibitions (enforced in code review)
+- **Never** `QApplication.processEvents()` — blocks event loop, use async instead
+- **Never** `dialog.exec()` or `dialog.exec_()` — blocks UI thread, use async dialogs or `show()`
+- **Never** `QTimer.singleShot(0, ...)` to defer work — use `await asyncio.sleep(0)` or proper async
+- **Never** `time.sleep()` in async code — use `await asyncio.sleep()`
+- **Never** `QThread` directly — use `asyncio.to_thread()` or `loop.run_in_executor()`
+- **Never** blocking I/O in signal handlers or UI methods — move to service layer
+- **Never** global singletons (`_instance = None` pattern) — use DI via constructor
+- **Never** mix UI and I/O in same class — UI reads state, services write state
+- **Never** `ModType` enum (removed) — use `provider_id: str` on `ListedMod`
 
 ## Donor code (`rimsort-original/`)
 - **NEVER modify** `rimsort-original/`. It's read-only reference.
@@ -44,7 +54,6 @@
 ## Key conventions
 - All files: `from __future__ import annotations` (PEP 604 style everywhere)
 - No comments unless explaining *why* (not *what*)
-- `ModType` enum setter raises on override (prevents accidental re-classification)
 - `pyproject.toml` has `lint.extend-select = ["I"]` for import sorting — run `ruff check --fix` after adding imports
 
 ## Testing quirks

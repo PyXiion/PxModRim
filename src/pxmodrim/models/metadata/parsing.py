@@ -8,6 +8,7 @@ from typing import Any, Sequence
 from loguru import logger
 
 from pxmodrim._compat.constants import DEFAULT_MISSING_PACKAGEID, RIMWORLD_DLC_METADATA
+from pxmodrim._compat.utils import find_about_xml
 from pxmodrim._compat.xml import xml_path_to_json
 from pxmodrim.models.metadata.structures import (
     AboutXmlMod,
@@ -424,18 +425,6 @@ def _create_about_mod_from_xml(
     return valid, mod
 
 
-def _find_about_xml(mod_path: Path) -> Path | None:
-    if not mod_path.is_dir():
-        return None
-    for entry in mod_path.iterdir():
-        if entry.name.lower() == "about" and entry.is_dir():
-            for child in entry.iterdir():
-                if child.name.lower() == "about.xml" and child.is_file():
-                    return child
-            break
-    return None
-
-
 def create_listed_mod_from_path(
     path: Path,
     target_version: str,
@@ -445,7 +434,7 @@ def create_listed_mod_from_path(
     if path.is_dir():
         about_xml_path: Path | None
         if case_insensitive_about_xml:
-            about_xml_path = _find_about_xml(path)
+            about_xml_path = find_about_xml(path)
         else:
             candidate = path / "About" / "About.xml"
             about_xml_path = candidate if candidate.exists() else None

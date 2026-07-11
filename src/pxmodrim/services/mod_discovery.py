@@ -5,17 +5,8 @@ from pathlib import Path
 from loguru import logger
 
 from pxmodrim._compat.mods_config import parse_mods_config
+from pxmodrim._compat.utils import find_about_xml
 from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
-
-
-def _find_about_xml(mod_path: Path) -> Path | None:
-    for entry in mod_path.iterdir():
-        if entry.name.lower() == "about" and entry.is_dir():
-            for child in entry.iterdir():
-                if child.name.lower() == "about.xml" and child.is_file():
-                    return child
-            break
-    return None
 
 
 def scan_mod_directory(mods_path: Path) -> list[Path]:
@@ -27,7 +18,7 @@ def scan_mod_directory(mods_path: Path) -> list[Path]:
     for entry in mods_path.iterdir():
         if not entry.is_dir():
             continue
-        if _find_about_xml(entry):
+        if find_about_xml(entry):
             results.append(entry)
     return results
 

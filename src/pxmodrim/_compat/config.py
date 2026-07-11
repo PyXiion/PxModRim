@@ -185,21 +185,32 @@ def _find_rimworld_in_steam_root(root: Path, steam_id: str) -> Path | None:
 
 def _vdf_find_rimworld(vdf_path: Path, steam_id: str) -> Path | None:
     try:
+        import re
         text = vdf_path.read_text(encoding="utf-8", errors="replace")
+
+        # Simple regex-based VDF parser for libraryfolders.vdf
+        # Looking for: "libraryfolders" { "0" { "path" "..." "apps" { "294100" { ... } } } }
+        path_pattern = re.compile(r'"path"\s+"(.+?)"')
+        app_pattern = re.compile(r'"' + re.escape(steam_id) + r'"\s*{')
+
+        current_path = None
+
         for line in text.splitlines():
             stripped = line.strip()
-            if f'"{steam_id}"' in stripped:
-                for prev in text.splitlines():
-                    if '"path"' in prev and '"path"' in text:
-                        import re
 
-                        m = re.search(r'"path"\s+"(.+)"', prev)
-                        if m:
-                            game = (
-                                Path(m.group(1)) / "steamapps" / "common" / "RimWorld"
-                            )
-                            if game.is_dir():
-                                return game
+            # Match library folder path
+            path_match = path_pattern.search(stripped)
+            if path_match:
+                current_path = Path(path_match.group(1))
+                continue
+
+            # Match app id entry
+            if app_pattern.search(stripped):
+                if current_path:
+                    game = current_path / "steamapps" / "common" / "RimWorld"
+                    if game.is_dir():
+                        return game
+
     except Exception:
         pass
     return None

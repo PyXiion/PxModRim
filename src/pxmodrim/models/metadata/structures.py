@@ -66,13 +66,11 @@ class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
         return hash(self._data)
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Set):
-            if not self._data and not other:
-                return True
-            return False
         if isinstance(other, CaseInsensitiveSet):
             return self._data == other._data
-        return self._data == other
+        if isinstance(other, Set):
+            return self._data == {CaseInsensitiveStr(i) for i in other}
+        return False
 
     def discard(self, value: CaseInsensitiveStr | str) -> None:
         if not isinstance(value, CaseInsensitiveStr) and isinstance(value, str):

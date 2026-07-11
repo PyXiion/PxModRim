@@ -14,6 +14,7 @@ class CoreModProvider(BaseModProvider):
 
     def __init__(self, game_path: Path) -> None:
         self._game = game_path
+        super().__init__(game_path)
 
     async def discover(self, target_version: str) -> dict[str, ListedMod]:
         def _scan() -> dict[str, ListedMod]:
@@ -37,3 +38,6 @@ class CoreModProvider(BaseModProvider):
             return result
 
         return await asyncio.to_thread(_scan)
+
+    def _should_include(self, mod: ListedMod) -> bool:
+        return True

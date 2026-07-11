@@ -105,6 +105,11 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.load_mods_async)
+        refresh_btn.setShortcut("F5")
+        layout.addWidget(refresh_btn)
+
         sort_btn = QPushButton("Auto-sort")
         sort_btn.setObjectName("primaryAction")
         sort_btn.clicked.connect(self._auto_sort)
