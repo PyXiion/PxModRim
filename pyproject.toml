@@ -1,0 +1,71 @@
+[project]
+name = "pxmodrim"
+description = "A mod manager for RimWorld."
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "loguru>=0.7.3",
+    "lxml>=6.1.1",
+    "msgspec>=0.21.1",
+    "natsort>=8.4.0",
+    "networkx>=3.6.1",
+    "pyside6>=6.11.1",
+    "qasync>=0.28.0",
+    "toposort>=1.10",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.20.2",
+    "pyright>=1.1.411",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-qt>=4.5.0",
+    "pytest-xvfb>=3.1.1",
+    "ruff>=0.15.21",
+]
+
+[tool.uv]
+package = true
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'win32'",
+    "sys_platform == 'darwin'",
+]
+
+[tool.mypy]
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+pretty = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+exclude = ['rimsort-original']
+
+[[tool.mypy.overrides]]
+module = ['lxml.*', 'lxml', 'qasync']
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+lint.extend-select = ["I"]
+exclude = ["rimsort-original"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+    "--no-qt-log",
+]
+pythonpath = 'src'
+testpaths = ['tests']
+
+[tool.pyright]
+pythonPlatform = "All"
+typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
+exclude = ['rimsort-original']

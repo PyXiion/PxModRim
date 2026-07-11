@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Test Mod</name>
+  <author>TestAuthor</author>
+  <packageId>test.mod</packageId>
+  <description>A test mod for unit testing.</description>
+  <supportedVersions>
+    <li>1.5</li>
+  </supportedVersions>
+  <modVersion>1.0.0</modVersion>
+  <loadAfter>
+    <li>ludeon.rimworld</li>
+  </loadAfter>
+</ModMetaData>

@@ -1,0 +1,263 @@
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import msgspec
+from loguru import logger
+
+from pxmodrim._compat.constants import RIMWORLD_STEAM_APP_ID
+
+
+class PathConfig(msgspec.Struct):
+    game: str = ""
+    local: str = ""
+    workshop: str = ""
+    config_folder: str = ""
+
+
+class AppConfig(msgspec.Struct):
+    paths: PathConfig = msgspec.field(default_factory=PathConfig)
+    target_version: str = "1.6"
+
+
+def config_dir() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
+    return Path(base) / "pxmodrim"
+
+
+def config_file_path() -> Path:
+    return config_dir() / "config.json"
+
+
+def load_config(path: Path | None = None) -> AppConfig:
+    path = path or config_file_path()
+    if not path.exists():
+        return AppConfig()
+    try:
+        raw = path.read_bytes()
+        return msgspec.json.decode(raw, type=AppConfig)
+    except Exception as e:
+        logger.warning(f"Failed to load config from {path}: {e}")
+        return AppConfig()
+
+
+def save_config(cfg: AppConfig, path: Path | None = None) -> None:
+    path = path or config_file_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = msgspec.json.encode(cfg)
+    formatted = msgspec.json.format(raw, indent=2)
+    path.write_bytes(formatted)
+    logger.info(f"Config saved to {path}")
+
+
+def _detect_config_folder(steam_root: Path | None) -> str:
+    if sys.platform == "linux":
+        if steam_root:
+            proton = (
+                steam_root
+                / "steamapps"
+                / "compatdata"
+                / RIMWORLD_STEAM_APP_ID
+                / "pfx"
+                / "drive_c"
+                / "users"
+                / "steamuser"
+                / "AppData"
+                / "LocalLow"
+                / "Ludeon Studios"
+                / "RimWorld by Ludeon Studios"
+                / "Config"
+            )
+            if proton.is_dir():
+                logger.debug(f"Detected Proton config folder: {proton}")
+                return str(proton)
+        native = (
+            Path.home()
+            / ".config"
+            / "unity3d"
+            / "Ludeon Studios"
+            / "RimWorld by Ludeon Studios"
+            / "Config"
+        )
+        if native.is_dir():
+            logger.debug(f"Detected native config folder: {native}")
+            return str(native)
+    elif sys.platform == "darwin":
+        config = Path.home() / "Library" / "Application Support" / "Rimworld" / "Config"
+        if config.is_dir():
+            logger.debug(f"Detected macOS config folder: {config}")
+            return str(config)
+    elif sys.platform == "win32":
+        config = (
+            Path.home()
+            / "AppData"
+            / "LocalLow"
+            / "Ludeon Studios"
+            / "RimWorld by Ludeon Studios"
+            / "Config"
+        )
+        if config.is_dir():
+            logger.debug(f"Detected Windows config folder: {config}")
+            return str(config)
+    return ""
+
+
+def detect_game_paths() -> PathConfig:
+    result = PathConfig()
+    steam_id = RIMWORLD_STEAM_APP_ID
+    found_root: Path | None = None
+
+    if sys.platform == "linux":
+        candidates = [
+            Path.home() / ".steam" / "debian-installation",
+            Path.home() / ".steam" / "steam",
+            Path.home() / ".local" / "share" / "Steam",
+            Path.home()
+            / ".var"
+            / "app"
+            / "com.valvesoftware.Steam"
+            / ".local"
+            / "share"
+            / "Steam",
+            Path.home() / "snap" / "steam" / "common" / ".local" / "share" / "Steam",
+        ]
+        for root in candidates:
+            if not root.is_dir():
+                continue
+            game = _find_rimworld_in_steam_root(root, steam_id)
+            if game:
+                result.game = str(game)
+                result.local = str(game / "Mods")
+                result.workshop = str(_workshop_path_from_game(game, root, steam_id))
+                found_root = root
+                break
+        if not result.game:
+            fallback_root = Path.home() / ".steam" / "steam"
+            fallback = fallback_root / "steamapps" / "common" / "RimWorld"
+            if fallback.is_dir():
+                result.game = str(fallback)
+                result.local = str(fallback / "Mods")
+                result.workshop = str(
+                    fallback_root / "steamapps" / "workshop" / "content" / steam_id
+                )
+                found_root = fallback_root if fallback_root.is_dir() else None
+
+    elif sys.platform == "darwin":
+        steam_root = Path.home() / "Library" / "Application Support" / "Steam"
+        found_root = steam_root if steam_root.is_dir() else None
+        game = _find_rimworld_in_steam_root(steam_root, steam_id)
+        if game:
+            result.game = str(game)
+            result.local = str(game / "Mods")
+            result.workshop = str(_workshop_path_from_game(game, steam_root, steam_id))
+        else:
+            fallback = steam_root / "steamapps" / "common" / "RimWorld"
+            app_bundle = _find_mac_app(fallback)
+            if app_bundle:
+                result.game = str(app_bundle)
+                result.local = str(fallback / "Mods")
+                result.workshop = str(
+                    steam_root / "steamapps" / "workshop" / "content" / steam_id
+                )
+
+    elif sys.platform == "win32":
+        result = _detect_windows_paths(steam_id)
+
+    result.config_folder = _detect_config_folder(found_root)
+
+    return result
+
+
+def _find_rimworld_in_steam_root(root: Path, steam_id: str) -> Path | None:
+    game = root / "steamapps" / "common" / "RimWorld"
+    if game.is_dir():
+        return game
+    vdf_path = root / "config" / "libraryfolders.vdf"
+    if vdf_path.exists():
+        return _vdf_find_rimworld(vdf_path, steam_id)
+    vdf_path = root / "steamapps" / "libraryfolders.vdf"
+    if vdf_path.exists():
+        return _vdf_find_rimworld(vdf_path, steam_id)
+    return None
+
+
+def _vdf_find_rimworld(vdf_path: Path, steam_id: str) -> Path | None:
+    try:
+        text = vdf_path.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            stripped = line.strip()
+            if f'"{steam_id}"' in stripped:
+                for prev in text.splitlines():
+                    if '"path"' in prev and '"path"' in text:
+                        import re
+
+                        m = re.search(r'"path"\s+"(.+)"', prev)
+                        if m:
+                            game = (
+                                Path(m.group(1)) / "steamapps" / "common" / "RimWorld"
+                            )
+                            if game.is_dir():
+                                return game
+    except Exception:
+        pass
+    return None
+
+
+def _workshop_path_from_game(game: Path, steam_root: Path, steam_id: str) -> Path:
+    try:
+        idx = game.parts.index("common")
+        base = Path(*game.parts[:idx])
+        workshop = base / "workshop" / "content" / steam_id
+        if workshop.is_dir():
+            return workshop
+    except ValueError:
+        pass
+    return steam_root / "steamapps" / "workshop" / "content" / steam_id
+
+
+def _find_mac_app(rimworld_dir: Path) -> Path | None:
+    if rimworld_dir.is_dir():
+        apps = list(rimworld_dir.glob("*.app"))
+        if apps:
+            return apps[0]
+    return None
+
+
+def _detect_windows_paths(steam_id: str) -> PathConfig:
+    result = PathConfig()
+    import winreg
+
+    for reg_key in [
+        r"SOFTWARE\Wow6432Node\Valve\Steam",
+        r"SOFTWARE\Valve\Steam",
+    ]:
+        try:
+            with winreg.OpenKey(  # type: ignore[attr-defined]
+                winreg.HKEY_LOCAL_MACHINE,  # type: ignore[attr-defined]
+                reg_key,
+            ) as key:
+                steam_path = winreg.QueryValueEx(  # type: ignore[attr-defined]
+                    key, "InstallPath"
+                )[0]
+                steam_root = Path(steam_path)
+                game = _find_rimworld_in_steam_root(steam_root, steam_id)
+                if game:
+                    result.game = str(game)
+                    result.local = str(game / "Mods")
+                    result.workshop = str(
+                        _workshop_path_from_game(game, steam_root, steam_id)
+                    )
+                    return result
+        except Exception:
+            continue
+    fallback = Path("C:/Program Files (x86)/Steam")
+    game = fallback / "steamapps" / "common" / "RimWorld"
+    if game.is_dir():
+        result.game = str(game)
+        result.local = str(game / "Mods")
+        result.workshop = str(
+            fallback / "steamapps" / "workshop" / "content" / steam_id
+        )
+    return result
