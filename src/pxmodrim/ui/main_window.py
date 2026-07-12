@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from loguru import logger
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -16,8 +17,12 @@ from qasync import asyncSlot
 from pxmodrim._compat.config import save_config
 from pxmodrim._compat.dialogs import await_dialog
 from pxmodrim.core.context import CoreContext
+from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.mod_service import ModService
-from pxmodrim.models.metadata.structures import ListedMod
+from pxmodrim.sort.community_service import CommunityRulesService
+from pxmodrim.sort.exceptions import CommunityRulesMissingError
+from pxmodrim.sort.service import SortService
+from pxmodrim.ui.components.progress_dialog import ProgressDialog
 from pxmodrim.ui.menu_bar import MenuBar
 from pxmodrim.ui.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.mod_list_panel import ModListPanel
@@ -47,6 +52,7 @@ class MainWindow(QMainWindow):
 
         self._ctx = ctx
         self._mod_service = mod_service
+        self._sort_service = SortService(ctx)
 
         # Menu bar
         menu_bar = MenuBar()
@@ -71,13 +77,15 @@ class MainWindow(QMainWindow):
         h_layout.setSpacing(0)
 
         self.sidebar = SidebarPanel()
-        self.sidebar.setFixedWidth(200)
+        self.sidebar.setFixedWidth(256)
         self.sidebar.entry_selected.connect(self._on_entry_selected)
         h_layout.addWidget(self.sidebar)
 
         self.mod_list = ModListPanel()
         self.mod_list.mod_selected.connect(self._on_mod_selected)
-        self.mod_list.active_mods_changed.connect(self._on_active_mods_changed)
+        self.mod_list.active_mods_changed.connect(
+            self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
+        )
         h_layout.addWidget(self.mod_list, stretch=3)
 
         self.mod_info = ModInfoPanel(self._ctx.config)
@@ -90,6 +98,9 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready")
+
+        # Pass mod list model to context for sorting
+        self._ctx.set_mod_list_model(self.mod_list.model)
 
     # ── Header ───────────────────────────────────────────────
 
@@ -133,6 +144,7 @@ class MainWindow(QMainWindow):
             return
 
         self.mod_list.load_mods(self._ctx.all_mods, self._ctx.active_uuids)
+        self._ctx.set_mod_list_model(self.mod_list.model)
         self._rebuild_sidebar()
         self.status_bar.showMessage(
             f"Loaded {len(self._ctx.all_mods)} mods, "
@@ -163,8 +175,42 @@ class MainWindow(QMainWindow):
             "PxModRim v0.1.0\nA mod manager for RimWorld.",
         )
 
-    def _auto_sort(self) -> None:
-        logger.info("Auto-sort not yet implemented")
+    @asyncSlot()
+    async def _auto_sort(self) -> None:
+        try:
+            result = await self._sort_service.sort_active_mods()
+        except CommunityRulesMissingError as e:
+            reply = QMessageBox.question(
+                self,
+                "Community Rules Missing",
+                f"Community rules file not found:\n{e.path}\n\nDownload now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+            async with ProgressDialog(LoadingState(self)) as dialog:
+                service = CommunityRulesService()
+                path = await service.ensure_rules(dialog.loading, force=True)
+
+            if not path:
+                QMessageBox.warning(
+                    self, "Download Failed", "Could not download community rules."
+                )
+                return
+
+            result = await self._sort_service.sort_active_mods()
+
+        await self._sort_service.apply_sort(result)
+
+        msg = f"Sorted {result.summary.sorted_mods} mods"
+        if result.summary.cycle_count:
+            msg += f", {result.summary.cycle_count} cycle(s) detected"
+        if result.summary.missing_dep_count:
+            msg += f", {result.summary.missing_dep_count} missing deps"
+        if result.community_rules_applied:
+            msg += f", {result.community_rules_applied} community rules applied"
+        self.status_bar.showMessage(msg, 5000)
 
     @asyncSlot()
     async def _save_mods_config(self) -> None:
@@ -175,23 +221,42 @@ class MainWindow(QMainWindow):
         else:
             self.status_bar.showMessage("Config folder not set", 3000)
 
-    def _on_mod_selected(self, mod: object) -> None:
-        if isinstance(mod, ListedMod):
-            self.mod_info.show_mod(mod)
+    def _on_mod_selected(self, uuid: str):
+        # Достаем живой элемент прямо из модели панели по UUID, гарантируя, что ссылка жива
+        item = self.mod_list.model.get_item_by_uuid(uuid)
+        if item and item.mod:
+            self.mod_info.show_mod(item.mod)
 
     def _on_active_mods_changed(self) -> None:
+        from PySide6.QtCore import QTimer
+
         uuids = self.mod_list.active_uuids()
         self._update_sidebar_counts(uuids)
-        # Re-apply the current entry's filter
+
+        # Заворачиваем применение фильтра в singleShot, чтобы дать Qt
+        # полностью завершить обработку текущего клика/перетаскивания
+        QTimer.singleShot(0, self._delayed_apply_current_filter)
+
+    def _delayed_apply_current_filter(self) -> None:
+        if not hasattr(self, "sidebar") or not self.sidebar:
+            return
         selected = self.sidebar.filter_list.currentRow()
         if 0 <= selected < len(self.sidebar._entries):
             self._apply_entry(self.sidebar._entries[selected])
 
+    def _apply_entry(self, entry: SidebarEntry) -> None:
+        selection_model = self.mod_list.list.selectionModel()
+        if selection_model:
+            selection_model.blockSignals(True)
+            # Очищаем выделение, так как при смене фильтра старые индексы инвалидируются
+            selection_model.clearSelection()
+            self.mod_list.proxy.set_sidebar_filter(entry.visible_uuids)
+            selection_model.blockSignals(False)
+        else:
+            self.mod_list.proxy.set_sidebar_filter(entry.visible_uuids)
+
     def _on_entry_selected(self, entry: SidebarEntry) -> None:
         self._apply_entry(entry)
-
-    def _apply_entry(self, entry: SidebarEntry) -> None:
-        self.mod_list.proxy.set_sidebar_filter(entry.visible_uuids)
 
     # ── Sidebar ─────────────────────────────────────────────
 

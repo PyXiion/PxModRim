@@ -81,7 +81,9 @@ def _build_etree(parent: ET._Element, value: Any) -> None:
         parent.text = str(value)
 
 
-def json_to_xml_write(data: dict[str, Any], path: str, raise_errs: bool = False) -> None:
+def json_to_xml_write(
+    data: dict[str, Any], path: str, raise_errs: bool = False
+) -> None:
     """Write dictionary data to an XML file with pretty printing."""
     try:
         root = dict_to_etree(data)

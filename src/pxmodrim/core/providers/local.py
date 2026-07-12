@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 from loguru import logger
+
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.models.metadata.parsing import create_listed_mod_from_path
 from pxmodrim.models.metadata.structures import ListedMod
@@ -12,6 +13,7 @@ from pxmodrim.services.mod_discovery import scan_mod_directory
 
 class LocalModProvider(BaseModProvider):
     """Provider for local (non-Steam) mods."""
+
     provider_id = "local"
 
     def __init__(self, local_path: Path) -> None:
@@ -32,7 +34,9 @@ class LocalModProvider(BaseModProvider):
                 )
                 # Local provider handles non-Steam mods
                 if not has_pfid:
-                    logger.trace("LocalModProvider found: {} (uuid: {})", mod.name, mod.uuid)
+                    logger.trace(
+                        "LocalModProvider found: {} (uuid: {})", mod.name, mod.uuid
+                    )
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
                 else:
@@ -49,6 +53,7 @@ class LocalModProvider(BaseModProvider):
 
 class SteamCmdModProvider(BaseModProvider):
     """Provider for Steam CMD / workshop mods - only includes mods with PublishedFileId.txt."""
+
     provider_id = "steam_cmd"
 
     def __init__(self, local_path: Path) -> None:
@@ -69,11 +74,15 @@ class SteamCmdModProvider(BaseModProvider):
                 )
                 # Steam provider handles only Steam mods
                 if has_pfid:
-                    logger.trace("SteamCmdModProvider found: {} (uuid: {})", mod.name, mod.uuid)
+                    logger.trace(
+                        "SteamCmdModProvider found: {} (uuid: {})", mod.name, mod.uuid
+                    )
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
                 else:
-                    logger.trace("SteamCmdModProvider skipping non-Steam mod: {}", mod.name)
+                    logger.trace(
+                        "SteamCmdModProvider skipping non-Steam mod: {}", mod.name
+                    )
             return result
 
         discovered = await asyncio.to_thread(_scan)

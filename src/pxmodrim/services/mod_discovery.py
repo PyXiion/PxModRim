@@ -26,17 +26,26 @@ def scan_mod_directory(mods_path: Path) -> list[Path]:
 def resolve_active_uuids(
     all_mods: dict[str, ListedMod],
     config_folder: str,
-) -> set[str]:
+) -> list[str]:
     if not config_folder:
-        return set()
+        return []
     path = Path(config_folder) / "ModsConfig.xml"
     data = parse_mods_config(path)
     if not data:
-        return set()
+        return []
 
-    active_pids = {str(pid).removesuffix("_steam").lower() for pid in data.activeMods}
-    active: set[str] = set()
+    # Build map from normalized package_id -> UUID (first match for duplicates)
+    pid_to_uuid: dict[str, str] = {}
     for uuid, mod in all_mods.items():
-        if isinstance(mod, AboutXmlMod) and mod.package_id.lower() in active_pids:
-            active.add(uuid)
+        if isinstance(mod, AboutXmlMod):
+            pid = mod.package_id.lower().removesuffix("_steam")
+            if pid not in pid_to_uuid:
+                pid_to_uuid[pid] = uuid
+
+    # Iterate ModsConfig.xml activeMods IN ORDER, pick matching UUID
+    active: list[str] = []
+    for pid in data.activeMods:
+        normalized = str(pid).removesuffix("_steam").lower()
+        if normalized in pid_to_uuid:
+            active.append(pid_to_uuid[normalized])
     return active

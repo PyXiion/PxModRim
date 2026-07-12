@@ -4,8 +4,8 @@ import asyncio
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
 
 from pxmodrim._compat.config import AppConfig, save_config
 from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
@@ -30,67 +30,58 @@ class ModInfoPanel(QWidget):
         self._config = config
         self._mod: ListedMod | None = None
         self._current_mod_id: str | None = None
+        self._preview_task: asyncio.Task[None] | None = None
 
-        # Task for loading preview icons
-        # We cancel it when we switch mods, so we don't have any race conditions
-        self._preview_task: "asyncio.Task[None] | None" = None
-        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        layout.addWidget(scroll)
-        
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        layout.addWidget(self._scroll)
+
         self._content = QWidget()
         cl = QVBoxLayout(self._content)
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
-        scroll.setWidget(self._content)
-        
-        # Placeholder
-        self._placeholder = QLabel("Select a mod to view details")
-        self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._placeholder.setObjectName("placeholder")
-        self._placeholder.setMinimumHeight(200)
-        cl.addWidget(self._placeholder, stretch=1)
-        
+        self._scroll.setWidget(self._content)
+
         # Banner
         self._banner = AspectRatioBanner(max_height=300)
         self._banner.hide()
-        cl.addWidget(self._banner)
-        
+        cl.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
+
+        # Placeholder (shown when no mod is selected, hidden when a mod is shown)
+        self._placeholder = QLabel("Select a mod to view details")
+        self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._placeholder.setObjectName("placeholder")
+        cl.addWidget(self._placeholder, stretch=1)
+
         # Info area
         self._info_area = QWidget()
+        self._info_area.setObjectName("infoArea")
+        self._info_area.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+        )
         self._info_area.hide()
         ia_layout = QVBoxLayout(self._info_area)
-        ia_layout.setContentsMargins(16, 16, 16, 16)
-        ia_layout.setSpacing(16)
-        cl.addWidget(self._info_area)
-        
+        ia_layout.setContentsMargins(24, 24, 24, 24)
+        ia_layout.setSpacing(0)
+        cl.addWidget(self._info_area, 0, Qt.AlignmentFlag.AlignTop)
+
         # Meta grid
-        self._meta_grid = ResponsiveMetaGrid({
-            "package_id": "Package ID",
-            "author": "Author",
-            "version": "Version",
-            "source": "Source",
-        })
-        ia_layout.addWidget(self._meta_grid)
-        
-        # Dependencies accordion
-        self._deps_label = QLabel("None")
-        self._deps_label.setWordWrap(True)
-        self._deps_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self._deps_section = AccordionSection(
-            "Dependencies",
-            self._deps_label,
-            expanded=self._config.ui.deps_expanded,
+        self._meta_grid = ResponsiveMetaGrid(
+            {
+                "package_id": "Package ID",
+                "author": "Author",
+                "version": "Version",
+                "source": "Source",
+            }
         )
-        self._deps_section.toggled.connect(self._on_deps_toggled)
-        self._deps_section.hide()
-        ia_layout.addWidget(self._deps_section)
-        
+        ia_layout.addWidget(self._meta_grid, 0, Qt.AlignmentFlag.AlignTop)
+
+        ia_layout.addSpacing(16)
+
         # Description accordion
         self._desc_renderer = DescriptionRenderer()
         self._desc_section = AccordionSection(
@@ -100,48 +91,74 @@ class ModInfoPanel(QWidget):
         )
         self._desc_section.toggled.connect(self._on_desc_toggled)
         self._desc_section.hide()
-        ia_layout.addWidget(self._desc_section)
-        
-        ia_layout.addStretch()
-    
+        ia_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
+
+        ia_layout.addSpacing(16)
+
+        # Dependencies accordion
+        self._deps_label = QLabel("None")
+        self._deps_label.setWordWrap(True)
+        self._deps_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self._deps_section = AccordionSection(
+            "Dependencies",
+            self._deps_label,
+            expanded=self._config.ui.deps_expanded,
+        )
+        self._deps_section.toggled.connect(self._on_deps_toggled)
+        self._deps_section.hide()
+        ia_layout.addWidget(self._deps_section, 0, Qt.AlignmentFlag.AlignTop)
+
     def show_mod(self, mod: ListedMod) -> None:
-        # Cancel any pending preview task
         if self._preview_task and not self._preview_task.done():
             self._preview_task.cancel()
-        
-        # Use package_id as unique identifier for the mod
-        mod_id = getattr(mod, 'package_id', None)
+
+        mod_id = getattr(mod, "package_id", None)
         if mod_id is None:
             mod_id = mod.name
-        
+
         self._mod = mod
         self._current_mod_id = mod_id
-        
+
         self._placeholder.hide()
         self._banner.show()
         self._info_area.show()
-        
+
+        self._scroll.verticalScrollBar().setValue(0)
+
         self._banner.setTitle(mod.name)
-        
-        # Start async preview load with mod_id tracking
-        self._preview_task = asyncio.create_task(self._load_preview_async(mod.mod_path, mod_id))
-        
-        # Meta (sync, fast)
+
+        self._preview_task = asyncio.ensure_future(
+            self._load_preview(mod.mod_path, mod_id)
+        )
+
         if isinstance(mod, AboutXmlMod):
-            self._meta_grid.update_values({
-                "package_id": str(mod.package_id),
-                "author": ", ".join(mod.authors) if mod.authors else "—",
-                "version": mod.mod_version or "—",
-                "source": mod.provider_id or "—",
-            })
+            self._meta_grid.update_values(
+                {
+                    "package_id": str(mod.package_id),
+                    "author": ", ".join(mod.authors) if mod.authors else "—",
+                    "version": mod.mod_version or "—",
+                    "source": mod.provider_id or "—",
+                }
+            )
         else:
-            self._meta_grid.update_values({
-                "package_id": "—",
-                "author": "—",
-                "version": "—",
-                "source": "—",
-            })
-        
+            self._meta_grid.update_values(
+                {
+                    "package_id": "—",
+                    "author": "—",
+                    "version": "—",
+                    "source": "—",
+                }
+            )
+
+        # Description
+        if mod.description:
+            self._desc_renderer.set_description(mod.description)
+            self._desc_section.show()
+        else:
+            self._desc_section.hide()
+
         # Dependencies
         if isinstance(mod, AboutXmlMod) and mod.about_rules.dependencies:
             deps = [str(d.package_id) for d in mod.about_rules.dependencies.values()]
@@ -149,43 +166,36 @@ class ModInfoPanel(QWidget):
             self._deps_section.show()
         else:
             self._deps_section.hide()
-        
-        # Description
-        if mod.description:
-            self._desc_renderer.set_description(mod.description)
-            self._desc_section.show()
-        else:
-            self._desc_section.hide()
-    
-    async def _load_preview_async(self, mod_path: Path | None, mod_id: str) -> None:
+
+    async def _load_preview(self, mod_path: Path | None, mod_id: str) -> None:
         """Load preview image in background thread. Only updates UI if still current mod."""
         try:
-            preview = _find_preview(mod_path)
-            if preview:
-                pixmap = await asyncio.to_thread(QPixmap, str(preview))
-                # Only update if this is still the current mod
-                if self._current_mod_id == mod_id and not pixmap.isNull():
-                    self._banner.setPixmap(pixmap)
-            else:
+            preview = await asyncio.to_thread(_find_preview, mod_path)
+            if preview is None:
                 if self._current_mod_id == mod_id:
                     self._banner.setPixmap(QPixmap())
+                return
+
+            image = await asyncio.to_thread(QImage, str(preview))
+            if self._current_mod_id != mod_id:
+                return
+            self._banner.setPixmap(
+                QPixmap() if image.isNull() else QPixmap.fromImage(image)
+            )
         except asyncio.CancelledError:
-            # Task was cancelled, ignore
             pass
-    
+
     def clear(self) -> None:
-        if self._preview_task and not self._preview_task.done():
-            self._preview_task.cancel()
         self._mod = None
         self._current_mod_id = None
         self._placeholder.show()
         self._banner.hide()
         self._info_area.hide()
-    
+
     def _on_deps_toggled(self, expanded: bool) -> None:
         self._config.ui.deps_expanded = expanded
         save_config(self._config)
-    
+
     def _on_desc_toggled(self, expanded: bool) -> None:
         self._config.ui.desc_expanded = expanded
         save_config(self._config)

@@ -28,7 +28,9 @@ def _extract_li_list(container: dict[str, Any] | list[Any] | str | None) -> list
 
 
 def _get_dlc_package_ids() -> list[CaseInsensitiveStr]:
-    return [CaseInsensitiveStr(dlc["packageid"]) for dlc in RIMWORLD_DLC_METADATA.values()]
+    return [
+        CaseInsensitiveStr(dlc["packageid"]) for dlc in RIMWORLD_DLC_METADATA.values()
+    ]
 
 
 def parse_mods_config(path: Path) -> ModsConfig | None:

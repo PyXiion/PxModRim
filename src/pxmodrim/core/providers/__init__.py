@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from pxmodrim._compat.config import PathConfig
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.providers.core import CoreModProvider
 from pxmodrim.core.providers.local import LocalModProvider, SteamCmdModProvider
 
+if TYPE_CHECKING:
+    from pxmodrim._compat.config import PathConfig
 
-def create_providers(paths: PathConfig) -> list[BaseModProvider]:
+
+def create_providers(paths: "PathConfig") -> list[BaseModProvider]:
     providers: list[BaseModProvider] = []
     if paths.game:
         providers.append(CoreModProvider(Path(paths.game)))

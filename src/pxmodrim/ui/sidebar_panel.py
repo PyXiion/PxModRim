@@ -6,6 +6,7 @@ from dataclasses import field
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QFont, QPainter
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QFrame,
     QListWidget,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 from pxmodrim.models.metadata.structures import ListedMod
 from pxmodrim.ui.palette import (
     ITEM_ACTIVE_Q,
+    ITEM_HOVER_Q,
     PANEL_BG_Q,
     TEXT_MAIN_Q,
     TEXT_MUTED_Q,
@@ -113,9 +115,14 @@ class SidebarDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         is_selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
         r = option.rect
 
-        bg = ITEM_ACTIVE_Q if is_selected else PANEL_BG_Q
+        bg = (
+            ITEM_ACTIVE_Q
+            if is_selected
+            else (ITEM_HOVER_Q if is_hovered else PANEL_BG_Q)
+        )
         painter.fillRect(r, bg)
 
         label: str = index.data(LABEL_ROLE) or ""
@@ -127,7 +134,7 @@ class SidebarDelegate(QStyledItemDelegate):
 
         font = painter.font()
         name_font = QFont(font)
-        name_font.setPointSize(13)
+        name_font.setPointSize(12)
         painter.setFont(name_font)
         painter.setPen(text_color)
         text_rect = QRect(r.left() + 12, r.top(), r.width() - 60, r.height())
@@ -140,7 +147,7 @@ class SidebarDelegate(QStyledItemDelegate):
         if count > 0 or is_errors:
             badge_text = str(count)
             badge_font = QFont(font)
-            badge_font.setPointSize(11)
+            badge_font.setPointSize(10)
             painter.setFont(badge_font)
             badge_w = painter.fontMetrics().horizontalAdvance(badge_text) + 14
             badge_h = 20
@@ -174,7 +181,7 @@ class SidebarPanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
         self.preset_combo = QComboBox()
@@ -186,6 +193,11 @@ class SidebarPanel(QWidget):
         self.filter_list.setObjectName("filterList")
         self.filter_list.setFrameShape(QFrame.Shape.NoFrame)
         self.filter_list.setSpacing(1)
+        self.filter_list.viewport().setMouseTracking(True)
+        self.filter_list.setVerticalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel
+        )
+        self.filter_list.verticalScrollBar().setSingleStep(20)
         self.filter_list.setItemDelegate(SidebarDelegate(self.filter_list))
         self.filter_list.currentRowChanged.connect(self._emit_entry)
         layout.addWidget(self.filter_list)

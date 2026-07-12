@@ -33,7 +33,6 @@ def _exception_hook(
     """Global exception handler for unhandled exceptions."""
     error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
     logger.error("Unhandled exception:\n{}", error_msg)
-    # Try to show a dialog if QApplication exists
     app = QApplication.instance()
     if app is not None:
         QMessageBox.critical(
@@ -41,6 +40,16 @@ def _exception_hook(
             "PxModRim - Crash",
             f"An unexpected error occurred:\n\n{exc_type.__name__}: {exc_value}\n\nDetails have been logged.",
         )
+
+
+def _async_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+    """Handle unhandled exceptions in async tasks."""
+    exc = context.get("exception")
+    if exc:
+        logger.error("Unhandled async exception: {}", exc, exc_info=exc)
+    else:
+        logger.error("Unhandled async error: {}", context.get("message"))
+
 
 sys.excepthook = _exception_hook
 
@@ -99,4 +108,6 @@ class App:
         return 0
 
     def run(self) -> int:
-        return asyncio.run(self.async_run(), loop_factory=QEventLoop)
+        loop = QEventLoop()
+        loop.set_exception_handler(_async_exception_handler)
+        return asyncio.run(self.async_run(), loop_factory=lambda: loop)

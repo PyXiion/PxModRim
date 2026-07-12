@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 from loguru import logger
+
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.models.metadata.parsing import create_listed_mod_from_path
 from pxmodrim.models.metadata.structures import ListedMod
@@ -26,7 +27,9 @@ class CoreModProvider(BaseModProvider):
             if data_dir.exists():
                 for d in scan_mod_directory(data_dir):
                     _, mod = create_listed_mod_from_path(d, target_version)
-                    logger.debug("CoreModProvider found: {} (uuid: {})", mod.name, mod.uuid)
+                    logger.debug(
+                        "CoreModProvider found: {} (uuid: {})", mod.name, mod.uuid
+                    )
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
 

@@ -31,7 +31,7 @@ class ModService:
         active = resolve_active_uuids(all_mods, self._ctx.config.paths.config_folder)
         self._ctx.load(all_mods, active)
 
-    def compute_stats(self, active_ids: set[str] | None = None) -> CollectionStats:
+    def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         return self._ctx.compute_stats(active_ids)
 
     async def save_active_layout(self, active_ids: list[str]) -> bool:

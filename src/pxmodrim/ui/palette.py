@@ -5,45 +5,45 @@ from pathlib import Path
 from PySide6.QtGui import QColor
 
 PALETTE: dict[str, str] = {
-    "MAIN_BG": "#1a1c1e",
-    "PANEL_BG": "#212427",
-    "ITEM_HOVER": "#2c3135",
-    "ITEM_ACTIVE": "#383e44",
-    "BORDER": "#2f3438",
-    "TEXT_MAIN": "#e3e6e8",
-    "TEXT_MUTED": "#9099a2",
-    "DESC_TEXT": "#cdd2d6",
-    "GREEN": "#4caf50",
-    "BLUE": "#00a2ff",
-    "BLUE_HOVER": "#008be0",
-    "BUTTON_HOVER": "#3c4248",
-    "WARNING": "#ffb300",
-    "DANGER": "#f44336",
-    "SEARCH_BG": "#1e2124",
-    "INPUT_BG": "#2d3135",
-    "TAG_BG": "#2d352e",
-    "DEP_BG": "#292d32",
-    "PANEL_RGB": "33,36,39",
+    "MAIN_BG": "#0f172a",
+    "PANEL_BG": "#1e293b",
+    "ITEM_HOVER": "#334155",
+    "ITEM_ACTIVE": "#334155",
+    "BORDER": "#334155",
+    "TEXT_MAIN": "#e2e8f0",
+    "TEXT_MUTED": "#94a3b8",
+    "DESC_TEXT": "#cbd5e1",
+    "GREEN": "#22c55e",
+    "BLUE": "#3b82f6",
+    "BLUE_HOVER": "#2563eb",
+    "BUTTON_HOVER": "#475569",
+    "WARNING": "#f59e0b",
+    "DANGER": "#ef4444",
+    "SEARCH_BG": "#0f172a",
+    "INPUT_BG": "#0f172a",
+    "TAG_BG": "#1e293b",
+    "DEP_BG": "#1e293b",
+    "PANEL_RGB": "30,41,59",
 }
 
 # QColor variants for QPainter delegates
-MAIN_BG_Q = QColor(26, 28, 30)
-PANEL_BG_Q = QColor(33, 36, 39)
-ITEM_HOVER_Q = QColor(44, 49, 53)
-ITEM_ACTIVE_Q = QColor(56, 62, 68)
-BORDER_Q = QColor(47, 52, 56)
-TEXT_MAIN_Q = QColor(227, 230, 232)
-TEXT_MUTED_Q = QColor(144, 153, 162)
-GREEN_Q = QColor(76, 175, 80)
-BLUE_Q = QColor(0, 162, 255)
-WARNING_Q = QColor(255, 179, 0)
-DANGER_Q = QColor(244, 67, 54)
-TAG_BG_Q = QColor(45, 53, 46)
-DESC_TEXT_Q = QColor(205, 210, 214)
-DEP_BG_Q = QColor(41, 45, 50)
-CHECKBOX_BORDER_Q = QColor(47, 52, 56)
-CHECKBOX_FILL_Q = QColor(45, 49, 53)
-CHECKBOX_CHECK_Q = QColor(0, 162, 255)
+MAIN_BG_Q = QColor(15, 23, 42)
+PANEL_BG_Q = QColor(30, 41, 59)
+ITEM_HOVER_Q = QColor(51, 65, 85)
+ITEM_ACTIVE_Q = QColor(51, 65, 85)
+BORDER_Q = QColor(51, 65, 85)
+TEXT_MAIN_Q = QColor(226, 232, 240)
+TEXT_MUTED_Q = QColor(148, 163, 184)
+GREEN_Q = QColor(34, 197, 94)
+BLUE_Q = QColor(59, 130, 246)
+WARNING_Q = QColor(245, 158, 11)
+DANGER_Q = QColor(239, 68, 68)
+TAG_BG_Q = QColor(30, 41, 59)
+DESC_TEXT_Q = QColor(203, 213, 225)
+DEP_BG_Q = QColor(30, 41, 59)
+CHECKBOX_BORDER_Q = QColor(71, 85, 105)
+CHECKBOX_FILL_Q = QColor(30, 41, 59)
+CHECKBOX_CHECK_Q = QColor(59, 130, 246)
 
 
 def get_stylesheet() -> str:

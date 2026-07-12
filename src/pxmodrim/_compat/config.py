@@ -8,6 +8,8 @@ import msgspec
 from loguru import logger
 
 from pxmodrim._compat.constants import RIMWORLD_STEAM_APP_ID
+from pxmodrim._compat.mspec_hooks import dec_hook, enc_hook
+from pxmodrim.sort.config import SortSettings, TierConfig
 
 
 class PathConfig(msgspec.Struct):
@@ -15,6 +17,7 @@ class PathConfig(msgspec.Struct):
     local: str = ""
     workshop: str = ""
     config_folder: str = ""
+    community_rules_file: str = ""
 
 
 class UIPrefs(msgspec.Struct):
@@ -26,6 +29,9 @@ class AppConfig(msgspec.Struct):
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
     target_version: str = "1.6"
     ui: UIPrefs = msgspec.field(default_factory=UIPrefs)
+    sort: SortSettings = msgspec.field(
+        default_factory=lambda: SortSettings(tier_config=TierConfig.default())
+    )
 
 
 def config_dir() -> Path:
@@ -37,13 +43,17 @@ def config_file_path() -> Path:
     return config_dir() / "config.json"
 
 
+def community_rules_file() -> Path:
+    return config_dir() / "communityRules.json"
+
+
 def load_config(path: Path | None = None) -> AppConfig:
     path = path or config_file_path()
     if not path.exists():
         return AppConfig()
     try:
         raw = path.read_bytes()
-        return msgspec.json.decode(raw, type=AppConfig)
+        return msgspec.json.decode(raw, type=AppConfig, dec_hook=dec_hook)
     except Exception as e:
         logger.warning(f"Failed to load config from {path}: {e}")
         return AppConfig()
@@ -52,7 +62,7 @@ def load_config(path: Path | None = None) -> AppConfig:
 def save_config(cfg: AppConfig, path: Path | None = None) -> None:
     path = path or config_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    raw = msgspec.json.encode(cfg)
+    raw = msgspec.json.encode(cfg, enc_hook=enc_hook)
     formatted = msgspec.json.format(raw, indent=2)
     path.write_bytes(formatted)
     logger.info(f"Config saved to {path}")
@@ -172,6 +182,7 @@ def detect_game_paths() -> PathConfig:
         result = _detect_windows_paths(steam_id)
 
     result.config_folder = _detect_config_folder(found_root)
+    result.community_rules_file = str(community_rules_file())
 
     return result
 
@@ -192,6 +203,7 @@ def _find_rimworld_in_steam_root(root: Path, steam_id: str) -> Path | None:
 def _vdf_find_rimworld(vdf_path: Path, steam_id: str) -> Path | None:
     try:
         import re
+
         text = vdf_path.read_text(encoding="utf-8", errors="replace")
 
         # Simple regex-based VDF parser for libraryfolders.vdf
