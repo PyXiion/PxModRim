@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -21,36 +22,25 @@ class SettingsPanel(QDialog):
         super().__init__()
         self.setWindowTitle("Settings")
         self.setModal(True)
-        self.resize(500, 250)
+        self.resize(600, 300)
 
         self._config = cfg
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        self.game_edit = QLineEdit(cfg.paths.game)
-        self.game_browse = QPushButton("Browse\u2026")
-        self.game_browse.clicked.connect(self._browse_game)
-        game_row = QHBoxLayout()
-        game_row.addWidget(self.game_edit, 1)
-        game_row.addWidget(self.game_browse)
-        form.addRow("Game path:", game_row)
-
-        self.local_edit = QLineEdit(cfg.paths.local)
-        self.local_browse = QPushButton("Browse\u2026")
-        self.local_browse.clicked.connect(self._browse_local)
-        local_row = QHBoxLayout()
-        local_row.addWidget(self.local_edit, 1)
-        local_row.addWidget(self.local_browse)
-        form.addRow("Local mods:", local_row)
-
-        self.workshop_edit = QLineEdit(cfg.paths.workshop)
-        self.workshop_browse = QPushButton("Browse\u2026")
-        self.workshop_browse.clicked.connect(self._browse_workshop)
-        workshop_row = QHBoxLayout()
-        workshop_row.addWidget(self.workshop_edit, 1)
-        workshop_row.addWidget(self.workshop_browse)
-        form.addRow("Workshop:", workshop_row)
+        self.game_edit, self.game_browse = self._add_path_row(
+            form, "Game path:", cfg.paths.game, "Select RimWorld game folder", self._browse_game
+        )
+        self.local_edit, self.local_browse = self._add_path_row(
+            form, "Local mods:", cfg.paths.local, "Select local mods folder", self._browse_local
+        )
+        self.workshop_edit, self.workshop_browse = self._add_path_row(
+            form, "Workshop:", cfg.paths.workshop, "Select workshop mods folder", self._browse_workshop
+        )
+        self.config_edit, self.config_browse = self._add_path_row(
+            form, "Config folder:", cfg.paths.config_folder, "Select RimWorld Config folder", self._browse_config
+        )
 
         self.version_combo = QComboBox()
         for v in ["1.5", "1.4", "1.3"]:
@@ -76,6 +66,23 @@ class SettingsPanel(QDialog):
         buttons.addWidget(cancel_btn)
         layout.addLayout(buttons)
 
+    def _add_path_row(
+        self,
+        form: QFormLayout,
+        label: str,
+        value: str,
+        dialog_title: str,
+        browse_handler: Callable[[], None],
+    ) -> tuple[QLineEdit, QPushButton]:
+        edit = QLineEdit(value)
+        browse = QPushButton("Browse\u2026")
+        browse.clicked.connect(browse_handler)
+        row = QHBoxLayout()
+        row.addWidget(edit, 1)
+        row.addWidget(browse)
+        form.addRow(label, row)
+        return edit, browse
+
     def _browse_game(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Select RimWorld game folder")
         if path:
@@ -92,6 +99,11 @@ class SettingsPanel(QDialog):
         if path:
             self.workshop_edit.setText(path)
 
+    def _browse_config(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "Select RimWorld Config folder")
+        if path:
+            self.config_edit.setText(path)
+
     def _auto_fill_local(self, game_path: str) -> None:
         if not self.local_edit.text():
             candidate = Path(game_path) / "Mods"
@@ -100,12 +112,17 @@ class SettingsPanel(QDialog):
 
     def _auto_detect(self) -> None:
         detected = detect_game_paths()
-        if detected.game:
-            self.game_edit.setText(detected.game)
-        if detected.local:
-            self.local_edit.setText(detected.local)
-        if detected.workshop:
-            self.workshop_edit.setText(detected.workshop)
+        self._apply_detected(detected)
+
+    def _apply_detected(self, detected: PathConfig) -> None:
+        for edit, val in [
+            (self.game_edit, detected.game),
+            (self.local_edit, detected.local),
+            (self.workshop_edit, detected.workshop),
+            (self.config_edit, detected.config_folder),
+        ]:
+            if val:
+                edit.setText(val)
 
     def _save(self) -> None:
         self._config = AppConfig(
@@ -113,6 +130,7 @@ class SettingsPanel(QDialog):
                 game=self.game_edit.text().strip(),
                 local=self.local_edit.text().strip(),
                 workshop=self.workshop_edit.text().strip(),
+                config_folder=self.config_edit.text().strip(),
             ),
             target_version=self.version_combo.currentText(),
         )

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pxmodrim._compat.mods_config import ModsConfigData, write_mods_config
+from pxmodrim._compat.mods_config import parse_mods_config, write_mods_config
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.structures import CollectionStats
-from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.models.metadata.structures import (
+    AboutXmlMod,
+    CaseInsensitiveStr,
+    ListedMod,
+    ModsConfig,
+)
 from pxmodrim.services.mod_discovery import resolve_active_uuids
 
 
@@ -34,14 +39,21 @@ class ModService:
         if not cfg.paths.config_folder:
             return False
         mods = self._ctx.all_mods
-        package_ids: list[str] = []
+        package_ids: list[CaseInsensitiveStr] = []
         for uuid in active_ids:
             mod = mods.get(uuid)
             if isinstance(mod, AboutXmlMod):
-                package_ids.append(str(mod.package_id))
-        data = ModsConfigData(
+                package_ids.append(mod.package_id)
+
+        # Preserve knownExpansions from existing ModsConfig.xml
+        config_path = Path(cfg.paths.config_folder) / "ModsConfig.xml"
+        existing = parse_mods_config(config_path)
+        known_expansions = existing.knownExpansions if existing else []
+
+        data = ModsConfig(
             version=cfg.target_version,
-            active_mods=package_ids,
+            activeMods=package_ids,
+            knownExpansions=known_expansions,
         )
-        write_mods_config(Path(cfg.paths.config_folder) / "ModsConfig.xml", data)
+        write_mods_config(config_path, data)
         return True

@@ -34,7 +34,7 @@ def resolve_active_uuids(
     if not data:
         return set()
 
-    active_pids = {pid.removesuffix("_steam").lower() for pid in data.active_mods}
+    active_pids = {str(pid).removesuffix("_steam").lower() for pid in data.activeMods}
     active: set[str] = set()
     for uuid, mod in all_mods.items():
         if isinstance(mod, AboutXmlMod) and mod.package_id.lower() in active_pids:

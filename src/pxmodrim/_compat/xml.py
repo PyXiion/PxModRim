@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import xml.dom.minidom as minidom
 from typing import Any
 
 import lxml.etree as ET
@@ -44,3 +45,54 @@ def xml_path_to_json(path: str) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Error parsing XML file {path}: {e}")
         return {}
+
+
+def dict_to_etree(data: dict[str, Any]) -> ET._Element:
+    """Convert a dictionary to an lxml.etree Element recursively."""
+    if len(data) != 1:
+        raise ValueError("Dictionary must have exactly one root key")
+    root_key, root_val = next(iter(data.items()))
+    root = ET.Element(root_key)
+    _build_etree(root, root_val)
+    return root
+
+
+def _build_etree(parent: ET._Element, value: Any) -> None:
+    """Recursively build XML elements from dict/list/str values."""
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if k.startswith("@"):
+                parent.set(k[1:], str(v))
+            elif k == "#text":
+                parent.text = str(v)
+            elif isinstance(v, list):
+                for item in v:
+                    child = ET.SubElement(parent, k)
+                    _build_etree(child, item)
+            else:
+                child = ET.SubElement(parent, k)
+                _build_etree(child, v)
+    elif isinstance(value, list):
+        for item in value:
+            # Anonymous list items - shouldn't happen with well-formed data
+            child = ET.SubElement(parent, "li")
+            _build_etree(child, item)
+    else:
+        parent.text = str(value)
+
+
+def json_to_xml_write(data: dict[str, Any], path: str, raise_errs: bool = False) -> None:
+    """Write dictionary data to an XML file with pretty printing."""
+    try:
+        root = dict_to_etree(data)
+        rough_string = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+        reparsed = minidom.parseString(rough_string)
+        formatted = reparsed.toprettyxml(indent="  ", encoding=None)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(formatted)
+        logger.debug(f"XML written to {path}")
+    except Exception as e:
+        logger.error(f"Error writing XML file: {e}")
+        if raise_errs:
+            raise

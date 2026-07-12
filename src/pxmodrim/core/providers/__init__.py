@@ -5,7 +5,7 @@ from pathlib import Path
 from pxmodrim._compat.config import PathConfig
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.providers.core import CoreModProvider
-from pxmodrim.core.providers.local import LocalModProvider
+from pxmodrim.core.providers.local import LocalModProvider, SteamCmdModProvider
 
 
 def create_providers(paths: PathConfig) -> list[BaseModProvider]:
@@ -14,6 +14,7 @@ def create_providers(paths: PathConfig) -> list[BaseModProvider]:
         providers.append(CoreModProvider(Path(paths.game)))
     if paths.local:
         providers.append(LocalModProvider(Path(paths.local)))
+        providers.append(SteamCmdModProvider(Path(paths.local)))
     return providers
 
 
@@ -21,5 +22,6 @@ __all__ = [
     "BaseModProvider",
     "CoreModProvider",
     "LocalModProvider",
+    "SteamCmdModProvider",
     "create_providers",
 ]

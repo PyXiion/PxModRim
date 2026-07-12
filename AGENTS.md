@@ -29,8 +29,6 @@
 - Long blocking work → `await asyncio.to_thread(target)`
 - No fire-and-forget helpers yet (add when needed)
 - Do not write smelly code.
-
-## Prohibitions (enforced in code review)
 - **Never** `QApplication.processEvents()` — blocks event loop, use async instead
 - **Never** `dialog.exec()` or `dialog.exec_()` — blocks UI thread, use async dialogs or `show()`
 - **Never** `QTimer.singleShot(0, ...)` to defer work — use `await asyncio.sleep(0)` or proper async
@@ -40,6 +38,10 @@
 - **Never** global singletons (`_instance = None` pattern) — use DI via constructor
 - **Never** mix UI and I/O in same class — UI reads state, services write state
 - **Never** `ModType` enum (removed) — use `provider_id: str` on `ListedMod`
+- **Strict UI/Logic Separation:** Views and Delegates must remain 100% "dumb"—their only job is 
+rendering pixels and capturing raw events. Never include business logic, direct data 
+mutations, or any I/O operations (os, json, databases) inside UI components. All data 
+interaction must go strictly through index.data(CustomRole) and model.setData().
 
 ## Donor code (`rimsort-original/`)
 - **NEVER modify** `rimsort-original/`. It's read-only reference.

@@ -34,7 +34,7 @@ from pxmodrim.ui.sidebar_panel import (
 
 PROVIDER_LABELS: dict[str, str] = {
     "local": "Local",
-    "steam_cmd": "Steam CMD",
+    "steam_cmd": "Steam Workshop",
     "core": "System / Core",
 }
 
@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
         self.mod_list.active_mods_changed.connect(self._on_active_mods_changed)
         h_layout.addWidget(self.mod_list, stretch=3)
 
-        self.mod_info = ModInfoPanel()
+        self.mod_info = ModInfoPanel(self._ctx.config)
         self.mod_info.setMinimumWidth(300)
         h_layout.addWidget(self.mod_info, stretch=2)
 
@@ -191,7 +191,7 @@ class MainWindow(QMainWindow):
         self._apply_entry(entry)
 
     def _apply_entry(self, entry: SidebarEntry) -> None:
-        self.mod_list.show_uuids(entry.visible_uuids)
+        self.mod_list.proxy.set_sidebar_filter(entry.visible_uuids)
 
     # ── Sidebar ─────────────────────────────────────────────
 

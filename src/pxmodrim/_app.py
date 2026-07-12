@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import traceback
+from types import TracebackType
 
 from loguru import logger
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
 
 from pxmodrim._compat.config import (
@@ -21,6 +23,26 @@ from pxmodrim.core.providers import create_providers
 from pxmodrim.ui.main_window import MainWindow
 from pxmodrim.ui.palette import get_stylesheet
 from pxmodrim.ui.settings_panel import SettingsPanel
+
+
+def _exception_hook(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_tb: TracebackType | None,
+) -> None:
+    """Global exception handler for unhandled exceptions."""
+    error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    logger.error("Unhandled exception:\n{}", error_msg)
+    # Try to show a dialog if QApplication exists
+    app = QApplication.instance()
+    if app is not None:
+        QMessageBox.critical(
+            None,
+            "PxModRim - Crash",
+            f"An unexpected error occurred:\n\n{exc_type.__name__}: {exc_value}\n\nDetails have been logged.",
+        )
+
+sys.excepthook = _exception_hook
 
 
 class App:

@@ -5,7 +5,7 @@ pytest_opts := "--doctest-modules --no-qt-log"
     just --list
 
 run: dev-setup
-    uv run python -m pxmodrim
+    LOGURU_LEVEL=DEBUG uv run python -m pxmodrim
 
 test: dev-setup
     uv run pytest {{pytest_opts}} -s

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from loguru import logger
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.models.metadata.parsing import create_listed_mod_from_path
 from pxmodrim.models.metadata.structures import ListedMod
@@ -19,25 +20,21 @@ class CoreModProvider(BaseModProvider):
     async def discover(self, target_version: str) -> dict[str, ListedMod]:
         def _scan() -> dict[str, ListedMod]:
             result: dict[str, ListedMod] = {}
-            mods_dir = self._game / "Mods"
             data_dir = self._game / "Data"
 
-            if mods_dir.exists():
-                for d in scan_mod_directory(mods_dir):
+            logger.debug("CoreModProvider scanning: {}", data_dir)
+            if data_dir.exists():
+                for d in scan_mod_directory(data_dir):
                     _, mod = create_listed_mod_from_path(d, target_version)
+                    logger.debug("CoreModProvider found: {} (uuid: {})", mod.name, mod.uuid)
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
 
-            if data_dir.exists():
-                for d in data_dir.iterdir():
-                    if d.is_dir():
-                        _, mod = create_listed_mod_from_path(d, target_version)
-                        mod.provider_id = self.provider_id
-                        result[mod.uuid] = mod
-
             return result
 
-        return await asyncio.to_thread(_scan)
+        discovered = await asyncio.to_thread(_scan)
+        logger.info("CoreModProvider discovered {} mods", len(discovered))
+        return discovered
 
     def _should_include(self, mod: ListedMod) -> bool:
         return True

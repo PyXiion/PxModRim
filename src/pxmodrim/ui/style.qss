@@ -281,3 +281,42 @@ QToolTip {{
     padding: 6px 10px;
     font-size: 12px;
 }}
+
+/* --- Mod Info Panel Components --- */
+QWidget#accordionHeader {{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid {BORDER};
+}}
+QLabel#accordionTitle {{
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: {TEXT_MUTED};
+}}
+QLabel#accordionChevron {{
+    font-size: 10px;
+    font-weight: 600;
+    color: {TEXT_MUTED};
+    background: transparent;
+}}
+QWidget#accordionContent {{
+    background: {MAIN_BG};
+}}
+
+QLabel#metaLabel {{
+    color: {TEXT_MUTED};
+    font-size: 11px;
+}}
+QLabel#metaValue {{
+    font-weight: 500;
+    font-size: 13px;
+    color: {TEXT_MAIN};
+}}
+
+QTextBrowser#descriptionBrowser {{
+    background: transparent;
+    border: none;
+    padding: 0;
+}}

@@ -1,21 +1,37 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
+from pxmodrim._compat.constants import RIMWORLD_DLC_METADATA
 from pxmodrim._compat.xml import xml_path_to_json
+from pxmodrim.models.metadata.structures import CaseInsensitiveStr, ModsConfig
 
 
-@dataclass
-class ModsConfigData:
-    version: str = "1.5"
-    active_mods: list[str] = field(default_factory=list)
-    known_expansions: list[str] = field(default_factory=list)
+def _extract_li_list(container: dict[str, Any] | list[Any] | str | None) -> list[str]:
+    """Extract list of strings from various XML dict structures for <li> elements."""
+    if not container:
+        return []
+    if isinstance(container, list):
+        return [str(x) for x in container if isinstance(x, str)]
+    if isinstance(container, str):
+        return [container]
+    if isinstance(container, dict):
+        li = container.get("li")
+        if isinstance(li, str):
+            return [li]
+        if isinstance(li, list):
+            return [str(x) for x in li if isinstance(x, str)]
+    return []
 
 
-def parse_mods_config(path: Path) -> ModsConfigData | None:
+def _get_dlc_package_ids() -> list[CaseInsensitiveStr]:
+    return [CaseInsensitiveStr(dlc["packageid"]) for dlc in RIMWORLD_DLC_METADATA.values()]
+
+
+def parse_mods_config(path: Path) -> ModsConfig | None:
     if not path.exists():
         logger.warning(f"ModsConfig.xml not found at {path}")
         return None
@@ -26,51 +42,30 @@ def parse_mods_config(path: Path) -> ModsConfigData | None:
 
     try:
         root = data.get("ModsConfigData", {})
-        version = root.get("version", "1.5")
-        raw_active = root.get("activeMods", {}).get("li", [])
-        raw_expansions = root.get("knownExpansions", {}).get("li", [])
+        version = str(root.get("version", "1.5"))
 
-        if isinstance(raw_active, str):
-            raw_active = [raw_active]
-        if isinstance(raw_expansions, str):
-            raw_expansions = [raw_expansions]
+        raw_active = _extract_li_list(root.get("activeMods", {}))
+        raw_expansions = _extract_li_list(root.get("knownExpansions", {}))
 
-        return ModsConfigData(
-            version=str(version),
-            active_mods=list(raw_active),
-            known_expansions=list(raw_expansions),
+        active_mods = [CaseInsensitiveStr(pid) for pid in raw_active]
+        known_expansions = [CaseInsensitiveStr(pid) for pid in raw_expansions]
+
+        # Fallback: if knownExpansions is empty, populate from known DLCs
+        if not known_expansions:
+            known_expansions = _get_dlc_package_ids()
+
+        return ModsConfig(
+            version=version,
+            activeMods=active_mods,
+            knownExpansions=known_expansions,
         )
     except Exception as e:
         logger.error(f"Failed to parse ModsConfig.xml: {e}")
         return None
 
 
-def write_mods_config(path: Path, data: ModsConfigData) -> None:
-    import lxml.etree as ET
+def write_mods_config(path: Path, data: ModsConfig) -> None:
+    from pxmodrim._compat.xml import json_to_xml_write
 
-    root = ET.Element("ModsConfigData")
-
-    version_el = ET.SubElement(root, "version")
-    version_el.text = data.version
-
-    active_mods = ET.SubElement(root, "activeMods")
-    for pid in data.active_mods:
-        li = ET.SubElement(active_mods, "li")
-        li.text = pid
-
-    known = ET.SubElement(root, "knownExpansions")
-    for eid in data.known_expansions:
-        li = ET.SubElement(known, "li")
-        li.text = eid
-
-    tree = ET.ElementTree(root)
-    raw = ET.tostring(tree, encoding="utf-8", xml_declaration=True, pretty_print=True)
-
-    import xml.dom.minidom as minidom
-
-    reparsed = minidom.parseString(raw)
-    formatted = reparsed.toprettyxml(indent="  ", encoding=None)
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(formatted, encoding="utf-8")
+    json_to_xml_write({"ModsConfigData": data.to_dict()}, str(path), raise_errs=True)
     logger.info(f"ModsConfig.xml written to {path}")

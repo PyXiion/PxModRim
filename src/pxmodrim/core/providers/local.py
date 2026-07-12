@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from loguru import logger
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.models.metadata.parsing import create_listed_mod_from_path
 from pxmodrim.models.metadata.structures import ListedMod
@@ -10,7 +11,7 @@ from pxmodrim.services.mod_discovery import scan_mod_directory
 
 
 class LocalModProvider(BaseModProvider):
-    """Unified provider for local mods - handles both non-Steam and Steam CMD mods in one scan."""
+    """Provider for local (non-Steam) mods."""
     provider_id = "local"
 
     def __init__(self, local_path: Path) -> None:
@@ -20,7 +21,9 @@ class LocalModProvider(BaseModProvider):
         def _scan() -> dict[str, ListedMod]:
             result: dict[str, ListedMod] = {}
             if not self._path.exists():
+                logger.debug("LocalModProvider path does not exist: {}", self._path)
                 return result
+            logger.debug("LocalModProvider scanning: {}", self._path)
             for d in scan_mod_directory(self._path):
                 _, mod = create_listed_mod_from_path(d, target_version)
                 has_pfid = (
@@ -29,14 +32,18 @@ class LocalModProvider(BaseModProvider):
                 )
                 # Local provider handles non-Steam mods
                 if not has_pfid:
+                    logger.trace("LocalModProvider found: {} (uuid: {})", mod.name, mod.uuid)
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
+                else:
+                    logger.trace("LocalModProvider skipping Steam mod: {}", mod.name)
             return result
 
-        return await asyncio.to_thread(_scan)
+        discovered = await asyncio.to_thread(_scan)
+        logger.info("LocalModProvider discovered {} mods", len(discovered))
+        return discovered
 
     def _should_include(self, mod: ListedMod) -> bool:
-        # Not used - discover() is overridden
         return False
 
 
@@ -51,7 +58,9 @@ class SteamCmdModProvider(BaseModProvider):
         def _scan() -> dict[str, ListedMod]:
             result: dict[str, ListedMod] = {}
             if not self._path.exists():
+                logger.debug("SteamCmdModProvider path does not exist: {}", self._path)
                 return result
+            logger.debug("SteamCmdModProvider scanning: {}", self._path)
             for d in scan_mod_directory(self._path):
                 _, mod = create_listed_mod_from_path(d, target_version)
                 has_pfid = (
@@ -60,12 +69,16 @@ class SteamCmdModProvider(BaseModProvider):
                 )
                 # Steam provider handles only Steam mods
                 if has_pfid:
+                    logger.trace("SteamCmdModProvider found: {} (uuid: {})", mod.name, mod.uuid)
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
+                else:
+                    logger.trace("SteamCmdModProvider skipping non-Steam mod: {}", mod.name)
             return result
 
-        return await asyncio.to_thread(_scan)
+        discovered = await asyncio.to_thread(_scan)
+        logger.info("SteamCmdModProvider discovered {} mods", len(discovered))
+        return discovered
 
     def _should_include(self, mod: ListedMod) -> bool:
-        # Not used - discover() is overridden
         return False

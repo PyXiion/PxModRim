@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from natsort import natsorted
 from PySide6.QtCore import (
     QAbstractItemModel,
     QEvent,
+    QItemSelection,
     QModelIndex,
     QPersistentModelIndex,
     QRect,
@@ -16,8 +16,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
+    QListView,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -26,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.ui.mod_list_model import ModFilterProxyModel, ModListModel
 from pxmodrim.ui.palette import (
     CHECKBOX_BORDER_Q,
     CHECKBOX_CHECK_Q,
@@ -51,7 +51,18 @@ class ModListDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index: QModelIndex | QPersistentModelIndex,
     ) -> None:
-        mod: ListedMod | None = index.data(Qt.ItemDataRole.UserRole)
+        # Get mod from model's custom role
+        model = index.model()
+        if not isinstance(model, ModFilterProxyModel):
+            super().paint(painter, option, index)
+            return
+
+        source_model = model.sourceModel()
+        if not isinstance(source_model, ModListModel):
+            super().paint(painter, option, index)
+            return
+
+        mod: ListedMod | None = index.data(ModListModel.ModRole)
         if mod is None:
             super().paint(painter, option, index)
             return
@@ -60,7 +71,7 @@ class ModListDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         is_selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        is_active = index.data(Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked
+        is_active = index.data(ModListModel.CheckStateRole) == Qt.CheckState.Checked
 
         r = option.rect
 
@@ -74,10 +85,13 @@ class ModListDelegate(QStyledItemDelegate):
 
         cx = 0
 
-        # Checkbox
-        check_rect = QRect(r.left() + MARGIN, r.top(), CHECKBOX_WIDTH, r.height())
-        self._draw_checkbox(painter, check_rect, is_active)
-        cx = check_rect.right() + 2
+        # Checkbox - custom drawing
+        checkbox_size = 14
+        checkbox_x = r.left() + MARGIN + (CHECKBOX_WIDTH - checkbox_size) // 2
+        checkbox_y = r.top() + (r.height() - checkbox_size) // 2
+        checkbox_rect = QRect(checkbox_x, checkbox_y, checkbox_size, checkbox_size)
+        self._draw_checkbox(painter, checkbox_rect, is_active)
+        cx = checkbox_rect.right() + 2
 
         # Index
         idx_rect = QRect(cx, r.top(), INDEX_WIDTH, r.height())
@@ -156,27 +170,25 @@ class ModListDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index: QModelIndex | QPersistentModelIndex,
     ) -> bool:
-        if isinstance(event, QMouseEvent):
-            if (
-                event.button() == Qt.MouseButton.LeftButton
-                and event.type() == QEvent.Type.MouseButtonRelease
-            ):
-                check_rect = QRect(
-                    option.rect.left() + MARGIN,
-                    option.rect.top(),
-                    CHECKBOX_WIDTH,
-                    option.rect.height(),
+        if (
+            isinstance(event, QMouseEvent)
+            and event.button() == Qt.MouseButton.LeftButton
+            and event.type() == QEvent.Type.MouseButtonRelease
+        ):
+            # Calculate checkbox rect same as in paint()
+            checkbox_size = 14
+            checkbox_x = option.rect.left() + MARGIN + (CHECKBOX_WIDTH - checkbox_size) // 2
+            checkbox_y = option.rect.top() + (option.rect.height() - checkbox_size) // 2
+            checkbox_rect = QRect(checkbox_x, checkbox_y, checkbox_size, checkbox_size)
+
+            if checkbox_rect.contains(event.pos()):
+                current = index.data(ModListModel.CheckStateRole)
+                new_state = (
+                    Qt.CheckState.Unchecked
+                    if current == Qt.CheckState.Checked
+                    else Qt.CheckState.Checked
                 )
-                if check_rect.contains(event.pos()):
-                    current = index.data(Qt.ItemDataRole.CheckStateRole)
-                    new_state = (
-                        Qt.CheckState.Unchecked
-                        if current == Qt.CheckState.Checked
-                        else Qt.CheckState.Checked
-                    )
-                    return model.setData(
-                        index, new_state, Qt.ItemDataRole.CheckStateRole
-                    )
+                return model.setData(index, new_state, ModListModel.CheckStateRole)
         return super().editorEvent(event, model, option, index)
 
     def _draw_checkbox(self, painter: QPainter, rect: QRect, checked: bool) -> None:
@@ -234,114 +246,53 @@ class ModListPanel(QWidget):
         self.search_input.setObjectName("searchInput")
         self.search_input.setPlaceholderText("Quick search by name or PackageID...")
         self.search_input.setClearButtonEnabled(True)
-        self.search_input.textChanged.connect(self._filter_items)
+        self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(self.search_input)
         layout.addWidget(search_container)
 
-        self.list = QListWidget()
+        # Model/View setup
+        self._model = ModListModel()
+        self._proxy = ModFilterProxyModel(self._model)
+        self._model.active_mods_changed.connect(self._on_model_active_changed)
+
+        self.list = QListView()
         self.list.setObjectName("modListWidget")
+        self.list.setModel(self._proxy)
         self.list.setItemDelegate(ModListDelegate(self.list))
         self.list.setSpacing(0)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.list.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self.list.currentItemChanged.connect(self._on_selection)
-        self.list.itemChanged.connect(self._on_item_changed)
+        self.list.setUniformItemSizes(True)
+        self.list.selectionModel().selectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self.list)
 
-        self._all_mods: dict[str, ListedMod] = {}
-        self._visible_uuids: set[str] = set()
-
-    @property
-    def all_mods(self) -> dict[str, ListedMod]:
-        return dict(self._all_mods)
-
     def load_mods(self, mods: dict[str, ListedMod], active_uuids: set[str]) -> None:
-        self._all_mods = dict(mods)
-        self._visible_uuids = set(mods.keys())
-
-        sorted_uuids = [
-            uuid
-            for uuid, _ in natsorted(
-                mods.items(),
-                key=lambda kv: kv[1].name.lower(),
-            )
-        ]
-
-        active_list: list[str] = []
-        inactive_list: list[str] = []
-        for uuid in sorted_uuids:
-            if uuid in active_uuids:
-                active_list.append(uuid)
-            else:
-                inactive_list.append(uuid)
-
-        self.list.blockSignals(True)
-        self.list.clear()
-        for uuid in [*active_list, *inactive_list]:
-            mod = mods[uuid]
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, mod)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(
-                Qt.CheckState.Checked
-                if uuid in active_uuids
-                else Qt.CheckState.Unchecked
-            )
-            self.list.addItem(item)
-        self.list.blockSignals(False)
-        self._filter_items()
+        self._model.load_mods(mods, active_uuids)
 
     def active_uuids(self) -> list[str]:
-        result: list[str] = []
-        for i in range(self.list.count()):
-            item = self.list.item(i)
-            if item is None:
-                continue
-            if item.checkState() == Qt.CheckState.Checked:
-                mod: ListedMod | None = item.data(Qt.ItemDataRole.UserRole)
-                if mod is not None:
-                    result.append(mod.uuid)
-        return result
+        return self._model.active_uuids()
 
-    def show_uuids(self, uuids: set[str]) -> None:
-        self._visible_uuids = uuids
-        self._filter_items()
+    @property
+    def proxy(self) -> ModFilterProxyModel:
+        return self._proxy
 
-    def _filter_items(self) -> None:
-        search = self.search_input.text().lower()
+    def _on_search_changed(self, text: str) -> None:
+        self._proxy.set_search_filter(text)
 
-        for i in range(self.list.count()):
-            item = self.list.item(i)
-            if item is None:
-                continue
-            mod: ListedMod | None = item.data(Qt.ItemDataRole.UserRole)
-            if mod is None:
-                item.setHidden(True)
-                continue
+    def _on_model_active_changed(self) -> None:
+        self.active_mods_changed.emit()
 
-            visible = mod.uuid in self._visible_uuids
-
-            if visible and search:
-                name_match = search in mod.name.lower()
-                pid_match = (
-                    isinstance(mod, AboutXmlMod)
-                    and search in str(mod.package_id).lower()
-                )
-                if not name_match and not pid_match:
-                    visible = False
-
-            item.setHidden(not visible)
-
-    def _on_selection(
-        self, current: QListWidgetItem | None, _previous: QListWidgetItem | None
+    def _on_selection_changed(
+        self, selected: QItemSelection, deselected: QItemSelection
     ) -> None:
-        if current is not None and not current.isHidden():
-            mod = current.data(Qt.ItemDataRole.UserRole)
+        indexes = self.list.selectionModel().selectedIndexes()
+        if indexes:
+            index = self._proxy.mapToSource(indexes[0])
+            mod = index.data(ModListModel.ModRole)
             if mod is not None:
                 self.mod_selected.emit(mod)
 
-    def _on_item_changed(self, item: QListWidgetItem | None) -> None:
-        if item is not None:
-            self.active_mods_changed.emit()
-            self._filter_items()
+    def _filter_items(self) -> None:
+        # Kept for compatibility - no-op now
+        pass

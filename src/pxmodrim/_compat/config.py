@@ -17,9 +17,15 @@ class PathConfig(msgspec.Struct):
     config_folder: str = ""
 
 
+class UIPrefs(msgspec.Struct):
+    deps_expanded: bool = True
+    desc_expanded: bool = False
+
+
 class AppConfig(msgspec.Struct):
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
     target_version: str = "1.6"
+    ui: UIPrefs = msgspec.field(default_factory=UIPrefs)
 
 
 def config_dir() -> Path:
