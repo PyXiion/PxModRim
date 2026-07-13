@@ -66,6 +66,7 @@ class App:
         self.qt_app.setApplicationName("PxModRim")
         self.qt_app.setOrganizationName("PxModRim")
         self.qt_app.setApplicationDisplayName("PxModRim")
+        self.qt_app.setDesktopFileName("pxmodrim")
 
         self._apply_theme()
 

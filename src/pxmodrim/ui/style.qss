@@ -490,3 +490,11 @@ QLabel#creditItem {
     color: $TEXT_MUTED;
     padding: 4px 0;
 }
+QLabel#creditSection {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $TEXT_DIM;
+    padding: 8px 0 2px;
+}
