@@ -22,11 +22,15 @@ def topological_sort(
     load_first = _build_load_first(active_mods, community_rules, all_pids, settings)
     load_last = _build_load_last(active_mods, community_rules, all_pids, settings)
 
-    tiers = assign_tiers(all_pids, deps, rev_deps, load_first, load_last, settings.tier_config)
+    tiers = assign_tiers(
+        all_pids, deps, rev_deps, load_first, load_last, settings.tier_config
+    )
 
     order: list[PackageId] = []
     for tier in (Tier.TIER_0, Tier.TIER_1, Tier.TIER_2, Tier.TIER_3):
-        tier_pids = {pid for pid in all_pids if pid not in order and tiers.get(pid) == tier}
+        tier_pids = {
+            pid for pid in all_pids if pid not in order and tiers.get(pid) == tier
+        }
         if not tier_pids:
             continue
 

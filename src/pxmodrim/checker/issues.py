@@ -65,7 +65,11 @@ class IncompatibilityIssueChecker(ModIssueChecker):
         pid = PackageId(mod.package_id)
         outgoing = ctx.graph.edges_of_type(pid, EdgeType.INCOMPATIBILITY)
         incoming = ctx.graph.incoming_of_type(pid, EdgeType.INCOMPATIBILITY)
-        return bool(mod.overall_rules.incompatible_with) or bool(outgoing) or bool(incoming)
+        return (
+            bool(mod.overall_rules.incompatible_with)
+            or bool(outgoing)
+            or bool(incoming)
+        )
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         issues: list[ModIssue] = []
