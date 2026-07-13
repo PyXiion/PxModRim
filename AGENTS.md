@@ -1,64 +1,100 @@
 # PxModRim — Agent guide
 
 ## Project state
-- **Fork** of RimSort with clean architecture. Original code preserved untouched in `rimsort-original/` as reference donor.
-- **src-layout**: package lives in `src/pxmodrim/`. UV auto-discovers it via `[tool.uv] package = true`.
-- **Incremental rewrite**: algorithms extracted from `rimsort-original/`, adapted and rewritten in new structure.
+- **Fork** of RimSort, clean rewrite. Original code preserved untouched in `rimsort-original/`.
+- **src-layout**: package lives in `src/pxmodrim/`. UV auto-discovers via `[tool.uv] package = true`.
+- **Incremental rewrite**: algorithms extracted from `rimsort-original/`, adapted into new structure.
 
 ## Toolchain
-- **uv** — `uv sync --dev`
+- **uv** — `uv sync --dev` (CI uses `uv sync --locked --dev`)
 - **just** — task runner, run `just` to list recipes
-- **ruff** lint+format — `just ruff-fix` (runs `ruff check --fix && ruff format`)
-- **mypy** + **pyright** — `just typecheck` / `just pyright`
+- **ruff** lint+format — `just ruff-fix` (`ruff check --fix && ruff format`)
+- **mypy** + **pyright** — `just typecheck` / `just pyright` / `just check` (runs both)
+- Verify with `just check`
 - **pytest** — `just test` or `just test-verbose`
-- Python **3.12 only**
+- Python **3.12 only** (`requires-python = "==3.12.*"`)
+- PySide6 + qasync for async Qt event loop
 
 ## Entrypoints
-- `just run`
+- `just run` (sets `LOGURU_LEVEL=DEBUG`)
+- `uv run python -m pxmodrim` (manual)
 
 ## Architecture (`src/pxmodrim/`)
-- `models/metadata/` — data models (`structures.py`, compiled msgspec dataclasses) and `parsing.py` (About.xml → objects)
-- `_compat/` — ported utilities from RimSort donor (`xml.py`, `constants.py`)
-- `services/` — async orchestrators (`mod_discovery.py`)
-- `ui/` — PySide6 widgets (MainWindow, ModListPanel, ModInfoPanel)
-- `_app.py` — bootstrap, QEventLoop wiring
-- `__main__.py` — entry point
+
+```
+__main__.py       — entry point: App().run()
+_app.py           — bootstrap: QEventLoop, DI assembly (CoreContext + services + MainWindow)
+core/
+├── context.py    — CoreContext: single source of truth (all_mods, active_uuids, config)
+├── mod_service.py— ModService: orchestrates discovery, save, provider management
+├── structures.py — CollectionStats (msgspec.Struct)
+├── loading.py    — LoadingState: stack-based progress signals for async ops
+└── providers/    — BaseModProvider ABC + implementations:
+    ├── core.py   — CoreModProvider (game/Mods dir)
+    └── local.py  — LocalModProvider + SteamCmdModProvider (both scan local_path, split on PublishedFileId.txt)
+services/
+├── mod_discovery.py      — scan_mod_directory(), resolve_active_uuids()
+├── diagnostics_service.py— DiagnosticsService: checker orchestration, sidebar entries, signals
+└── sort_service.py       — SortService: topological sort via asyncio.to_thread
+models/
+├── metadata/
+│   ├── structures.py     — ListedMod, AboutXmlMod, ModsConfig (msgspec structs)
+│   └── parsing.py        — About.xml → objects
+└── view/
+    ├── diagnostics.py    — ModDiagnosticsView, ModIssueView, ModItemState
+    └── sidebar.py        — SidebarEntry hierarchy + PROVIDER_LABELS
+checker/                  — ModChecker, issue checkers, ConstraintGraph, topological sort
+sort/                     — Community rules, tier ordering, sort models
+ui/
+├── main_window.py        — MainWindow: QMainWindow, manages panels, wires services
+├── mod_list_panel.py     — QListView + custom delegate
+├── mod_list_model.py     — QAbstractListModel with custom roles (CheckStateRole, ProviderColorRole, etc.)
+├── mod_info_panel.py     — Mod details pane
+├── sidebar_panel.py      — QML-based sidebar with SidebarEntry model
+├── settings_panel.py     — Config dialog with path browsers
+├── menu_bar.py           — App menu
+├── palette.py + theme.py — Styling / QML theme singleton + style.qss
+├── constants.py          — UI constants
+└── components/           — Reusable widgets (AccordionSection, BannerWidget, DescriptionRenderer, etc.)
+```
+
+## Service wiring (`_app.py`)
+- `CoreContext` holds all mod state + config reference
+- `ModService(Context, providers[])` handles I/O: discovery + save
+- `DiagnosticsService(Context)` runs ModChecker, emits diagnostics/sidebar signals
+- `SortService(Context, DiagnosticsService)` runs topological sort in thread
+- All passed to `MainWindow(...)` via constructor DI — no singletons
 
 ## Rules
-- Signal-connected async methods **must** have `@asyncSlot()` from qasync, or the coroutine is silently dropped
+- Signal-connected async methods **must** have `@asyncSlot()` from qasync
 - Long blocking work → `await asyncio.to_thread(target)`
-- No fire-and-forget helpers yet (add when needed)
-- Do not write smelly code.
-- **Never** `QApplication.processEvents()` — blocks event loop, use async instead
-- **Never** `dialog.exec()` or `dialog.exec_()` — blocks UI thread, use async dialogs or `show()`
-- **Never** `QTimer.singleShot(0, ...)` to defer work — use `await asyncio.sleep(0)` or proper async
+- **Never** `QApplication.processEvents()` — blocks event loop
+- **Never** `dialog.exec()` / `dialog.exec_()` — use `await await_dialog(...)` or `show()`
+- **Never** `QTimer.singleShot(0, ...)` to defer — use `await asyncio.sleep(0)`
 - **Never** `time.sleep()` in async code — use `await asyncio.sleep()`
 - **Never** `QThread` directly — use `asyncio.to_thread()` or `loop.run_in_executor()`
 - **Never** blocking I/O in signal handlers or UI methods — move to service layer
-- **Never** global singletons (`_instance = None` pattern) — use DI via constructor
-- **Never** mix UI and I/O in same class — UI reads state, services write state
-- **Never** `ModType` enum (removed) — use `provider_id: str` on `ListedMod`
-- **Strict UI/Logic Separation:** Views and Delegates must remain 100% "dumb"—their only job is 
-rendering pixels and capturing raw events. Never include business logic, direct data 
-mutations, or any I/O operations (os, json, databases) inside UI components. All data 
-interaction must go strictly through index.data(CustomRole) and model.setData().
+- **Never** global singletons — use DI via constructor
+- **Never** mix UI and I/O in the same class — UI reads state, services write state
+- **Never** `ModType` enum — use `provider_id: str` on `ListedMod`
+- `active_uuids` is `list[str]` throughout (not `set[str]`)
+- **Strict UI/Logic Separation:** Views and Delegates must remain 100% "dumb" — render pixels and capture raw events only. No business logic, mutations, or I/O inside UI components.
 
 ## Donor code (`rimsort-original/`)
-- **NEVER modify** `rimsort-original/`. It's read-only reference.
-- When implementing a feature, look at the donor implementation, understand the algorithm, write clean code in `src/pxmodrim/` (don't copy verbatim).
-- Key donor modules for reference:
-  - `rimsort-original/app/models/metadata/` — structures, factory, mediator
-  - `rimsort-original/app/sort/` — sorting algorithms
-  - `rimsort-original/app/utils/steam/` — steam integration
-  - `rimsort-original/app/utils/git_utils.py` — git operations
-  - `rimsort-original/app/utils/github/` — GitHub mod install
+- **NEVER modify.** Read-only reference.
+- Implement features by understanding the algorithm, then write clean code in `src/pxmodrim/`. Do not copy it id
+- Key donor modules: `app/models/metadata/`, `app/sort/`, `app/utils/steam/`, `app/utils/git_utils.py`, `app/utils/github/`
 
 ## Key conventions
 - All files: `from __future__ import annotations` (PEP 604 style everywhere)
 - No comments unless explaining *why* (not *what*)
-- `pyproject.toml` has `lint.extend-select = ["I"]` for import sorting — run `ruff check --fix` after adding imports
+- `pyproject.toml` has `lint.extend-select = ["I"]` — run `ruff check --fix` after adding imports
+- Ruff: line-length 88, double quotes, indent 4
+- `plans/ongoing_001.md` contains the architectural plan — consult for design intent
 
-## Testing quirks
-- `--import-mode=importlib` (set in pyproject.toml)
-- `--no-qt-log` avoids QPA warnings in CI
-- `pythonpath = 'src'` for test imports
+## Testing
+- Config: `--import-mode=importlib`, `--no-qt-log`, `pythonpath = 'src'`
+- Test tree mirrors `src/pxmodrim/`: `test_metadata/`, `test_compat/`, `test_checker/`, `test_sort/`, `test_ui/`
+- UI tests need `QT_QPA_PLATFORM=offscreen` on Linux
+- Single test: `uv run pytest tests/test_metadata/test_structures.py -v`
+- Mock providers by subclassing `BaseModProvider` for integration tests
