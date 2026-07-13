@@ -87,7 +87,7 @@ class AboutPanel(QDialog):
         github_link.setObjectName("aboutMeta")
         right_vbox.addWidget(github_link)
 
-        license_label = QLabel("License: MIT")
+        license_label = QLabel("License: LGPL-3.0")
         license_label.setObjectName("aboutMeta")
         right_vbox.addWidget(license_label)
 
@@ -107,23 +107,47 @@ class AboutPanel(QDialog):
     def _create_credits_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setSpacing(8)
+
+        based_on = QLabel("Based on")
+        based_on.setObjectName("creditSection")
+        layout.addWidget(based_on)
+
+        rimsort_label = QLabel(
+            'Clean rewrite inspired by '
+            '<a href="https://github.com/RimSort/RimSort" '
+            'style="color: #66c0f4;">RimSort</a> '
+            "(MIT licensed)."
+        )
+        rimsort_label.setOpenExternalLinks(True)
+        rimsort_label.setWordWrap(True)
+        rimsort_label.setObjectName("creditItem")
+        layout.addWidget(rimsort_label)
+
+        spacer = QLabel()
+        spacer.setFixedHeight(8)
+        layout.addWidget(spacer)
+
+        deps_header = QLabel("Dependencies")
+        deps_header.setObjectName("creditSection")
+        layout.addWidget(deps_header)
 
         deps = [
-            "httpx",
-            "loguru",
-            "lxml",
-            "msgspec",
-            "natsort",
-            "networkx",
-            "pyside6",
-            "qasync",
-            "toposort",
+            ("httpx", "BSD-3-Clause"),
+            ("loguru", "MIT"),
+            ("lxml", "BSD-3-Clause"),
+            ("msgspec", "BSD-3-Clause"),
+            ("natsort", "MIT"),
+            ("networkx", "BSD-3-Clause"),
+            ("pyside6", "LGPL-3.0 / GPL-2.0 / GPL-3.0"),
+            ("qasync", "BSD-2-Clause"),
+            ("toposort", "Apache-2.0"),
         ]
 
-        for dep in deps:
+        for dep, lic in deps:
             try:
                 ver = version(dep)
-                label = QLabel(f"{dep} {ver}")
+                label = QLabel(f"{dep} {ver}  —  {lic}")
                 label.setObjectName("creditItem")
                 layout.addWidget(label)
             except Exception:
