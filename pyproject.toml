@@ -15,9 +15,12 @@ dependencies = [
     "toposort>=1.10",
 ]
 
+[project.gui-scripts]
+pxmodrim = "pxmodrim.__main__:main"
+
 [dependency-groups]
 dev = [
-    "mypy>=1.20.2",
+    "nuitka>=2.6.7",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -33,20 +36,6 @@ environments = [
     "sys_platform == 'win32'",
     "sys_platform == 'darwin'",
 ]
-
-[tool.mypy]
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = true
-disallow_untyped_defs = true
-pretty = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-exclude = ['rimsort-original']
-
-[[tool.mypy.overrides]]
-module = ['lxml.*', 'lxml', 'qasync']
-ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 88

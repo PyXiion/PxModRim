@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PxModRim
+Comment=Mod manager for RimWorld
+Icon=pxmodrim
+Exec=pxmodrim
+Categories=Game;
+StartupWMClass=pxmodrim
+Terminal=false

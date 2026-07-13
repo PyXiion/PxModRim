@@ -13,9 +13,6 @@ test: dev-setup
 test-verbose: dev-setup
     uv run pytest {{pytest_opts}} -v --tb=short -s
 
-typecheck:
-    uv run mypy --config-file pyproject.toml src/
-
 pyright:
     uv run python -m pyright -p pyproject.toml src/ tests/
 
@@ -27,7 +24,7 @@ ruff-format-fix:
 
 fix: ruff-fix ruff-format-fix
 
-check: typecheck pyright
+check: pyright
     @echo "Done"
 
 ci: check test
@@ -35,6 +32,20 @@ ci: check test
 dev-setup:
     uv venv --allow-existing
     uv sync --dev
+
+linux-copy-desktop:
+    mkdir -p ~/.local/share/applications
+    sed "s|Icon=pxmodrim|Icon={{justfile_directory()}}/src/pxmodrim/ui/assets/logo.svg|" packaging/linux/pxmodrim.desktop > ~/.local/share/applications/pxmodrim.desktop
+    kbuildsycoca6 --noincremental
+
+build:
+    uv run python packaging/build.py
+
+build-release:
+    uv run python packaging/build.py --release
+
+build-clean:
+    rm -rf build/ dist/ *.build/ *.dist/ *.onefile-build/
 
 clean:
     rm -rf build/ dist/ *.egg-info
