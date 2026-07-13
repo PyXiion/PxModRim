@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300">
+<defs>
+<filter id="ring-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="sun-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="8" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<text x="600" y="210" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="170" font-weight="900" fill="#e8e8e8" letter-spacing="-14">P<tspan fill="#2ec4b6">x</tspan>M<tspan fill="#2ec4b6">o</tspan>d<tspan fill="#e6a23c">R</tspan>im</text>
+<path d="M 160 235 Q 600 285 1040 235" fill="none" stroke="#3a4550" stroke-width="14" stroke-linecap="round"/>
+<path d="M 160 235 Q 600 285 1040 235" fill="none" stroke="#e6a23c" stroke-width="14" stroke-linecap="round" stroke-dasharray="520 1300" stroke-dashoffset="-80" filter="url(#ring-glow)"/>
+<circle cx="1040" cy="235" r="12" fill="#e6a23c" filter="url(#sun-glow)"/>
+<circle cx="110" cy="90" r="3" fill="#a89f91" opacity="0.5"/>
+<circle cx="1080" cy="110" r="3" fill="#a89f91" opacity="0.5"/>
+<circle cx="90" cy="250" r="3" fill="#a89f91" opacity="0.5"/>
+<circle cx="1060" cy="270" r="3" fill="#a89f91" opacity="0.5"/>
+</svg>

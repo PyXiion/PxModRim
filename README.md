@@ -1,55 +1,82 @@
 # PxModRim
 
-An asynchronous, lightweight mod manager for RimWorld &mdash; Python + PySide6, Data-Driven Architecture.
+A friendly, modern mod manager for RimWorld.
+
+No frozen UI. No guessing where your mods came from. Just scan, sort, and play.
 
 ---
 
-## Why PxModRim?
-
-- **Async first** &mdash; Disk scanning never freezes the UI. The interface stays responsive no matter how many mods you have.
-- **Provider model** &mdash; Steam, Local, and Core mods are separated by design. No path-based guessing games to determine mod type.
-- **Clean polymorphic sidebar** &mdash; All / Active / Inactive / By source / With errors. Filtering logic lives in strategy objects, not in `if/else` chains.
-- **Data-driven state** &mdash; Single source of truth (`CoreContext`). UI only reads immutable slices; it never writes to disk directly.
-- **Modern stack** &mdash; Python 3.12, PySide6, qasync, uv, ruff, mypy, pyright, pytest.
+![Screenshot](screenshot.png)
 
 ---
 
-## Why Not RimSort?
+## What it does
 
-RimSort is the only usable mod manager for RimWorld &mdash; respect to the author. But the codebase has structural problems that patches can't fix:
-
-- **God objects** &mdash; `MainContent` (118 imports) mixes UI, game launching, file scanning, import/export, and ZIP installs. A 1041-line `eventFilter()` handles menus, `os.rename()`, SteamDB lookups, and dialogs all in one method.
-- **Magic instead of types** &mdash; Mod type is guessed by comparing folder paths against hardcoded directories. Move a folder &mdash; its "type" changes. `PublishedFileId` falls back to "is the folder name numeric?".
-- **Zero async** &mdash; All I/O runs on the UI thread. `QApplication.processEvents()` appears 11 times as a band-aid. `time.sleep()` in signal handlers. Three different concurrency models (asyncio, QThread, ThreadPoolExecutor) with no abstraction.
-- **Global singletons everywhere** &mdash; 9+ singletons, including the main view. Testing in isolation is practically impossible.
-
-This isn't fixable incrementally &mdash; it needed a rewrite from scratch with clean boundaries.
+- **Scans everything in one place** — Steam, local, and core mods all show up together.
+- **Catches problems for you** — missing dependencies, load-order conflicts, and other issues appear right in the list.
+- **Sorts your load order automatically** — one click and your active mods are ordered by dependencies and community rules.
+- **Saves back to RimWorld** — writes your final mod list to `ModsConfig.xml` so the game sees exactly what you picked.
 
 ---
 
-## Development
+## Installation
 
-```bash
-# Install deps
-uv sync --dev
+**No packaged installer yet.** PxModRim is early work-in-progress. This section will be updated once releases are ready.
 
-# Run GUI
-just run
+If you are comfortable running from source, see the developer notes in [`AGENTS.md`](./AGENTS.md).
 
-# Tests
-just test
+---
 
-# Lint + format
-just ruff-fix
+## A quick look at the UI
 
-# Typecheck
-just typecheck
-# or
-just pyright
-```
+The window is split into three simple panels:
+
+- **Sidebar on the left** — switch between views like All, Active, Inactive, By source, and With errors.
+- **Mod list in the middle** — your mods, colored by source, with icons for issues and warnings.
+- **Mod info on the right** — description, metadata, and any diagnostics for the selected mod.
+
+The header buttons let you refresh, sort, save, and open settings.
+
+---
+
+## PxModRim vs RimSort
+
+RimSort is the mod manager most RimWorld players know, and it packs in a huge number of features. PxModRim is not trying to match every one of those on day one — it is rebuilding the core experience to be smoother first, then growing from there.
+
+| Experience | RimSort | PxModRim |
+|---|---|---|
+| UI while scanning big mod lists | Can freeze or stutter | Stays responsive |
+| Settings dialog | Large 9-tab modal with many options | Smaller, path-focused |
+| How mod sources are shown | Detected from folder paths | Separated cleanly by source |
+| Load-order sorting | Rules + manual drag-and-drop | One-click auto-sort |
+| Error visibility | Separate dialogs and panels | Sidebar "With errors" filter + inline diagnostics |
+| Power-user features | Many: SteamCMD, backups, player logs, file search, instances, themes | Core loop only (for now) |
+
+---
+
+## Roadmap / TODO
+
+These are the big pieces planned next, in roughly the order they will be tackled. Checked items are already in place.
+
+- [x] Core mod discovery (Steam, local, core)
+- [x] Responsive three-panel UI with sidebar filters
+- [x] Dependency and conflict diagnostics
+- [x] Automatic load-order sorting
+- [x] Save active mod list to `ModsConfig.xml`
+- [ ] Game launching (Steam, standalone, with optional wrappers)
+- [ ] Steam Workshop integration (browse, subscribe, update)
+- [ ] SteamCMD support for downloading mods without the Steam client
+- [ ] Backup and restore for saves and mod configs
+- [ ] Player log viewer with filtering and colorization
+- [ ] File search across all installed mods
+- [ ] Custom sort rules editor
+- [ ] Theme and appearance options
+- [ ] Translations
+
+Features from RimSort will be adopted slowly and only when they genuinely improve the player experience.
 
 ---
 
 ## License
 
-MIT
+MIT. PxModRim is a clean rewrite inspired by [RimSort](https://github.com/RimSort/RimSort).
