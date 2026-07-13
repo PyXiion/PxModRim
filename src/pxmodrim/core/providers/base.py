@@ -8,6 +8,7 @@ from pxmodrim.models.metadata.structures import ListedMod
 
 class BaseModProvider(ABC):
     provider_id: str
+    color: str = "#808080"
 
     def __init__(self, path: Path) -> None:
         self._path = path

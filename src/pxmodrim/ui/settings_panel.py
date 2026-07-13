@@ -34,6 +34,7 @@ from pxmodrim.ui.components.progress_dialog import ProgressDialog
 class SettingsPanel(QDialog):
     def __init__(self, cfg: AppConfig) -> None:
         super().__init__()
+        self.setObjectName("settingsPanel")
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.resize(700, 500)
@@ -96,14 +97,6 @@ class SettingsPanel(QDialog):
             "Select RimWorld Config folder",
             self._browse_config,
         )
-
-        self.version_combo = QComboBox()
-        for v in ["1.6", "1.5", "1.4", "1.3"]:
-            self.version_combo.addItem(v)
-        idx = self.version_combo.findText(self._config.target_version)
-        if idx >= 0:
-            self.version_combo.setCurrentIndex(idx)
-        form.addRow("Target version:", self.version_combo)
 
         detect_btn = QPushButton("Auto-detect")
         detect_btn.clicked.connect(self._auto_detect)
@@ -259,7 +252,6 @@ class SettingsPanel(QDialog):
                 workshop=self.workshop_edit.text().strip(),
                 config_folder=self.config_edit.text().strip(),
             ),
-            target_version=self.version_combo.currentText(),
             sort=SortSettings(
                 method=SortMethod.TOPOLOGICAL,
                 use_moddependencies_as_load_before=self.use_moddeps_cb.isChecked(),

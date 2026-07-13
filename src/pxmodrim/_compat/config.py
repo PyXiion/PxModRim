@@ -12,12 +12,30 @@ from pxmodrim._compat.mspec_hooks import dec_hook, enc_hook
 from pxmodrim.sort.config import SortSettings, TierConfig
 
 
+def read_game_version(game_path: str | Path) -> str | None:
+    """Read game version string from ``Version.txt`` in the game directory.
+
+    Returns the stripped content (e.g. ``"1.6.4871 rev598"``) or ``None`` if
+    the file is missing or cannot be read.
+    """
+    path = Path(game_path) / "Version.txt"
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except Exception:
+        logger.warning("Failed to read game version from {}", path)
+        return None
+
+
 class PathConfig(msgspec.Struct):
     game: str = ""
     local: str = ""
     workshop: str = ""
     config_folder: str = ""
     community_rules_file: str = ""
+    no_version_warning_file: str = ""
+    use_this_instead_file: str = ""
 
 
 class UIPrefs(msgspec.Struct):
@@ -27,7 +45,6 @@ class UIPrefs(msgspec.Struct):
 
 class AppConfig(msgspec.Struct):
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
-    target_version: str = "1.6"
     ui: UIPrefs = msgspec.field(default_factory=UIPrefs)
     sort: SortSettings = msgspec.field(
         default_factory=lambda: SortSettings(tier_config=TierConfig.default())

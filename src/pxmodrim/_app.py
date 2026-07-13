@@ -6,6 +6,7 @@ import traceback
 from types import TracebackType
 
 from loguru import logger
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
 
@@ -20,8 +21,10 @@ from pxmodrim._compat.dialogs import await_dialog
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.providers import create_providers
+from pxmodrim.services.diagnostics_service import DiagnosticsService
+from pxmodrim.services.sort_service import SortService
 from pxmodrim.ui.main_window import MainWindow
-from pxmodrim.ui.palette import get_stylesheet
+from pxmodrim.ui.palette import PALETTE, get_stylesheet
 from pxmodrim.ui.settings_panel import SettingsPanel
 
 
@@ -64,6 +67,25 @@ class App:
         self._apply_theme()
 
     def _apply_theme(self) -> None:
+        self.qt_app.setStyle("Fusion")
+
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(PALETTE["ELEVATE_0"]))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(PALETTE["TEXT_MAIN"]))
+        palette.setColor(QPalette.ColorRole.Base, QColor(PALETTE["ELEVATE_1"]))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(PALETTE["ELEVATE_2"]))
+        palette.setColor(QPalette.ColorRole.Text, QColor(PALETTE["TEXT_MAIN"]))
+        palette.setColor(QPalette.ColorRole.Button, QColor(PALETTE["ELEVATE_2"]))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(PALETTE["TEXT_MAIN"]))
+        palette.setColor(QPalette.ColorRole.BrightText, QColor(PALETTE["TEXT_MAIN"]))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(PALETTE["PRIMARY"]))
+        palette.setColor(
+            QPalette.ColorRole.HighlightedText, QColor(PALETTE["ELEVATE_0"])
+        )
+        palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(PALETTE["ELEVATE_2"]))
+        palette.setColor(QPalette.ColorRole.ToolTipText, QColor(PALETTE["TEXT_MAIN"]))
+        self.qt_app.setPalette(palette)
+
         try:
             self.qt_app.setStyleSheet(get_stylesheet())
         except (FileNotFoundError, KeyError) as exc:
@@ -83,7 +105,14 @@ class App:
         self._ctx = CoreContext(cfg)
         providers = create_providers(cfg.paths)
         self._mod_service = ModService(self._ctx, providers)
-        self.main_window = MainWindow(self._ctx, self._mod_service)
+        diagnostics_service = DiagnosticsService(self._ctx)
+        sort_service = SortService(self._ctx, diagnostics_service)
+        self.main_window = MainWindow(
+            self._ctx,
+            self._mod_service,
+            diagnostics_service,
+            sort_service,
+        )
 
     async def async_run(self) -> int:
         logger.info("Starting PxModRim")

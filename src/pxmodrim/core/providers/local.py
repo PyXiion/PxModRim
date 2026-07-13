@@ -15,6 +15,7 @@ class LocalModProvider(BaseModProvider):
     """Provider for local (non-Steam) mods."""
 
     provider_id = "local"
+    color = "#2ecc71"
 
     def __init__(self, local_path: Path) -> None:
         super().__init__(local_path)
@@ -47,14 +48,12 @@ class LocalModProvider(BaseModProvider):
         logger.info("LocalModProvider discovered {} mods", len(discovered))
         return discovered
 
-    def _should_include(self, mod: ListedMod) -> bool:
-        return False
-
 
 class SteamCmdModProvider(BaseModProvider):
     """Provider for Steam CMD / workshop mods - only includes mods with PublishedFileId.txt."""
 
     provider_id = "steam_cmd"
+    color = "#3498db"
 
     def __init__(self, local_path: Path) -> None:
         super().__init__(local_path)
@@ -88,6 +87,3 @@ class SteamCmdModProvider(BaseModProvider):
         discovered = await asyncio.to_thread(_scan)
         logger.info("SteamCmdModProvider discovered {} mods", len(discovered))
         return discovered
-
-    def _should_include(self, mod: ListedMod) -> bool:
-        return False

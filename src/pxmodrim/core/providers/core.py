@@ -13,6 +13,7 @@ from pxmodrim.services.mod_discovery import scan_mod_directory
 
 class CoreModProvider(BaseModProvider):
     provider_id = "core"
+    color = "#e67e22"
 
     def __init__(self, game_path: Path) -> None:
         self._game = game_path
@@ -38,6 +39,3 @@ class CoreModProvider(BaseModProvider):
         discovered = await asyncio.to_thread(_scan)
         logger.info("CoreModProvider discovered {} mods", len(discovered))
         return discovered
-
-    def _should_include(self, mod: ListedMod) -> bool:
-        return True

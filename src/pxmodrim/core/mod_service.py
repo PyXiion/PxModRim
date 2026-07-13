@@ -18,15 +18,24 @@ from pxmodrim.services.mod_discovery import resolve_active_uuids
 class ModService:
     def __init__(self, ctx: CoreContext, providers: list[BaseModProvider]) -> None:
         self._ctx = ctx
-        self._providers = list(providers)
+        self._providers: dict[str, BaseModProvider] = {
+            p.provider_id: p for p in providers
+        }
 
     def reset_providers(self, providers: list[BaseModProvider]) -> None:
-        self._providers = list(providers)
+        self._providers = {p.provider_id: p for p in providers}
+
+    def get_provider(self, provider_id: str) -> BaseModProvider | None:
+        return self._providers.get(provider_id)
+
+    @property
+    def provider_colors(self) -> dict[str, str]:
+        return {pid: p.color for pid, p in self._providers.items()}
 
     async def discover(self) -> None:
         all_mods: dict[str, ListedMod] = {}
-        for p in self._providers:
-            mods = await p.discover(self._ctx.config.target_version)
+        for p in self._providers.values():
+            mods = await p.discover(self._ctx.target_version)
             all_mods.update(mods)
         active = resolve_active_uuids(all_mods, self._ctx.config.paths.config_folder)
         self._ctx.load(all_mods, active)
@@ -51,7 +60,7 @@ class ModService:
         known_expansions = existing.knownExpansions if existing else []
 
         data = ModsConfig(
-            version=cfg.target_version,
+            version=self._ctx.target_version,
             activeMods=package_ids,
             knownExpansions=known_expansions,
         )

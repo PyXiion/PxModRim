@@ -9,6 +9,9 @@ from pxmodrim.ui.mod_list_model import ModListModel
 if TYPE_CHECKING:
     from pxmodrim._compat.config import AppConfig
 
+# Minimum valid version string shape: "X.Y" — reject anything shorter
+_VERSION_MIN_PARTS = 2
+
 
 class CoreContext:
     def __init__(self, cfg: "AppConfig") -> None:
@@ -16,6 +19,8 @@ class CoreContext:
         self._mods: dict[str, ListedMod] = {}
         self._active_uuids: list[str] = []
         self._mod_list_model: ModListModel | None = None
+        self._game_version: str = "Unknown"
+        self._refresh_game_version()
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         self._mods = dict(mods)
@@ -23,9 +28,35 @@ class CoreContext:
 
     def update_config(self, cfg: "AppConfig") -> None:
         self._cfg = cfg
+        self._refresh_game_version()
 
     def set_mod_list_model(self, model: ModListModel) -> None:
         self._mod_list_model = model
+
+    # ── Game version ──────────────────────────────────────────────────────────
+
+    def _refresh_game_version(self) -> None:
+        from pxmodrim._compat.config import read_game_version
+
+        game = self._cfg.paths.game
+        if not game:
+            self._game_version = "Unknown"
+            return
+        version = read_game_version(game)
+        self._game_version = version if version else "Unknown"
+
+    @property
+    def game_version(self) -> str:
+        return self._game_version
+
+    @property
+    def target_version(self) -> str:
+        parts = self._game_version.split(".")
+        if len(parts) >= _VERSION_MIN_PARTS:
+            return f"{parts[0]}.{parts[1]}"
+        return "Unknown"
+
+    # ── Mods ──────────────────────────────────────────────────────────────────
 
     @property
     def all_mods(self) -> dict[str, ListedMod]:
