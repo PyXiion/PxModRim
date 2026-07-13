@@ -26,8 +26,8 @@ class HeaderPanel(QQuickWidget):
         self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)
         self.setClearColor(QColor(PALETTE["ELEVATE_1"]))
-        self.setFixedHeight(48)
-
-        ctx = self.rootContext()
-        ctx.setContextProperty("headerController", controller)
         self.setSource(str(_HEADER_QML))
+        root_obj = self.rootObject()
+        if root_obj is None:
+            raise RuntimeError("Header.qml failed to load: rootObject is None")
+        root_obj.setProperty("controller", controller)

@@ -18,6 +18,7 @@ class ModDiagnosticsView:
 @dataclass(frozen=True)
 class ModIssueView:
     category: str
+    category_display_name: str
     detail: str | None
     is_error: bool
 

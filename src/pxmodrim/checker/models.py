@@ -22,6 +22,7 @@ class ModIssue:
     category: str
     severity: Literal["error", "warning"]
     short_message: str
+    category_display_name: str = ""
     detail_message: str = ""
     related_package_ids: tuple[PackageId, ...] = ()
 

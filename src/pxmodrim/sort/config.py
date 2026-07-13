@@ -8,10 +8,6 @@ from pxmodrim.models.metadata.structures import CaseInsensitiveStr
 PackageId = CaseInsensitiveStr
 
 
-class SortMethod(IntEnum):
-    TOPOLOGICAL = 0
-
-
 class Tier(IntEnum):
     TIER_0 = 0
     TIER_1 = 1
@@ -60,8 +56,6 @@ class TierConfig:
 
 @dataclass(frozen=True, slots=True)
 class SortSettings:
-    method: SortMethod = SortMethod.TOPOLOGICAL
-    use_moddependencies_as_load_before: bool = True
     use_alternative_package_ids: bool = True
     check_missing_dependencies: bool = True
     use_community_rules: bool = True

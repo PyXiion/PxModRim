@@ -7,7 +7,6 @@ from pxmodrim.sort.community import (
 )
 from pxmodrim.sort.community_service import CommunityRulesService
 from pxmodrim.sort.config import (
-    SortMethod,
     SortSettings,
     Tier,
     TierConfig,
@@ -29,7 +28,6 @@ __all__ = [
     "CommunityRulesMissingError",
     "CommunityRulesService",
     "PackageId",
-    "SortMethod",
     "SortSettings",
     "Tier",
     "TierConfig",

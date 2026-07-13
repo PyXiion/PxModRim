@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 
 class ModIssueChecker(ABC):
+    category_display_name: str = ""
+
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return True
 
@@ -20,6 +22,8 @@ class ModIssueChecker(ABC):
 
 
 class DependencyIssueChecker(ModIssueChecker):
+    category_display_name = "Missing Dependency"
+
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return bool(mod.overall_rules.dependencies)
 
@@ -48,6 +52,7 @@ class DependencyIssueChecker(ModIssueChecker):
                 issues.append(
                     ModIssue(
                         category="missing_dependency",
+                        category_display_name=self.category_display_name,
                         severity="error",
                         short_message="Missing dependencies",
                         detail_message=(
@@ -61,6 +66,8 @@ class DependencyIssueChecker(ModIssueChecker):
 
 
 class IncompatibilityIssueChecker(ModIssueChecker):
+    category_display_name = "Incompatibility"
+
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         pid = PackageId(mod.package_id)
         outgoing = ctx.graph.edges_of_type(pid, EdgeType.INCOMPATIBILITY)
@@ -83,6 +90,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                 issues.append(
                     ModIssue(
                         category="incompatibility",
+                        category_display_name=self.category_display_name,
                         severity="error",
                         short_message="Incompatibilities detected",
                         detail_message=f"Mod declares incompatibility with: {name} ({incomp})",
@@ -110,6 +118,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                     issues.append(
                         ModIssue(
                             category="incompatibility",
+                            category_display_name=self.category_display_name,
                             severity="error",
                             short_message="Incompatibilities detected",
                             detail_message=f"Declared incompatible by: {name} ({edge.source})",
@@ -121,6 +130,8 @@ class IncompatibilityIssueChecker(ModIssueChecker):
 
 
 class LoadOrderIssueChecker(ModIssueChecker):
+    category_display_name = "Load Order"
+
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         pid = PackageId(mod.package_id)
         return bool(
@@ -143,6 +154,7 @@ class LoadOrderIssueChecker(ModIssueChecker):
                 issues.append(
                     ModIssue(
                         category="load_order",
+                        category_display_name=self.category_display_name,
                         severity="warning",
                         short_message="Load order violated",
                         detail_message=(
@@ -161,6 +173,7 @@ class LoadOrderIssueChecker(ModIssueChecker):
                 issues.append(
                     ModIssue(
                         category="load_order",
+                        category_display_name=self.category_display_name,
                         severity="warning",
                         short_message="Load order violated",
                         detail_message=(
@@ -175,6 +188,7 @@ class LoadOrderIssueChecker(ModIssueChecker):
 
 
 class CycleIssueChecker(ModIssueChecker):
+    category_display_name = "Cycle"
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         pid = PackageId(mod.package_id)
         issues: list[ModIssue] = []
@@ -184,6 +198,7 @@ class CycleIssueChecker(ModIssueChecker):
                 issues.append(
                     ModIssue(
                         category="cycle",
+                        category_display_name=self.category_display_name,
                         severity="warning",
                         short_message="Dependency cycle detected",
                         detail_message=(
@@ -198,6 +213,7 @@ class CycleIssueChecker(ModIssueChecker):
 
 
 class GameVersionIssueChecker(ModIssueChecker):
+    category_display_name = "Version Mismatch"
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return bool(mod.supported_versions)
 
@@ -216,6 +232,7 @@ class GameVersionIssueChecker(ModIssueChecker):
             return [
                 ModIssue(
                     category="version_mismatch",
+                    category_display_name=self.category_display_name,
                     severity="warning",
                     short_message="Version mismatch",
                     detail_message=(
@@ -229,6 +246,7 @@ class GameVersionIssueChecker(ModIssueChecker):
 
 
 class ReplacementIssueChecker(ModIssueChecker):
+    category_display_name = "Replacement Available"
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         pid = str(mod.published_file_id) if mod.published_file_id else None
         if pid is None:
@@ -241,6 +259,7 @@ class ReplacementIssueChecker(ModIssueChecker):
         return [
             ModIssue(
                 category="replacement_available",
+                category_display_name=self.category_display_name,
                 severity="warning",
                 short_message="Replacement available",
                 detail_message=(

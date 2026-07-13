@@ -31,6 +31,8 @@ if TYPE_CHECKING:
         "toast-warning",
         "toast-error",
         "empty",
+        "play",
+        "link",
     ]
 
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
@@ -234,11 +236,24 @@ _ICONS: dict[str, str] = {
         '<line x1="9" y1="9" x2="15" y2="15"/>'
         "</svg>"
     ),
+    "play": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<polygon points="5 3 19 12 5 21 5 3"/>'
+        "</svg>"
+    ),
     "empty": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"'
         ' stroke-linecap="round" stroke-linejoin="round">'
         '<path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>'
         '<polyline points="13 2 13 9 20 9"/>'
+        "</svg>"
+    ),
+    "link": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
+        '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
         "</svg>"
     ),
 }

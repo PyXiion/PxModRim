@@ -12,14 +12,16 @@ class IconButton(QPushButton):
         icon_name: str,
         tooltip: str = "",
         primary: bool = False,
+        size: int = 32,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._icon_name = icon_name
         self._primary = primary
 
-        self.setIcon(icon(icon_name, 16, "#949ba4"))
-        self.setFixedSize(32, 32)
+        icon_px = max(16, size // 2)
+        self.setIcon(icon(icon_name, icon_px, "#949ba4"))
+        self.setFixedSize(size, size)
         self.setObjectName("iconBtn")
         if primary:
             self.setProperty("primary", True)

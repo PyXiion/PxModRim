@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
 from loguru import logger
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QResizeEvent
+from PySide6.QtGui import QIcon, QKeyEvent, QKeySequence, QResizeEvent, QShortcut
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QMainWindow,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -23,11 +24,11 @@ from pxmodrim.core.mod_service import ModService
 from pxmodrim.models.view.sidebar import SidebarEntry
 from pxmodrim.services.diagnostics_service import DiagnosticsService
 from pxmodrim.services.sort_service import SortService
+from pxmodrim.ui.about_panel import AboutPanel
 from pxmodrim.ui.components import (
     HeaderController,
     HeaderPanel,
     SvgIconProvider,
-    TitleBar,
     ToastManager,
 )
 from pxmodrim.ui.menu_bar import MenuBar
@@ -51,10 +52,12 @@ class MainWindow(QMainWindow):
     ) -> None:
         super().__init__()
 
-        # Must init before any Qt method that could fire changeEvent
-        self._title_bar: TitleBar | None = None
+        self._is_frameless: bool = False
 
         self.setWindowTitle("PxModRim")
+        self.setWindowIcon(
+            QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
+        )
         self.resize(1400, 850)
 
         # Register theme singleton + SVG icon provider on a shared QML engine
@@ -75,22 +78,32 @@ class MainWindow(QMainWindow):
         )
 
         # ── Frameless window attempt ──
-        self._try_frameless()
-
-        # ── Menu bar ──
-        self._menu_bar = MenuBar()
-        self._menu_bar.settings_requested.connect(self._open_settings)
-        self._menu_bar.about_requested.connect(self._show_about)
-        self.setMenuBar(self._menu_bar)
+        self._is_frameless = self._try_frameless()
 
         # ── Header (QML) ──
-        self._header_controller = HeaderController()
+        self._header_controller = HeaderController(is_frameless=self._is_frameless)
         self._header_controller.refresh_requested.connect(self.load_mods_async)
         self._header_controller.sort_requested.connect(self._auto_sort)
         self._header_controller.save_requested.connect(self._save_mods_config)
         self._header_controller.settings_requested.connect(self._open_settings)
+        self._header_controller.launch_requested.connect(self._launch_game)
+        self._header_controller.minimize_requested.connect(self.showMinimized)
+        self._header_controller.maximize_requested.connect(self._toggle_maximized)
+        self._header_controller.close_requested.connect(self.close)
+        self._header_controller.drag_started.connect(self._start_system_move)
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
+
+        # ── Menu bar (hidden by default, toggled via Alt) ──
+        self._menu_bar = MenuBar()
+        self._menu_bar.settings_requested.connect(self._open_settings)
+        self._menu_bar.about_requested.connect(self._show_about)
+
+        # ── Keyboard shortcuts ──
+        QShortcut(QKeySequence("Ctrl+,"), self, self._open_settings)
+        QShortcut(QKeySequence("Ctrl+Q"), self, self.close)
+        QShortcut(QKeySequence("F5"), self, self._header_controller.refresh)
+        QShortcut(QKeySequence("Ctrl+S"), self, self._header_controller.save)
 
         # ── Outer container ──
         outer = QWidget()
@@ -99,12 +112,9 @@ class MainWindow(QMainWindow):
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
 
-        # Title bar (if frameless)
-        if self._title_bar:
-            outer_layout.addWidget(self._title_bar)
-
-        # Header (always below menu bar in native, or below title bar in frameless)
         outer_layout.addWidget(self._header)
+        outer_layout.addWidget(self._menu_bar)
+        self._menu_bar.hide()
 
         # Content (3-panel workspace)
         content = QWidget()
@@ -155,10 +165,12 @@ class MainWindow(QMainWindow):
         # Pass mod list model to context for sorting
         self._ctx.set_mod_list_model(self.mod_list.model)
 
-    def _try_frameless(self) -> None:
-        """Attempt to enable frameless window with custom title bar.
-        Falls back to native frame gracefully.
-        """
+        # Alt key event filter (installed after all widgets exist)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+
+    def _try_frameless(self) -> bool:
         try:
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
@@ -167,28 +179,48 @@ class MainWindow(QMainWindow):
                 | Qt.WindowType.WindowMaximizeButtonHint
                 | Qt.WindowType.WindowCloseButtonHint
             )
-            self._title_bar = TitleBar(self)
-            self._title_bar.minimize_requested.connect(self.showMinimized)
-            self._title_bar.maximize_requested.connect(self._toggle_maximized)
-            self._title_bar.close_requested.connect(self.close)
-
-            # Check if frameless actually took effect (some Wayland compositors ignore it)
             if self.windowFlags() & Qt.WindowType.FramelessWindowHint:
                 logger.debug("Frameless window enabled")
-            else:
-                logger.info("Frameless not supported, using native frame")
-                self._title_bar = None
+                return True
+            logger.info("Frameless not supported, using native frame")
+            return False
         except Exception as exc:
             logger.warning("Failed to set frameless window: {}", exc)
-            self._title_bar = None
+            return False
 
     def _toggle_maximized(self) -> None:
         if self.isMaximized():
             self.showNormal()
         else:
             self.showMaximized()
-        if self._title_bar:
-            self._title_bar.update_maximize_icon(self.isMaximized())
+        self._header_controller.set_maximized(self.isMaximized())
+
+    def _start_system_move(self) -> None:
+        if not self._is_frameless:
+            return
+        win = self.windowHandle()
+        if win is not None:
+            win.startSystemMove()
+
+    # ── Event filter (Alt → toggle menu bar) ─────────────
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if isinstance(event, QKeyEvent) and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Alt:
+                if isinstance(obj, QWidget) and obj.window() is self:
+                    self._toggle_menu_bar()
+                    return True
+            if event.key() == Qt.Key.Key_Escape and self._menu_bar.isVisible():
+                if isinstance(obj, QWidget) and obj.window() is self:
+                    self._menu_bar.hide()
+                    return True
+        return super().eventFilter(obj, event)
+
+    def _toggle_menu_bar(self) -> None:
+        shown = not self._menu_bar.isVisible()
+        self._menu_bar.setVisible(shown)
+        if shown:
+            self._menu_bar.setFocus()
 
     # ── Public ──────────────────────────────────────────────
 
@@ -227,12 +259,9 @@ class MainWindow(QMainWindow):
         self._mod_service.reset_providers(create_providers(cfg.paths))
         await self.load_mods_async()
 
-    def _show_about(self) -> None:
-        QMessageBox.about(
-            self,
-            "About PxModRim",
-            "PxModRim v0.1.0\nA mod manager for RimWorld.",
-        )
+    @asyncSlot()
+    async def _show_about(self) -> None:
+        await await_dialog(AboutPanel, self)
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
@@ -249,6 +278,9 @@ class MainWindow(QMainWindow):
             self._toast_manager.success(f"Saved {len(active_ids)} active mods", 3000)
         else:
             self._toast_manager.warning("Config folder not set", 3000)
+
+    def _launch_game(self) -> None:
+        self._toast_manager.info("Launch not implemented yet")
 
     def _on_mod_selected(self, uuid: str) -> None:
         self._selected_uuid = uuid
@@ -309,5 +341,5 @@ class MainWindow(QMainWindow):
 
     def changeEvent(self, event: QEvent) -> None:
         super().changeEvent(event)
-        if self._title_bar and event.type() == QEvent.Type.WindowStateChange:
-            self._title_bar.update_maximize_icon(self.isMaximized())
+        if event.type() == QEvent.Type.WindowStateChange:
+            self._header_controller.set_maximized(self.isMaximized())

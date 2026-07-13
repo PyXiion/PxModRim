@@ -41,7 +41,6 @@ def _sort(
     ordered_pids = list(mods.keys())
     settings = SortSettings(
         use_community_rules=False,
-        use_moddependencies_as_load_before=False,
         use_alternative_package_ids=False,
         tier_config=tier_config or TierConfig.default(),
     )

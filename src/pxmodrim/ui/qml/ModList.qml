@@ -126,9 +126,13 @@ Rectangle {
                 preventStealing: true
 
                 property bool wasDragged: false
+                property bool dragConfirmed: false
+                property bool mousePressed: false
 
                 onPressed: (mouse) => {
+                    mousePressed = true
                     wasDragged = false
+                    dragConfirmed = false
                     var rootPos = delegateRect.mapToItem(root, 0, 0)
                     dragProxy.modName = model.name || ""
                     dragProxy.modPackageId = model.packageId || ""
@@ -136,16 +140,20 @@ Rectangle {
                     dragProxy.pressOffsetY = mouse.y
                     dragProxy.x = rootPos.x
                     dragProxy.y = rootPos.y
-                    dragProxy.visible = true
 
                     listView.dragSourceIndex = index
                     listView.currentIndex = index
-                    listView.itemIsHeld = true
                 }
 
                 onPositionChanged: (mouse) => {
-                    if (!listView.itemIsHeld)
+                    if (!mousePressed)
                         return
+
+                    if (!dragConfirmed) {
+                        dragConfirmed = true
+                        listView.itemIsHeld = true
+                        dragProxy.visible = true
+                    }
 
                     var rootPos = mouseArea.mapToItem(root, mouse.x, mouse.y)
                     dragProxy.y = rootPos.y - dragProxy.pressOffsetY
@@ -164,19 +172,23 @@ Rectangle {
                 }
 
                 onReleased: {
+                    mousePressed = false
                     dragProxy.visible = false
                     listView.itemIsHeld = false
                     var hadDrag = wasDragged
                     listView.dragSourceIndex = -1
+                    dragConfirmed = false
                     if (hadDrag) {
                         modListPanel.dragEnded()
                     }
                 }
 
                 onCanceled: {
+                    mousePressed = false
                     dragProxy.visible = false
                     listView.itemIsHeld = false
                     listView.dragSourceIndex = -1
+                    dragConfirmed = false
                 }
             }
 

@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import sys
 import traceback
+from importlib.resources import files as resource_files
 from types import TracebackType
 
 from loguru import logger
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
 
@@ -60,6 +61,8 @@ sys.excepthook = _exception_hook
 class App:
     def __init__(self) -> None:
         self.qt_app = QApplication(sys.argv)
+        icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
+        self.qt_app.setWindowIcon(icon)
         self.qt_app.setApplicationName("PxModRim")
         self.qt_app.setOrganizationName("PxModRim")
         self.qt_app.setApplicationDisplayName("PxModRim")

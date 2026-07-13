@@ -28,7 +28,6 @@ def _make_mod(package_id: str, name: str | None = None) -> AboutXmlMod:
 def _settings() -> SortSettings:
     return SortSettings(
         use_community_rules=False,
-        use_moddependencies_as_load_before=False,
         use_alternative_package_ids=True,
         check_missing_dependencies=True,
     )

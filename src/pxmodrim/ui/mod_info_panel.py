@@ -4,9 +4,16 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QImage, QPixmap
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from pxmodrim._compat.config import AppConfig, save_config
 from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
@@ -17,6 +24,8 @@ from pxmodrim.ui.components import (
     MetaChipRow,
     generate_preview,
 )
+from pxmodrim.ui.components.icons import icon, pixmap
+from pxmodrim.ui.palette import PALETTE
 
 if TYPE_CHECKING:
     from pxmodrim.models.view.diagnostics import ModIssueView
@@ -43,6 +52,41 @@ def _find_preview(mod_path: Path | None) -> Path | None:
     return candidate if candidate.exists() else None
 
 
+
+
+
+class IssueRow(QWidget):
+    def __init__(self, issue: ModIssueView, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(8)
+
+        icon_name = "error" if issue.is_error else "warning"
+        color = "#ed4245" if issue.is_error else "#f9a825"
+        icon_label = QLabel()
+        icon_label.setPixmap(pixmap(icon_name, 16, color))
+        icon_label.setFixedSize(16, 16)
+        layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+
+        content = QVBoxLayout()
+        content.setContentsMargins(0, 0, 0, 0)
+        content.setSpacing(2)
+
+        cat_label = QLabel(issue.category_display_name)
+        cat_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+        content.addWidget(cat_label)
+
+        if issue.detail:
+            detail_label = QLabel(issue.detail)
+            detail_label.setWordWrap(True)
+            detail_label.setStyleSheet("color: #949ba4;")
+            content.addWidget(detail_label)
+
+        layout.addLayout(content, 1)
+
+
 class ModInfoPanel(QWidget):
     def __init__(self, config: AppConfig) -> None:
         super().__init__()
@@ -66,7 +110,7 @@ class ModInfoPanel(QWidget):
         self._scroll.setWidget(self._content)
 
         # Banner
-        self._banner = AspectRatioBanner(self, max_height=200)
+        self._banner = AspectRatioBanner(self, max_height=260)
         self._banner.hide()
         cl.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
 
@@ -74,7 +118,7 @@ class ModInfoPanel(QWidget):
         self._placeholder = QLabel("Select a mod to view details")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setObjectName("placeholder")
-        cl.addWidget(self._placeholder, stretch=1)
+        cl.addWidget(self._placeholder, 0, Qt.AlignmentFlag.AlignTop)
 
         # Info area
         self._info_area = QWidget()
@@ -83,7 +127,59 @@ class ModInfoPanel(QWidget):
         ia_layout = QVBoxLayout(self._info_area)
         ia_layout.setContentsMargins(0, 0, 0, 0)
         ia_layout.setSpacing(0)
-        cl.addWidget(self._info_area)
+        cl.addWidget(self._info_area, stretch=1)
+
+        # Open mod folder button
+        self._btn_container = QWidget()
+        self._btn_container.setObjectName("infoButtonContainer")
+        btn_layout = QHBoxLayout(self._btn_container)
+        btn_layout.setContentsMargins(16, 8, 16, 8)
+
+        self._open_folder_btn = QPushButton()
+        self._open_folder_btn.setIcon(icon("folder", 16, "#949ba4"))
+        self._open_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._open_folder_btn.setToolTip("Open mod folder")
+        self._open_folder_btn.clicked.connect(self._on_open_folder)
+        self._open_folder_btn.setStyleSheet(f"""
+            QPushButton {{
+                min-width: 32px; max-width: 32px;
+                min-height: 32px; max-height: 32px;
+                background-color: {PALETTE['ELEVATE_3']};
+                border: 1px solid {PALETTE['BORDER']};
+                border-radius: 6px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background-color: {PALETTE['ELEVATE_4']};
+                border-color: {PALETTE['ELEVATE_4']};
+            }}
+        """)
+        btn_layout.addWidget(self._open_folder_btn)
+
+        self._open_url_btn = QPushButton()
+        self._open_url_btn.setIcon(icon("link", 16, "#949ba4"))
+        self._open_url_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._open_url_btn.setToolTip("Open mod URL")
+        self._open_url_btn.clicked.connect(self._on_open_url)
+        self._open_url_btn.setStyleSheet(f"""
+            QPushButton {{
+                min-width: 32px; max-width: 32px;
+                min-height: 32px; max-height: 32px;
+                background-color: {PALETTE['ELEVATE_3']};
+                border: 1px solid {PALETTE['BORDER']};
+                border-radius: 6px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background-color: {PALETTE['ELEVATE_4']};
+                border-color: {PALETTE['ELEVATE_4']};
+            }}
+        """)
+        btn_layout.addWidget(self._open_url_btn)
+        btn_layout.addStretch()
+
+        self._btn_container.hide()
+        ia_layout.addWidget(self._btn_container, 0, Qt.AlignmentFlag.AlignTop)
 
         # Meta chips
         self._meta_chips = MetaChipRow(
@@ -94,7 +190,7 @@ class ModInfoPanel(QWidget):
                 "source": "Source",
             }
         )
-        ia_layout.addWidget(self._meta_chips)
+        ia_layout.addWidget(self._meta_chips, 0, Qt.AlignmentFlag.AlignTop)
 
         # Description accordion
         self._desc_renderer = DescriptionRenderer()
@@ -105,7 +201,7 @@ class ModInfoPanel(QWidget):
         )
         self._desc_section.toggled.connect(self._on_desc_toggled)
         self._desc_section.hide()
-        ia_layout.addWidget(self._desc_section, 1)
+        ia_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
 
         # Dependencies accordion
         self._deps_label = QLabel("None")
@@ -123,19 +219,27 @@ class ModInfoPanel(QWidget):
         ia_layout.addWidget(self._deps_section, 0, Qt.AlignmentFlag.AlignTop)
 
         # Issues accordion
-        self._issues_label = QLabel("No issues detected")
-        self._issues_label.setObjectName("issuesLabel")
-        self._issues_label.setWordWrap(True)
-        self._issues_label.setTextInteractionFlags(
+        self._no_issues_label = QLabel("No issues detected")
+        self._no_issues_label.setObjectName("issuesLabel")
+        self._no_issues_label.setWordWrap(True)
+        self._no_issues_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
+
+        self._issues_container = QWidget()
+        self._issues_layout = QVBoxLayout(self._issues_container)
+        self._issues_layout.setContentsMargins(0, 0, 0, 0)
+        self._issues_layout.setSpacing(0)
+        self._issues_layout.addWidget(self._no_issues_label)
+
         self._issues_section = AccordionSection(
             "Issues",
-            self._issues_label,
+            self._issues_container,
             expanded=True,
         )
         self._issues_section.hide()
         ia_layout.addWidget(self._issues_section, 0, Qt.AlignmentFlag.AlignTop)
+        ia_layout.addStretch()
 
         self._current_issues: list[ModIssueView] = []
 
@@ -162,6 +266,16 @@ class ModInfoPanel(QWidget):
             if mod.description
             else (str(mod.package_id) if isinstance(mod, AboutXmlMod) else "")
         )
+
+        self._btn_container.setVisible(
+            mod.mod_path is not None and mod.mod_path.exists()
+        )
+
+        if isinstance(mod, AboutXmlMod) and bool(mod.url):
+            self._open_url_btn.setVisible(True)
+            self._open_url_btn.setToolTip(f"Open URL: {mod.url}")
+        else:
+            self._open_url_btn.setVisible(False)
 
         self._preview_task = asyncio.ensure_future(
             self._load_preview(mod.mod_path, mod_id, mod.name)
@@ -209,45 +323,54 @@ class ModInfoPanel(QWidget):
         self._show_issues(issues)
 
     def _show_issues(self, issues: list[ModIssueView]) -> None:
+        while self._issues_layout.count():
+            item = self._issues_layout.takeAt(0)
+            if item is not None:
+                w = item.widget()
+                if w is not None and w is not self._no_issues_label:
+                    w.deleteLater()
+
         if not issues:
-            self._issues_label.setText("No issues detected")
+            self._no_issues_label.show()
+            self._issues_layout.addWidget(self._no_issues_label)
             self._issues_section.show()
             return
 
-        parts: list[str] = []
+        self._no_issues_label.hide()
         for issue in issues:
-            icon = "\u2716" if issue.is_error else "\u26a0"
-            color = "#ed4245" if issue.is_error else "#f9a825"
-            parts.append(
-                f'<span style="color: {color};">{icon} {issue.category}</span>'
-            )
-            if issue.detail:
-                parts.append(f"&nbsp;&nbsp;{issue.detail}")
-
-        self._issues_label.setText("<br>".join(parts))
+            self._issues_layout.addWidget(IssueRow(issue))
         self._issues_section.show()
+
+    def _on_open_folder(self) -> None:
+        if self._mod is not None and self._mod.mod_path is not None:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._mod.mod_path)))
+
+    def _on_open_url(self) -> None:
+        if isinstance(self._mod, AboutXmlMod) and self._mod.url:
+            QDesktopServices.openUrl(QUrl(self._mod.url))
 
     async def _load_preview(
         self, mod_path: Path | None, mod_id: str, mod_name: str
     ) -> None:
         """Load preview image in background thread. Only updates UI if still current mod."""
         try:
-            preview = await asyncio.to_thread(_find_preview, mod_path)
-            if preview is None:
-                if self._current_mod_id == mod_id:
-                    w = self._banner.width() or 300
-                    h = self._banner.sizeHint().height()
-                    fallback = await asyncio.to_thread(generate_preview, mod_name, w, h)
-                    if self._current_mod_id == mod_id:
-                        self._banner.setPixmap(fallback)
-                return
+            preview_path = await asyncio.to_thread(_find_preview, mod_path)
 
-            image = await asyncio.to_thread(QImage, str(preview))
-            if self._current_mod_id != mod_id:
-                return
-            self._banner.setPixmap(
-                QPixmap() if image.isNull() else QPixmap.fromImage(image)
-            )
+            if preview_path is not None:
+                image = await asyncio.to_thread(QImage, str(preview_path))
+                if self._current_mod_id == mod_id and not image.isNull():
+                    self._banner.setPixmap(QPixmap.fromImage(image))
+                    self._banner.setShowOverlay(False)
+                    return
+
+            # No usable preview — show fallback with overlay
+            if self._current_mod_id == mod_id:
+                w = self._banner.width() or 300
+                h = self._banner.sizeHint().height()
+                fallback = await asyncio.to_thread(generate_preview, mod_name, w, h)
+                if self._current_mod_id == mod_id:
+                    self._banner.setShowOverlay(True)
+                    self._banner.setPixmap(fallback)
         except asyncio.CancelledError:
             pass
 
@@ -256,6 +379,7 @@ class ModInfoPanel(QWidget):
         self._current_mod_id = None
         self._placeholder.show()
         self._banner.hide()
+        self._btn_container.hide()
         self._info_area.hide()
 
     def _on_deps_toggled(self, expanded: bool) -> None:

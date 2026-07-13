@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import base64
+import random
+from importlib.resources import files as resource_files
+
 from PySide6.QtCore import Property, QObject, Signal
 
 from pxmodrim.ui.components.icons import svg_str
@@ -11,6 +15,17 @@ class Theme(QObject):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
+        self._logo_data_uri = self._load_logo()
+
+    @staticmethod
+    def _load_logo() -> str:
+        logo_files = [f"logo_nobg_{N}.svg" for N in range(1, 4 + 1)]
+
+        chosen = random.choice(logo_files)
+        svg_path = resource_files("pxmodrim.ui.assets") / chosen
+        raw = svg_path.read_bytes()
+        encoded = base64.b64encode(raw).decode("ascii")
+        return f"data:image/svg+xml;base64,{encoded}"
 
     # ── Elevation backgrounds ────────────────────────────
 
@@ -221,6 +236,10 @@ class Theme(QObject):
     @Property(str, constant=True)
     def logoSvg(self) -> str:
         return svg_str("logo", "currentColor")
+
+    @Property(str, constant=True)
+    def logoFileDataUri(self) -> str:
+        return self._logo_data_uri
 
     @Property(str, constant=True)
     def refreshSvg(self) -> str:

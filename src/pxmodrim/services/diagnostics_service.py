@@ -150,6 +150,7 @@ class DiagnosticsService(QObject):
             views.append(
                 ModIssueView(
                     category=issue.category,
+                    category_display_name=issue.category_display_name or issue.category,
                     detail=issue.detail_message or None,
                     is_error=True,
                 )
@@ -158,6 +159,7 @@ class DiagnosticsService(QObject):
             views.append(
                 ModIssueView(
                     category=issue.category,
+                    category_display_name=issue.category_display_name or issue.category,
                     detail=issue.detail_message or None,
                     is_error=False,
                 )

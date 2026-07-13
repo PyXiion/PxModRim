@@ -7,7 +7,6 @@ QDialog {
 
 QWidget {
     color: $TEXT_MAIN;
-    background-color: $ELEVATE_1;
     font-family: "Source Sans 3", "Liberation Sans", sans-serif;
 }
 
@@ -79,9 +78,11 @@ QPushButton {
     border: 1px solid $BORDER;
     border-radius: 6px;
     color: $TEXT_MAIN;
-    padding: 6px 14px;
     font-size: 12px;
     font-weight: 500;
+}
+QPushButton#appBtn {
+    padding: 6px 14px;
     min-height: 18px;
 }
 QPushButton:hover {
@@ -388,31 +389,6 @@ QTabBar::tab:hover {
     color: $TEXT_MAIN;
 }
 
-/* ── Title Bar ── */
-QWidget#titleBar {
-    background-color: $ELEVATE_0;
-    min-height: 32px;
-    max-height: 32px;
-}
-QLabel#titleBarTitle {
-    color: $TEXT_DIM;
-    font-size: 12px;
-    font-weight: 500;
-}
-QPushButton#titleBarBtn {
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    min-height: 0;
-}
-QPushButton#titleBarBtn:hover {
-    background-color: $ELEVATE_3;
-}
-QPushButton#titleBarBtn:last-child:hover {
-    background-color: $DANGER;
-}
-
 /* ── Icon Buttons ── */
 QPushButton#iconBtn {
     background: transparent;
@@ -485,4 +461,32 @@ QProgressBar {
 QProgressBar::chunk {
     background: $PRIMARY;
     border-radius: 3px;
+}
+
+/* ── About Dialog ── */
+QWidget#aboutPanel {
+    background-color: $ELEVATE_1;
+}
+QLabel#aboutTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: $TEXT_MAIN;
+}
+QLabel#aboutVersion {
+    font-size: 12px;
+    color: $TEXT_MUTED;
+}
+QLabel#aboutDescription {
+    font-size: 14px;
+    color: $TEXT_MAIN;
+    line-height: 1.4;
+}
+QLabel#aboutMeta {
+    font-size: 12px;
+    color: $TEXT_MUTED;
+}
+QLabel#creditItem {
+    font-size: 12px;
+    color: $TEXT_MUTED;
+    padding: 4px 0;
 }

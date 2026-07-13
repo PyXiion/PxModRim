@@ -5,14 +5,12 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLineEdit,
-    QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -27,7 +25,8 @@ from pxmodrim._compat.config import (
 )
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.sort.community_service import CommunityRulesService
-from pxmodrim.sort.config import SortMethod, SortSettings, TierConfig
+from pxmodrim.sort.config import SortSettings
+from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
 
 
@@ -55,9 +54,9 @@ class SettingsPanel(QDialog):
         buttons = QHBoxLayout()
         buttons.addStretch()
 
-        save_btn = QPushButton("Save")
+        save_btn = AppButton("Save")
         save_btn.clicked.connect(self._save)
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = AppButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         buttons.addWidget(save_btn)
         buttons.addWidget(cancel_btn)
@@ -98,7 +97,7 @@ class SettingsPanel(QDialog):
             self._browse_config,
         )
 
-        detect_btn = QPushButton("Auto-detect")
+        detect_btn = AppButton("Auto-detect")
         detect_btn.clicked.connect(self._auto_detect)
         form.addRow("", detect_btn)
 
@@ -110,27 +109,9 @@ class SettingsPanel(QDialog):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # Algorithm group
-        algo_group = QGroupBox("Algorithm")
-        algo_layout = QVBoxLayout(algo_group)
-
-        self.sort_method = QComboBox()
-        self.sort_method.addItems(["Topological"])
-        if self._config.sort.method == SortMethod.TOPOLOGICAL:
-            self.sort_method.setCurrentIndex(0)
-        algo_layout.addWidget(self.sort_method)
-
-        layout.addWidget(algo_group)
-
         # Options group
         opts_group = QGroupBox("Options")
         opts_layout = QVBoxLayout(opts_group)
-
-        self.use_moddeps_cb = QCheckBox("Use modDependencies as loadBefore")
-        self.use_moddeps_cb.setChecked(
-            self._config.sort.use_moddependencies_as_load_before
-        )
-        opts_layout.addWidget(self.use_moddeps_cb)
 
         self.use_alt_ids_cb = QCheckBox("Use alternativePackageIds")
         self.use_alt_ids_cb.setChecked(self._config.sort.use_alternative_package_ids)
@@ -159,7 +140,7 @@ class SettingsPanel(QDialog):
             self.cr_status.setText("Not downloaded")
         cr_layout.addWidget(self.cr_status)
 
-        self.cr_download_btn = QPushButton("Download / Update")
+        self.cr_download_btn = AppButton("Download / Update")
         self.cr_download_btn.clicked.connect(self._download_community_rules)
         cr_layout.addWidget(self.cr_download_btn)
 
@@ -177,9 +158,9 @@ class SettingsPanel(QDialog):
         value: str,
         dialog_title: str,
         browse_handler: Callable[[], None],
-    ) -> tuple[QLineEdit, QPushButton]:
+    ) -> tuple[QLineEdit, AppButton]:
         edit = QLineEdit(value)
-        browse = QPushButton("Browse\u2026")
+        browse = AppButton("Browse\u2026")
         browse.clicked.connect(browse_handler)
         row = QHBoxLayout()
         row.addWidget(edit, 1)
@@ -253,12 +234,9 @@ class SettingsPanel(QDialog):
                 config_folder=self.config_edit.text().strip(),
             ),
             sort=SortSettings(
-                method=SortMethod.TOPOLOGICAL,
-                use_moddependencies_as_load_before=self.use_moddeps_cb.isChecked(),
                 use_alternative_package_ids=self.use_alt_ids_cb.isChecked(),
                 check_missing_dependencies=self.check_missing_cb.isChecked(),
                 use_community_rules=self.use_community_cb.isChecked(),
-                tier_config=TierConfig.default(),
             ),
         )
         self.accept()

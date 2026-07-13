@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QColor, QIcon
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QShortcut
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
@@ -84,6 +84,15 @@ class ModListPanel(QWidget):
 
         layout.addWidget(self._qml)
 
+        # Keyboard navigation (window-scoped so it works even when info panel has focus)
+        self._up_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Up), self)
+        self._up_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        self._up_shortcut.activated.connect(self._navigate_up)
+
+        self._down_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Down), self)
+        self._down_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        self._down_shortcut.activated.connect(self._navigate_down)
+
     # ── Public API ────────────────────────────────────────────
 
     def load_mods(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
@@ -151,3 +160,26 @@ class ModListPanel(QWidget):
 
     def _on_model_active_changed(self) -> None:
         self.active_mods_changed.emit()
+
+    # ── Keyboard navigation ───────────────────────────────────
+
+    def _navigate_up(self) -> None:
+        if self.search_input.hasFocus():
+            return
+        list_view = self._qml.rootObject().findChild(QObject, "listView") if self._qml.rootObject() else None
+        if list_view is None:
+            return
+        idx = list_view.property("currentIndex")
+        if isinstance(idx, int) and idx > 0:
+            list_view.setProperty("currentIndex", idx - 1)
+
+    def _navigate_down(self) -> None:
+        if self.search_input.hasFocus():
+            return
+        list_view = self._qml.rootObject().findChild(QObject, "listView") if self._qml.rootObject() else None
+        if list_view is None:
+            return
+        idx = list_view.property("currentIndex")
+        count = list_view.property("count")
+        if isinstance(idx, int) and isinstance(count, int) and idx < count - 1:
+            list_view.setProperty("currentIndex", idx + 1)

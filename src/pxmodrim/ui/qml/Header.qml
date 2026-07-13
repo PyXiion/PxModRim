@@ -4,61 +4,120 @@ import QtQuick.Layouts 1.15
 
 Rectangle {
     id: root
-    height: 48
+    height: 80
     color: Theme.elevate1
+    property var controller: null
 
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 16
         anchors.rightMargin: 16
-        spacing: 6
+        anchors.bottomMargin: 8
+        spacing: 12
 
-        // ── Logo + title ──
-        RowLayout {
-            spacing: 8
+        // ── Logo ──
+        Image {
+            source: Theme.logoFileDataUri
+            Layout.preferredWidth: 128
+            Layout.fillHeight: true
+            fillMode: Image.PreserveAspectFit
+        }
+
+        // ── Text column ──
+        ColumnLayout {
             Layout.alignment: Qt.AlignVCenter
+            spacing: 0
 
-            Image {
-                source: "image://icons/logo?color=" + encodeURIComponent(Theme.primary)
-                sourceSize.width: 20
-                sourceSize.height: 20
-                fillMode: Image.PreserveAspectFit
+            Text {
+                text: "RimWorld Mod Manager"
+                color: Theme.textMuted
+                font.pixelSize: 11
             }
 
             Text {
-                text: "PxModRim"
-                color: Theme.primary
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
+                text: "v0.1.0"
+                color: Theme.textDim
+                font.pixelSize: 11
             }
         }
 
         Item { Layout.fillWidth: true }
 
-        // ── Icon buttons ──
-        HeaderButton {
-            iconName: "refresh"
-            tooltip: "Refresh (F5)"
-            onClicked: headerController.refresh()
-        }
+        // ── Buttons column ──
+        ColumnLayout {
+            Layout.alignment: Qt.AlignVCenter
+            spacing: 8
 
-        HeaderButton {
-            iconName: "sort"
-            tooltip: "Auto-sort"
-            isPrimary: true
-            onClicked: headerController.autoSort()
-        }
+            // Window controls (top row)
+            Row {
+                Layout.alignment: Qt.AlignRight
+                spacing: 6
+                visible: root.controller.is_frameless
 
-        HeaderButton {
-            iconName: "save"
-            tooltip: "Save (Ctrl+S)"
-            onClicked: headerController.save()
-        }
+                HeaderButton {
+                    iconName: "minimize"
+                    onClicked: root.controller.minimize()
+                }
 
-        HeaderButton {
-            iconName: "settings"
-            tooltip: "Settings"
-            onClicked: headerController.openSettings()
+                HeaderButton {
+                    iconName: root.controller.maximized ? "restore" : "maximize"
+                    onClicked: root.controller.maximize()
+                }
+
+                HeaderButton {
+                    iconName: "close"
+                    bgHoverColor: Theme.danger
+                    iconHoverColor: "#ffffff"
+                    onClicked: root.controller.closeWindow()
+                }
+            }
+
+            // Action buttons (bottom row)
+            Row {
+                Layout.alignment: Qt.AlignRight
+                spacing: 6
+
+                HeaderButton {
+                    iconName: "settings"
+                    bgColor: Theme.elevate0
+                    tooltip: "Settings"
+                    onClicked: root.controller.openSettings()
+                }
+
+                HeaderButton {
+                    iconName: "save"
+                    bgColor: Theme.elevate0
+                    tooltip: "Save (Ctrl+S)"
+                    onClicked: root.controller.save()
+                }
+
+                HeaderButton {
+                    iconName: "sort"
+                    tooltip: "Auto-sort"
+                    bgColor: Theme.primary
+                    bgHoverColor: Qt.lighter(Theme.primary, 1.15)
+                    iconColor: "#0b0d10"
+                    iconHoverColor: "#0b0d10"
+                    onClicked: root.controller.autoSort()
+                }
+
+                HeaderButton {
+                    iconName: "refresh"
+                    bgColor: Theme.elevate0
+                    tooltip: "Refresh (F5)"
+                    onClicked: root.controller.refresh()
+                }
+
+                HeaderButton {
+                    iconName: "play"
+                    tooltip: "Launch game"
+                    bgColor: Theme.success
+                    bgHoverColor: Qt.lighter(Theme.success, 1.15)
+                    iconColor: "white"
+                    iconHoverColor: "white"
+                    onClicked: root.controller.launch()
+                }
+            }
         }
     }
 
@@ -71,16 +130,29 @@ Rectangle {
         color: Theme.border
     }
 
+    // ── Drag region (behind buttons, z: -1) ──
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        acceptedButtons: Qt.LeftButton
+        onPressed: root.controller.dragStarted()
+        onDoubleClicked: root.controller.maximize()
+
+        cursorShape: root.controller.is_frameless ? Qt.OpenHandCursor : Qt.ArrowCursor
+    }
+
     // ── Reusable button component ──
     component HeaderButton: Rectangle {
         id: btn
         width: 32; height: 32
         radius: Theme.radiusMd
-        color: mouseArea.containsMouse ? Theme.elevate3 : "transparent"
-        border.color: isPrimary ? "transparent" : "transparent"
-        property bool isPrimary: false
+        color: mouseArea.containsMouse ? bgHoverColor : bgColor
         property string iconName: ""
         property string tooltip: ""
+        property color bgColor: "transparent"
+        property color bgHoverColor: Theme.elevate3
+        property color iconColor: Theme.textMuted
+        property color iconHoverColor: Theme.textMain
 
         signal clicked()
 
@@ -88,19 +160,11 @@ Rectangle {
             anchors.centerIn: parent
             source: {
                 if (btn.iconName === "") return ""
-                var color = btn.isPrimary ? "#0b0d10" : (mouseArea.containsMouse ? "#f2f3f5" : "#949ba4")
+                var color = mouseArea.containsMouse ? btn.iconHoverColor : btn.iconColor
                 return "image://icons/" + btn.iconName + "?color=" + encodeURIComponent(color)
             }
             sourceSize.width: 16; sourceSize.height: 16
             fillMode: Image.PreserveAspectFit
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            radius: Theme.radiusMd
-            visible: btn.isPrimary
-            color: mouseArea.containsMouse ? Theme.primaryHover : Theme.primary
-            z: -1
         }
 
         MouseArea {

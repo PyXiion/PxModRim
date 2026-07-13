@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QSizePolicy, QTextBrowser, QWidget
+from PySide6.QtWidgets import QFrame, QTextBrowser, QWidget
 
 from pxmodrim.ui.components.unity_rich_text import unity_rich_text_to_html
 
@@ -23,12 +23,6 @@ class DescriptionRenderer(QTextBrowser):
 
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        self.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Preferred,
-        )
-
         self.document().setDocumentMargin(0)
 
         self.document().setDefaultStyleSheet("""

@@ -9,11 +9,12 @@ from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
+
+from pxmodrim.ui.components import AppButton
 
 
 class AboutPanel(QDialog):
@@ -31,7 +32,7 @@ class AboutPanel(QDialog):
         tabs.addTab(self._create_credits_tab(), "Credits")
         layout.addWidget(tabs)
 
-        close_btn = QPushButton("Close")
+        close_btn = AppButton("Close")
         close_btn.clicked.connect(self.reject)
         layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
