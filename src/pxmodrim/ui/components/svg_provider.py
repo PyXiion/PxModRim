@@ -14,7 +14,7 @@ class SvgIconProvider(QQuickImageProvider):
     """Serves named SVG icons to QML via image://icons/<name>?color=<hex>."""
 
     def __init__(self) -> None:
-        super().__init__(QQuickImageProvider.Pixmap)
+        super().__init__(QQuickImageProvider.Pixmap)  # pyright: ignore[reportAttributeAccessIssue]
 
     def requestPixmap(self, id: str, _size: QSize, requested_size: QSize) -> QPixmap:
         parts = id.split("?", 1)

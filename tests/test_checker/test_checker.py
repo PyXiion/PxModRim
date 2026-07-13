@@ -6,7 +6,9 @@ from pxmodrim.checker.issues import (
     DependencyIssueChecker,
     IncompatibilityIssueChecker,
     LoadOrderIssueChecker,
+    ModIssueChecker,
 )
+from pxmodrim.checker.models import ModDiagnostics
 from pxmodrim.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
@@ -60,9 +62,9 @@ class TestModChecker:
         mods = _as_listed([a, b])
         active_uuids = [u for u, m in mods.items() if m.name in ("mod.a", "mod.b")]
 
-        collected_diags: dict[str, object] = {}
+        collected_diags: dict[str, ModDiagnostics] = {}
 
-        def on_change(diags: dict[str, object]) -> None:
+        def on_change(diags: dict[str, ModDiagnostics]) -> None:
             collected_diags.update(diags)
 
         checker = ModChecker(checkers, _settings(), on_diagnostics_changed=on_change)
@@ -115,7 +117,7 @@ class TestModChecker:
         assert diag is None or not diag.has_errors
 
     def test_move_mod_updates_load_order(self):
-        checkers = [
+        checkers: list[ModIssueChecker] = [
             LoadOrderIssueChecker(),
         ]
         a = _make_mod("mod.a")

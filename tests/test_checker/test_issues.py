@@ -9,6 +9,8 @@ from pxmodrim.checker.issues import (
     LoadOrderIssueChecker,
     ReplacementIssueChecker,
 )
+from typing import Any
+
 from pxmodrim.checker.models import CheckContext, PackageId
 from pxmodrim.models.metadata.structures import (
     AboutXmlMod,
@@ -40,7 +42,7 @@ def _ctx(
     ordered_pids: list[PackageId] | None = None,
     graph: ConstraintGraph | None = None,
     settings: SortSettings | None = None,
-    **kwargs: bool | str | set | list | dict,
+    **kwargs: Any,
 ) -> CheckContext:
     if ordered_pids is None:
         ordered_pids = list(mods.keys())

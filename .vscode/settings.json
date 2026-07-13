@@ -5,7 +5,6 @@
   "search.maxResults": 100000,
   "python.terminal.activateEnvironment": true,
   "python.terminal.activateEnvInCurrentTerminal": true,
-  "mypy.runUsingActiveInterpreter": true,
   "editor.codeActionsOnSave": {
     "source.organizeImports": "explicit"
   },
