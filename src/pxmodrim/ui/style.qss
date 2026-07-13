@@ -1,326 +1,488 @@
-/* --- Base --- */
+/* ── Base ── */
 QMainWindow,
-QDialog {{
-    background-color: {MAIN_BG};
-    color: {TEXT_MAIN};
-}}
+QDialog {
+    background-color: $ELEVATE_0;
+    color: $TEXT_MAIN;
+}
 
-QWidget {{
-    color: {TEXT_MAIN};
-    background-color: transparent;
+QWidget {
+    color: $TEXT_MAIN;
+    background-color: $ELEVATE_1;
     font-family: "Source Sans 3", "Liberation Sans", sans-serif;
-}}
+}
 
-/* --- Header --- */
-QWidget#header {{
-    background-color: {PANEL_BG};
-    border-bottom: 1px solid {BORDER};
-    min-height: 36px;
-}}
-QLabel#appTitle {{
-    color: {BLUE};
-    font-weight: bold;
-    font-size: 14px;
-}}
+/* ── Panel containers ── */
+QWidget#outerContainer {
+    background-color: $ELEVATE_0;
+}
+QWidget#contentArea {
+    background-color: $ELEVATE_0;
+}
+QWidget#sidebarPanel {
+    background-color: $ELEVATE_2;
+}
+QWidget#modListPanel {
+    background-color: $ELEVATE_1;
+}
+QWidget#modInfoPanel {
+    background-color: $ELEVATE_2;
+}
 
-/* --- Buttons --- */
-QPushButton {{
-    background-color: {INPUT_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    color: {TEXT_MAIN};
-    padding: 6px 12px;
-    font-size: 13px;
+/* ── Transparent overrides ── */
+QScrollArea,
+QWidget#accordionContent,
+QWidget#toastManager {
+    background-color: transparent;
+}
+
+/* ── Menu Bar ── */
+QMenuBar {
+    background-color: $ELEVATE_1;
+    border-bottom: 1px solid $BORDER;
+    padding: 2px 4px;
+    color: $TEXT_MUTED;
+    font-size: 12px;
+}
+QMenuBar::item {
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: transparent;
+}
+QMenuBar::item:selected {
+    background-color: $ELEVATE_3;
+    color: $TEXT_MAIN;
+}
+
+QMenu {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    padding: 4px;
+    color: $TEXT_MAIN;
+}
+QMenu::item {
+    padding: 6px 28px 6px 12px;
+    border-radius: 4px;
+}
+QMenu::item:selected {
+    background-color: $ELEVATE_3;
+}
+QMenu::separator {
+    height: 1px;
+    background-color: $BORDER;
+    margin: 4px 8px;
+}
+
+/* ── Buttons ── */
+QPushButton {
+    background-color: $ELEVATE_3;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
     min-height: 18px;
-}}
-QPushButton:hover {{
-    background-color: {BUTTON_HOVER};
-}}
-QPushButton#primaryAction {{
-    background-color: {BLUE};
-    border-color: {BLUE};
-    font-weight: bold;
-}}
-QPushButton#primaryAction:hover {{
-    background-color: {BLUE_HOVER};
-}}
+}
+QPushButton:hover {
+    background-color: $ELEVATE_4;
+    border-color: $ELEVATE_4;
+}
+QPushButton:pressed {
+    background-color: $ELEVATE_4;
+}
+QPushButton#primaryAction {
+    background-color: $PRIMARY;
+    border-color: $PRIMARY;
+    color: $ELEVATE_0;
+    font-weight: 600;
+}
+QPushButton#primaryAction:hover {
+    background-color: $PRIMARY_HOVER;
+    border-color: $PRIMARY_HOVER;
+}
 
-/* --- Line Edit (Search) --- */
-QLineEdit {{
-    background-color: {INPUT_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    color: {TEXT_MAIN};
-    padding: 8px;
-    font-size: 13px;
-    selection-background-color: {BLUE};
-}}
-QLineEdit:focus {{
-    border-color: {BLUE};
-}}
-QWidget#searchBox {{
-    background-color: {SEARCH_BG};
-    border-bottom: 1px solid {BORDER};
-    padding: 16px;
-}}
+/* ── Line Edit ── */
+QLineEdit {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 7px 10px;
+    font-size: 12px;
+    selection-background-color: $PRIMARY;
+}
+QLineEdit:focus {
+    border-color: $PRIMARY;
+}
+QWidget#searchBox {
+    background-color: $ELEVATE_1;
+    border-bottom: 1px solid $BORDER;
+}
 
-/* --- Combo Box --- */
-QComboBox {{
-    background-color: {INPUT_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    color: {TEXT_MAIN};
-    padding: 8px;
-    font-size: 13px;
-    min-width: 100px;
-}}
-QComboBox:hover {{
-    border-color: {ITEM_ACTIVE};
-}}
-QComboBox::drop-down {{
+/* ── Combo Box ── */
+QComboBox {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 6px 10px;
+    font-size: 11px;
+    min-width: 80px;
+}
+QComboBox:hover {
+    border-color: $ELEVATE_4;
+}
+QComboBox:focus {
+    border-color: $PRIMARY;
+}
+QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 28px;
-    border-left: 1px solid {BORDER};
-    border-top-right-radius: 8px;
-    border-bottom-right-radius: 8px;
-}}
-QComboBox::down-arrow {{
-    width: 10px;
-    height: 10px;
-}}
-QComboBox QAbstractItemView {{
-    background-color: {PANEL_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    selection-background-color: {ITEM_HOVER};
-    selection-color: {TEXT_MAIN};
-    color: {TEXT_MAIN};
+    width: 24px;
+    border-left: 1px solid $BORDER;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QComboBox::down-arrow {
+    width: 8px;
+    height: 8px;
+}
+QComboBox QAbstractItemView {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    selection-background-color: $ELEVATE_3;
+    selection-color: $TEXT_MAIN;
+    color: $TEXT_MAIN;
     outline: none;
     padding: 4px;
-}}
+}
 
-/* --- List Widget --- */
-QListWidget {{
-    background-color: transparent;
-    border: none;
-    outline: none;
-    color: {TEXT_MAIN};
-    font-size: 13px;
-}}
-QListWidget::item {{
-    border-radius: 8px;
-}}
-QListWidget::item:hover {{
-    background-color: {ITEM_HOVER};
-}}
-QListWidget::item:selected {{
-    background-color: {ITEM_ACTIVE};
-}}
-QListWidget#filterList::item {{
-    padding: 8px 12px;
-    border-radius: 8px;
-    margin: 1px 0;
-}}
-QListWidget#filterList::item:selected {{
-    background-color: {BLUE};
-    color: #ffffff;
-}}
-
-/* --- Scroll Area --- */
-QScrollArea {{
+/* ── Scroll Area ── */
+QScrollArea {
     border: none;
     background-color: transparent;
-}}
+}
 
-/* --- Scroll Bars --- */
-QScrollBar:vertical {{
-    background-color: {PANEL_BG};
+/* ── Scroll Bars ── */
+QScrollBar:vertical {
+    background-color: transparent;
     width: 6px;
     margin: 0;
-}}
-QScrollBar::handle:vertical {{
-    background-color: {BUTTON_HOVER};
+}
+QScrollBar::handle:vertical {
+    background-color: $ELEVATE_4;
     border-radius: 3px;
     min-height: 30px;
     margin: 2px;
-}}
-QScrollBar::handle:vertical:hover {{
-    background-color: {TEXT_MUTED};
-}}
+}
+QScrollBar::handle:vertical:hover {
+    background-color: $TEXT_DIM;
+}
 QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {{
+QScrollBar::sub-line:vertical {
     height: 0;
-}}
+}
 QScrollBar::add-page:vertical,
-QScrollBar::sub-page:vertical {{
+QScrollBar::sub-page:vertical {
     background: none;
-}}
-QScrollBar:horizontal {{
-    background-color: {PANEL_BG};
+}
+QScrollBar:horizontal {
+    background-color: transparent;
     height: 6px;
     margin: 0;
-}}
-QScrollBar::handle:horizontal {{
-    background-color: {BUTTON_HOVER};
+}
+QScrollBar::handle:horizontal {
+    background-color: $ELEVATE_4;
     border-radius: 3px;
     min-width: 30px;
     margin: 2px;
-}}
-QScrollBar::handle:horizontal:hover {{
-    background-color: {TEXT_MUTED};
-}}
+}
+QScrollBar::handle:horizontal:hover {
+    background-color: $TEXT_DIM;
+}
 QScrollBar::add-line:horizontal,
-QScrollBar::sub-line:horizontal {{
+QScrollBar::sub-line:horizontal {
     width: 0;
-}}
+}
 QScrollBar::add-page:horizontal,
-QScrollBar::sub-page:horizontal {{
+QScrollBar::sub-page:horizontal {
     background: none;
-}}
+}
 
-/* --- Info Panel --- */
-QWidget#infoArea {{
-    background-color: {PANEL_BG};
-}}
-QWidget#depsSection {{
+/* ── Info Panel ── */
+QWidget#infoArea {
+    background-color: $ELEVATE_2;
+}
+QWidget#depsSection {
     background-color: transparent;
-}}
-QLabel#bannerTitle {{
-    font-size: 18px;
-    font-weight: bold;
-}}
+}
 
-/* --- Placeholder --- */
-QLabel#placeholder {{
-    color: {TEXT_MUTED};
-    font-size: 15px;
+/* ── Placeholder ── */
+QLabel#placeholder {
+    color: $TEXT_DIM;
+    font-size: 14px;
     padding: 32px;
-}}
+}
 
-/* --- Text Browser (Description) --- */
-QTextBrowser#descriptionBrowser {{
+/* ── Description Browser ── */
+QTextBrowser#descriptionBrowser {
     background: transparent;
     border: none;
     padding: 0;
     font-size: 13px;
-    color: {DESC_TEXT};
-}}
+    color: $TEXT_MUTED;
+    line-height: 1.5;
+}
 
-/* --- Info Panel Sections --- */
-QLabel#sectionTitle {{
-    font-size: 11px;
-    font-weight: bold;
-    text-transform: uppercase;
-    color: {TEXT_MUTED};
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid {BORDER};
-    padding-bottom: 4px;
-}}
-QLabel#metaLabel {{
-    color: {TEXT_MUTED};
-    font-size: 11px;
-}}
-QLabel#metaValue {{
-    font-weight: 500;
-    font-size: 13px;
-    color: {TEXT_MAIN};
-}}
-QWidget#metaWidget {{
-    background-color: {MAIN_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    padding: 8px;
-}}
-QLabel#modBanner {{
-    background: qlineargradient(
-        x1:0, y1:0, x2:0, y2:1,
-        stop:0 rgba({PANEL_RGB},0.2),
-        stop:1 rgba({PANEL_RGB},1)
-    );
-    border-bottom: 1px solid {BORDER};
-    padding: 12px;
-    font-size: 18px;
-    font-weight: bold;
-}}
-
-/* --- Status Bar --- */
-QStatusBar {{
-    background-color: {PANEL_BG};
-    border-top: 1px solid {BORDER};
-    color: {TEXT_MUTED};
-    font-size: 12px;
-    padding: 4px 8px;
-}}
-
-/* --- Menu Bar --- */
-QMenuBar {{
-    background-color: {MAIN_BG};
-    border-bottom: 1px solid {BORDER};
-    padding: 2px;
-    color: {TEXT_MAIN};
-    font-size: 13px;
-}}
-QMenuBar::item {{
-    padding: 4px 10px;
-    border-radius: 8px;
-}}
-QMenuBar::item:selected {{
-    background-color: {ITEM_HOVER};
-}}
-QMenu {{
-    background-color: {PANEL_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    padding: 4px;
-    color: {TEXT_MAIN};
-}}
-QMenu::item {{
-    padding: 6px 24px 6px 12px;
-    border-radius: 8px;
-}}
-QMenu::item:selected {{
-    background-color: {ITEM_HOVER};
-}}
-QMenu::separator {{
-    height: 1px;
-    background-color: {BORDER};
-    margin: 4px 8px;
-}}
-
-/* --- Tool Tip --- */
-QToolTip {{
-    background-color: {PANEL_BG};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    color: {TEXT_MAIN};
-    padding: 6px 10px;
-    font-size: 12px;
-}}
-
-/* --- Mod Info Panel Components --- */
-QWidget#accordionHeader {{
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid {BORDER};
-}}
-QWidget#accordionHeader:hover {{
-    background: {ITEM_HOVER};
-}}
-QLabel#accordionTitle {{
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: {TEXT_MUTED};
-}}
-QLabel#accordionChevron {{
+/* ── Meta Chip ── */
+QWidget#metaChip {
+    background-color: $ELEVATE_3;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    padding: 0;
+    min-width: 120px;
+}
+QLabel#metaChipLabel {
+    color: $TEXT_DIM;
     font-size: 10px;
     font-weight: 600;
-    color: {TEXT_MUTED};
-    background: transparent;
-}}
-QWidget#accordionContent {{
-    background: {MAIN_BG};
-}}
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+QLabel#metaChipValue {
+    font-weight: 500;
+    font-size: 13px;
+    color: $TEXT_MAIN;
+}
 
+/* ── Issues Label ── */
+QLabel#issuesLabel {
+    color: $TEXT_DIM;
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* ── Meta Labels ── */
+QLabel#metaLabel {
+    color: $TEXT_DIM;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+QLabel#metaValue {
+    font-weight: 500;
+    font-size: 13px;
+    color: $TEXT_MAIN;
+}
+QWidget#metaWidget {
+    background-color: $ELEVATE_3;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+/* ── Status Bar ── */
+QStatusBar {
+    background-color: $ELEVATE_2;
+    border-top: 1px solid $BORDER;
+    color: $TEXT_MUTED;
+    font-size: 11px;
+    padding: 2px 8px;
+}
+
+/* ── Tool Tip ── */
+QToolTip {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+/* ── Accordion ── */
+QWidget#accordionHeader {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid $BORDER;
+}
+QWidget#accordionHeader:hover {
+    background: $ELEVATE_3;
+}
+QLabel#accordionTitle {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $TEXT_DIM;
+}
+QLabel#accordionChevron {
+    font-size: 10px;
+    font-weight: 600;
+    color: $TEXT_DIM;
+    background: transparent;
+}
+QWidget#accordionContent {
+    background: transparent;
+}
+
+/* ── Group Box ── */
+QGroupBox {
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    margin-top: 12px;
+    padding: 16px 12px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: $TEXT_MAIN;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 8px;
+    color: $TEXT_DIM;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* ── Check Box ── */
+QCheckBox {
+    color: $TEXT_MAIN;
+    font-size: 12px;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid $BORDER;
+    border-radius: 3px;
+    background: $ELEVATE_3;
+}
+QCheckBox::indicator:checked {
+    background: $PRIMARY;
+    border-color: $PRIMARY;
+}
+
+/* ── Tab Widget ── */
+QTabWidget::pane {
+    border: none;
+    background: transparent;
+}
+QTabBar::tab {
+    background: transparent;
+    color: $TEXT_MUTED;
+    padding: 8px 16px;
+    border-bottom: 2px solid transparent;
+    font-size: 12px;
+}
+QTabBar::tab:selected {
+    color: $PRIMARY;
+    border-bottom-color: $PRIMARY;
+}
+QTabBar::tab:hover {
+    color: $TEXT_MAIN;
+}
+
+/* ── Title Bar ── */
+QWidget#titleBar {
+    background-color: $ELEVATE_0;
+    min-height: 32px;
+    max-height: 32px;
+}
+QLabel#titleBarTitle {
+    color: $TEXT_DIM;
+    font-size: 12px;
+    font-weight: 500;
+}
+QPushButton#titleBarBtn {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    min-height: 0;
+}
+QPushButton#titleBarBtn:hover {
+    background-color: $ELEVATE_3;
+}
+QPushButton#titleBarBtn:last-child:hover {
+    background-color: $DANGER;
+}
+
+/* ── Icon Buttons ── */
+QPushButton#iconBtn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0;
+    min-height: 0;
+}
+QPushButton#iconBtn:hover {
+    background-color: $ELEVATE_3;
+    border-color: $BORDER;
+}
+QPushButton#iconBtn[primary="true"] {
+    background-color: $PRIMARY;
+    border-color: $PRIMARY;
+}
+QPushButton#iconBtn[primary="true"]:hover {
+    background-color: $PRIMARY_HOVER;
+    border-color: $PRIMARY_HOVER;
+}
+
+/* ── Toast ── */
+QWidget#toast {
+    background-color: $SURFACE;
+    border: 1px solid $BORDER;
+    border-radius: 8px;
+}
+QLabel#toastMessage {
+    color: $TEXT_MAIN;
+    font-size: 12px;
+}
+QPushButton#toastClose {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 0;
+    min-height: 0;
+}
+QPushButton#toastClose:hover {
+    background-color: $ELEVATE_3;
+}
+QWidget#toastManager {
+    background: transparent;
+    border: none;
+}
+
+/* ── Settings Dialog ── */
+QWidget#settingsPanel {
+    background-color: $ELEVATE_1;
+}
+QWidget#settingsPanel QTabWidget::pane {
+    background-color: $ELEVATE_1;
+}
+QWidget#settingsPanel QGroupBox {
+    background-color: $ELEVATE_2;
+}
+QWidget#settingsPanel QFormLayout {
+    background-color: transparent;
+}
+
+/* ── Progress Bar ── */
+QProgressBar {
+    border: 1px solid $BORDER;
+    border-radius: 4px;
+    background: $ELEVATE_0;
+    text-align: center;
+    font-size: 11px;
+    height: 18px;
+}
+QProgressBar::chunk {
+    background: $PRIMARY;
+    border-radius: 3px;
+}
