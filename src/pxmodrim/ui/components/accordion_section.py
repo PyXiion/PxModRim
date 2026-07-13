@@ -24,7 +24,7 @@ class _AccordionHeader(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(0)
 
         self._chevron = QLabel("▶")
@@ -89,7 +89,7 @@ class AccordionSection(QWidget):
         self._content_wrapper = QWidget()
         self._content_wrapper.setObjectName("accordionContent")
         cw_layout = QVBoxLayout(self._content_wrapper)
-        cw_layout.setContentsMargins(12, 8, 12, 12)
+        cw_layout.setContentsMargins(20, 0, 20, 16)
         cw_layout.setSpacing(0)
         cw_layout.addWidget(content)
         self._content_wrapper.setMaximumHeight(

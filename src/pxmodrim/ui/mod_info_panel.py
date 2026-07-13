@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from pxmodrim._compat.config import AppConfig, save_config
 from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
@@ -13,8 +14,26 @@ from pxmodrim.ui.components import (
     AccordionSection,
     AspectRatioBanner,
     DescriptionRenderer,
-    ResponsiveMetaGrid,
+    MetaChipRow,
+    generate_preview,
 )
+
+if TYPE_CHECKING:
+    from pxmodrim.models.view.diagnostics import ModIssueView
+
+
+def _first_sentence(text: str, max_len: int = 80) -> str:
+    if not text:
+        return ""
+    stripped = text.strip()
+    end = stripped.find(".")
+    if end != -1:
+        result = stripped[: end + 1]
+    else:
+        result = stripped
+    if len(result) > max_len:
+        result = result[:max_len].rsplit(" ", 1)[0] + "\u2026"
+    return result
 
 
 def _find_preview(mod_path: Path | None) -> Path | None:
@@ -47,11 +66,11 @@ class ModInfoPanel(QWidget):
         self._scroll.setWidget(self._content)
 
         # Banner
-        self._banner = AspectRatioBanner(max_height=300)
+        self._banner = AspectRatioBanner(self, max_height=200)
         self._banner.hide()
         cl.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
 
-        # Placeholder (shown when no mod is selected, hidden when a mod is shown)
+        # Placeholder (shown when no mod is selected)
         self._placeholder = QLabel("Select a mod to view details")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setObjectName("placeholder")
@@ -60,17 +79,14 @@ class ModInfoPanel(QWidget):
         # Info area
         self._info_area = QWidget()
         self._info_area.setObjectName("infoArea")
-        self._info_area.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
-        )
         self._info_area.hide()
         ia_layout = QVBoxLayout(self._info_area)
-        ia_layout.setContentsMargins(24, 24, 24, 24)
+        ia_layout.setContentsMargins(0, 0, 0, 0)
         ia_layout.setSpacing(0)
-        cl.addWidget(self._info_area, 0, Qt.AlignmentFlag.AlignTop)
+        cl.addWidget(self._info_area)
 
-        # Meta grid
-        self._meta_grid = ResponsiveMetaGrid(
+        # Meta chips
+        self._meta_chips = MetaChipRow(
             {
                 "package_id": "Package ID",
                 "author": "Author",
@@ -78,9 +94,7 @@ class ModInfoPanel(QWidget):
                 "source": "Source",
             }
         )
-        ia_layout.addWidget(self._meta_grid, 0, Qt.AlignmentFlag.AlignTop)
-
-        ia_layout.addSpacing(16)
+        ia_layout.addWidget(self._meta_chips)
 
         # Description accordion
         self._desc_renderer = DescriptionRenderer()
@@ -91,9 +105,7 @@ class ModInfoPanel(QWidget):
         )
         self._desc_section.toggled.connect(self._on_desc_toggled)
         self._desc_section.hide()
-        ia_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
-
-        ia_layout.addSpacing(16)
+        ia_layout.addWidget(self._desc_section, 1)
 
         # Dependencies accordion
         self._deps_label = QLabel("None")
@@ -109,6 +121,23 @@ class ModInfoPanel(QWidget):
         self._deps_section.toggled.connect(self._on_deps_toggled)
         self._deps_section.hide()
         ia_layout.addWidget(self._deps_section, 0, Qt.AlignmentFlag.AlignTop)
+
+        # Issues accordion
+        self._issues_label = QLabel("No issues detected")
+        self._issues_label.setObjectName("issuesLabel")
+        self._issues_label.setWordWrap(True)
+        self._issues_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self._issues_section = AccordionSection(
+            "Issues",
+            self._issues_label,
+            expanded=True,
+        )
+        self._issues_section.hide()
+        ia_layout.addWidget(self._issues_section, 0, Qt.AlignmentFlag.AlignTop)
+
+        self._current_issues: list[ModIssueView] = []
 
     def show_mod(self, mod: ListedMod) -> None:
         if self._preview_task and not self._preview_task.done():
@@ -128,13 +157,18 @@ class ModInfoPanel(QWidget):
         self._scroll.verticalScrollBar().setValue(0)
 
         self._banner.setTitle(mod.name)
+        self._banner.setSubtitle(
+            _first_sentence(mod.description)
+            if mod.description
+            else (str(mod.package_id) if isinstance(mod, AboutXmlMod) else "")
+        )
 
         self._preview_task = asyncio.ensure_future(
-            self._load_preview(mod.mod_path, mod_id)
+            self._load_preview(mod.mod_path, mod_id, mod.name)
         )
 
         if isinstance(mod, AboutXmlMod):
-            self._meta_grid.update_values(
+            self._meta_chips.update_values(
                 {
                     "package_id": str(mod.package_id),
                     "author": ", ".join(mod.authors) if mod.authors else "—",
@@ -143,7 +177,7 @@ class ModInfoPanel(QWidget):
                 }
             )
         else:
-            self._meta_grid.update_values(
+            self._meta_chips.update_values(
                 {
                     "package_id": "—",
                     "author": "—",
@@ -167,13 +201,45 @@ class ModInfoPanel(QWidget):
         else:
             self._deps_section.hide()
 
-    async def _load_preview(self, mod_path: Path | None, mod_id: str) -> None:
+        # Issues — hidden until set_issues is called
+        self._issues_section.hide()
+
+    def set_issues(self, issues: list[ModIssueView]) -> None:
+        self._current_issues = issues
+        self._show_issues(issues)
+
+    def _show_issues(self, issues: list[ModIssueView]) -> None:
+        if not issues:
+            self._issues_label.setText("No issues detected")
+            self._issues_section.show()
+            return
+
+        parts: list[str] = []
+        for issue in issues:
+            icon = "\u2716" if issue.is_error else "\u26a0"
+            color = "#ed4245" if issue.is_error else "#f9a825"
+            parts.append(
+                f'<span style="color: {color};">{icon} {issue.category}</span>'
+            )
+            if issue.detail:
+                parts.append(f"&nbsp;&nbsp;{issue.detail}")
+
+        self._issues_label.setText("<br>".join(parts))
+        self._issues_section.show()
+
+    async def _load_preview(
+        self, mod_path: Path | None, mod_id: str, mod_name: str
+    ) -> None:
         """Load preview image in background thread. Only updates UI if still current mod."""
         try:
             preview = await asyncio.to_thread(_find_preview, mod_path)
             if preview is None:
                 if self._current_mod_id == mod_id:
-                    self._banner.setPixmap(QPixmap())
+                    w = self._banner.width() or 300
+                    h = self._banner.sizeHint().height()
+                    fallback = await asyncio.to_thread(generate_preview, mod_name, w, h)
+                    if self._current_mod_id == mod_id:
+                        self._banner.setPixmap(fallback)
                 return
 
             image = await asyncio.to_thread(QImage, str(preview))

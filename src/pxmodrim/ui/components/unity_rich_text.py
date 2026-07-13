@@ -20,29 +20,29 @@ class UnityRichTextConverter:
         # Process tags first, escape text content between tags
         result_parts = []
         last_end = 0
-        
+
         for match in UNITY_TAG_PATTERN.finditer(text):
             # Text before this tag - escape it
             if match.start() > last_end:
-                text_segment = text[last_end:match.start()]
+                text_segment = text[last_end : match.start()]
                 result_parts.append(html.escape(text_segment))
-            
+
             # Process the tag
             full = match.group(0)
             tag_name = match.group(1).lower()
             attr = match.group(2)
-            
+
             if full.startswith("</"):
                 result_parts.append(self._handle_close_tag(tag_name))
             else:
                 result_parts.append(self._handle_open_tag(tag_name, attr))
-            
+
             last_end = match.end()
-        
+
         # Remaining text after last tag
         if last_end < len(text):
             result_parts.append(html.escape(text[last_end:]))
-        
+
         result = "".join(result_parts)
         result = result.replace("\n", "<br>")
         result = result.replace("\\n", "<br>")
@@ -80,7 +80,7 @@ class UnityRichTextConverter:
             case "u" | "underline":
                 return '<span style="text-decoration: underline;">'
             case "s" | "strike" | "strikethrough":
-                return '<s>'
+                return "<s>"
             case "color":
                 return self._color_tag(attr)
             case "size":
@@ -99,11 +99,29 @@ class UnityRichTextConverter:
                 return "<sup>"
             case "a" | "link":
                 return self._link_tag(attr)
-            case "noparse" | "alpha" | "font" | "font-weight" | "mspace" \
-                 | "style" | "gradient" | "cspace" | "voffset" | "pos" \
-                 | "width" | "line-height" | "line-indent" | "margin" \
-                 | "margin-left" | "margin-right" | "uppercase" | "lowercase" \
-                 | "smallcaps" | "rotate" | "sprite":
+            case (
+                "noparse"
+                | "alpha"
+                | "font"
+                | "font-weight"
+                | "mspace"
+                | "style"
+                | "gradient"
+                | "cspace"
+                | "voffset"
+                | "pos"
+                | "width"
+                | "line-height"
+                | "line-indent"
+                | "margin"
+                | "margin-left"
+                | "margin-right"
+                | "uppercase"
+                | "lowercase"
+                | "smallcaps"
+                | "rotate"
+                | "sprite"
+            ):
                 # TODO: Implement these tags
                 return ""
             case _:
@@ -141,7 +159,7 @@ class UnityRichTextConverter:
     def _color_tag(self, attr: str | None) -> str:
         if not attr:
             return '<font color="#ffffff">'
-        attr = attr.strip('"\'')
+        attr = attr.strip("\"'")
         if UNITY_COLOR_PATTERN.match(attr):
             return f'<font color="{self._normalize_color(attr)}">'
         return '<font color="#ffffff">'
@@ -158,17 +176,25 @@ class UnityRichTextConverter:
             if len(hex_part) == 8:
                 return "#" + hex_part[:6]
         named_colors = {
-            "red": "#ff0000", "green": "#00ff00", "blue": "#0000ff",
-            "white": "#ffffff", "black": "#000000", "yellow": "#ffff00",
-            "cyan": "#00ffff", "magenta": "#ff00ff", "gray": "#808080",
-            "grey": "#808080", "orange": "#ffa500", "purple": "#800080",
+            "red": "#ff0000",
+            "green": "#00ff00",
+            "blue": "#0000ff",
+            "white": "#ffffff",
+            "black": "#000000",
+            "yellow": "#ffff00",
+            "cyan": "#00ffff",
+            "magenta": "#ff00ff",
+            "gray": "#808080",
+            "grey": "#808080",
+            "orange": "#ffa500",
+            "purple": "#800080",
         }
         return named_colors.get(color.lower(), "#ffffff")
 
     def _size_tag(self, attr: str | None) -> str:
         if not attr:
             return '<span style="font-size: 13pt;">'
-        attr = attr.strip('"\'')
+        attr = attr.strip("\"'")
         m = UNITY_SIZE_PATTERN.match(attr)
         if not m:
             return '<span style="font-size: 13pt;">'
@@ -189,15 +215,20 @@ class UnityRichTextConverter:
     def _align_tag(self, attr: str | None) -> str:
         if not attr:
             return '<div style="text-align: left;">'
-        attr = attr.strip('"\'').lower()
-        align_map = {"left": "left", "center": "center", "right": "right",
-                     "justified": "justify", "flush": "justify"}
+        attr = attr.strip("\"'").lower()
+        align_map = {
+            "left": "left",
+            "center": "center",
+            "right": "right",
+            "justified": "justify",
+            "flush": "justify",
+        }
         return f'<div style="text-align: {align_map.get(attr, "left")};">'
 
     def _indent_tag(self, attr: str | None) -> str:
         if not attr:
             return '<div style="margin-left: 20px;">'
-        attr = attr.strip('"\'')
+        attr = attr.strip("\"'")
         m = UNITY_SIZE_PATTERN.match(attr)
         if not m:
             return '<div style="margin-left: 20px;">'
@@ -214,7 +245,7 @@ class UnityRichTextConverter:
     def _mark_tag(self, attr: str | None) -> str:
         if not attr:
             return '<mark style="background-color: #ffff00;">'
-        attr = attr.strip('"\'')
+        attr = attr.strip("\"'")
         color = self._normalize_color(attr)
         if len(attr) == 9 and attr.startswith("#"):
             alpha = int(attr[7:], 16) / 255
@@ -224,7 +255,7 @@ class UnityRichTextConverter:
     def _link_tag(self, attr: str | None) -> str:
         if not attr:
             return '<a href="#">'
-        attr = attr.strip('"\'')
+        attr = attr.strip("\"'")
         return f'<a href="{html.escape(attr)}">'
 
 

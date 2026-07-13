@@ -15,14 +15,14 @@ from PySide6.QtWidgets import QWidget
 class AspectRatioBanner(QWidget):
     """Banner that scales pixmap to width, preserves aspect ratio, clamps max height."""
 
-    def __init__(self, max_height: int = 300, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, max_height: int = 260) -> None:
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._scaled_pixmap: QPixmap | None = None  # Кэш
         self._title = ""
+        self._subtitle = ""
         self._max_height = max_height
         self._overlay_height = 80
-        self.setMinimumHeight(60)
         self.setSizePolicy(
             self.sizePolicy().Policy.Expanding,
             self.sizePolicy().Policy.Fixed,
@@ -57,19 +57,20 @@ class AspectRatioBanner(QWidget):
         self._title = title
         self.update()
 
+    def setSubtitle(self, subtitle: str) -> None:
+        self._subtitle = subtitle or ""
+        self.update()
+
     def sizeHint(self) -> QSize:
-        if self._pixmap and not self._pixmap.isNull():
-            w = self.width() or self.minimumWidth()
-            h = int(w * self._pixmap.height() / self._pixmap.width())
-            return QSize(w, min(h, self._max_height))
-        return QSize(100, 120)
+        return QSize(self.width() or 300, self._max_height)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setClipRect(self.rect())
 
         if self._scaled_pixmap and not self._scaled_pixmap.isNull():
-            y = (self.height() - self._scaled_pixmap.height())//2
+            y = (self.height() - self._scaled_pixmap.height()) // 2
             painter.drawPixmap(0, y, self._scaled_pixmap)
 
         # Gradient overlay at bottom
@@ -107,14 +108,33 @@ class AspectRatioBanner(QWidget):
             font.setPointSize(16)
             font.setBold(True)
             painter.setFont(font)
+            title_rect_y = self.height() - self._overlay_height
+            title_rect_h = self._overlay_height - 8
+            if self._subtitle:
+                title_rect_h = title_rect_h * 3 // 5
             painter.drawText(
                 16,
-                self.height() - self._overlay_height,
+                title_rect_y,
                 self.width() - 32,
-                self._overlay_height - 8,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                title_rect_h,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom,
                 self._title,
             )
+
+            if self._subtitle:
+                font.setPointSize(11)
+                font.setBold(False)
+                painter.setFont(font)
+                painter.setPen(QColor(148, 155, 164))
+                subtitle_rect_h = self._overlay_height - 8 - title_rect_h
+                painter.drawText(
+                    16,
+                    title_rect_y + title_rect_h,
+                    self.width() - 32,
+                    subtitle_rect_h,
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                    self._subtitle,
+                )
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         self._recompute_scaled_pixmap()
