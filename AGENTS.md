@@ -9,7 +9,7 @@
 - **uv** — `uv sync --dev` (CI uses `uv sync --locked --dev`)
 - **just** — task runner, `just` to list
 - **ruff** lint+format: `just ruff-fix` / `just fix` (both check+format)
-- **mypy** (on `src/`) + **pyright** (on `src/ tests/`): `just typecheck` / `just pyright` / `just check` (runs both sequentially)
+- **pyright** (on `src/ tests/`): `just pyright` / `just check`
 - **pytest**: `just test` or `just test-verbose`
 - **`just ci`** = `check` then `test`
 - Python **3.12 only** (`requires-python = "==3.12.*"`)
