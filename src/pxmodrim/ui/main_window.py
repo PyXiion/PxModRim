@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+from typing import TYPE_CHECKING
+
 from loguru import logger
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtGui import QResizeEvent
+from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMessageBox,
-    QPushButton,
-    QStatusBar,
     QVBoxLayout,
     QWidget,
 )
@@ -17,141 +19,198 @@ from qasync import asyncSlot
 from pxmodrim._compat.config import save_config
 from pxmodrim._compat.dialogs import await_dialog
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.mod_service import ModService
-from pxmodrim.sort.community_service import CommunityRulesService
-from pxmodrim.sort.exceptions import CommunityRulesMissingError
-from pxmodrim.sort.service import SortService
-from pxmodrim.ui.components.progress_dialog import ProgressDialog
+from pxmodrim.models.view.sidebar import SidebarEntry
+from pxmodrim.services.diagnostics_service import DiagnosticsService
+from pxmodrim.services.sort_service import SortService
+from pxmodrim.ui.components import (
+    HeaderController,
+    HeaderPanel,
+    SvgIconProvider,
+    TitleBar,
+    ToastManager,
+)
 from pxmodrim.ui.menu_bar import MenuBar
 from pxmodrim.ui.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.mod_list_panel import ModListPanel
 from pxmodrim.ui.settings_panel import SettingsPanel
-from pxmodrim.ui.sidebar_panel import (
-    ActiveModsEntry,
-    AllModsEntry,
-    ErrorModsEntry,
-    InactiveModsEntry,
-    ProviderModsEntry,
-    SidebarEntry,
-    SidebarPanel,
-)
+from pxmodrim.ui.sidebar_panel import SidebarPanel
+from pxmodrim.ui.theme import Theme
 
-PROVIDER_LABELS: dict[str, str] = {
-    "local": "Local",
-    "steam_cmd": "Steam Workshop",
-    "core": "System / Core",
-}
+if TYPE_CHECKING:
+    from pxmodrim.models.view.diagnostics import ModDiagnosticsView
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, ctx: CoreContext, mod_service: ModService) -> None:
+    def __init__(
+        self,
+        ctx: CoreContext,
+        mod_service: ModService,
+        diagnostics_service: DiagnosticsService,
+        sort_service: SortService,
+    ) -> None:
         super().__init__()
+
+        # Must init before any Qt method that could fire changeEvent
+        self._title_bar: TitleBar | None = None
+
         self.setWindowTitle("PxModRim")
         self.resize(1400, 850)
 
+        # Register theme singleton + SVG icon provider on a shared QML engine
+        self._qml_engine = QQmlEngine(self)
+        self._theme = Theme(self)
+        self._qml_engine.rootContext().setContextProperty("Theme", self._theme)
+        self._qml_engine.addImageProvider("icons", SvgIconProvider())
+
         self._ctx = ctx
         self._mod_service = mod_service
-        self._sort_service = SortService(ctx)
+        self._diagnostics_service = diagnostics_service
+        self._sort_service = sort_service
+        self._selected_uuid: str | None = None
 
-        # Menu bar
-        menu_bar = MenuBar()
-        menu_bar.settings_requested.connect(self._open_settings)
-        menu_bar.about_requested.connect(self._show_about)
-        self.setMenuBar(menu_bar)
+        # Wire diagnostics service signals
+        self._diagnostics_service.diagnostics_summary_changed.connect(
+            self._on_diagnostics_summary_changed
+        )
 
-        # Outer container: header + content
+        # ── Frameless window attempt ──
+        self._try_frameless()
+
+        # ── Menu bar ──
+        self._menu_bar = MenuBar()
+        self._menu_bar.settings_requested.connect(self._open_settings)
+        self._menu_bar.about_requested.connect(self._show_about)
+        self.setMenuBar(self._menu_bar)
+
+        # ── Header (QML) ──
+        self._header_controller = HeaderController()
+        self._header_controller.refresh_requested.connect(self.load_mods_async)
+        self._header_controller.sort_requested.connect(self._auto_sort)
+        self._header_controller.save_requested.connect(self._save_mods_config)
+        self._header_controller.settings_requested.connect(self._open_settings)
+
+        self._header = HeaderPanel(self._header_controller, self._qml_engine)
+
+        # ── Outer container ──
         outer = QWidget()
+        outer.setObjectName("outerContainer")
         outer_layout = QVBoxLayout(outer)
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
 
-        # Header
-        header = self._create_header()
-        outer_layout.addWidget(header)
+        # Title bar (if frameless)
+        if self._title_bar:
+            outer_layout.addWidget(self._title_bar)
+
+        # Header (always below menu bar in native, or below title bar in frameless)
+        outer_layout.addWidget(self._header)
 
         # Content (3-panel workspace)
         content = QWidget()
+        content.setObjectName("contentArea")
         h_layout = QHBoxLayout(content)
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(0)
 
-        self.sidebar = SidebarPanel()
-        self.sidebar.setFixedWidth(256)
+        self.sidebar = SidebarPanel(self._qml_engine)
+        self.sidebar.setObjectName("sidebarPanel")
+        self.sidebar.setFixedWidth(240)
         self.sidebar.entry_selected.connect(self._on_entry_selected)
         h_layout.addWidget(self.sidebar)
 
-        self.mod_list = ModListPanel()
+        self.mod_list = ModListPanel(
+            self._mod_service.provider_colors, self._qml_engine
+        )
+        self.mod_list.setObjectName("modListPanel")
         self.mod_list.mod_selected.connect(self._on_mod_selected)
         self.mod_list.active_mods_changed.connect(
             self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
         )
+        self.mod_list.order_changed.connect(
+            self._on_order_changed, Qt.ConnectionType.QueuedConnection
+        )
         h_layout.addWidget(self.mod_list, stretch=3)
 
         self.mod_info = ModInfoPanel(self._ctx.config)
+        self.mod_info.setObjectName("modInfoPanel")
         self.mod_info.setMinimumWidth(300)
         h_layout.addWidget(self.mod_info, stretch=2)
 
         outer_layout.addWidget(content, stretch=1)
         self.setCentralWidget(outer)
 
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Ready")
+        # ── Toast overlay (replaces status bar) ──
+        self._toast_manager = ToastManager(self.centralWidget())
+        self._toast_manager.resize_to_parent()
+
+        # Wire deferred signal connections (widgets now exist)
+        self._diagnostics_service.status_message_changed.connect(
+            self._on_status_message
+        )
+        self._diagnostics_service.sidebar_entries_changed.connect(
+            self.sidebar.set_entries
+        )
 
         # Pass mod list model to context for sorting
         self._ctx.set_mod_list_model(self.mod_list.model)
 
-    # ── Header ───────────────────────────────────────────────
+    def _try_frameless(self) -> None:
+        """Attempt to enable frameless window with custom title bar.
+        Falls back to native frame gracefully.
+        """
+        try:
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.Window
+                | Qt.WindowType.WindowMinimizeButtonHint
+                | Qt.WindowType.WindowMaximizeButtonHint
+                | Qt.WindowType.WindowCloseButtonHint
+            )
+            self._title_bar = TitleBar(self)
+            self._title_bar.minimize_requested.connect(self.showMinimized)
+            self._title_bar.maximize_requested.connect(self._toggle_maximized)
+            self._title_bar.close_requested.connect(self.close)
 
-    def _create_header(self) -> QWidget:
-        header = QWidget()
-        header.setObjectName("header")
-        layout = QHBoxLayout(header)
-        layout.setContentsMargins(16, 8, 16, 8)
+            # Check if frameless actually took effect (some Wayland compositors ignore it)
+            if self.windowFlags() & Qt.WindowType.FramelessWindowHint:
+                logger.debug("Frameless window enabled")
+            else:
+                logger.info("Frameless not supported, using native frame")
+                self._title_bar = None
+        except Exception as exc:
+            logger.warning("Failed to set frameless window: {}", exc)
+            self._title_bar = None
 
-        title = QLabel("PxModRim // Mod Manager")
-        title.setObjectName("appTitle")
-        layout.addWidget(title)
-
-        layout.addStretch()
-
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.clicked.connect(self.load_mods_async)
-        refresh_btn.setShortcut("F5")
-        layout.addWidget(refresh_btn)
-
-        sort_btn = QPushButton("Auto-sort")
-        sort_btn.setObjectName("primaryAction")
-        sort_btn.clicked.connect(self._auto_sort)
-        layout.addWidget(sort_btn)
-
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self._save_mods_config)
-        save_btn.setShortcut("Ctrl+S")
-        layout.addWidget(save_btn)
-
-        return header
+    def _toggle_maximized(self) -> None:
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+        if self._title_bar:
+            self._title_bar.update_maximize_icon(self.isMaximized())
 
     # ── Public ──────────────────────────────────────────────
 
     @asyncSlot()
     async def load_mods_async(self) -> None:
-        self.status_bar.showMessage("Scanning mods...")
+        self._toast_manager.info("Scanning mods...")
         await self._mod_service.discover()
         if not self._ctx.all_mods:
-            self.status_bar.showMessage("No mods found")
+            self._toast_manager.warning("No mods found")
             return
 
+        self.mod_list.model.update_provider_colors(self._mod_service.provider_colors)
         self.mod_list.load_mods(self._ctx.all_mods, self._ctx.active_uuids)
         self._ctx.set_mod_list_model(self.mod_list.model)
-        self._rebuild_sidebar()
-        self.status_bar.showMessage(
-            f"Loaded {len(self._ctx.all_mods)} mods, "
-            f"{len(self._ctx.active_uuids)} active"
-        )
+
+        await self._diagnostics_service.initialize()
+        self._diagnostics_service.rebuild(self._ctx.active_uuids)
 
     # ── Private slots ───────────────────────────────────────
+
+    def _on_status_message(self, message: str) -> None:
+        self._toast_manager.info(message)
 
     @asyncSlot()
     async def _open_settings(self) -> None:
@@ -177,131 +236,78 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
-        try:
-            result = await self._sort_service.sort_active_mods()
-        except CommunityRulesMissingError as e:
-            reply = QMessageBox.question(
-                self,
-                "Community Rules Missing",
-                f"Community rules file not found:\n{e.path}\n\nDownload now?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-            async with ProgressDialog(LoadingState(self)) as dialog:
-                service = CommunityRulesService()
-                path = await service.ensure_rules(dialog.loading, force=True)
-
-            if not path:
-                QMessageBox.warning(
-                    self, "Download Failed", "Could not download community rules."
-                )
-                return
-
-            result = await self._sort_service.sort_active_mods()
-
-        await self._sort_service.apply_sort(result)
-
-        msg = f"Sorted {result.summary.sorted_mods} mods"
-        if result.summary.cycle_count:
-            msg += f", {result.summary.cycle_count} cycle(s) detected"
-        if result.summary.missing_dep_count:
-            msg += f", {result.summary.missing_dep_count} missing deps"
-        if result.community_rules_applied:
-            msg += f", {result.community_rules_applied} community rules applied"
-        self.status_bar.showMessage(msg, 5000)
+        ordered_uuids = await self._sort_service.sort_active_mods()
+        await self._sort_service.apply_sort(ordered_uuids)
+        self._diagnostics_service.reorder(ordered_uuids)
+        self._toast_manager.success(f"Sorted {len(ordered_uuids)} mods", 5000)
 
     @asyncSlot()
     async def _save_mods_config(self) -> None:
         active_ids = self.mod_list.active_uuids()
         ok = await self._mod_service.save_active_layout(active_ids)
         if ok:
-            self.status_bar.showMessage(f"Saved {len(active_ids)} active mods", 3000)
+            self._toast_manager.success(f"Saved {len(active_ids)} active mods", 3000)
         else:
-            self.status_bar.showMessage("Config folder not set", 3000)
+            self._toast_manager.warning("Config folder not set", 3000)
 
-    def _on_mod_selected(self, uuid: str):
-        # Достаем живой элемент прямо из модели панели по UUID, гарантируя, что ссылка жива
+    def _on_mod_selected(self, uuid: str) -> None:
+        self._selected_uuid = uuid
         item = self.mod_list.model.get_item_by_uuid(uuid)
         if item and item.mod:
             self.mod_info.show_mod(item.mod)
+            self.mod_info.set_issues(self._diagnostics_service.issues_for(uuid))
 
-    def _on_active_mods_changed(self) -> None:
-        from PySide6.QtCore import QTimer
+    @asyncSlot()
+    async def _on_active_mods_changed(self) -> None:
+        if self.mod_list.model.rowCount() == 0:
+            return
+        self._diagnostics_service.rebuild(self.mod_list.active_uuids())
+        await asyncio.sleep(0)
+        self._apply_current_sidebar_filter()
 
+    def _on_order_changed(self) -> None:
         uuids = self.mod_list.active_uuids()
-        self._update_sidebar_counts(uuids)
+        self._diagnostics_service.reorder(uuids if uuids else self._ctx.active_uuids)
 
-        # Заворачиваем применение фильтра в singleShot, чтобы дать Qt
-        # полностью завершить обработку текущего клика/перетаскивания
-        QTimer.singleShot(0, self._delayed_apply_current_filter)
-
-    def _delayed_apply_current_filter(self) -> None:
+    def _apply_current_sidebar_filter(self) -> None:
         if not hasattr(self, "sidebar") or not self.sidebar:
             return
-        selected = self.sidebar.filter_list.currentRow()
+        root = self.sidebar._qml.rootObject()
+        if root is None:
+            return
+        list_view = root.findChild(QObject, "listView")
+        if list_view is None:
+            return
+        selected = list_view.property("currentIndex")
         if 0 <= selected < len(self.sidebar._entries):
             self._apply_entry(self.sidebar._entries[selected])
 
     def _apply_entry(self, entry: SidebarEntry) -> None:
-        selection_model = self.mod_list.list.selectionModel()
-        if selection_model:
-            selection_model.blockSignals(True)
-            # Очищаем выделение, так как при смене фильтра старые индексы инвалидируются
-            selection_model.clearSelection()
-            self.mod_list.proxy.set_sidebar_filter(entry.visible_uuids)
-            selection_model.blockSignals(False)
-        else:
-            self.mod_list.proxy.set_sidebar_filter(entry.visible_uuids)
+        self.mod_list.clearSelection()
+        self.mod_list.model.set_sidebar_filter(entry.visible_uuids)
 
     def _on_entry_selected(self, entry: SidebarEntry) -> None:
         self._apply_entry(entry)
 
-    # ── Sidebar ─────────────────────────────────────────────
+    # ── Diagnostics summary callback ─────────────────────────
 
-    def _rebuild_sidebar(self) -> None:
-        mods = self._ctx.all_mods
-        active = self._ctx.active_uuids
-
-        by_provider: dict[str, list[str]] = {}
-        errors: list[str] = []
-        for u, m in mods.items():
-            by_provider.setdefault(m.provider_id, []).append(u)
-            if not m.valid:
-                errors.append(u)
-
-        entries: list[SidebarEntry] = [
-            AllModsEntry(),
-            ActiveModsEntry(),
-        ]
-        all_uuids = set(mods.keys())
-        for pid in sorted(by_provider):
-            entries.append(
-                ProviderModsEntry(
-                    pid,
-                    PROVIDER_LABELS.get(pid, pid),
-                    set(by_provider[pid]),
-                )
+    def _on_diagnostics_summary_changed(
+        self, diagnostics: dict[str, ModDiagnosticsView]
+    ) -> None:
+        self.mod_list.model.set_diagnostics(diagnostics)
+        if self._selected_uuid is not None:
+            self.mod_info.set_issues(
+                self._diagnostics_service.issues_for(self._selected_uuid)
             )
-        entries.append(InactiveModsEntry())
-        entries.append(ErrorModsEntry())
 
-        # Set pre-computed sets on built-in entries
-        entries[0].visible_uuids = all_uuids  # All
-        entries[0].refresh_count()
-        entries[1].visible_uuids = set(active)  # Active
-        entries[1].refresh_count()
-        entries[-2].visible_uuids = all_uuids - set(active)  # Inactive
-        entries[-2].refresh_count()
-        entries[-1].visible_uuids = set(errors)  # Errors
-        entries[-1].refresh_count()
+    # ── Resize ───────────────────────────────────────────────
 
-        self.sidebar.set_entries(entries)
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "_toast_manager"):
+            self._toast_manager.resize_to_parent()
 
-    def _update_sidebar_counts(self, active_uuids: list[str]) -> None:
-        mods = self._ctx.all_mods
-        active_set = set(active_uuids)
-        for entry in self.sidebar._entries:
-            entry.update_uuids(mods, active_set)
-        self.sidebar.update_counts()
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if self._title_bar and event.type() == QEvent.Type.WindowStateChange:
+            self._title_bar.update_maximize_icon(self.isMaximized())
