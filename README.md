@@ -6,6 +6,13 @@ A friendly, modern mod manager for RimWorld.
 
 No frozen UI. No guessing where your mods came from. Just scan, sort, and play.
 
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.12-blue?logo=python" alt="Python 3.12" />
+  <img src="https://img.shields.io/badge/license-LGPL--3.0-blue" alt="License: LGPL-3.0" />
+  <img src="https://img.shields.io/codacy/grade/f0c8db5021594e89adf514192fa9a205" alt="Codacy grade" />
+  <img src="https://img.shields.io/badge/platform-linux%20%7C%20win%20%7C%20macOS-lightgrey" alt="Platforms" />
+</p>
+
 ---
 
 ![Screenshot](screenshot.png)
@@ -72,4 +79,4 @@ Features from RimSort will be adopted slowly and only when they genuinely improv
 
 ## License
 
-MIT. PxModRim is a clean rewrite inspired by [RimSort](https://github.com/RimSort/RimSort).
+LGPL-3.0. Portions derived from [RimSort](https://github.com/RimSort/RimSort) are used under the MIT license.
