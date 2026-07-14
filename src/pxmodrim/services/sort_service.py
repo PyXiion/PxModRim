@@ -38,9 +38,4 @@ class SortService:
 
         return [pid_to_uuid[pid] for pid in sorted_pids if pid in pid_to_uuid]
 
-    async def apply_sort(self, ordered_uuids: list[str]) -> bool:
-        """Apply the newly sorted UUID order to the mod list model."""
-        model = self._ctx.mod_list_model
-        if model:
-            model.reorder(ordered_uuids)
-        return True
+

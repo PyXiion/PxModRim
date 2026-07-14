@@ -162,9 +162,6 @@ class MainWindow(QMainWindow):
             self.sidebar.set_entries
         )
 
-        # Pass mod list model to context for sorting
-        self._ctx.set_mod_list_model(self.mod_list.model)
-
         # Alt key event filter (installed after all widgets exist)
         app = QApplication.instance()
         if app is not None:
@@ -241,7 +238,6 @@ class MainWindow(QMainWindow):
 
         self.mod_list.model.update_provider_colors(self._mod_service.provider_colors)
         self.mod_list.load_mods(self._ctx.all_mods, self._ctx.active_uuids)
-        self._ctx.set_mod_list_model(self.mod_list.model)
 
         await self._diagnostics_service.initialize()
         self._diagnostics_service.rebuild(self._ctx.active_uuids)
@@ -273,7 +269,7 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _auto_sort(self) -> None:
         ordered_uuids = await self._sort_service.sort_active_mods()
-        await self._sort_service.apply_sort(ordered_uuids)
+        self.mod_list.model.reorder(ordered_uuids)
         self._diagnostics_service.reorder(ordered_uuids)
         self._toast_manager.success(f"Sorted {len(ordered_uuids)} mods", 5000)
 

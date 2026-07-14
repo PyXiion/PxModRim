@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING
 
 from pxmodrim.core.structures import CollectionStats
 from pxmodrim.models.metadata.structures import ListedMod
-from pxmodrim.ui.mod_list_model import ModListModel
-
 if TYPE_CHECKING:
     from pxmodrim._compat.config import AppConfig
 
@@ -20,7 +18,6 @@ class CoreContext:
         self._cfg = cfg
         self._mods: dict[str, ListedMod] = {}
         self._active_uuids: list[str] = []
-        self._mod_list_model: ModListModel | None = None
         self._game_version: str = "Unknown"
         self._refresh_game_version()
 
@@ -33,10 +30,6 @@ class CoreContext:
         """Replace the live config and refresh derived values (game version)."""
         self._cfg = cfg
         self._refresh_game_version()
-
-    def set_mod_list_model(self, model: ModListModel) -> None:
-        """Attach the UI mod-list model for view-level access."""
-        self._mod_list_model = model
 
     # ── Game version ──────────────────────────────────────────────────────────
 
@@ -75,10 +68,6 @@ class CoreContext:
     @property
     def config(self) -> AppConfig:
         return self._cfg
-
-    @property
-    def mod_list_model(self) -> ModListModel | None:
-        return self._mod_list_model
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         """Return total/active/inactive/error counts for the current mod set."""
