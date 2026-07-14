@@ -66,5 +66,7 @@ exclude = ['rimsort-original']
     "D",    # no docs
     "F841", # unused local vars
 ]
+[tool.bandit]
+targets = ["src", "tests"]
 [tool.bandit.per_file_ignores]
 "tests/**/*.py" = ["B101", "B105", "B106", "B107", "B110"]
