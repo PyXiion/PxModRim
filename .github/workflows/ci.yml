@@ -29,6 +29,12 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+
       - name: Install Dependencies
         run: uv sync --locked --dev
 

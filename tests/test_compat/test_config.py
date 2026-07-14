@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+import pytest
 
 from pxmodrim._compat.config import read_game_version
 
@@ -30,6 +33,7 @@ class TestReadGameVersion:
         result = read_game_version("/nonexistent/path")
         assert result is None
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="chmod has no effect on Windows")
     def test_unreadable_file_returns_none(self, tmp_path: Path) -> None:
         ver_file = tmp_path / "Version.txt"
         ver_file.write_text("1.6.4871 rev598\n")
