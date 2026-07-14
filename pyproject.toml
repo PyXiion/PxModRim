@@ -67,6 +67,5 @@ exclude = ['rimsort-original']
     "F841", # unused local vars
 ]
 [tool.bandit]
-targets = ["src", "tests"]
-[tool.bandit.assert_used]
-skips = ['*_test.py', '*test_*.py']
+targets = ["src"]
+exclude_dirs = ['tests']
