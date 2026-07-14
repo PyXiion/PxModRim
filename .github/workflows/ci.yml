@@ -38,15 +38,13 @@ jobs:
       - name: Install Dependencies
         run: uv sync --locked --dev
 
-      - name: Type checking
-        run: uv run python -m pyright -p pyproject.toml src/ tests/
+      - name: Check (type checking + dependency layers)
+        run: just check
 
       - name: Run tests
         shell: bash
-        env:
-          PYTHONIOENCODING: utf-8
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             export QT_QPA_PLATFORM=offscreen
           fi
-          uv run pytest --no-qt-log
+          just test
