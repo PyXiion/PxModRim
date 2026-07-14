@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from pxmodrim.checker.graph import (
+from pxmodrim.core.checker.graph import (
     ConstraintGraph,
     EdgeOrigin,
     EdgeType,
     PackageId,
 )
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
     CaseInsensitiveStr,
     DependencyMod,
 )
-from pxmodrim.sort.config import SortSettings
+from pxmodrim.core.sort.config import SortSettings
 
 
 def _make_mod(package_id: str) -> AboutXmlMod:

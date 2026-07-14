@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import msgspec
 
-from pxmodrim._compat.constants import RIMWORLD_DLC_METADATA
+from pxmodrim.core.constants import RIMWORLD_DLC_METADATA
 
 
 @dataclass

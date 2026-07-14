@@ -5,18 +5,18 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from pxmodrim.checker.graph import ConstraintGraph
-from pxmodrim.checker.models import (
+from pxmodrim.core.checker.graph import ConstraintGraph
+from pxmodrim.core.checker.models import (
     CheckContext,
     ModDiagnostics,
     PackageId,
 )
-from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
 if TYPE_CHECKING:
-    from pxmodrim.checker.issues import ModIssueChecker
-    from pxmodrim.sort.community import CommunityRule
-    from pxmodrim.sort.config import SortSettings
+    from pxmodrim.core.checker.issues import ModIssueChecker
+    from pxmodrim.core.sort.community import CommunityRule
+    from pxmodrim.core.sort.config import SortSettings
 
 
 class ModChecker:

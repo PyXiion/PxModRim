@@ -17,29 +17,29 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim._compat.config import save_config
-from pxmodrim._compat.dialogs import await_dialog
+from pxmodrim.core.config import save_config
+from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
-from pxmodrim.models.view.sidebar import SidebarEntry
-from pxmodrim.services.diagnostics_service import DiagnosticsService
-from pxmodrim.services.sort_service import SortService
-from pxmodrim.ui.about_panel import AboutPanel
+from pxmodrim.core.models.view.sidebar import SidebarEntry
+from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+from pxmodrim.core.services.sort_service import SortService
+from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.components import (
     HeaderController,
     HeaderPanel,
     SvgIconProvider,
     ToastManager,
 )
-from pxmodrim.ui.menu_bar import MenuBar
-from pxmodrim.ui.mod_info_panel import ModInfoPanel
-from pxmodrim.ui.mod_list_panel import ModListPanel
-from pxmodrim.ui.settings_panel import SettingsPanel
-from pxmodrim.ui.sidebar_panel import SidebarPanel
-from pxmodrim.ui.theme import Theme
+from pxmodrim.ui.window.menu_bar import MenuBar
+from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
+from pxmodrim.ui.panels.mod_list_panel import ModListPanel
+from pxmodrim.ui.panels.settings_panel import SettingsPanel
+from pxmodrim.ui.panels.sidebar_panel import SidebarPanel
+from pxmodrim.ui.theme.qml_theme import Theme
 
 if TYPE_CHECKING:
-    from pxmodrim.models.view.diagnostics import ModDiagnosticsView
+    from pxmodrim.core.models.view.diagnostics import ModDiagnosticsView
 
 
 class MainWindow(QMainWindow):

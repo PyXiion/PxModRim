@@ -9,9 +9,9 @@ from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QWidget
 
 from pxmodrim.ui.components.header_controller import HeaderController
-from pxmodrim.ui.palette import PALETTE
+from pxmodrim.ui.theme.palette import PALETTE
 
-_QML_DIR = Path(__file__).parent.parent / "qml"
+_QML_DIR = Path(__file__).parent
 _HEADER_QML = _QML_DIR / "Header.qml"
 
 

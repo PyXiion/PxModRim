@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pxmodrim.models.metadata.structures import CaseInsensitiveStr
+from pxmodrim.core.models.metadata.structures import CaseInsensitiveStr
 
 PackageId = CaseInsensitiveStr
 

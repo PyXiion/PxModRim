@@ -8,9 +8,9 @@ from pathlib import Path
 import httpx
 from loguru import logger
 
-from pxmodrim._compat.xml import xml_path_to_json
-from pxmodrim.checker.models import PackageId, ReplacementInfo
-from pxmodrim.sort.community import config_dir as checker_config_dir
+from pxmodrim.core.xml import xml_path_to_json
+from pxmodrim.core.checker.models import PackageId, ReplacementInfo
+from pxmodrim.core.sort.community import config_dir as checker_config_dir
 
 NO_VERSION_WARNING_URL = (
     "https://github.com/emipa606/NoVersionWarning/archive/refs/heads/main.zip"

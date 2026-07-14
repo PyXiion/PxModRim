@@ -6,9 +6,9 @@ from pathlib import Path
 from loguru import logger
 
 from pxmodrim.core.providers.base import BaseModProvider
-from pxmodrim.models.metadata.parsing import create_listed_mod_from_path
-from pxmodrim.models.metadata.structures import ListedMod
-from pxmodrim.services.mod_discovery import scan_mod_directory
+from pxmodrim.core.models.metadata.parsing import create_listed_mod_from_path
+from pxmodrim.core.models.metadata.structures import ListedMod
+from pxmodrim.core.services.mod_discovery import scan_mod_directory
 
 
 class CoreModProvider(BaseModProvider):

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from pxmodrim.ui.components.icons import icon
-from pxmodrim.ui.palette import PALETTE
+from pxmodrim.ui.theme.palette import PALETTE
 
 _TOAST_LEVELS = {
     "info": ("info", PALETTE["PRIMARY"]),

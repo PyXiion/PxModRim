@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import IntEnum
 
-from pxmodrim.models.metadata.structures import CaseInsensitiveStr
+from pxmodrim.core.models.metadata.structures import CaseInsensitiveStr
 
 PackageId = CaseInsensitiveStr
 

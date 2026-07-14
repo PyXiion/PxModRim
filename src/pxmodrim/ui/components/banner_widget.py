@@ -11,7 +11,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 
-from pxmodrim.ui.palette import PANEL_BG_Q, TEXT_MAIN_Q, TEXT_MUTED_Q
+from pxmodrim.ui.theme.palette import PANEL_BG_Q, TEXT_MAIN_Q, TEXT_MUTED_Q
 
 
 class AspectRatioBanner(QWidget):

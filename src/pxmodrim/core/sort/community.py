@@ -6,9 +6,9 @@ from typing import Any
 
 import msgspec
 
-from pxmodrim._compat.mspec_hooks import dec_hook
-from pxmodrim.models.metadata.structures import BaseRules
-from pxmodrim.sort.models import CommunityRule, PackageId
+from pxmodrim.core.msgspec_hooks import dec_hook
+from pxmodrim.core.models.metadata.structures import BaseRules
+from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 COMMUNITY_RULES_URL = (
     "https://github.com/RimSort/Community-Rules-Database/archive/refs/heads/main.zip"

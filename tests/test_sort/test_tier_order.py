@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from pxmodrim.checker.graph import ConstraintGraph
-from pxmodrim.checker.sort import topological_sort
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.checker.graph import ConstraintGraph
+from pxmodrim.core.checker.sort import topological_sort
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
     CaseInsensitiveStr,
 )
-from pxmodrim.sort.config import SortSettings, Tier, TierConfig
+from pxmodrim.core.sort.config import SortSettings, Tier, TierConfig
 
 PackageId = CaseInsensitiveStr
 

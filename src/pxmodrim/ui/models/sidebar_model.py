@@ -13,7 +13,7 @@ from PySide6.QtCore import (
     Signal,
 )
 
-from pxmodrim.ui.palette import PALETTE
+from pxmodrim.ui.theme.palette import PALETTE
 
 # (badge_bg, badge_fg, icon_name, icon_color)
 _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {

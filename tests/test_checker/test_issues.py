@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from pxmodrim.checker.graph import ConstraintGraph
-from pxmodrim.checker.issues import (
+from pxmodrim.core.checker.graph import ConstraintGraph
+from pxmodrim.core.checker.issues import (
     CycleIssueChecker,
     DependencyIssueChecker,
     GameVersionIssueChecker,
@@ -11,14 +11,14 @@ from pxmodrim.checker.issues import (
     LoadOrderIssueChecker,
     ReplacementIssueChecker,
 )
-from pxmodrim.checker.models import CheckContext, PackageId
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.checker.models import CheckContext, PackageId
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
     CaseInsensitiveStr,
     DependencyMod,
 )
-from pxmodrim.sort.config import SortSettings
+from pxmodrim.core.sort.config import SortSettings
 
 
 def _make_mod(package_id: str) -> AboutXmlMod:

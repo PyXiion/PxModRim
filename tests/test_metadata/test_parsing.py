@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from pxmodrim._compat.utils import find_about_xml
-from pxmodrim.models.metadata.parsing import (
+from pxmodrim.core.utils import find_about_xml
+from pxmodrim.core.models.metadata.parsing import (
     create_about_mod,
     create_listed_mod_from_path,
     value_extractor,
 )
-from pxmodrim.models.metadata.structures import AboutXmlMod
+from pxmodrim.core.models.metadata.structures import AboutXmlMod
 
 TEST_DATA = Path(__file__).parent / "data"
 

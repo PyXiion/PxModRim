@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
     CaseInsensitiveStr,

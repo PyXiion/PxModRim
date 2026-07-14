@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
-from pxmodrim.checker.checker import ModChecker
-from pxmodrim.checker.databases import NoVersionWarningService, UseThisInsteadService
-from pxmodrim.checker.issues import (
+from pxmodrim.core.checker.checker import ModChecker
+from pxmodrim.core.checker.databases import NoVersionWarningService, UseThisInsteadService
+from pxmodrim.core.checker.issues import (
     CycleIssueChecker,
     DependencyIssueChecker,
     GameVersionIssueChecker,
@@ -15,13 +15,13 @@ from pxmodrim.checker.issues import (
     LoadOrderIssueChecker,
     ReplacementIssueChecker,
 )
-from pxmodrim.checker.models import ModDiagnostics
-from pxmodrim.models.view.diagnostics import (
+from pxmodrim.core.checker.models import ModDiagnostics
+from pxmodrim.core.models.view.diagnostics import (
     ModDiagnosticsView,
     ModIssueView,
     ModItemState,
 )
-from pxmodrim.models.view.sidebar import (
+from pxmodrim.core.models.view.sidebar import (
     PROVIDER_LABELS,
     ActiveModsEntry,
     AllModsEntry,
@@ -31,12 +31,12 @@ from pxmodrim.models.view.sidebar import (
     SidebarEntry,
     WarningModsEntry,
 )
-from pxmodrim.sort.models import CommunityRule, PackageId
+from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 if TYPE_CHECKING:
-    from pxmodrim.checker.graph import ConstraintGraph
+    from pxmodrim.core.checker.graph import ConstraintGraph
     from pxmodrim.core.context import CoreContext
-    from pxmodrim.models.metadata.structures import AboutXmlMod
+    from pxmodrim.core.models.metadata.structures import AboutXmlMod
 
 
 class DiagnosticsService(QObject):
@@ -97,7 +97,7 @@ class DiagnosticsService(QObject):
         """Load community sorting rules from disk, if enabled."""
         if not self._ctx.config.sort.use_community_rules:
             return None
-        from pxmodrim.sort.community import community_rules_path, load_community_rules
+        from pxmodrim.core.sort.community import community_rules_path, load_community_rules
 
         path = self._ctx.config.paths.community_rules_file
         if not path:

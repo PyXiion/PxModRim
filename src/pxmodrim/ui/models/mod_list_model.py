@@ -13,7 +13,7 @@ from PySide6.QtCore import (
     Slot,
 )
 
-from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
 if TYPE_CHECKING:
     pass

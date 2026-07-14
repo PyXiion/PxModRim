@@ -4,9 +4,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from pxmodrim._compat.mods_config import parse_mods_config
-from pxmodrim._compat.utils import find_about_xml
-from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.mods_config import parse_mods_config
+from pxmodrim.core.utils import find_about_xml
+from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
 
 def scan_mod_directory(mods_path: Path) -> list[Path]:

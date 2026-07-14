@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pxmodrim.core.structures import CollectionStats
-from pxmodrim.models.metadata.structures import ListedMod
+from pxmodrim.core.models.metadata.structures import ListedMod
 if TYPE_CHECKING:
-    from pxmodrim._compat.config import AppConfig
+    from pxmodrim.core.config import AppConfig
 
 # Minimum valid version string shape: "X.Y" — reject anything shorter
 _VERSION_MIN_PARTS = 2
@@ -35,7 +35,7 @@ class CoreContext:
 
     def _refresh_game_version(self) -> None:
         """Read the game version from disk and cache it in `_game_version`."""
-        from pxmodrim._compat.config import read_game_version
+        from pxmodrim.core.config import read_game_version
 
         game = self._cfg.paths.game
         if not game:

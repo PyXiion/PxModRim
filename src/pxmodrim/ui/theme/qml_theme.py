@@ -7,7 +7,7 @@ from importlib.resources import files as resource_files
 from PySide6.QtCore import Property, QObject, Signal
 
 from pxmodrim.ui.components.icons import svg_str
-from pxmodrim.ui.palette import PALETTE
+from pxmodrim.ui.theme.palette import PALETTE
 
 
 class Theme(QObject):

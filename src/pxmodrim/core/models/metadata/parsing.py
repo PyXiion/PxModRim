@@ -8,10 +8,10 @@ from typing import Any
 
 from loguru import logger
 
-from pxmodrim._compat.constants import DEFAULT_MISSING_PACKAGEID, RIMWORLD_DLC_METADATA
-from pxmodrim._compat.utils import find_about_xml
-from pxmodrim._compat.xml import xml_path_to_json
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.constants import DEFAULT_MISSING_PACKAGEID, RIMWORLD_DLC_METADATA
+from pxmodrim.core.utils import find_about_xml
+from pxmodrim.core.xml import xml_path_to_json
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     BaseRules,
     CaseInsensitiveSet,

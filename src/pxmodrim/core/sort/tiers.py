@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pxmodrim.sort.config import PackageId, Tier, TierConfig
+from pxmodrim.core.sort.config import PackageId, Tier, TierConfig
 
 
 def assign_tiers(

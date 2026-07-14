@@ -17,15 +17,15 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim._compat.config import (
+from pxmodrim.core.config import (
     AppConfig,
     PathConfig,
     community_rules_file,
     detect_game_paths,
 )
 from pxmodrim.core.loading import LoadingState
-from pxmodrim.sort.community_service import CommunityRulesService
-from pxmodrim.sort.config import SortSettings
+from pxmodrim.core.sort.community_service import CommunityRulesService
+from pxmodrim.core.sort.config import SortSettings
 from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
 

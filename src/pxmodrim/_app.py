@@ -11,22 +11,22 @@ from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
 
-from pxmodrim._compat.config import (
+from pxmodrim.core.config import (
     AppConfig,
     config_file_path,
     detect_game_paths,
     load_config,
     save_config,
 )
-from pxmodrim._compat.dialogs import await_dialog
+from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.providers import create_providers
-from pxmodrim.services.diagnostics_service import DiagnosticsService
-from pxmodrim.services.sort_service import SortService
-from pxmodrim.ui.main_window import MainWindow
-from pxmodrim.ui.palette import PALETTE, get_stylesheet
-from pxmodrim.ui.settings_panel import SettingsPanel
+from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+from pxmodrim.core.services.sort_service import SortService
+from pxmodrim.ui.window.main_window import MainWindow
+from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
+from pxmodrim.ui.panels.settings_panel import SettingsPanel
 
 
 def _exception_hook(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pxmodrim.models.metadata.structures import CaseInsensitiveStr
+from pxmodrim.core.models.metadata.structures import CaseInsensitiveStr
 
 
 def enc_hook(obj: Any) -> Any:

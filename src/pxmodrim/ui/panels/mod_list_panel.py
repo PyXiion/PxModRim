@@ -8,12 +8,12 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
 
-from pxmodrim.models.metadata.structures import ListedMod
+from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import svg_str
-from pxmodrim.ui.mod_list_model import ModListModel
-from pxmodrim.ui.palette import PALETTE
+from pxmodrim.ui.models.mod_list_model import ModListModel
+from pxmodrim.ui.theme.palette import PALETTE
 
-_QML_DIR = Path(__file__).parent / "qml"
+_QML_DIR = Path(__file__).parent
 _MOD_LIST_QML = _QML_DIR / "ModList.qml"
 
 

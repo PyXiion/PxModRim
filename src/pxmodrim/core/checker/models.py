@@ -4,15 +4,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.models.metadata.structures import (
     CaseInsensitiveStr,
     ReplacementInfo,
 )
-from pxmodrim.sort.config import SortSettings
+from pxmodrim.core.sort.config import SortSettings
 
 if TYPE_CHECKING:
-    from pxmodrim.checker.graph import ConstraintGraph
-    from pxmodrim.models.metadata.structures import AboutXmlMod
+    from pxmodrim.core.checker.graph import ConstraintGraph
+    from pxmodrim.core.models.metadata.structures import AboutXmlMod
 
 PackageId = CaseInsensitiveStr
 

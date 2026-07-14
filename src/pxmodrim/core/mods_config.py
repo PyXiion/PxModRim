@@ -5,9 +5,9 @@ from typing import Any
 
 from loguru import logger
 
-from pxmodrim._compat.constants import RIMWORLD_DLC_METADATA
-from pxmodrim._compat.xml import xml_path_to_json
-from pxmodrim.models.metadata.structures import CaseInsensitiveStr, ModsConfig
+from pxmodrim.core.constants import RIMWORLD_DLC_METADATA
+from pxmodrim.core.xml import xml_path_to_json
+from pxmodrim.core.models.metadata.structures import CaseInsensitiveStr, ModsConfig
 
 
 def _extract_li_list(container: dict[str, Any] | list[Any] | str | None) -> list[str]:
@@ -69,7 +69,7 @@ def parse_mods_config(path: Path) -> ModsConfig | None:
 
 def write_mods_config(path: Path, data: ModsConfig) -> None:
     """Serialize a ModsConfig object back to ModsConfig.xml."""
-    from pxmodrim._compat.xml import json_to_xml_write
+    from pxmodrim.core.xml import json_to_xml_write
 
     json_to_xml_write({"ModsConfigData": data.to_dict()}, str(path), raise_errs=True)
     logger.info(f"ModsConfig.xml written to {path}")

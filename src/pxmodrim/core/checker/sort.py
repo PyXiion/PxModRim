@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from pxmodrim.checker.graph import ConstraintGraph, EdgeType
-from pxmodrim.checker.models import PackageId
-from pxmodrim.models.metadata.structures import AboutXmlMod
-from pxmodrim.sort.config import SortSettings, Tier, TierConfig
-from pxmodrim.sort.models import CommunityRule
-from pxmodrim.sort.tiers import assign_tiers
+from pxmodrim.core.checker.graph import ConstraintGraph, EdgeType
+from pxmodrim.core.checker.models import PackageId
+from pxmodrim.core.models.metadata.structures import AboutXmlMod
+from pxmodrim.core.sort.config import SortSettings, Tier, TierConfig
+from pxmodrim.core.sort.models import CommunityRule
+from pxmodrim.core.sort.tiers import assign_tiers
 
 
 def topological_sort(

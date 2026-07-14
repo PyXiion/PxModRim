@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import field
 
-from pxmodrim.models.metadata.structures import ListedMod
+from pxmodrim.core.models.metadata.structures import ListedMod
 
 PROVIDER_LABELS: dict[str, str] = {
     "local": "Local",

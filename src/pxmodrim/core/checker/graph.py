@@ -4,16 +4,16 @@ from collections.abc import Set as AbstractSet
 from enum import IntEnum, auto
 from typing import TYPE_CHECKING
 
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     BaseRules,
     CaseInsensitiveStr,
 )
-from pxmodrim.sort.tiers import find_cycle
+from pxmodrim.core.sort.tiers import find_cycle
 
 if TYPE_CHECKING:
-    from pxmodrim.sort.community import CommunityRule
-    from pxmodrim.sort.config import SortSettings
+    from pxmodrim.core.sort.community import CommunityRule
+    from pxmodrim.core.sort.config import SortSettings
 
 PackageId = CaseInsensitiveStr
 

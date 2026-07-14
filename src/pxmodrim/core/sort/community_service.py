@@ -9,7 +9,7 @@ import httpx
 import msgspec
 
 from pxmodrim.core.loading import LoadingState
-from pxmodrim.sort.community import (
+from pxmodrim.core.sort.community import (
     COMMUNITY_RULES_FILENAME,
     COMMUNITY_RULES_URL,
     ExternalRulesSchema,
@@ -17,7 +17,7 @@ from pxmodrim.sort.community import (
     config_dir,
     dec_hook,
 )
-from pxmodrim.sort.models import CommunityRule, PackageId
+from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 if TYPE_CHECKING:
     pass

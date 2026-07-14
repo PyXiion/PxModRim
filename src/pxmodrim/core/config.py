@@ -7,9 +7,9 @@ from pathlib import Path
 import msgspec
 from loguru import logger
 
-from pxmodrim._compat.constants import RIMWORLD_STEAM_APP_ID
-from pxmodrim._compat.mspec_hooks import dec_hook, enc_hook
-from pxmodrim.sort.config import SortSettings, TierConfig
+from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
+from pxmodrim.core.msgspec_hooks import dec_hook, enc_hook
+from pxmodrim.core.sort.config import SortSettings, TierConfig
 
 
 def read_game_version(game_path: str | Path) -> str | None:

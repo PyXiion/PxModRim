@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pxmodrim._compat.mods_config import parse_mods_config, write_mods_config
+from pxmodrim.core.mods_config import parse_mods_config, write_mods_config
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.structures import CollectionStats
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveStr,
     ListedMod,
     ModsConfig,
 )
-from pxmodrim.services.mod_discovery import resolve_active_uuids
+from pxmodrim.core.services.mod_discovery import resolve_active_uuids
 
 
 class ModService:

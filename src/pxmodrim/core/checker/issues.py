@@ -3,9 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from pxmodrim.checker.graph import EdgeType
-from pxmodrim.checker.models import CheckContext, ModIssue, PackageId
-from pxmodrim.models.metadata.structures import AboutXmlMod
+from pxmodrim.core.checker.graph import EdgeType
+from pxmodrim.core.checker.models import CheckContext, ModIssue, PackageId
+from pxmodrim.core.models.metadata.structures import AboutXmlMod
 
 if TYPE_CHECKING:
     pass

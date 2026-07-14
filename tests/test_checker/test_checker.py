@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from pxmodrim.checker.checker import ModChecker
-from pxmodrim.checker.issues import (
+from pxmodrim.core.checker.checker import ModChecker
+from pxmodrim.core.checker.issues import (
     CycleIssueChecker,
     DependencyIssueChecker,
     IncompatibilityIssueChecker,
     LoadOrderIssueChecker,
     ModIssueChecker,
 )
-from pxmodrim.checker.models import ModDiagnostics
-from pxmodrim.models.metadata.structures import (
+from pxmodrim.core.checker.models import ModDiagnostics
+from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
     CaseInsensitiveStr,
     DependencyMod,
     ListedMod,
 )
-from pxmodrim.sort.config import SortSettings
+from pxmodrim.core.sort.config import SortSettings
 
 
 def _make_mod(package_id: str, name: str | None = None) -> AboutXmlMod:

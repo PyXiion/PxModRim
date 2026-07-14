@@ -15,8 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pxmodrim._compat.config import AppConfig, save_config
-from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.config import AppConfig, save_config
+from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 from pxmodrim.ui.components import (
     AccordionSection,
     AspectRatioBanner,
@@ -25,10 +25,10 @@ from pxmodrim.ui.components import (
     generate_preview,
 )
 from pxmodrim.ui.components.icons import icon, pixmap
-from pxmodrim.ui.palette import PALETTE
+from pxmodrim.ui.theme.palette import PALETTE
 
 if TYPE_CHECKING:
-    from pxmodrim.models.view.diagnostics import ModIssueView
+    from pxmodrim.core.models.view.diagnostics import ModIssueView
 
 
 def _first_sentence(text: str, max_len: int = 80) -> str:

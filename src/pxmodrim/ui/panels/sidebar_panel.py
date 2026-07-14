@@ -8,11 +8,11 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QComboBox, QVBoxLayout, QWidget
 
-from pxmodrim.models.view.sidebar import SidebarEntry
-from pxmodrim.ui.palette import PALETTE
-from pxmodrim.ui.sidebar_model import SidebarModel
+from pxmodrim.core.models.view.sidebar import SidebarEntry
+from pxmodrim.ui.theme.palette import PALETTE
+from pxmodrim.ui.models.sidebar_model import SidebarModel
 
-_QML_DIR = Path(__file__).parent / "qml"
+_QML_DIR = Path(__file__).parent
 _SIDEBAR_QML = _QML_DIR / "Sidebar.qml"
 
 

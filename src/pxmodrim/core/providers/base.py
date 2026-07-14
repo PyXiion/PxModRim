@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from pxmodrim.models.metadata.structures import ListedMod
+from pxmodrim.core.models.metadata.structures import ListedMod
 
 
 class BaseModProvider(ABC):

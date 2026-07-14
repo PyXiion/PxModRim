@@ -8,7 +8,7 @@ from pxmodrim.core.providers.core import CoreModProvider
 from pxmodrim.core.providers.local import LocalModProvider, SteamCmdModProvider
 
 if TYPE_CHECKING:
-    from pxmodrim._compat.config import PathConfig
+    from pxmodrim.core.config import PathConfig
 
 
 def create_providers(paths: PathConfig) -> list[BaseModProvider]:

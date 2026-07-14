@@ -3,13 +3,13 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from pxmodrim.checker.sort import topological_sort
+from pxmodrim.core.checker.sort import topological_sort
 from pxmodrim.core.context import CoreContext
-from pxmodrim.models.metadata.structures import AboutXmlMod
-from pxmodrim.sort.models import PackageId
+from pxmodrim.core.models.metadata.structures import AboutXmlMod
+from pxmodrim.core.sort.models import PackageId
 
 if TYPE_CHECKING:
-    from pxmodrim.services.diagnostics_service import DiagnosticsService
+    from pxmodrim.core.services.diagnostics_service import DiagnosticsService
 
 
 class SortService:

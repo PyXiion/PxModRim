@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pxmodrim._compat.config import read_game_version
+from pxmodrim.core.config import read_game_version
 
 
 class TestReadGameVersion:

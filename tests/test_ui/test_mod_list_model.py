@@ -6,8 +6,8 @@ import pytest
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import QApplication
 
-from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
-from pxmodrim.ui.mod_list_model import ModListModel
+from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.ui.models.mod_list_model import ModListModel
 
 
 def _provider_colors() -> dict[str, str]:
