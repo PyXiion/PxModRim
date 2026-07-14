@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/pxmodrim/ui/assets/logo_nobg_4.svg" alt="PxModRim" width="480">
+  <img src="src/pxmodrim/ui/assets/logo_nobg_4.svg" alt="PxModRim" width="240">
 </p>
 
 A friendly, modern mod manager for RimWorld.
