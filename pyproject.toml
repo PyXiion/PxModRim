@@ -55,6 +55,8 @@ pythonpath = 'src'
 testpaths = ['tests']
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 pythonPlatform = "All"
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true

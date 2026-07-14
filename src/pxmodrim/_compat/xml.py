@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import xml.dom.minidom as minidom
 from typing import Any
 
 import lxml.etree as ET
@@ -87,12 +86,12 @@ def json_to_xml_write(
     """Write dictionary data to an XML file with pretty printing."""
     try:
         root = dict_to_etree(data)
-        rough_string = ET.tostring(root, encoding="utf-8", xml_declaration=True)
-        reparsed = minidom.parseString(rough_string)
-        formatted = reparsed.toprettyxml(indent="  ", encoding=None)
+        formatted = ET.tostring(
+            root, encoding="utf-8", xml_declaration=True, pretty_print=True
+        )
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
-            f.write(formatted)
+            f.write(formatted.decode("utf-8"))
         logger.debug(f"XML written to {path}")
     except Exception as e:
         logger.error(f"Error writing XML file: {e}")
