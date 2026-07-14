@@ -29,6 +29,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.40.0
+
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
