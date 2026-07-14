@@ -5,7 +5,6 @@
 </defs>
 <ellipse cx="450" cy="130" rx="380" ry="72" fill="none" stroke="#3a4550" stroke-width="18" transform="rotate(-8 450 130)"/>
 <text x="450" y="252" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="150" font-weight="900" fill="#e8e8e8" letter-spacing="-10">P<tspan fill="#2ec4b6">x</tspan>M<tspan fill="#2ec4b6">o</tspan>d<tspan fill="#e6a23c">R</tspan>im</text>
-<path fill="none" stroke="#3a4550" stroke-width="18" stroke-linecap="round" d="M 78.70 168.31 A 380 72 -8 1 1 414.09 207.21" />
 <path fill="none" stroke="#e6a23c" stroke-width="18" stroke-linecap="round" filter="url(#ring-glow)" d="M 414.09 207.21 A 380 72 -8 0 1 78.70 168.31" />
 <circle cx="760" cy="58" r="12" fill="#e6a23c" filter="url(#sun-glow)"/>
 <circle cx="90" cy="60" r="3" fill="#a89f91" opacity="0.5"/>
