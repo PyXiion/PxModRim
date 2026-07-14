@@ -48,7 +48,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Build with Nuitka
-        run: uv run python packaging/build.py
+        run: just build
 
       - name: Package distribution
         shell: bash
