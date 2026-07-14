@@ -69,3 +69,6 @@ exclude = ['rimsort-original']
 [tool.bandit]
 targets = ["src"]
 exclude_dirs = ['tests']
+
+[tool.bandit.assert_used]
+skips = ['tests/**/*.py']
