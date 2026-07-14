@@ -45,6 +45,7 @@ class DiagnosticsService(QObject):
     sidebar_entries_changed = Signal(list)  # list[SidebarEntry]
 
     def __init__(self, ctx: CoreContext) -> None:
+        """Initialise diagnostics with checkers, databases, and community rules."""
         super().__init__()
         self._ctx = ctx
         self._no_version_warning_service = NoVersionWarningService()
@@ -68,12 +69,14 @@ class DiagnosticsService(QObject):
     # ── Lifecycle ──────────────────────────────────────────────
 
     async def initialize(self) -> None:
+        """Load databases and community rules, then apply them to the checker."""
         await self._ensure_databases()
         self._community_rules = await self._load_community_rules()
         if self._community_rules:
             self._checker.set_community_rules(self._community_rules)
 
     async def _ensure_databases(self) -> None:
+        """Fetch or load NoVersionWarning and UseThisInstead databases."""
         nvw = await self._no_version_warning_service.ensure()
         if nvw:
             self._checker.set_no_version_warning(nvw)
@@ -91,6 +94,7 @@ class DiagnosticsService(QObject):
                 self._checker.set_use_this_instead(uti)
 
     async def _load_community_rules(self) -> dict[PackageId, CommunityRule] | None:
+        """Load community sorting rules from disk, if enabled."""
         if not self._ctx.config.sort.use_community_rules:
             return None
         from pxmodrim.sort.community import community_rules_path, load_community_rules
@@ -105,17 +109,20 @@ class DiagnosticsService(QObject):
     # ── Mutations ──────────────────────────────────────────────
 
     def rebuild(self, active_uuids: list[str] | None = None) -> None:
+        """Rebuild the checker for all mods with the given active UUIDs."""
         if active_uuids is None:
             active_uuids = self._ctx.active_uuids
         self._last_active_uuids = active_uuids
         self._checker.rebuild(self._ctx.all_mods, active_uuids)
 
     def apply_active_mods_change(self, states: list[ModItemState]) -> None:
+        """Apply a new active set from toggle states and rebuild diagnostics."""
         active_uuids = [s.uuid for s in states if s.checked]
         self._last_active_uuids = active_uuids
         self._checker.rebuild(self._ctx.all_mods, active_uuids)
 
     def reorder(self, active_uuids: list[str]) -> None:
+        """Notify the checker of a new active mod order."""
         self._last_active_uuids = active_uuids
         self._checker.reorder(active_uuids)
 
@@ -138,6 +145,7 @@ class DiagnosticsService(QObject):
         return self._checker.community_rules
 
     def issues_for(self, uuid: str) -> list[ModIssueView]:
+        """Return view models for all diagnostics associated with a given mod UUID."""
         diag = self._checker.diagnostics_for(uuid)
         return self._to_issue_views(diag) if diag else []
 
@@ -145,6 +153,7 @@ class DiagnosticsService(QObject):
 
     @staticmethod
     def _to_issue_views(diag: ModDiagnostics) -> list[ModIssueView]:
+        """Convert a ModDiagnostics object into a list of ModIssueView models."""
         views: list[ModIssueView] = []
         for issue in diag.errors:
             views.append(
@@ -170,6 +179,7 @@ class DiagnosticsService(QObject):
     def _to_view(
         diagnostics: dict[str, ModDiagnostics],
     ) -> dict[str, ModDiagnosticsView]:
+        """Convert diagnostics dict to a serialisable view dict for the UI."""
         result: dict[str, ModDiagnosticsView] = {}
         for uuid, diag in diagnostics.items():
             result[uuid] = ModDiagnosticsView(
@@ -185,6 +195,7 @@ class DiagnosticsService(QObject):
     def _on_checker_diagnostics_changed(
         self, diagnostics: dict[str, ModDiagnostics]
     ) -> None:
+        """Callback from checker; emit updated summary, status, and sidebar signals."""
         self.diagnostics_summary_changed.emit(self._to_view(diagnostics))
         self.status_message_changed.emit(self._format_status())
         self.sidebar_entries_changed.emit(self._build_sidebar_entries())
@@ -192,6 +203,7 @@ class DiagnosticsService(QObject):
     # ── Status ──────────────────────────────────────────────────
 
     def _format_status(self) -> str:
+        """Build a human-readable status string showing active/error/warning counts."""
         active = self._last_active_uuids
         diagnostics = self._checker.active_mod_diagnostics()
 
@@ -208,6 +220,7 @@ class DiagnosticsService(QObject):
     # ── Sidebar ─────────────────────────────────────────────────
 
     def _build_sidebar_entries(self) -> list[SidebarEntry]:
+        """Build sidebar entries categorised by provider, active, error, warning."""
         mods = self._ctx.all_mods
         active = self._last_active_uuids
         diagnostics = self._checker.active_mod_diagnostics()

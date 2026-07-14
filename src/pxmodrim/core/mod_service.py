@@ -16,6 +16,8 @@ from pxmodrim.services.mod_discovery import resolve_active_uuids
 
 
 class ModService:
+    """Orchestrates mod discovery and lifecycle across a set of providers."""
+
     def __init__(self, ctx: CoreContext, providers: list[BaseModProvider]) -> None:
         self._ctx = ctx
         self._providers: dict[str, BaseModProvider] = {
@@ -23,9 +25,11 @@ class ModService:
         }
 
     def reset_providers(self, providers: list[BaseModProvider]) -> None:
+        """Replace the current provider set with a new list."""
         self._providers = {p.provider_id: p for p in providers}
 
     def get_provider(self, provider_id: str) -> BaseModProvider | None:
+        """Retrieve a provider by its ``provider_id``, or ``None``."""
         return self._providers.get(provider_id)
 
     @property
@@ -33,6 +37,7 @@ class ModService:
         return {pid: p.color for pid, p in self._providers.items()}
 
     async def discover(self) -> None:
+        """Run all providers' discovery in sequence and load results into context."""
         all_mods: dict[str, ListedMod] = {}
         for p in self._providers.values():
             mods = await p.discover(self._ctx.target_version)
@@ -44,6 +49,7 @@ class ModService:
         return self._ctx.compute_stats(active_ids)
 
     async def save_active_layout(self, active_ids: list[str]) -> bool:
+        """Persist the given active UUIDs as a ModsConfig.xml file."""
         cfg = self._ctx.config
         if not cfg.paths.config_folder:
             return False

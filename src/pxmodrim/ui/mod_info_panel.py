@@ -36,10 +36,7 @@ def _first_sentence(text: str, max_len: int = 80) -> str:
         return ""
     stripped = text.strip()
     end = stripped.find(".")
-    if end != -1:
-        result = stripped[: end + 1]
-    else:
-        result = stripped
+    result = stripped[:end + 1] if end != -1 else stripped
     if len(result) > max_len:
         result = result[:max_len].rsplit(" ", 1)[0] + "\u2026"
     return result
@@ -50,9 +47,6 @@ def _find_preview(mod_path: Path | None) -> Path | None:
         return None
     candidate = mod_path / "About" / "Preview.png"
     return candidate if candidate.exists() else None
-
-
-
 
 
 class IssueRow(QWidget):
@@ -144,14 +138,14 @@ class ModInfoPanel(QWidget):
             QPushButton {{
                 min-width: 32px; max-width: 32px;
                 min-height: 32px; max-height: 32px;
-                background-color: {PALETTE['ELEVATE_3']};
-                border: 1px solid {PALETTE['BORDER']};
+                background-color: {PALETTE["ELEVATE_3"]};
+                border: 1px solid {PALETTE["BORDER"]};
                 border-radius: 6px;
                 padding: 0;
             }}
             QPushButton:hover {{
-                background-color: {PALETTE['ELEVATE_4']};
-                border-color: {PALETTE['ELEVATE_4']};
+                background-color: {PALETTE["ELEVATE_4"]};
+                border-color: {PALETTE["ELEVATE_4"]};
             }}
         """)
         btn_layout.addWidget(self._open_folder_btn)
@@ -165,14 +159,14 @@ class ModInfoPanel(QWidget):
             QPushButton {{
                 min-width: 32px; max-width: 32px;
                 min-height: 32px; max-height: 32px;
-                background-color: {PALETTE['ELEVATE_3']};
-                border: 1px solid {PALETTE['BORDER']};
+                background-color: {PALETTE["ELEVATE_3"]};
+                border: 1px solid {PALETTE["BORDER"]};
                 border-radius: 6px;
                 padding: 0;
             }}
             QPushButton:hover {{
-                background-color: {PALETTE['ELEVATE_4']};
-                border-color: {PALETTE['ELEVATE_4']};
+                background-color: {PALETTE["ELEVATE_4"]};
+                border-color: {PALETTE["ELEVATE_4"]};
             }}
         """)
         btn_layout.addWidget(self._open_url_btn)
@@ -352,7 +346,7 @@ class ModInfoPanel(QWidget):
     async def _load_preview(
         self, mod_path: Path | None, mod_id: str, mod_name: str
     ) -> None:
-        """Load preview image in background thread. Only updates UI if still current mod."""
+        """Load preview image in background thread. Only updates UI if current mod."""
         try:
             preview_path = await asyncio.to_thread(_find_preview, mod_path)
 

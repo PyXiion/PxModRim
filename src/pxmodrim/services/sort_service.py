@@ -14,18 +14,19 @@ if TYPE_CHECKING:
 
 class SortService:
     def __init__(self, ctx: CoreContext, diagnostics_service: DiagnosticsService):
+        """Initialise with core context and diagnostics for topological sort."""
         self._ctx = ctx
         self._diagnostics_service = diagnostics_service
 
     async def sort_active_mods(self) -> list[str]:
+        """Run topological sort on active mods in a thread, returning ordered UUIDs."""
         active_mods = self._diagnostics_service.active_mods_by_pid
         graph = self._diagnostics_service.constraint_graph
         settings = self._ctx.config.sort
         community_rules = self._diagnostics_service.community_rules
 
         def _sort() -> list[PackageId]:
-            pids = topological_sort(active_mods, graph, settings, community_rules)
-            return pids
+            return topological_sort(active_mods, graph, settings, community_rules)
 
         sorted_pids = await asyncio.to_thread(_sort)
 
@@ -38,6 +39,7 @@ class SortService:
         return [pid_to_uuid[pid] for pid in sorted_pids if pid in pid_to_uuid]
 
     async def apply_sort(self, ordered_uuids: list[str]) -> bool:
+        """Apply the newly sorted UUID order to the mod list model."""
         model = self._ctx.mod_list_model
         if model:
             model.reorder(ordered_uuids)

@@ -11,7 +11,8 @@ def assign_tiers(
     load_last: set[PackageId],
     tier_config: TierConfig,
 ) -> dict[PackageId, Tier]:
-    tiers = {pid: Tier.TIER_2 for pid in canonical_ids}
+    """Assign each mod to a Tier (0-3) based on load order & dependency constraints."""
+    tiers = dict.fromkeys(canonical_ids, Tier.TIER_2)
 
     tier3_set = set(load_last)
     for pid in load_last:
@@ -52,6 +53,7 @@ def get_deps_recursive(
     deps: dict[PackageId, set[PackageId]],
     visited: set[PackageId] | None = None,
 ) -> set[PackageId]:
+    """Recursively collect all transitive dependencies for a given package."""
     if visited is None:
         visited = set()
     if start in visited:
@@ -69,6 +71,7 @@ def get_reverse_deps_recursive(
     rev_deps: dict[PackageId, set[PackageId]],
     visited: set[PackageId] | None = None,
 ) -> set[PackageId]:
+    """Recursively collect all transitive reverse-dependents for a given package."""
     if visited is None:
         visited = set()
     if start in visited:
@@ -85,6 +88,7 @@ def find_cycle(
     nodes: set[PackageId],
     deps: dict[PackageId, set[PackageId]],
 ) -> list[PackageId] | None:
+    """Detect a dependency cycle in the given nodes using DFS. Returns cycle or None."""
     visited = set()
     rec_stack = set()
     parent: dict[PackageId, PackageId] = {}

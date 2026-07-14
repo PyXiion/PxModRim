@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 
 class ModChecker:
+    """Orchestrates diagnostic checks across active mods."""
+
     def __init__(
         self,
         checkers: list[ModIssueChecker],
@@ -63,6 +65,7 @@ class ModChecker:
         mods: dict[str, ListedMod],
         ordered_uuids: list[str],
     ) -> None:
+        """Re-scan all mods and regenerate diagnostics from scratch."""
         self._collect_active(mods, ordered_uuids)
 
         self._graph.build(
@@ -90,6 +93,7 @@ class ModChecker:
         active: bool,
         ordered_uuids: list[str],
     ) -> None:
+        """Add/remove a mod from active set, update diagnostics for affected mods."""
         if not isinstance(mod, AboutXmlMod):
             self._emit()
             return
@@ -125,6 +129,7 @@ class ModChecker:
         self._emit()
 
     def move_mod(self, uuid: str, old_index: int, new_index: int) -> None:
+        """Move a mod to new position and recheck diagnostics for neighbors."""
         if not self._ordered_pids:
             return
 
@@ -148,6 +153,7 @@ class ModChecker:
         self._emit()
 
     def reorder(self, ordered_uuids: list[str]) -> None:
+        """Reapply the full active-mod order and regenerate all diagnostics."""
         self._collect_active(
             dict(self._all_mods),
             ordered_uuids,
@@ -183,12 +189,14 @@ class ModChecker:
         return self._community_rules
 
     def diagnostics_for(self, uuid: str) -> ModDiagnostics | None:
+        """Return diagnostics for a given UUID, or None if not active."""
         pid = self._uuid_to_pid.get(uuid)
         if pid is None:
             return None
         return self._diagnostics.get(pid)
 
     def active_mod_diagnostics(self) -> dict[str, ModDiagnostics]:
+        """Return diagnostics for all active mods, keyed by UUID."""
         result: dict[str, ModDiagnostics] = {}
         for uuid, pid in self._uuid_to_pid.items():
             diag = self._diagnostics.get(pid)
@@ -201,6 +209,7 @@ class ModChecker:
     def _collect_active(
         self, mods: dict[str, ListedMod], ordered_uuids: list[str]
     ) -> None:
+        """Populate internal active-mod state from full mod list and UUID ordering."""
         self._all_mods = dict(mods)
         self._active_mods = {}
         self._uuid_to_pid = {}
@@ -231,6 +240,7 @@ class ModChecker:
         )
 
     def _check_mod(self, mod: AboutXmlMod, ctx: CheckContext) -> ModDiagnostics:
+        """Run all registered checkers against a single mod and collect diagnostics."""
         errors: list[Any] = []
         warnings: list[Any] = []
 

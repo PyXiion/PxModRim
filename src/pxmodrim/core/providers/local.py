@@ -21,6 +21,7 @@ class LocalModProvider(BaseModProvider):
         super().__init__(local_path)
 
     async def discover(self, target_version: str) -> dict[str, ListedMod]:
+        """Scan local path for mods lacking `PublishedFileId.txt` (off main thread)."""
         def _scan() -> dict[str, ListedMod]:
             result: dict[str, ListedMod] = {}
             if not self._path.exists():
@@ -50,7 +51,7 @@ class LocalModProvider(BaseModProvider):
 
 
 class SteamCmdModProvider(BaseModProvider):
-    """Provider for Steam CMD / workshop mods - only includes mods with PublishedFileId.txt."""
+    """Provider for Steam CMD / workshop mods - only mods with PublishedFileId.txt."""
 
     provider_id = "steam_cmd"
     color = "#3498db"
@@ -59,6 +60,7 @@ class SteamCmdModProvider(BaseModProvider):
         super().__init__(local_path)
 
     async def discover(self, target_version: str) -> dict[str, ListedMod]:
+        """Scan local path for mods with ``PublishedFileId.txt`` (off main thread)."""
         def _scan() -> dict[str, ListedMod]:
             result: dict[str, ListedMod] = {}
             if not self._path.exists():

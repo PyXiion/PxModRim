@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pxmodrim.checker.graph import ConstraintGraph
 from pxmodrim.checker.issues import (
     CycleIssueChecker,
@@ -9,8 +11,6 @@ from pxmodrim.checker.issues import (
     LoadOrderIssueChecker,
     ReplacementIssueChecker,
 )
-from typing import Any
-
 from pxmodrim.checker.models import CheckContext, PackageId
 from pxmodrim.models.metadata.structures import (
     AboutXmlMod,

@@ -67,6 +67,8 @@ class ConstraintEdge:
 
 
 class ConstraintGraph:
+    """Directed graph modelling mod dependencies, load order, incompatibilities."""
+
     def __init__(self) -> None:
         self._outgoing: dict[PackageId, set[ConstraintEdge]] = {}
         self._incoming: dict[PackageId, set[ConstraintEdge]] = {}
@@ -129,6 +131,7 @@ class ConstraintGraph:
         settings: SortSettings,
         community_rules: dict[PackageId, CommunityRule] | None = None,
     ) -> None:
+        """Build constraint graph from active mods, order, settings, community rules."""
         self._outgoing.clear()
         self._incoming.clear()
         self._ordered_pids = list(ordered_pids)
@@ -166,6 +169,7 @@ class ConstraintGraph:
         settings: SortSettings,
         community_rules: dict[PackageId, CommunityRule] | None = None,
     ) -> None:
+        """Insert a single mod into the graph at a given index and add its edges."""
         self._ensure_node(pid)
         self._ordered_pids.insert(index, pid)
         self._rebuild_index()
@@ -186,6 +190,7 @@ class ConstraintGraph:
             )
 
     def remove_mod(self, pid: PackageId) -> None:
+        """Remove a mod and all its incident edges from the graph."""
         self._remove_outgoing(pid)
         self._remove_incoming(pid)
         self._pid_to_index.pop(pid, None)
@@ -193,12 +198,14 @@ class ConstraintGraph:
         self._rebuild_index()
 
     def update_order(self, ordered_pids: list[PackageId]) -> None:
+        """Replace the mod ordering without rebuilding constraint edges."""
         self._ordered_pids = list(ordered_pids)
         self._pid_to_index = {pid: i for i, pid in enumerate(ordered_pids)}
 
     # ── Cycle detection ────────────────────────────────────────
 
     def find_cycles(self) -> list[list[PackageId]]:
+        """Detect dependency cycles in the current graph via tier-based finding."""
         dep_graph: dict[PackageId, set[PackageId]] = {}
         for pid in self._outgoing:
             deps: set[PackageId] = set()
@@ -302,6 +309,7 @@ class ConstraintGraph:
 def _build_alt_map(
     active_mods: dict[PackageId, AboutXmlMod],
 ) -> dict[PackageId, PackageId]:
+    """Build a mapping from alternative package IDs to their canonical active PID."""
     alt_map: dict[PackageId, PackageId] = {}
     for pid, mod in active_mods.items():
         for dep in mod.about_rules.dependencies.values():

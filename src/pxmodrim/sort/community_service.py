@@ -58,17 +58,16 @@ class CommunityRulesService:
 
                     with loading.task(
                         "Downloading community rules...", total_steps=total_size
-                    ) as task:
-                        with open(zip_path, "wb") as fh:
-                            async for chunk in resp.aiter_bytes(8192):
-                                fh.write(chunk)
-                                task.step(len(chunk))
+                    ) as task, open(zip_path, "wb") as fh:
+                        async for chunk in resp.aiter_bytes(8192):
+                            fh.write(chunk)
+                            task.step(len(chunk))
 
                     with loading.task("Extracting...", total_steps=100) as task:
                         with zipfile.ZipFile(zip_path, "r") as zf:
                             zf.extractall(extract_dir)
                         task.step(50)
-                        for root, dirs, files in os.walk(extract_dir):
+                        for root, _dirs, files in os.walk(extract_dir):
                             for filename in files:
                                 if filename == COMMUNITY_RULES_FILENAME:
                                     src_path = Path(str(root)) / filename

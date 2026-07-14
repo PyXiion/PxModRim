@@ -26,12 +26,13 @@ def community_rules_path() -> Path:
 
 
 class ExternalRule(msgspec.Struct, omit_defaults=True):
+    """A single community rule specifying load-ordering relationships for a mod."""
     loadAfter: dict[str, Any] = {}
     loadBefore: dict[str, Any] = {}
-    loadTop: "SubExternalBoolRule" = msgspec.field(
+    loadTop: SubExternalBoolRule = msgspec.field(
         default_factory=lambda: SubExternalBoolRule()
     )
-    loadBottom: "SubExternalBoolRule" = msgspec.field(
+    loadBottom: SubExternalBoolRule = msgspec.field(
         default_factory=lambda: SubExternalBoolRule()
     )
 
@@ -41,6 +42,7 @@ class SubExternalBoolRule(msgspec.Struct, omit_defaults=True):
 
 
 class ExternalRulesSchema(msgspec.Struct, omit_defaults=True):
+    """Schema for the community rules JSON file, wrapping a timestamp and rule map."""
     timestamp: int = 0
     rules: dict[str, ExternalRule] = {}
 
@@ -50,8 +52,8 @@ class ExternalRulesSchema(msgspec.Struct, omit_defaults=True):
             pid = PackageId(pid_str)
             result[pid] = CommunityRule(
                 package_id=pid,
-                load_after={PackageId(x) for x in rule.loadAfter.keys()},
-                load_before={PackageId(x) for x in rule.loadBefore.keys()},
+                load_after={PackageId(x) for x in rule.loadAfter},
+                load_before={PackageId(x) for x in rule.loadBefore},
                 load_first=rule.loadTop.value,
                 load_last=rule.loadBottom.value,
                 incompatible_with=set(),
@@ -60,6 +62,7 @@ class ExternalRulesSchema(msgspec.Struct, omit_defaults=True):
 
 
 def load_community_rules(json_path: Path) -> dict[PackageId, CommunityRule]:
+    """Load and deserialize community rules from a JSON file on disk."""
     if not json_path.exists():
         return {}
     data = msgspec.json.decode(
@@ -73,14 +76,14 @@ def merge_community_rules(
     community_rules: dict[PackageId, CommunityRule],
     mod_pid: PackageId,
 ) -> BaseRules:
+    """Merge community-sourced ordering rules into a mod's own BaseRules."""
     if mod_pid not in community_rules:
         return mod_rules
 
     cr = community_rules[mod_pid]
-    merged = BaseRules(
+    return BaseRules(
         load_after=mod_rules.load_after | cr.load_after,
         load_before=mod_rules.load_before | cr.load_before,
         incompatible_with=mod_rules.incompatible_with,
         dependencies=dict(mod_rules.dependencies),
     )
-    return merged

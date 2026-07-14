@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Type
+from typing import Any
 
 from pxmodrim.models.metadata.structures import CaseInsensitiveStr
 
@@ -13,7 +13,7 @@ def enc_hook(obj: Any) -> Any:
     )
 
 
-def dec_hook(type_: Type, obj: Any) -> Any:
+def dec_hook(type_: type, obj: Any) -> Any:
     if type_ is CaseInsensitiveStr and isinstance(obj, str):
         return CaseInsensitiveStr(obj)
     raise NotImplementedError(f"Cannot decode {type_}")

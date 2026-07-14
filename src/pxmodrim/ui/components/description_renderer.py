@@ -24,6 +24,7 @@ class DescriptionRenderer(QTextBrowser):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.document().setDocumentMargin(0)
+        self.setMinimumHeight(0)
 
         self.document().setDefaultStyleSheet("""
             body {
@@ -59,3 +60,4 @@ class DescriptionRenderer(QTextBrowser):
         html_text = unity_rich_text_to_html(text)
         self.setHtml(f"<body>{html_text}</body>")
         self.show()
+        self.setFixedHeight(int(self.document().size().height()))

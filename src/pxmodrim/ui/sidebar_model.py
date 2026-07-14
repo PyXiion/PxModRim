@@ -147,8 +147,10 @@ class SidebarModel(QAbstractListModel):
         self._items: list[SidebarItem] = []
 
     def rowCount(
-        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+        self, parent: QModelIndex | QPersistentModelIndex | None = None
     ) -> int:
+        if parent is None:
+            parent = QModelIndex()
         if parent.isValid():
             return 0
         return len(self._items)
@@ -165,17 +167,17 @@ class SidebarModel(QAbstractListModel):
 
         if role == Qt.ItemDataRole.DisplayRole or role == self.LabelRole:
             return item.label if item.label else ""
-        elif role == self.CountRole:
+        if role == self.CountRole:
             return item.count if item.count is not None else 0
-        elif role == self.BadgeBgRole:
+        if role == self.BadgeBgRole:
             return item.badge_bg if item.badge_bg else ""
-        elif role == self.BadgeFgRole:
+        if role == self.BadgeFgRole:
             return item.badge_fg if item.badge_fg else ""
-        elif role == self.IconRole:
+        if role == self.IconRole:
             return item.icon_name if item.icon_name else ""
-        elif role == self.IconColorRole:
+        if role == self.IconColorRole:
             return item.icon_color if item.icon_color else ""
-        elif role == self.SectionRole:
+        if role == self.SectionRole:
             return item.section_name if item.section_name else ""
 
         return None

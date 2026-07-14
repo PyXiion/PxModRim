@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import functools
 import os
 from collections.abc import Iterable, Iterator, MutableSet, Set
@@ -15,6 +16,8 @@ from pxmodrim._compat.constants import RIMWORLD_DLC_METADATA
 
 @dataclass
 class ReplacementInfo:
+    """Replacement info for a mod from the database or local data."""
+
     name: str
     author: str
     packageid: str
@@ -24,11 +27,15 @@ class ReplacementInfo:
 
 
 class CaseInsensitiveStr(str):
+    """Case-insensitive string that stores the lowered version."""
+
     def __new__(cls, pid: str) -> CaseInsensitiveStr:
         return super().__new__(cls, pid.lower())
 
 
 class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
+    """Mutable set with case-insensitive string membership."""
+
     def __init__(
         self,
         s: Iterable[CaseInsensitiveStr | str] | CaseInsensitiveStr | str | None = (),
@@ -87,6 +94,8 @@ class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
 
 
 class ModsConfig:
+    """Parsed ModsConfig.xml data with active mods and known expansions."""
+
     version: str
     _activeMods: list[CaseInsensitiveStr]
     _knownExpansions: list[CaseInsensitiveStr]
@@ -131,12 +140,15 @@ class ModsConfig:
             raise TypeError(f"Expected list, got {type(value)}")
 
     def check_active_duplicates(self) -> bool:
+        """True if the activeMods list contains duplicate entries."""
         return len(self.activeMods) != len(set(self.activeMods))
 
     def check_expansions_duplicates(self) -> bool:
+        """True if the knownExpansions list contains duplicate entries."""
         return len(self.knownExpansions) != len(set(self.knownExpansions))
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize ModsConfig to a plain dictionary."""
         return {
             "version": self.version,
             "activeMods": [str(i) for i in self.activeMods],
@@ -146,6 +158,8 @@ class ModsConfig:
 
 @dataclass
 class BaseMod:
+    """Base dataclass for all mod types with a name and UUID."""
+
     name: str = "Unknown Mod Name"
     _uuid: str = str(uuid4())
 
@@ -159,22 +173,29 @@ class BaseMod:
 
 @dataclass
 class PackageIdMod:
+    """Mixin dataclass adding a case-insensitive package ID."""
+
     package_id: CaseInsensitiveStr = CaseInsensitiveStr("invalid.mod")
 
 
 @dataclass
 class DependencyMod(BaseMod, PackageIdMod):
+    """A mod dependency with workshop URL and alternative package IDs."""
+
     workshop_url: str = ""
     alternative_package_ids: set[CaseInsensitiveStr] = field(default_factory=set)
 
 
 @dataclass
 class ListedMod(BaseMod):
+    """A mod discovered from any provider with validation and path info."""
+
     valid: bool = True
     supported_versions: set[str] = field(default_factory=set)
     description: str = (
         "This mod is considered invalid by PxModRim (and the RimWorld game)."
-        + "\n\nThis mod does NOT contain an ./About/About.xml and is likely leftover from previous usage."
+        + "\n\nThis mod does NOT contain an ./About/About.xml and is likely "
+        "leftover from previous usage."
     )
 
     _mod_path: Path | None = None
@@ -196,12 +217,14 @@ class ListedMod(BaseMod):
 
     @property
     def mod_folder(self) -> str | None:
+        """The folder name (stem) of the mod path, or None."""
         if self.mod_path:
             return self.mod_path.stem
         return None
 
     @property
     def internal_time_touched(self) -> int:
+        """Modification timestamp of the mod folder, or -1 if unavailable."""
         if self.mod_path and os.path.exists(self.mod_path):
             return int(os.path.getmtime(self.mod_path))
         return -1
@@ -214,6 +237,7 @@ class ListedMod(BaseMod):
 
     @functools.cached_property
     def published_file_id(self) -> str | None:
+        """Published file ID from About/PublishedFileId.txt or numeric folder name."""
         if self.mod_path is None:
             return None
         pfid_path = self.mod_path / "About/PublishedFileId.txt"
@@ -230,6 +254,7 @@ class ListedMod(BaseMod):
 
     @functools.cached_property
     def c_sharp_mod(self) -> bool:
+        """Whether the mod contains a non-empty Assemblies directory."""
         if self.mod_path is None:
             return False
         assemblies = self.mod_path / "Assemblies"
@@ -237,6 +262,7 @@ class ListedMod(BaseMod):
 
     @functools.cached_property
     def xml_patch_mod(self) -> bool:
+        """Whether the mod contains XML patch files in its Patches directory."""
         if self.mod_path is None:
             return False
         patches = self.mod_path / "Patches"
@@ -246,6 +272,7 @@ class ListedMod(BaseMod):
 
     @property
     def preview_img_path(self) -> Path | None:
+        """Path to About/Preview.png if it exists, otherwise None."""
         if self.mod_path is None:
             return None
         candidate = self.mod_path / "About/Preview.png"
@@ -256,11 +283,15 @@ class ListedMod(BaseMod):
 
 @dataclass
 class ScenarioMod(ListedMod):
+    """A scenario mod with an optional summary."""
+
     summary: str = ""
 
 
 @dataclass
 class BaseRules:
+    """Load order rules: load_after, load_before, incompatible_with, dependencies."""
+
     load_after: CaseInsensitiveSet = field(default_factory=CaseInsensitiveSet)
     load_before: CaseInsensitiveSet = field(default_factory=CaseInsensitiveSet)
     incompatible_with: CaseInsensitiveSet = field(default_factory=CaseInsensitiveSet)
@@ -269,12 +300,16 @@ class BaseRules:
 
 @dataclass
 class Rules(BaseRules):
+    """Load order rules extended with load_first and load_last flags."""
+
     load_first: bool = False
     load_last: bool = False
 
 
 @dataclass
 class AboutXmlMod(ListedMod, PackageIdMod):
+    """A mod with an About.xml, including authors, version, rules, and DLC metadata."""
+
     authors: list[str] = field(default_factory=list)
     mod_version: str = ""
     mod_icon_path: Path | None = None
@@ -287,6 +322,7 @@ class AboutXmlMod(ListedMod, PackageIdMod):
 
     @functools.cached_property
     def overall_rules(self) -> Rules:
+        """Merged rules from about.xml, community, user; prefers community overrides."""
         overall = Rules()
 
         overall.load_before = (
@@ -317,13 +353,13 @@ class AboutXmlMod(ListedMod, PackageIdMod):
         return overall
 
     def clear_cache(self) -> None:
-        try:
+        """Invalidate the cached `overall_rules` property."""
+        with contextlib.suppress(AttributeError):
             del self.overall_rules
-        except AttributeError:
-            pass
 
     def get_dlc_name(self) -> str | None:
-        for appid, meta in RIMWORLD_DLC_METADATA.items():
+        """Return the DLC name if this mod matches a known RimWorld DLC."""
+        for _appid, meta in RIMWORLD_DLC_METADATA.items():
             if meta["packageid"] == str(self.package_id):
                 return meta["name"]
         return None
@@ -331,6 +367,8 @@ class AboutXmlMod(ListedMod, PackageIdMod):
 
 @dataclass
 class CompiledDependencyData:
+    """Pre-computed dependency graphs and tier classification for sorting."""
+
     deps_graph: dict[str, set[str]] = field(default_factory=dict)
     rev_deps_graph: dict[str, set[str]] = field(default_factory=dict)
     tier_zero_mods: set[str] = field(default_factory=set)
@@ -341,16 +379,22 @@ class CompiledDependencyData:
 
 
 class SubExternalRule(msgspec.Struct, omit_defaults=True):
+    """A single external rule entry with name and comment fields."""
+
     name: list[str] | str = msgspec.field(default_factory=str)
     comment: list[str] | str = msgspec.field(default_factory=str)
 
 
 class SubExternalBoolRule(msgspec.Struct, omit_defaults=True):
+    """An external boolean rule with an optional comment."""
+
     value: bool = False
     comment: list[str] | str = msgspec.field(default_factory=str)
 
 
 class ExternalRule(msgspec.Struct, omit_defaults=True):
+    """Community-sourced load order rule for a single package ID."""
+
     loadAfter: dict[str, SubExternalRule] = {}
     loadBefore: dict[str, SubExternalRule] = {}
     loadTop: SubExternalBoolRule = msgspec.field(default_factory=SubExternalBoolRule)
@@ -358,21 +402,29 @@ class ExternalRule(msgspec.Struct, omit_defaults=True):
 
 
 class ExternalRulesSchema(msgspec.Struct, omit_defaults=True):
+    """Top-level schema for community rules, keyed by package ID."""
+
     timestamp: int = 0
     rules: dict[str, ExternalRule] = msgspec.field(default_factory=dict)
 
 
 class SteamDbEntryDependency(msgspec.Struct, omit_defaults=True):
+    """A dependency reference from the Steam database."""
+
     name: str = msgspec.field(default_factory=str)
     url: str = msgspec.field(default_factory=str)
 
 
 class SteamDbEntryBlacklist(msgspec.Struct, omit_defaults=True):
+    """Blacklist status with reason comment from the Steam database."""
+
     value: bool = False
     comment: str = msgspec.field(default_factory=str)
 
 
 class SteamDbEntry(msgspec.Struct, omit_defaults=True):
+    """A single entry in the Steam Workshop database."""
+
     unpublished: bool = False
     url: str = msgspec.field(default_factory=str)
     packageId: str = msgspec.field(default_factory=str)
@@ -390,6 +442,8 @@ class SteamDbEntry(msgspec.Struct, omit_defaults=True):
 
 
 class SteamDbSchema(msgspec.Struct):
+    """Top-level Steam Workshop database schema with version and entries."""
+
     version: int = 0
     database: dict[str, SteamDbEntry] = msgspec.field(default_factory=dict)
 
@@ -399,6 +453,8 @@ ModMetadata = dict[str, Any]
 
 @dataclass
 class WorkshopUpdateResult:
+    """Result of a workshop mod update operation."""
+
     status: Literal["success", "no_workshop_mods", "partial", "failed"]
     mods_checked: int
     mods_updated: int

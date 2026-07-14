@@ -206,14 +206,21 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if isinstance(event, QKeyEvent) and event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Alt:
-                if isinstance(obj, QWidget) and obj.window() is self:
-                    self._toggle_menu_bar()
-                    return True
-            if event.key() == Qt.Key.Key_Escape and self._menu_bar.isVisible():
-                if isinstance(obj, QWidget) and obj.window() is self:
-                    self._menu_bar.hide()
-                    return True
+            if (
+                event.key() == Qt.Key.Key_Alt
+                and isinstance(obj, QWidget)
+                and obj.window() is self
+            ):
+                self._toggle_menu_bar()
+                return True
+            if (
+                event.key() == Qt.Key.Key_Escape
+                and self._menu_bar.isVisible()
+                and isinstance(obj, QWidget)
+                and obj.window() is self
+            ):
+                self._menu_bar.hide()
+                return True
         return super().eventFilter(obj, event)
 
     def _toggle_menu_bar(self) -> None:

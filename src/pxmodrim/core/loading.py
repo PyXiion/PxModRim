@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Generator
 
 from PySide6.QtCore import QObject, Signal
 
@@ -21,14 +21,17 @@ class LoadingState(QObject):
     finished = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
+        """Initialise with an empty stack and no active task."""
         super().__init__(parent)
         self._stack: list[StackFrame] = []
 
     def push(self, status: str, total_steps: int = 100) -> None:
+        """Start a new subtask, pushing a frame onto the loading stack."""
         self._stack.append(StackFrame(status=status, total_steps=total_steps))
         self._emit()
 
     def pop(self) -> None:
+        """Finish the current subtask and restore the parent frame."""
         if self._stack:
             self._stack.pop()
         if not self._stack:
@@ -37,17 +40,20 @@ class LoadingState(QObject):
             self._emit()
 
     def step(self, amount: int = 1) -> None:
+        """Advance the current task's progress by *amount* steps."""
         if self._stack:
             frame = self._stack[-1]
             frame.current_step = min(frame.total_steps, frame.current_step + amount)
             self._emit()
 
     def set_total(self, total: int) -> None:
+        """Update the total step count for the current task."""
         if self._stack:
             self._stack[-1].total_steps = max(1, total)
             self._emit()
 
     def set_progress(self, value: int) -> None:
+        """Set the current task's progress to an absolute *value*."""
         if self._stack:
             frame = self._stack[-1]
             frame.current_step = max(0, min(frame.total_steps, value))
@@ -67,7 +73,8 @@ class LoadingState(QObject):
     @contextmanager
     def task(
         self, status: str, total_steps: int = 100
-    ) -> Generator["LoadingState", None, None]:
+    ) -> Generator[LoadingState, None, None]:
+        """Context manager: push a frame on enter, pop on exit (even on exception)."""
         self.push(status, total_steps)
         try:
             yield self

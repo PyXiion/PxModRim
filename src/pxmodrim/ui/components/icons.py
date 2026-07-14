@@ -105,7 +105,8 @@ _ICONS: dict[str, str] = {
     "warning": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
+        '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3'
+        'L13.71 3.86a2 2 0 00-3.42 0z"/>'
         '<line x1="12" y1="9" x2="12" y2="13"/>'
         '<line x1="12" y1="17" x2="12.01" y2="17"/>'
         "</svg>"
@@ -153,7 +154,8 @@ _ICONS: dict[str, str] = {
     "folder": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+        '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9'
+        'a2 2 0 012 2z"/>'
         "</svg>"
     ),
     "steam": (
@@ -167,7 +169,8 @@ _ICONS: dict[str, str] = {
     "local": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+        '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9'
+        'a2 2 0 012 2z"/>'
         '<circle cx="12" cy="13" r="2"/>'
         "</svg>"
     ),
@@ -223,7 +226,8 @@ _ICONS: dict[str, str] = {
     "toast-warning": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
+        '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3'
+        'L13.71 3.86a2 2 0 00-3.42 0z"/>'
         '<line x1="12" y1="9" x2="12" y2="13"/>'
         '<line x1="12" y1="17" x2="12.01" y2="17"/>'
         "</svg>"

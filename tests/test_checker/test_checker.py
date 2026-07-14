@@ -125,7 +125,7 @@ class TestModChecker:
         a.about_rules.load_after = CaseInsensitiveSet(["mod.b"])
         # Order: b first, then a -> satisfies load_after
         mods = _as_listed([b, a])
-        active_uuids = [u for u in mods.keys()]
+        active_uuids = list(mods)
 
         checker = ModChecker(checkers, _settings())
         checker.rebuild(mods, active_uuids)

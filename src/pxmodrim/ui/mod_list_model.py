@@ -85,8 +85,10 @@ class ModListModel(QAbstractListModel):
         self.apply_filter()
 
     def rowCount(
-        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+        self, parent: QModelIndex | QPersistentModelIndex | None = None
     ) -> int:
+        if parent is None:
+            parent = QModelIndex()
         if parent.isValid():
             return 0
         return len(self._visible_items)
@@ -107,27 +109,30 @@ class ModListModel(QAbstractListModel):
 
         if role == Qt.ItemDataRole.DisplayRole:
             return item.mod.name
-        elif role == self.CheckStateRole:
+        if role == self.CheckStateRole:
             return Qt.CheckState.Checked if item.checked else Qt.CheckState.Unchecked
-        elif role == self.PackageIdRole:
+        if role == self.PackageIdRole:
             return str(item.mod.package_id) if isinstance(item.mod, AboutXmlMod) else ""
-        elif role == self.ModVersionRole:
+        if role == self.ModVersionRole:
             return item.mod.mod_version if isinstance(item.mod, AboutXmlMod) else ""
-        elif role == self.ProviderColorRole:
+        if role == self.ProviderColorRole:
             return item.provider_color
-        elif role == self.UuidRole:
+        if role == self.UuidRole:
             return item.uuid
-        elif role == self.HasErrorRole:
+        if role == self.HasErrorRole:
             return 1 if item.has_error else 0
-        elif role == self.HasWarningRole:
+        if role == self.HasWarningRole:
             return 1 if item.has_warning else 0
-        elif role == self.ErrorTooltipRole:
+        if role == self.ErrorTooltipRole:
             return item.error_tooltip
-        elif role == self.WarningTooltipRole:
+        if role == self.WarningTooltipRole:
             return item.warning_tooltip
-        elif role == Qt.ItemDataRole.ToolTipRole:
-            if hasattr(item.mod, "description") and item.mod.description:
-                return item.mod.description
+        if (
+            role == Qt.ItemDataRole.ToolTipRole
+            and hasattr(item.mod, "description")
+            and item.mod.description
+        ):
+            return item.mod.description
 
         return None
 
@@ -274,7 +279,7 @@ class ModListModel(QAbstractListModel):
         self._sync_all_to_visible()
 
     def _sync_all_to_visible(self) -> None:
-        visible_set = set(id(item) for item in self._visible_items)
+        visible_set = {id(item) for item in self._visible_items}
         reordered_visible = list(self._visible_items)
         new_all: list[ModItem] = []
         new_all.extend(reordered_visible)
@@ -343,10 +348,12 @@ class ModListModel(QAbstractListModel):
             return
         changed_rows: list[int] = []
         for row in rows:
-            if 0 <= row < len(self._visible_items):
-                if self._visible_items[row].checked != checked:
-                    self._visible_items[row].checked = checked
-                    changed_rows.append(row)
+            if (
+                0 <= row < len(self._visible_items)
+                and self._visible_items[row].checked != checked
+            ):
+                self._visible_items[row].checked = checked
+                changed_rows.append(row)
         if not changed_rows:
             return
         top = self.index(min(changed_rows), 0)

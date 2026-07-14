@@ -29,6 +29,7 @@ def read_game_version(game_path: str | Path) -> str | None:
 
 
 class PathConfig(msgspec.Struct):
+    """Paths to the game, mods, workshop, and config directories."""
     game: str = ""
     local: str = ""
     workshop: str = ""
@@ -39,11 +40,13 @@ class PathConfig(msgspec.Struct):
 
 
 class UIPrefs(msgspec.Struct):
+    """Persistent UI state preferences (expand/collapse toggles)."""
     deps_expanded: bool = True
     desc_expanded: bool = False
 
 
 class AppConfig(msgspec.Struct):
+    """Top-level config combining paths, UI prefs, and sort settings."""
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
     ui: UIPrefs = msgspec.field(default_factory=UIPrefs)
     sort: SortSettings = msgspec.field(
@@ -65,6 +68,7 @@ def community_rules_file() -> Path:
 
 
 def load_config(path: Path | None = None) -> AppConfig:
+    """Load config from a JSON file. Returns defaults if missing or corrupt."""
     path = path or config_file_path()
     if not path.exists():
         return AppConfig()
@@ -77,6 +81,7 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 
 def save_config(cfg: AppConfig, path: Path | None = None) -> None:
+    """Serialize and write application config to a JSON file."""
     path = path or config_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     raw = msgspec.json.encode(cfg, enc_hook=enc_hook)
@@ -86,6 +91,7 @@ def save_config(cfg: AppConfig, path: Path | None = None) -> None:
 
 
 def _detect_config_folder(steam_root: Path | None) -> str:
+    """Locate the RimWorld Config folder for the current platform."""
     if sys.platform == "linux":
         if steam_root:
             proton = (
@@ -138,6 +144,7 @@ def _detect_config_folder(steam_root: Path | None) -> str:
 
 
 def detect_game_paths() -> PathConfig:
+    """Auto-detect game, local mods, and workshop paths via Steam library folders."""
     result = PathConfig()
     steam_id = RIMWORLD_STEAM_APP_ID
     found_root: Path | None = None
@@ -205,6 +212,7 @@ def detect_game_paths() -> PathConfig:
 
 
 def _find_rimworld_in_steam_root(root: Path, steam_id: str) -> Path | None:
+    """Search a Steam library root for an installed RimWorld directory."""
     game = root / "steamapps" / "common" / "RimWorld"
     if game.is_dir():
         return game
@@ -218,13 +226,15 @@ def _find_rimworld_in_steam_root(root: Path, steam_id: str) -> Path | None:
 
 
 def _vdf_find_rimworld(vdf_path: Path, steam_id: str) -> Path | None:
+    """Parse a libraryfolders.vdf to find RimWorld in alternate Steam library paths."""
     try:
         import re
 
         text = vdf_path.read_text(encoding="utf-8", errors="replace")
 
         # Simple regex-based VDF parser for libraryfolders.vdf
-        # Looking for: "libraryfolders" { "0" { "path" "..." "apps" { "294100" { ... } } } }
+        # Looking for: "libraryfolders" { "0" { "path" "..." "apps"
+        # { "294100" { ... } } } }
         path_pattern = re.compile(r'"path"\s+"(.+?)"')
         app_pattern = re.compile(r'"' + re.escape(steam_id) + r'"\s*{')
 
@@ -240,11 +250,10 @@ def _vdf_find_rimworld(vdf_path: Path, steam_id: str) -> Path | None:
                 continue
 
             # Match app id entry
-            if app_pattern.search(stripped):
-                if current_path:
-                    game = current_path / "steamapps" / "common" / "RimWorld"
-                    if game.is_dir():
-                        return game
+            if app_pattern.search(stripped) and current_path:
+                game = current_path / "steamapps" / "common" / "RimWorld"
+                if game.is_dir():
+                    return game
 
     except Exception:
         pass
@@ -272,6 +281,7 @@ def _find_mac_app(rimworld_dir: Path) -> Path | None:
 
 
 def _detect_windows_paths(steam_id: str) -> PathConfig:
+    """Detect RimWorld paths on Windows via the Windows registry."""
     result = PathConfig()
     import winreg
 

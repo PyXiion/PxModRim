@@ -81,7 +81,8 @@ class AboutPanel(QDialog):
         right_vbox.addWidget(author_label)
 
         github_link = QLabel(
-            '<a href="https://github.com/PyXiion/PxModRim" style="color: #66c0f4;">GitHub</a>'
+            '<a href="https://github.com/PyXiion/PxModRim" '
+            'style="color: #66c0f4;">GitHub</a>'
         )
         github_link.setOpenExternalLinks(True)
         github_link.setObjectName("aboutMeta")
@@ -114,9 +115,9 @@ class AboutPanel(QDialog):
         layout.addWidget(based_on)
 
         rimsort_label = QLabel(
-            'Clean rewrite inspired by '
-            '<a href="https://github.com/RimSort/RimSort" '
-            'style="color: #66c0f4;">RimSort</a> '
+            "Clean rewrite inspired by " +
+            '<a href="https://github.com/RimSort/RimSort" ' +
+            'style="color: #66c0f4;">RimSort</a> ' +
             "(MIT licensed)."
         )
         rimsort_label.setOpenExternalLinks(True)

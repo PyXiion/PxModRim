@@ -14,7 +14,9 @@ _VERSION_MIN_PARTS = 2
 
 
 class CoreContext:
-    def __init__(self, cfg: "AppConfig") -> None:
+    """Centralised application state for mods, config, and game version."""
+
+    def __init__(self, cfg: AppConfig) -> None:
         self._cfg = cfg
         self._mods: dict[str, ListedMod] = {}
         self._active_uuids: list[str] = []
@@ -23,19 +25,23 @@ class CoreContext:
         self._refresh_game_version()
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
+        """Replace all mods and active UUIDs, taking ownership of the data."""
         self._mods = dict(mods)
         self._active_uuids = list(active_uuids)
 
-    def update_config(self, cfg: "AppConfig") -> None:
+    def update_config(self, cfg: AppConfig) -> None:
+        """Replace the live config and refresh derived values (game version)."""
         self._cfg = cfg
         self._refresh_game_version()
 
     def set_mod_list_model(self, model: ModListModel) -> None:
+        """Attach the UI mod-list model for view-level access."""
         self._mod_list_model = model
 
     # ── Game version ──────────────────────────────────────────────────────────
 
     def _refresh_game_version(self) -> None:
+        """Read the game version from disk and cache it in `_game_version`."""
         from pxmodrim._compat.config import read_game_version
 
         game = self._cfg.paths.game
@@ -67,7 +73,7 @@ class CoreContext:
         return list(self._active_uuids)
 
     @property
-    def config(self) -> "AppConfig":
+    def config(self) -> AppConfig:
         return self._cfg
 
     @property
@@ -75,6 +81,7 @@ class CoreContext:
         return self._mod_list_model
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
+        """Return total/active/inactive/error counts for the current mod set."""
         ids = active_ids if active_ids is not None else self._active_uuids
         stats = CollectionStats()
         stats.total = len(self._mods)

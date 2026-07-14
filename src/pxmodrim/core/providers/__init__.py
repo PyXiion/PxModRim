@@ -11,7 +11,8 @@ if TYPE_CHECKING:
     from pxmodrim._compat.config import PathConfig
 
 
-def create_providers(paths: "PathConfig") -> list[BaseModProvider]:
+def create_providers(paths: PathConfig) -> list[BaseModProvider]:
+    """Build the default provider list from the given path configuration."""
     providers: list[BaseModProvider] = []
     if paths.game:
         providers.append(CoreModProvider(Path(paths.game)))

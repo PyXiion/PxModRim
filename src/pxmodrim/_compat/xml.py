@@ -8,6 +8,7 @@ from loguru import logger
 
 
 def etree_to_dict(t: Any) -> dict[str, Any]:
+    """Recursively convert an lxml Element tree into a plain nested dictionary."""
     d: dict[str, Any] = {str(t.tag): {}}
     children = list(t)
     if children:
@@ -34,6 +35,7 @@ def etree_to_dict(t: Any) -> dict[str, Any]:
 
 
 def xml_path_to_json(path: str) -> dict[str, Any]:
+    """Parse an XML file at *path* and return its contents as a nested dictionary."""
     if not os.path.exists(path):
         logger.error(f"XML file does not exist at: {path}")
         return {}

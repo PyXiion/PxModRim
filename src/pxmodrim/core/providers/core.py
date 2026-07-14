@@ -16,10 +16,12 @@ class CoreModProvider(BaseModProvider):
     color = "#e67e22"
 
     def __init__(self, game_path: Path) -> None:
+        """Point the provider at the game root (``Data/`` is resolved inside)."""
         self._game = game_path
         super().__init__(game_path)
 
     async def discover(self, target_version: str) -> dict[str, ListedMod]:
+        """Scan ``Data/`` directory for core mods (runs off the main thread)."""
         def _scan() -> dict[str, ListedMod]:
             result: dict[str, ListedMod] = {}
             data_dir = self._game / "Data"

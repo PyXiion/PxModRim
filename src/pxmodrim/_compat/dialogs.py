@@ -8,11 +8,12 @@ from PySide6.QtWidgets import QDialog
 T = TypeVar("T", bound=QDialog)
 
 
-async def await_dialog(
+async def await_dialog[T: QDialog](
     cls: type[T],
     *args: Any,
     **kwargs: Any,
 ) -> tuple[int, T]:
+    """Show a modal QDialog async and await its result via an asyncio future."""
     dialog = cls(*args, **kwargs)
     dialog.setModal(True)
 

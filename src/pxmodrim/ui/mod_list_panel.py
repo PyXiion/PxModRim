@@ -166,7 +166,11 @@ class ModListPanel(QWidget):
     def _navigate_up(self) -> None:
         if self.search_input.hasFocus():
             return
-        list_view = self._qml.rootObject().findChild(QObject, "listView") if self._qml.rootObject() else None
+        list_view = (
+            self._qml.rootObject().findChild(QObject, "listView")
+            if self._qml.rootObject()
+            else None
+        )
         if list_view is None:
             return
         idx = list_view.property("currentIndex")
@@ -176,7 +180,11 @@ class ModListPanel(QWidget):
     def _navigate_down(self) -> None:
         if self.search_input.hasFocus():
             return
-        list_view = self._qml.rootObject().findChild(QObject, "listView") if self._qml.rootObject() else None
+        list_view = (
+            self._qml.rootObject().findChild(QObject, "listView")
+            if self._qml.rootObject()
+            else None
+        )
         if list_view is None:
             return
         idx = list_view.property("currentIndex")

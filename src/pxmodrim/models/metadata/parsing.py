@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 import traceback
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from loguru import logger
 
@@ -21,6 +22,8 @@ from pxmodrim.models.metadata.structures import (
 
 
 class MalformedDataException(Exception):
+    """Raised when parsed About.xml data is structurally invalid."""
+
     def __init__(self, message: str):
         super().__init__(message)
         self.message = f"Malformed data: {message}"
@@ -30,19 +33,19 @@ def value_extractor(
     input: dict[str, str] | dict[str, list[str]] | Sequence[str] | str | None,
     strip_str: bool = True,
 ) -> str | list[Any] | dict[str, str] | dict[str, list[str]] | None:
+    """Normalize XML-parsed values, unwrap single-entry dicts and strip strings."""
     if input is None:
         return None
     if isinstance(input, str):
         return input.strip() if strip_str else input
-    elif isinstance(input, Sequence):
+    if isinstance(input, Sequence):
         return [value_extractor(item) for item in input]
-    elif isinstance(input, dict):
+    if isinstance(input, dict):
         if len(input) == 1:
             return value_extractor(next(iter(input.values())))
-        elif input.keys() == {"@IgnoreIfNoMatchingField", "#text"}:
+        if input.keys() == {"@IgnoreIfNoMatchingField", "#text"}:
             return input["#text"]
-        else:
-            return input
+        return input
     return input
 
 
@@ -51,6 +54,7 @@ def match_version(
     target_version: str,
     stop_at_first: bool = True,
 ) -> tuple[bool, None | list[str] | str]:
+    """Match a versioned dict entry by major.minor, return value(s) on success."""
     try:
         major, minor = target_version.split(".")[:2]
         version_regex = f"v{major}.{minor}"
@@ -58,9 +62,8 @@ def match_version(
         return False, None
 
     if stop_at_first:
-        if (result := input.get(version_regex)) and result is not None:
-            return True, result
-        elif (result := input.get(f"{major}.{minor}")) and result is not None:
+        result = input.get(version_regex) or input.get(f"{major}.{minor}")
+        if result is not None:
             return True, result
 
     results = []
@@ -86,6 +89,7 @@ def _set_mod_invalid(mod: ListedMod, message: str) -> ListedMod:
 
 
 def _parse_basic(mod_data: dict[str, Any], mod: AboutXmlMod) -> AboutXmlMod:
+    """Populate an AboutXmlMod with basic fields (packageId, name, authors)."""
     package_id = value_extractor(mod_data.get("packageId", False))
     if isinstance(package_id, str) and package_id.strip():
         mod.package_id = CaseInsensitiveStr(package_id)
@@ -156,6 +160,7 @@ def _parse_optional(
     target_version: str,
     prefer_versioned: bool = True,
 ) -> AboutXmlMod:
+    """Populate optional AboutXmlMod fields (modVersion, icon, url, rules)."""
     mod_version = value_extractor(mod_data.get("modVersion", False))
     if mod_version and isinstance(mod_version, str):
         mod.mod_version = mod_version
@@ -185,6 +190,7 @@ def _match_byversion_raw(
     byversion_data: dict[str, Any],
     target_version: str,
 ) -> tuple[bool, Any]:
+    """Match versioned raw data by major.minor key, returning the first match."""
     try:
         major, minor = target_version.split(".")[:2]
     except ValueError:
@@ -205,6 +211,7 @@ def _match_byversion_raw(
 
 
 def create_mod_dependency(input_dict: dict[str, str]) -> DependencyMod:
+    """Build a DependencyMod from a parsed dependency dictionary."""
     mod = DependencyMod()
     package_id = input_dict.get("packageId", False)
     if isinstance(package_id, str):
@@ -232,6 +239,7 @@ def create_base_rules(
     target_version: str,
     prefer_versioned: bool = True,
 ) -> BaseRules:
+    """Build BaseRules from parsed mod_data, resolving versioned deps and load-order."""
     rules = BaseRules()
 
     mod_dependencies = value_extractor(mod_data.get("modDependencies", []))
@@ -388,6 +396,7 @@ def create_about_mod(
     target_version: str,
     prefer_versioned: bool = True,
 ) -> tuple[bool, AboutXmlMod]:
+    """Create an AboutXmlMod from parsed XML data. Returns (valid, mod)."""
     mod = _parse_basic(mod_data, AboutXmlMod())
 
     if not isinstance(mod, AboutXmlMod):
@@ -406,6 +415,7 @@ def _create_about_mod_from_xml(
     target_version: str,
     prefer_versioned: bool = True,
 ) -> tuple[bool, AboutXmlMod]:
+    """Parse an About.xml file and return a validated AboutXmlMod with its path set."""
     try:
         mod_data = xml_path_to_json(str(mod_xml_path))
     except Exception:
@@ -431,6 +441,7 @@ def create_listed_mod_from_path(
     prefer_versioned: bool = True,
     case_insensitive_about_xml: bool = True,
 ) -> tuple[bool, ListedMod]:
+    """Create a ListedMod from a directory path, parsing About.xml if present."""
     if path.is_dir():
         about_xml_path: Path | None
         if case_insensitive_about_xml:
@@ -450,7 +461,7 @@ def create_listed_mod_from_path(
             logger.warning(f"Multiple .rsc files found in {path}. Aborting.")
             return False, ListedMod(valid=False, _mod_path=path)
 
-        elif len(rsc_files) == 1:
+        if len(rsc_files) == 1:
             # Scenario .rsc files - not implemented in detail yet
             logger.warning(f"Scenario .rsc files not yet supported: {path}")
             return False, ListedMod(valid=False, _mod_path=path)

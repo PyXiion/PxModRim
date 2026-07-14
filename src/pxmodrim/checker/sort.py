@@ -14,6 +14,7 @@ def topological_sort(
     settings: SortSettings,
     community_rules: dict[PackageId, CommunityRule] | None = None,
 ) -> list[PackageId]:
+    """Sort active mods into tiers by dependencies, load-order, and config priority."""
     all_pids = set(active_mods.keys())
     if not all_pids:
         return []
@@ -44,7 +45,7 @@ def topological_sort(
 
         config_priority = _build_config_priority(settings.tier_config)
 
-        def _key(pid: PackageId) -> tuple:
+        def _key(pid: PackageId, config_priority=config_priority) -> tuple:
             return (config_priority.get(pid, len(config_priority)), pid.lower())
 
         queue = [pid for pid, deg in indegree.items() if deg == 0]
@@ -70,6 +71,7 @@ def _build_deps_and_rev_deps(
     graph: ConstraintGraph,
     all_pids: set[PackageId],
 ) -> tuple[dict[PackageId, set[PackageId]], dict[PackageId, set[PackageId]]]:
+    """Extract dependency and reverse-dependency maps from constraint graph edges."""
     deps: dict[PackageId, set[PackageId]] = {pid: set() for pid in all_pids}
     rev_deps: dict[PackageId, set[PackageId]] = {pid: set() for pid in all_pids}
 
@@ -101,6 +103,7 @@ def _build_load_first(
     all_pids: set[PackageId],
     settings: SortSettings,
 ) -> set[PackageId]:
+    """Collect PIDs that should be loaded first from mod rules and community rules."""
     load_first: set[PackageId] = set()
     for pid in all_pids:
         mod = active_mods.get(pid)
@@ -119,6 +122,7 @@ def _build_load_last(
     all_pids: set[PackageId],
     settings: SortSettings,
 ) -> set[PackageId]:
+    """Collect PIDs that should be loaded last from mod rules and community rules."""
     load_last: set[PackageId] = set()
     for pid in all_pids:
         mod = active_mods.get(pid)
@@ -133,6 +137,7 @@ def _build_load_last(
 
 
 def _build_config_priority(tier_config: TierConfig) -> dict[PackageId, int]:
+    """Build a stable ordering priority map from tier-config package lists."""
     priority: dict[PackageId, int] = {}
     for i, pid in enumerate(tier_config.tier_0):
         priority[pid] = i

@@ -12,22 +12,29 @@ if TYPE_CHECKING:
 
 
 class ModIssueChecker(ABC):
+    """Abstract base for individual mod-issue checkers."""
+
     category_display_name: str = ""
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return True
 
     @abstractmethod
-    def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]: ...
+    def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Run checks against a single mod and return any issues found."""
+        ...
 
 
 class DependencyIssueChecker(ModIssueChecker):
+    """Check for missing or unsatisfied mod dependencies."""
+
     category_display_name = "Missing Dependency"
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return bool(mod.overall_rules.dependencies)
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Report errors for unresolved deps, considering alternatives if enabled."""
         if not ctx.settings.check_missing_dependencies:
             return []
 
@@ -66,6 +73,8 @@ class DependencyIssueChecker(ModIssueChecker):
 
 
 class IncompatibilityIssueChecker(ModIssueChecker):
+    """Check for mod-to-mod incompatibility declarations (self-declared and reverse)."""
+
     category_display_name = "Incompatibility"
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
@@ -79,6 +88,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
         )
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Report errors for active incompatible mods, avoid duplicate mutual decls."""
         issues: list[ModIssue] = []
         pid = PackageId(mod.package_id)
 
@@ -93,7 +103,8 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                         category_display_name=self.category_display_name,
                         severity="error",
                         short_message="Incompatibilities detected",
-                        detail_message=f"Mod declares incompatibility with: {name} ({incomp})",
+                        detail_message=f"Mod declares incompatibility with: "
+                        f"{name} ({incomp})",
                         related_package_ids=(PackageId(incomp),),
                     )
                 )
@@ -121,7 +132,8 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                             category_display_name=self.category_display_name,
                             severity="error",
                             short_message="Incompatibilities detected",
-                            detail_message=f"Declared incompatible by: {name} ({edge.source})",
+                            detail_message=f"Declared incompatible by: "
+                            f"{name} ({edge.source})",
                             related_package_ids=(PackageId(edge.source),),
                         )
                     )
@@ -130,6 +142,8 @@ class IncompatibilityIssueChecker(ModIssueChecker):
 
 
 class LoadOrderIssueChecker(ModIssueChecker):
+    """Check that load-before/after constraints are satisfied by current order."""
+
     category_display_name = "Load Order"
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
@@ -140,6 +154,7 @@ class LoadOrderIssueChecker(ModIssueChecker):
         )
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Report warnings when a load-before or load-after constraint is violated."""
         issues: list[ModIssue] = []
         pid = PackageId(mod.package_id)
         idx = ctx.pid_to_index.get(pid, -1)
@@ -188,8 +203,12 @@ class LoadOrderIssueChecker(ModIssueChecker):
 
 
 class CycleIssueChecker(ModIssueChecker):
+    """Check whether a mod participates in a dependency cycle."""
+
     category_display_name = "Cycle"
+
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Report warnings for each cycle the mod belongs to."""
         pid = PackageId(mod.package_id)
         issues: list[ModIssue] = []
 
@@ -213,11 +232,15 @@ class CycleIssueChecker(ModIssueChecker):
 
 
 class GameVersionIssueChecker(ModIssueChecker):
+    """Check that the mod's supported game versions match the target version."""
+
     category_display_name = "Version Mismatch"
+
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return bool(mod.supported_versions)
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Report a warning if the mod's supported versions lack the target version."""
         if not mod.supported_versions:
             return []
 
@@ -246,8 +269,12 @@ class GameVersionIssueChecker(ModIssueChecker):
 
 
 class ReplacementIssueChecker(ModIssueChecker):
+    """Check whether a mod has a known replacement available."""
+
     category_display_name = "Replacement Available"
+
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
+        """Report a warning if the mod's published file ID has a replacement."""
         pid = str(mod.published_file_id) if mod.published_file_id else None
         if pid is None:
             return []

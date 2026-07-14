@@ -34,6 +34,7 @@ def _get_dlc_package_ids() -> list[CaseInsensitiveStr]:
 
 
 def parse_mods_config(path: Path) -> ModsConfig | None:
+    """Parse a ModsConfig.xml file into a structured ModsConfig object."""
     if not path.exists():
         logger.warning(f"ModsConfig.xml not found at {path}")
         return None
@@ -67,6 +68,7 @@ def parse_mods_config(path: Path) -> ModsConfig | None:
 
 
 def write_mods_config(path: Path, data: ModsConfig) -> None:
+    """Serialize a ModsConfig object back to ModsConfig.xml."""
     from pxmodrim._compat.xml import json_to_xml_write
 
     json_to_xml_write({"ModsConfigData": data.to_dict()}, str(path), raise_errs=True)

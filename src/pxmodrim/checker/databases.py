@@ -29,23 +29,28 @@ def use_this_instead_path() -> Path:
 
 
 class NoVersionWarningService:
+    """Service to download and cache the NoVersionWarning package-ID list."""
+
     def __init__(self) -> None:
         self._cache_dir = checker_config_dir()
         self._xml_path = no_version_warning_path()
         self._pids: set[PackageId] = set()
 
     async def ensure(self, force: bool = False) -> set[PackageId]:
+        """Return cached PIDs, or download and cache them if missing or forced."""
         if self._xml_path.exists() and not force:
             self._pids = self._load()
             return self._pids
         return await self._download()
 
     def load_if_exists(self) -> set[PackageId]:
+        """Load cached PIDs if the local file exists, otherwise return empty set."""
         if self._xml_path.exists():
             self._pids = self._load()
         return self._pids
 
     def _load(self) -> set[PackageId]:
+        """Parse the cached XML file into a set of PackageIds."""
         try:
             data = xml_path_to_json(str(self._xml_path))
             mod_ids = data.get("ModIdsToFix", {}).get("li", [])
@@ -59,19 +64,19 @@ class NoVersionWarningService:
             return set()
 
     async def _download(self) -> set[PackageId]:
+        """Download, extract, and cache the NoVersionWarning database from GitHub."""
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         zip_path = self._cache_dir / "no_version_warning.zip"
         extract_dir = self._cache_dir / "no_version_warning_extracted"
 
         try:
-            async with httpx.AsyncClient() as client:
-                async with client.stream(
-                    "GET", NO_VERSION_WARNING_URL, follow_redirects=True, timeout=30.0
-                ) as resp:
-                    resp.raise_for_status()
-                    with open(zip_path, "wb") as fh:
-                        async for chunk in resp.aiter_bytes(8192):
-                            fh.write(chunk)
+            async with httpx.AsyncClient() as client, client.stream(
+                "GET", NO_VERSION_WARNING_URL, follow_redirects=True, timeout=30.0
+            ) as resp:
+                resp.raise_for_status()
+                with open(zip_path, "wb") as fh:
+                    async for chunk in resp.aiter_bytes(8192):
+                        fh.write(chunk)
 
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(extract_dir)
@@ -94,23 +99,28 @@ class NoVersionWarningService:
 
 
 class UseThisInsteadService:
+    """Service to download and cache the UseThisInstead replacement database."""
+
     def __init__(self) -> None:
         self._cache_dir = checker_config_dir()
         self._json_path = use_this_instead_path()
         self._entries: dict[str, ReplacementInfo] = {}
 
     async def ensure(self, force: bool = False) -> Mapping[str, ReplacementInfo]:
+        """Return cached replacement entries, download if missing or forced."""
         if self._json_path.exists() and not force:
             self._entries = self._load()
             return self._entries
         return await self._download()
 
     def load_if_exists(self) -> Mapping[str, ReplacementInfo]:
+        """Load cached replacement entries if local file exists, else empty dict."""
         if self._json_path.exists():
             self._entries = self._load()
         return self._entries
 
     def _load(self) -> dict[str, ReplacementInfo]:
+        """Parse cached JSON into a dict of old-Workshop-ID to ReplacementInfo."""
         try:
             path = self._json_path
             if str(path).endswith(".gz"):
@@ -141,19 +151,19 @@ class UseThisInsteadService:
             return {}
 
     async def _download(self) -> dict[str, ReplacementInfo]:
+        """Download, extract, and cache the UseThisInstead database from GitHub."""
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         zip_path = self._cache_dir / "use_this_instead.zip"
         extract_dir = self._cache_dir / "use_this_instead_extracted"
 
         try:
-            async with httpx.AsyncClient() as client:
-                async with client.stream(
-                    "GET", USE_THIS_INSTEAD_URL, follow_redirects=True, timeout=30.0
-                ) as resp:
-                    resp.raise_for_status()
-                    with open(zip_path, "wb") as fh:
-                        async for chunk in resp.aiter_bytes(8192):
-                            fh.write(chunk)
+            async with httpx.AsyncClient() as client, client.stream(
+                "GET", USE_THIS_INSTEAD_URL, follow_redirects=True, timeout=30.0
+            ) as resp:
+                resp.raise_for_status()
+                with open(zip_path, "wb") as fh:
+                    async for chunk in resp.aiter_bytes(8192):
+                        fh.write(chunk)
 
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(extract_dir)

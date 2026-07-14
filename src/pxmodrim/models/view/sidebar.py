@@ -27,17 +27,22 @@ class SidebarEntry(ABC):
     def refresh_count(self) -> None:
         self.count = len(self.visible_uuids)
 
+    @abstractmethod
     def update_uuids(
         self, all_mods: dict[str, ListedMod], active_uuids: set[str]
     ) -> None:
-        """Override for entries that need re-computation on toggles (Active/Inactive)."""
-        pass
+        """Override for entries needing re-computation on toggles (Active/Inactive)."""
 
 
 class AllModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return "All"
+
+    def update_uuids(
+        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
+    ) -> None:
+        self.visible_uuids = set(all_mods)
 
 
 class ActiveModsEntry(SidebarEntry):
@@ -69,11 +74,21 @@ class ErrorModsEntry(SidebarEntry):
     def label(self) -> str:
         return "With errors"
 
+    def update_uuids(
+        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
+    ) -> None:
+        pass
+
 
 class WarningModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return "With warnings"
+
+    def update_uuids(
+        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
+    ) -> None:
+        pass
 
 
 class ProviderModsEntry(SidebarEntry):
@@ -87,3 +102,8 @@ class ProviderModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return self._label
+
+    def update_uuids(
+        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
+    ) -> None:
+        pass

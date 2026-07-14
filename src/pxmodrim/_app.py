@@ -35,6 +35,9 @@ def _exception_hook(
     exc_tb: TracebackType | None,
 ) -> None:
     """Global exception handler for unhandled exceptions."""
+    if exc_type is KeyboardInterrupt:
+        return
+
     error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
     logger.error("Unhandled exception:\n{}", error_msg)
     app = QApplication.instance()
@@ -42,7 +45,8 @@ def _exception_hook(
         QMessageBox.critical(
             None,
             "PxModRim - Crash",
-            f"An unexpected error occurred:\n\n{exc_type.__name__}: {exc_value}\n\nDetails have been logged.",
+            f"An unexpected error occurred:\n\n"
+            f"{exc_type.__name__}: {exc_value}\n\nDetails have been logged.",
         )
 
 
@@ -59,6 +63,8 @@ sys.excepthook = _exception_hook
 
 
 class App:
+    """Top-level application class wiring together Qt, services, and the main window."""
+
     def __init__(self) -> None:
         self.qt_app = QApplication(sys.argv)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
@@ -71,6 +77,7 @@ class App:
         self._apply_theme()
 
     def _apply_theme(self) -> None:
+        """Set Fusion style, dark palette, stylesheet; detect game paths if missing."""
         self.qt_app.setStyle("Fusion")
 
         palette = QPalette()
@@ -106,6 +113,7 @@ class App:
         self._setup(cfg)
 
     def _setup(self, cfg: AppConfig) -> None:
+        """Initialize CoreContext, services, and the main window via constructor DI."""
         self._ctx = CoreContext(cfg)
         providers = create_providers(cfg.paths)
         self._mod_service = ModService(self._ctx, providers)
@@ -119,6 +127,7 @@ class App:
         )
 
     async def async_run(self) -> int:
+        """Start main window, prompt for game path if needed, then run event loop."""
         logger.info("Starting PxModRim")
         self.main_window.show()
 
@@ -141,6 +150,7 @@ class App:
         return 0
 
     def run(self) -> int:
+        """Create a qasync event loop and run the application synchronously."""
         loop = QEventLoop()
         loop.set_exception_handler(_async_exception_handler)
         return asyncio.run(self.async_run(), loop_factory=lambda: loop)

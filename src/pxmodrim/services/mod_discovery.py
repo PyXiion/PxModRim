@@ -10,6 +10,7 @@ from pxmodrim.models.metadata.structures import AboutXmlMod, ListedMod
 
 
 def scan_mod_directory(mods_path: Path) -> list[Path]:
+    """Scan a directory for mod subdirectories, returning those containing About.xml."""
     if not mods_path.exists() or not mods_path.is_dir():
         logger.warning(f"Mod directory not found: {mods_path}")
         return []
@@ -27,6 +28,7 @@ def resolve_active_uuids(
     all_mods: dict[str, ListedMod],
     config_folder: str,
 ) -> list[str]:
+    """Parse ModsConfig.xml and return ordered UUIDs matching active mods."""
     if not config_folder:
         return []
     path = Path(config_folder) / "ModsConfig.xml"
