@@ -280,11 +280,12 @@ class ModListModel(QAbstractListModel):
 
     def _sync_all_to_visible(self) -> None:
         visible_set = {id(item) for item in self._visible_items}
-        reordered_visible = list(self._visible_items)
+        reordered_visible = iter(self._visible_items)
         new_all: list[ModItem] = []
-        new_all.extend(reordered_visible)
         for item in self._all_items:
-            if id(item) not in visible_set:
+            if id(item) in visible_set:
+                new_all.append(next(reordered_visible))
+            else:
                 new_all.append(item)
         self._all_items = new_all
 

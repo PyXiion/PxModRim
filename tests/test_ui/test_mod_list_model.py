@@ -91,6 +91,31 @@ class TestCommitOrder:
         assert model._visible_items[0].uuid == visible[2]
         assert model._visible_items[1].uuid == visible[0]
 
+    def test_filtered_reorder_preserves_hidden_item_positions(
+        self, model: ModListModel
+    ) -> None:
+        model.set_sidebar_filter({"uuid-1", "uuid-3"})
+
+        assert [item.uuid for item in model._visible_items] == ["uuid-1", "uuid-3"]
+        assert [item.uuid for item in model._all_items] == [
+            "uuid-0",
+            "uuid-2",
+            "uuid-1",
+            "uuid-3",
+            "uuid-4",
+        ]
+
+        assert model.move_row(1, 0) is True
+
+        assert [item.uuid for item in model._visible_items] == ["uuid-3", "uuid-1"]
+        assert [item.uuid for item in model._all_items] == [
+            "uuid-0",
+            "uuid-2",
+            "uuid-3",
+            "uuid-1",
+            "uuid-4",
+        ]
+
 
 class TestActiveUuids:
     def test_returns_only_checked_in_order(self, model: ModListModel) -> None:
