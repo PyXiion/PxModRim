@@ -1,17 +1,12 @@
 # PxModRim — Agent guide
 
-## Project state
-- **Fork** of RimSort, clean rewrite. Original code in `rimsort-original/` — read-only.
-- **src-layout**: package in `src/pxmodrim/`. UV auto-discovers via `[tool.uv] package = true`.
-- **Incremental rewrite**: algorithms extracted from `rimsort-original/`, adapted into new structure.
-
 ## Toolchain
 - **uv** — `uv sync --dev` (CI uses `uv sync --locked --dev`)
-- **just** — task runner, `just` to list
-- **ruff** lint+format: `just ruff-fix` / `just fix` (both check+format)
+- **just** — task runner; `just` to list
+- **ruff** lint+format: `just fix` (runs check+format) or `just ruff-fix`
 - **pyright** (on `src/ tests/`): `just pyright` / `just check`
 - **pytest**: `just test` or `just test-verbose`
-- **`just ci`** = `check` then `test`
+- **`just ci`** = `check` then `test` — must pass before commit
 - Python **3.12 only** (`requires-python = "==3.12.*"`)
 - PySide6 + qasync for async Qt event loop
 
@@ -19,44 +14,59 @@
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)
 - `uv run python -m pxmodrim`
 
-## Architecture (`src/pxmodrim/`)
-- `__main__.py` → `_app.py` (App class, DI assembly, Fusion style + dark QPalette)
-- `_app.py` wires: `CoreContext` → `ModService(CoreContext, providers[])` + `DiagnosticsService(CoreContext)` + `SortService(Ctx, Diag)` → `MainWindow(...)` via constructor DI — no singletons
-- `core/context.py` — CoreContext: single source of truth (all_mods, active_uuids, config)
-- `core/providers/` — `BaseModProvider` ABC; `core.py` (game/Mods), `local.py` (local_path), `workshop.py` (workshop_path)
-- `services/` — `mod_discovery.py` (scan + resolve), `diagnostics_service.py` (checker orchestration + sidebar signals), `sort_service.py` (topological sort via `asyncio.to_thread`)
-- `checker/` — ModChecker, issue checkers, ConstraintGraph
-- `sort/` — Community rules, tier ordering
-- `models/metadata/` — `ListedMod`, `AboutXmlMod`, `ModsConfig` (msgspec structs); `parsing.py` (About.xml → objects)
-- `models/view/` — `ModDiagnosticsView`, `ModIssueView`, `SidebarEntry` hierarchy
-- `ui/` — 3-panel layout: sidebar (QML), mod-list (QML), mod-info (QWidget); title bar, header (QML), toast overlay
-- `ui/palette.py` + `theme.py` + `style.qss` — color tokens, QML theme singleton, QSS templated via `string.Template`
-- `ui/components/` — reusable widgets: AccordionSection, MetaChip/MetaChipRow, AspectRatioBanner, DescriptionRenderer, Toast/ToastManager, TitleBar, IconButton, SvgIconProvider
+## Module layout
+
+```
+src/pxmodrim/
+├── _app.py              # composition root: DI assembly, Fusion + QPalette
+├── core/                # all domain logic; never imports ui/
+│   ├── config.py        # AppConfig/PathConfig msgspec, JSON persistence
+│   ├── constants.py     # RimWorld DLC metadata, Steam app ID
+│   ├── context.py       # CoreContext: single source of truth
+│   ├── mod_service.py   # ModService(ctx, providers[])
+│   ├── structures.py    # CollectionStats
+│   ├── utils.py         # find_about_xml
+│   ├── xml.py           # lxml ↔ dict conversion
+│   ├── mods_config.py   # parse/write ModsConfig.xml
+│   ├── msgspec_hooks.py
+│   ├── providers/       # BaseModProvider, core/local/workshop
+│   ├── services/        # diagnostics_service, mod_discovery, sort_service
+│   ├── sort/            # community rules, tier ordering
+│   ├── checker/         # ModChecker, ConstraintGraph, issue checkers
+│   └── models/          # msgspec structs: metadata/ + view/ subpackages
+└── ui/                  # Qt widgets + QML; imports core/ freely
+    ├── window/          # main_window, menu_bar
+    ├── panels/          # about, mod_info, mod_list, sidebar, settings
+    ├── models/          # ModListModel, SidebarModel (Qt models)
+    ├── theme/           # palette, qml_theme, constants, style.qss
+    ├── components/      # AccordionSection, MetaChip, Toast, icons, etc.
+    └── progress.py      # LoadingState QObject (TODO: move from core/loading.py)
+```
 
 ## Key conventions
-- `from __future__ import annotations` in every file (PEP 604)
+- `from __future__ import annotations` in every file
 - No comments unless explaining *why*
-- `active_uuids` is `list[str]` throughout (not `set[str]`)
-- No `ModType` enum — use `provider_id: str` on `ListedMod`
-- Strict UI/Logic separation: views render pixels and capture raw events only. No business logic or I/O in UI components.
-- Long blocking work → `await asyncio.to_thread(target)`
+- Strict UI/Logic separation: views render pixels and capture raw events. No business logic or I/O in UI components.
 - Async signal handlers **must** have `@asyncSlot()` from `qasync`
-- Never `QApplication.processEvents()` (blocks loop), `dialog.exec()` (use `await await_dialog(...)` or `show()`), `QThread` (use `asyncio.to_thread`), `time.sleep()` (use `await asyncio.sleep()`), `QTimer.singleShot(0, …)` (use `await asyncio.sleep(0)`)
-- Never global singletons — use constructor DI
-- Do not run subagents to just find/read a file.
+- Never `QApplication.processEvents()`, `dialog.exec()`, `QThread`, `time.sleep()`, `QTimer.singleShot(0, …)` — use `await asyncio.to_thread()`, `await await_dialog()`, `await asyncio.sleep(0)`
+- Never global singletons — constructor DI everywhere
+- Long blocking work → `await asyncio.to_thread(target)`
+- All git renames: `git mv`, never `shutil.move` (preserves rename tracking)
 
 ## QML / SVG quirks
-- Icons served via `image://icons/<name>?color=<hex>` protocol — `SvgIconProvider` registered on a shared `QQmlEngine` in MainWindow.
-- **Color URL encoding**: QML must use `encodeURIComponent(color)`. The provider `urllib.parse.unquote`s it.
-- **Missing xmlns**: `svg_str()` injects `xmlns="http://www.w3.org/2000/svg"`.
-- `QQuickImageProvider.Pixmap` works at runtime but pyright flags it as a false positive.
+- Icons via `image://icons/<name>?color=<hex>` — `SvgIconProvider` on shared `QQmlEngine`
+- **Color URL encoding**: QML must `encodeURIComponent(color)`. Provider does `urllib.parse.unquote`.
+- `QQuickImageProvider.Pixmap` works at runtime; pyright flags false positive.
+- QML files sit next to their Python panel
 
 ## Testing
 - Config: `--import-mode=importlib`, `--no-qt-log`, `pythonpath = 'src'`, `testpaths = ['tests']`
-- Test tree mirrors `src/pxmodrim/`: `test_metadata/`, `test_compat/`, `test_checker/`, `test_sort/`, `test_ui/`
+- Test tree mirrors `src/pxmodrim/`: `test_checker/`, `test_compat/`, `test_metadata/`, `test_sort/`, `test_ui/`
 - UI tests need `QT_QPA_PLATFORM=offscreen` on Linux
 - Single test: `uv run pytest tests/test_metadata/test_structures.py -v`
-- Mock providers by subclassing `BaseModProvider` for integration tests
+- Mock providers by subclassing `BaseModProvider`
+- Excludes `rimsort-original/` from all tools
 
-## Design references
-- `reference.html` — visual target for UI redesign (Discord/Steam aesthetic)
+## Stale / needs attention
+- `core/loading.py` — `LoadingState` QObject with a planned move to `ui/progress.py`. Three files still import from `core/loading` (settings_panel, community_service, progress_dialog).
+- `core/models/view/` — view models living in `core/`; potential future move to `ui/`.
