@@ -43,6 +43,7 @@
 - Async signal handlers **must** have `@asyncSlot()` from `qasync`
 - Never `QApplication.processEvents()` (blocks loop), `dialog.exec()` (use `await await_dialog(...)` or `show()`), `QThread` (use `asyncio.to_thread`), `time.sleep()` (use `await asyncio.sleep()`), `QTimer.singleShot(0, …)` (use `await asyncio.sleep(0)`)
 - Never global singletons — use constructor DI
+- Do not run subagents to just find/read a file.
 
 ## QML / SVG quirks
 - Icons served via `image://icons/<name>?color=<hex>` protocol — `SvgIconProvider` registered on a shared `QQmlEngine` in MainWindow.

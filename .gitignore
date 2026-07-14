@@ -54,3 +54,7 @@ ltex.dictionary*
 
 # Translation cache
 .translation_cache.json
+
+# OpenCode
+.opencode/**
+opencode.json
