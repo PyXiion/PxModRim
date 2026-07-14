@@ -27,10 +27,14 @@ def get_standalone_args(release: bool = False) -> list[str]:
 
     system = platform.system()
     if system == "Windows":
+        import tomllib
+        pyproject = project_root / "pyproject.toml"
+        version = tomllib.loads(pyproject.read_text("utf-8"))["project"]["version"]
         args.extend([
             "--windows-icon-from-ico=packaging/logo.ico",
             "--windows-company-name=PxModRim",
             "--windows-product-name=PxModRim",
+            f"--windows-product-version={version}",
         ])
 
     return args
