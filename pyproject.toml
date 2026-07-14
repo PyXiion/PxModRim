@@ -21,6 +21,7 @@ pxmodrim = "pxmodrim.__main__:main"
 [dependency-groups]
 dev = [
     "nuitka>=2.6.7",
+    "pydeps>=3.0.6",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

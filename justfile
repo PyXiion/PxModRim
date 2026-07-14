@@ -24,8 +24,10 @@ ruff-format-fix:
 
 fix: ruff-fix ruff-format-fix
 
-check: pyright
-    @echo "Done"
+check: pyright check-deps
+
+check-deps:
+    uv run python scripts/check-deps.py
 
 ci: check test
 
