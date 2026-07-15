@@ -111,11 +111,11 @@ class ModsConfig:
         self.knownExpansions = knownExpansions
 
     def clear_active_mods(self) -> None:
-        self.activeMods.clear()
+        self._activeMods.clear()
 
     def clear_all(self) -> None:
-        self.clear_active_mods()
-        self.knownExpansions.clear()
+        self._activeMods.clear()
+        self._knownExpansions.clear()
 
     @property
     def activeMods(self) -> list[CaseInsensitiveStr]:
@@ -148,11 +148,11 @@ class ModsConfig:
         return len(self.knownExpansions) != len(set(self.knownExpansions))
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize ModsConfig to a plain dictionary."""
+        """Serialize ModsConfig to a plain dictionary matching XML li structure."""
         return {
             "version": self.version,
-            "activeMods": [str(i) for i in self.activeMods],
-            "knownExpansions": [str(i) for i in self.knownExpansions],
+            "activeMods": {"li": [str(i) for i in self.activeMods]},
+            "knownExpansions": {"li": [str(i) for i in self.knownExpansions]},
         }
 
 

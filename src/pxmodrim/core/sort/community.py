@@ -6,8 +6,8 @@ from typing import Any
 
 import msgspec
 
-from pxmodrim.core.msgspec_hooks import dec_hook
 from pxmodrim.core.models.metadata.structures import BaseRules
+from pxmodrim.core.msgspec_hooks import dec_hook
 from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 COMMUNITY_RULES_URL = (
@@ -27,6 +27,7 @@ def community_rules_path() -> Path:
 
 class ExternalRule(msgspec.Struct, omit_defaults=True):
     """A single community rule specifying load-ordering relationships for a mod."""
+
     loadAfter: dict[str, Any] = {}
     loadBefore: dict[str, Any] = {}
     loadTop: SubExternalBoolRule = msgspec.field(
@@ -43,6 +44,7 @@ class SubExternalBoolRule(msgspec.Struct, omit_defaults=True):
 
 class ExternalRulesSchema(msgspec.Struct, omit_defaults=True):
     """Schema for the community rules JSON file, wrapping a timestamp and rule map."""
+
     timestamp: int = 0
     rules: dict[str, ExternalRule] = {}
 

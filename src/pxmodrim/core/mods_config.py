@@ -6,8 +6,8 @@ from typing import Any
 from loguru import logger
 
 from pxmodrim.core.constants import RIMWORLD_DLC_METADATA
-from pxmodrim.core.xml import xml_path_to_json
 from pxmodrim.core.models.metadata.structures import CaseInsensitiveStr, ModsConfig
+from pxmodrim.core.xml import xml_path_to_json
 
 
 def _extract_li_list(container: dict[str, Any] | list[Any] | str | None) -> list[str]:
