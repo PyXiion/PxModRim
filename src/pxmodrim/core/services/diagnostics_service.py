@@ -3,10 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Signal
-
+from pxmodrim.core.events import Event
 from pxmodrim.core.checker.checker import ModChecker
-from pxmodrim.core.checker.databases import NoVersionWarningService, UseThisInsteadService
+from pxmodrim.core.checker.databases import (
+    NoVersionWarningService,
+    UseThisInsteadService,
+)
 from pxmodrim.core.checker.issues import (
     CycleIssueChecker,
     DependencyIssueChecker,
@@ -31,6 +33,7 @@ from pxmodrim.core.models.view.sidebar import (
     SidebarEntry,
     WarningModsEntry,
 )
+from pxmodrim.core.profiler import profile
 from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 if TYPE_CHECKING:
@@ -39,14 +42,16 @@ if TYPE_CHECKING:
     from pxmodrim.core.models.metadata.structures import AboutXmlMod
 
 
-class DiagnosticsService(QObject):
-    diagnostics_summary_changed = Signal(dict)  # dict[str, ModDiagnosticsView]
-    status_message_changed = Signal(str)
-    sidebar_entries_changed = Signal(list)  # list[SidebarEntry]
+class DiagnosticsService:
+    diagnostics_summary_changed: Event[dict[str, ModDiagnosticsView]]
+    status_message_changed: Event[str]
+    sidebar_entries_changed: Event[list[SidebarEntry]]
 
     def __init__(self, ctx: CoreContext) -> None:
         """Initialise diagnostics with checkers, databases, and community rules."""
-        super().__init__()
+        self.diagnostics_summary_changed = Event()
+        self.status_message_changed = Event()
+        self.sidebar_entries_changed = Event()
         self._ctx = ctx
         self._no_version_warning_service = NoVersionWarningService()
         self._use_this_instead_service = UseThisInsteadService()
@@ -70,10 +75,13 @@ class DiagnosticsService(QObject):
 
     async def initialize(self) -> None:
         """Load databases and community rules, then apply them to the checker."""
-        await self._ensure_databases()
-        self._community_rules = await self._load_community_rules()
-        if self._community_rules:
-            self._checker.set_community_rules(self._community_rules)
+        with profile("diagnostics.init") as t:
+            with t("ensure_databases"):
+                await self._ensure_databases()
+            with t("load_community_rules"):
+                self._community_rules = await self._load_community_rules()
+            if self._community_rules:
+                self._checker.set_community_rules(self._community_rules)
 
     async def _ensure_databases(self) -> None:
         """Fetch or load NoVersionWarning and UseThisInstead databases."""
@@ -97,7 +105,10 @@ class DiagnosticsService(QObject):
         """Load community sorting rules from disk, if enabled."""
         if not self._ctx.config.sort.use_community_rules:
             return None
-        from pxmodrim.core.sort.community import community_rules_path, load_community_rules
+        from pxmodrim.core.sort.community import (
+            community_rules_path,
+            load_community_rules,
+        )
 
         path = self._ctx.config.paths.community_rules_file
         if not path:
@@ -110,10 +121,12 @@ class DiagnosticsService(QObject):
 
     def rebuild(self, active_uuids: list[str] | None = None) -> None:
         """Rebuild the checker for all mods with the given active UUIDs."""
-        if active_uuids is None:
-            active_uuids = self._ctx.active_uuids
-        self._last_active_uuids = active_uuids
-        self._checker.rebuild(self._ctx.all_mods, active_uuids)
+        with profile("diagnostics.rebuild") as t:
+            if active_uuids is None:
+                active_uuids = self._ctx.active_uuids
+            self._last_active_uuids = active_uuids
+            with t("checker.rebuild"):
+                self._checker.rebuild(self._ctx.all_mods, active_uuids, timer=t)
 
     def apply_active_mods_change(self, states: list[ModItemState]) -> None:
         """Apply a new active set from toggle states and rebuild diagnostics."""

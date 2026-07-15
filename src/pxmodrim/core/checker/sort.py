@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pxmodrim.core.checker.graph import ConstraintGraph, EdgeType
 from pxmodrim.core.checker.models import PackageId
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
@@ -7,25 +9,36 @@ from pxmodrim.core.sort.config import SortSettings, Tier, TierConfig
 from pxmodrim.core.sort.models import CommunityRule
 from pxmodrim.core.sort.tiers import assign_tiers
 
+if TYPE_CHECKING:
+    from ttimer import Timer
+
 
 def topological_sort(
     active_mods: dict[PackageId, AboutXmlMod],
     graph: ConstraintGraph,
     settings: SortSettings,
     community_rules: dict[PackageId, CommunityRule] | None = None,
+    timer: Timer | None = None,
 ) -> list[PackageId]:
     """Sort active mods into tiers by dependencies, load-order, and config priority."""
+    from ttimer import Timer
+
+    t = timer or Timer()
     all_pids = set(active_mods.keys())
     if not all_pids:
         return []
 
-    deps, rev_deps = _build_deps_and_rev_deps(graph, all_pids)
-    load_first = _build_load_first(active_mods, community_rules, all_pids, settings)
-    load_last = _build_load_last(active_mods, community_rules, all_pids, settings)
+    with t("build_deps"):
+        deps, rev_deps = _build_deps_and_rev_deps(graph, all_pids)
+    with t("build_load_first"):
+        load_first = _build_load_first(active_mods, community_rules, all_pids, settings)
+    with t("build_load_last"):
+        load_last = _build_load_last(active_mods, community_rules, all_pids, settings)
 
-    tiers = assign_tiers(
-        all_pids, deps, rev_deps, load_first, load_last, settings.tier_config
-    )
+    with t("assign_tiers"):
+        tiers = assign_tiers(
+            all_pids, deps, rev_deps, load_first, load_last, settings.tier_config
+        )
 
     order: list[PackageId] = []
     for tier in (Tier.TIER_0, Tier.TIER_1, Tier.TIER_2, Tier.TIER_3):
@@ -35,34 +48,35 @@ def topological_sort(
         if not tier_pids:
             continue
 
-        sub_deps = {pid: deps.get(pid, set()) & tier_pids for pid in tier_pids}
-        indegree = {pid: len(d) for pid, d in sub_deps.items()}
+        with t(f"kahn_{tier.name.lower()}"):
+            sub_deps = {pid: deps.get(pid, set()) & tier_pids for pid in tier_pids}
+            indegree = {pid: len(d) for pid, d in sub_deps.items()}
 
-        rev: dict[PackageId, set[PackageId]] = {}
-        for pid, ds in sub_deps.items():
-            for d in ds:
-                rev.setdefault(d, set()).add(pid)
+            rev: dict[PackageId, set[PackageId]] = {}
+            for pid, ds in sub_deps.items():
+                for d in ds:
+                    rev.setdefault(d, set()).add(pid)
 
-        config_priority = _build_config_priority(settings.tier_config)
+            config_priority = _build_config_priority(settings.tier_config)
 
-        def _key(pid: PackageId, config_priority=config_priority) -> tuple:
-            return (config_priority.get(pid, len(config_priority)), pid.lower())
+            def _key(pid: PackageId, config_priority=config_priority) -> tuple:
+                return (config_priority.get(pid, len(config_priority)), pid.lower())
 
-        queue = [pid for pid, deg in indegree.items() if deg == 0]
-        queue.sort(key=_key)
-
-        while queue:
-            pid = queue.pop(0)
-            order.append(pid)
-            for dependent in rev.get(pid, set()):
-                indegree[dependent] -= 1
-                if indegree[dependent] == 0:
-                    queue.append(dependent)
+            queue = [pid for pid, deg in indegree.items() if deg == 0]
             queue.sort(key=_key)
 
-        remaining = tier_pids - set(order)
-        if remaining:
-            order.extend(sorted(remaining, key=_key))
+            while queue:
+                pid = queue.pop(0)
+                order.append(pid)
+                for dependent in rev.get(pid, set()):
+                    indegree[dependent] -= 1
+                    if indegree[dependent] == 0:
+                        queue.append(dependent)
+                queue.sort(key=_key)
+
+            remaining = tier_pids - set(order)
+            if remaining:
+                order.extend(sorted(remaining, key=_key))
 
     return order
 

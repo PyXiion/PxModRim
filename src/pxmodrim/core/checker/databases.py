@@ -8,9 +8,9 @@ from pathlib import Path
 import httpx
 from loguru import logger
 
-from pxmodrim.core.xml import xml_path_to_json
 from pxmodrim.core.checker.models import PackageId, ReplacementInfo
 from pxmodrim.core.sort.community import config_dir as checker_config_dir
+from pxmodrim.core.xml import xml_path_to_json
 
 NO_VERSION_WARNING_URL = (
     "https://github.com/emipa606/NoVersionWarning/archive/refs/heads/main.zip"
@@ -70,9 +70,12 @@ class NoVersionWarningService:
         extract_dir = self._cache_dir / "no_version_warning_extracted"
 
         try:
-            async with httpx.AsyncClient() as client, client.stream(
-                "GET", NO_VERSION_WARNING_URL, follow_redirects=True, timeout=30.0
-            ) as resp:
+            async with (
+                httpx.AsyncClient() as client,
+                client.stream(
+                    "GET", NO_VERSION_WARNING_URL, follow_redirects=True, timeout=30.0
+                ) as resp,
+            ):
                 resp.raise_for_status()
                 with open(zip_path, "wb") as fh:
                     async for chunk in resp.aiter_bytes(8192):
@@ -157,9 +160,12 @@ class UseThisInsteadService:
         extract_dir = self._cache_dir / "use_this_instead_extracted"
 
         try:
-            async with httpx.AsyncClient() as client, client.stream(
-                "GET", USE_THIS_INSTEAD_URL, follow_redirects=True, timeout=30.0
-            ) as resp:
+            async with (
+                httpx.AsyncClient() as client,
+                client.stream(
+                    "GET", USE_THIS_INSTEAD_URL, follow_redirects=True, timeout=30.0
+                ) as resp,
+            ):
                 resp.raise_for_status()
                 with open(zip_path, "wb") as fh:
                     async for chunk in resp.aiter_bytes(8192):

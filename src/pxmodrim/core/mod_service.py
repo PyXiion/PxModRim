@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pxmodrim.core.mods_config import parse_mods_config, write_mods_config
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.providers.base import BaseModProvider
-from pxmodrim.core.structures import CollectionStats
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveStr,
     ListedMod,
     ModsConfig,
 )
+from pxmodrim.core.mods_config import parse_mods_config, write_mods_config
+from pxmodrim.core.profiler import profile
+from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.services.mod_discovery import resolve_active_uuids
+from pxmodrim.core.structures import CollectionStats
 
 
 class ModService:
@@ -38,12 +39,16 @@ class ModService:
 
     async def discover(self) -> None:
         """Run all providers' discovery in sequence and load results into context."""
-        all_mods: dict[str, ListedMod] = {}
-        for p in self._providers.values():
-            mods = await p.discover(self._ctx.target_version)
-            all_mods.update(mods)
-        active = resolve_active_uuids(all_mods, self._ctx.config.paths.config_folder)
-        self._ctx.load(all_mods, active)
+        with profile("discover") as t:
+            all_mods: dict[str, ListedMod] = {}
+            for p in self._providers.values():
+                with t(f"provider.{p.provider_id}"):
+                    mods = await p.discover(self._ctx.target_version, timer=t)
+                    all_mods.update(mods)
+            with t("resolve_active"):
+                active = resolve_active_uuids(all_mods, self._ctx.config.paths.config_folder)
+            with t("ctx.load"):
+                self._ctx.load(all_mods, active)
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         return self._ctx.compute_stats(active_ids)

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pxmodrim.core.models.metadata.structures import ListedMod
+
+if TYPE_CHECKING:
+    from ttimer import Timer
 
 
 class BaseModProvider(ABC):
@@ -17,7 +21,9 @@ class BaseModProvider(ABC):
         self._path = path
 
     @abstractmethod
-    async def discover(self, target_version: str) -> dict[str, ListedMod]:
+    async def discover(
+        self, target_version: str, timer: Timer | None = None
+    ) -> dict[str, ListedMod]:
         """Discover mods from this provider's path."""
         ...
 

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pxmodrim.core.checker.issues import ModIssueChecker
     from pxmodrim.core.sort.community import CommunityRule
     from pxmodrim.core.sort.config import SortSettings
+    from ttimer import Timer
 
 
 class ModChecker:
@@ -64,23 +65,32 @@ class ModChecker:
         self,
         mods: dict[str, ListedMod],
         ordered_uuids: list[str],
+        timer: Timer | None = None,
     ) -> None:
         """Re-scan all mods and regenerate diagnostics from scratch."""
-        self._collect_active(mods, ordered_uuids)
+        from ttimer import Timer
 
-        self._graph.build(
-            self._active_mods,
-            self._ordered_pids,
-            self._settings,
-            self._community_rules,
-        )
+        t = timer or Timer()
 
-        self._cached_cycles = self._graph.find_cycles()
+        with t("collect_active"):
+            self._collect_active(mods, ordered_uuids)
+
+        with t("graph.build"):
+            self._graph.build(
+                self._active_mods,
+                self._ordered_pids,
+                self._settings,
+                self._community_rules,
+            )
+
+        with t("find_cycles"):
+            self._cached_cycles = self._graph.find_cycles()
         ctx = self._build_context(self._cached_cycles)
 
         self._diagnostics = {}
         for pid, mod in self._active_mods.items():
-            diag = self._check_mod(mod, ctx)
+            with t("check_mod"):
+                diag = self._check_mod(mod, ctx)
             self._diagnostics[pid] = diag
 
         self._emit()

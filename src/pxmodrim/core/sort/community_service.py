@@ -56,9 +56,12 @@ class CommunityRulesService:
                 ) as resp:
                     resp.raise_for_status()
 
-                    with loading.task(
-                        "Downloading community rules...", total_steps=total_size
-                    ) as task, open(zip_path, "wb") as fh:
+                    with (
+                        loading.task(
+                            "Downloading community rules...", total_steps=total_size
+                        ) as task,
+                        open(zip_path, "wb") as fh,
+                    ):
                         async for chunk in resp.aiter_bytes(8192):
                             fh.write(chunk)
                             task.step(len(chunk))

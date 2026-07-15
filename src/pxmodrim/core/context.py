@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pxmodrim.core.structures import CollectionStats
 from pxmodrim.core.models.metadata.structures import ListedMod
+from pxmodrim.core.structures import CollectionStats
+
 if TYPE_CHECKING:
     from pxmodrim.core.config import AppConfig
 
