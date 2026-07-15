@@ -46,7 +46,7 @@ class TestSetData:
         data_changes: list[None] = []
         model.dataChanged.connect(lambda *_: data_changes.append(None))
 
-        inactive_rows = [i for i, it in enumerate(model._all_items) if not it.checked]
+        inactive_rows = [i for i, it in enumerate(model._items) if not it.checked]
         idx = model.index(inactive_rows[0], 0)
         ok = model.setData(idx, Qt.CheckState.Checked, ModListModel.CheckStateRole)
         assert ok is True
@@ -57,7 +57,7 @@ class TestSetData:
         assert resets == []
 
     def test_toggle_unchanged_is_noop(self, model: ModListModel) -> None:
-        active_rows = [i for i, it in enumerate(model._all_items) if it.checked]
+        active_rows = [i for i, it in enumerate(model._items) if it.checked]
         idx = model.index(active_rows[0], 0)
         data_changes: list[None] = []
         model.dataChanged.connect(lambda *_: data_changes.append(None))
@@ -67,55 +67,27 @@ class TestSetData:
 
 
 class TestCommitOrder:
-    def test_reorder_visible_and_all(self, model: ModListModel) -> None:
-        before_visible = [it.uuid for it in model._visible_items]
-        before_all = [it.uuid for it in model._all_items]
-        target = list(reversed(before_visible))
+    def test_reorder_subset_preserves_positions(self, model: ModListModel) -> None:
+        before = [it.uuid for it in model._items]
+        # _items = [uuid-0, uuid-2, uuid-1, uuid-3, uuid-4]
+        # reorder active mods uuid-0 and uuid-2 within their positions
+        model.commitOrder(["uuid-2", "uuid-0"])
+        after = [it.uuid for it in model._items]
+        # uuid-2 swaps into uuid-0's position (0), uuid-0 goes to uuid-2's position (1)
+        assert after == ["uuid-2", "uuid-0", "uuid-1", "uuid-3", "uuid-4"]
+        assert set(after) == set(before)
 
+    def test_reorder_full_list(self, model: ModListModel) -> None:
+        before = [it.uuid for it in model._items]
+        target = list(reversed(before))
         model.commitOrder(target)
-
-        assert [it.uuid for it in model._visible_items] == target
-        assert [it.uuid for it in model._all_items[: len(target)]] == target
-        for uuid in before_all:
-            assert uuid in [it.uuid for it in model._all_items]
+        assert [it.uuid for it in model._items] == target
 
     def test_noop_on_same_order(self, model: ModListModel) -> None:
         layout_changes: list[None] = []
         model.layoutChanged.connect(lambda *_: layout_changes.append(None))
-        model.commitOrder([it.uuid for it in model._visible_items])
+        model.commitOrder([it.uuid for it in model._items])
         assert layout_changes == []
-
-    def test_partial_uuid_list_pins_subset(self, model: ModListModel) -> None:
-        visible = [it.uuid for it in model._visible_items]
-        model.commitOrder([visible[2], visible[0]])
-        assert model._visible_items[0].uuid == visible[2]
-        assert model._visible_items[1].uuid == visible[0]
-
-    def test_filtered_reorder_preserves_hidden_item_positions(
-        self, model: ModListModel
-    ) -> None:
-        model.set_sidebar_filter({"uuid-1", "uuid-3"})
-
-        assert [item.uuid for item in model._visible_items] == ["uuid-1", "uuid-3"]
-        assert [item.uuid for item in model._all_items] == [
-            "uuid-0",
-            "uuid-2",
-            "uuid-1",
-            "uuid-3",
-            "uuid-4",
-        ]
-
-        moved = model.move_row(1, 0)
-        assert moved is True
-
-        assert [item.uuid for item in model._visible_items] == ["uuid-3", "uuid-1"]
-        assert [item.uuid for item in model._all_items] == [
-            "uuid-0",
-            "uuid-2",
-            "uuid-3",
-            "uuid-1",
-            "uuid-4",
-        ]
 
 
 class TestActiveUuids:

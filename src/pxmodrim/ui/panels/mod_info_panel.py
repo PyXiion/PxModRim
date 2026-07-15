@@ -36,7 +36,7 @@ def _first_sentence(text: str, max_len: int = 80) -> str:
         return ""
     stripped = text.strip()
     end = stripped.find(".")
-    result = stripped[:end + 1] if end != -1 else stripped
+    result = stripped[: end + 1] if end != -1 else stripped
     if len(result) > max_len:
         result = result[:max_len].rsplit(" ", 1)[0] + "\u2026"
     return result

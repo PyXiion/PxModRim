@@ -52,6 +52,7 @@ src/pxmodrim/
 - Never global singletons — constructor DI everywhere
 - Long blocking work → `await asyncio.to_thread(target)`
 - All git renames: `git mv`, never `shutil.move` (preserves rename tracking)
+- If you lack some documentation for a library, Google it. Do not decompile/extract sources.
 
 ## QML / SVG quirks
 - Icons via `image://icons/<name>?color=<hex>` — `SvgIconProvider` on shared `QQmlEngine`
@@ -70,3 +71,5 @@ src/pxmodrim/
 ## Stale / needs attention
 - `core/loading.py` — `LoadingState` QObject with a planned move to `ui/progress.py`. Three files still import from `core/loading` (settings_panel, community_service, progress_dialog).
 - `core/models/view/` — view models living in `core/`; potential future move to `ui/`.
+
+# For AI contributors

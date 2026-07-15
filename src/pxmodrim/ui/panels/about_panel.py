@@ -115,10 +115,10 @@ class AboutPanel(QDialog):
         layout.addWidget(based_on)
 
         rimsort_label = QLabel(
-            "Clean rewrite inspired by " +
-            '<a href="https://github.com/RimSort/RimSort" ' +
-            'style="color: #66c0f4;">RimSort</a> ' +
-            "(MIT licensed)."
+            "Clean rewrite inspired by "
+            + '<a href="https://github.com/RimSort/RimSort" '
+            + 'style="color: #66c0f4;">RimSort</a> '
+            + "(MIT licensed)."
         )
         rimsort_label.setOpenExternalLinks(True)
         rimsort_label.setWordWrap(True)

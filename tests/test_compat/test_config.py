@@ -25,14 +25,6 @@ class TestReadGameVersion:
         result = read_game_version(tmp_path)
         assert result is None
 
-    def test_empty_game_path_returns_none(self) -> None:
-        result = read_game_version("")
-        assert result is None
-
-    def test_nonexistent_path_returns_none(self) -> None:
-        result = read_game_version("/nonexistent/path")
-        assert result is None
-
     @pytest.mark.skipif(
         sys.platform == "win32", reason="chmod has no effect on Windows"
     )

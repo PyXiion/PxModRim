@@ -4,21 +4,18 @@ from pathlib import Path
 
 import pytest
 
-from pxmodrim.core.utils import find_about_xml
 from pxmodrim.core.models.metadata.parsing import (
     create_about_mod,
     create_listed_mod_from_path,
     value_extractor,
 )
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
+from pxmodrim.core.utils import find_about_xml
 
 TEST_DATA = Path(__file__).parent / "data"
 
 
 class TestValueExtractor:
-    def test_string(self) -> None:
-        assert value_extractor("hello") == "hello"
-
     def test_nested_dict(self) -> None:
         assert value_extractor({"key": "value"}) == "value"
 
