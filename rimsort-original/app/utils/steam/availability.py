@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import subprocess
@@ -18,7 +19,7 @@ try:
     if "__compiled__" not in globals():
         sys.path.append(str((Path.cwd() / "submodules" / "SteamworksPy")))
 except Exception:
-    pass
+    logging.exception('unexpected error')
 
 SLEEP_TIME = 15
 MAX_ATTEMPTS = 10
