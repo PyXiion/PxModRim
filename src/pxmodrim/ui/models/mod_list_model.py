@@ -10,7 +10,6 @@ from PySide6.QtCore import (
     QPersistentModelIndex,
     Qt,
     Signal,
-    Slot,
 )
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
@@ -47,42 +46,7 @@ class ModListModel(QAbstractListModel):
     def __init__(self, provider_colors: dict[str, str]) -> None:
         super().__init__()
         self._provider_colors = provider_colors
-        self._all_items: list[ModItem] = []
-        self._visible_items: list[ModItem] = []
-
-        self._search_text = ""
-        self._sidebar_uuids: set[str] | None = None
-
-    def _item_visible(self, item: ModItem) -> bool:
-        if self._sidebar_uuids is not None and item.uuid not in self._sidebar_uuids:
-            return False
-        if self._search_text:
-            name_match = self._search_text in item.mod.name.lower()
-            pid_match = (
-                isinstance(item.mod, AboutXmlMod)
-                and self._search_text in str(item.mod.package_id).lower()
-            )
-            if not (name_match or pid_match):
-                return False
-        return True
-
-    def _rebuild_visible(self) -> None:
-        self._visible_items = [
-            item for item in self._all_items if self._item_visible(item)
-        ]
-
-    def apply_filter(self) -> None:
-        self.beginResetModel()
-        self._rebuild_visible()
-        self.endResetModel()
-
-    def set_search_filter(self, search_text: str) -> None:
-        self._search_text = search_text.lower()
-        self.apply_filter()
-
-    def set_sidebar_filter(self, uuids: set[str] | None) -> None:
-        self._sidebar_uuids = uuids
-        self.apply_filter()
+        self._items: list[ModItem] = []
 
     def rowCount(
         self, parent: QModelIndex | QPersistentModelIndex | None = None
@@ -91,7 +55,7 @@ class ModListModel(QAbstractListModel):
             parent = QModelIndex()
         if parent.isValid():
             return 0
-        return len(self._visible_items)
+        return len(self._items)
 
     def data(
         self,
@@ -101,11 +65,11 @@ class ModListModel(QAbstractListModel):
         if (
             not index.isValid()
             or index.row() < 0
-            or index.row() >= len(self._visible_items)
+            or index.row() >= len(self._items)
         ):
             return None
 
-        item = self._visible_items[index.row()]
+        item = self._items[index.row()]
 
         if role == Qt.ItemDataRole.DisplayRole:
             return item.mod.name
@@ -145,12 +109,12 @@ class ModListModel(QAbstractListModel):
         if (
             not index.isValid()
             or index.row() < 0
-            or index.row() >= len(self._visible_items)
+            or index.row() >= len(self._items)
         ):
             return False
 
         if role == self.CheckStateRole:
-            item = self._visible_items[index.row()]
+            item = self._items[index.row()]
             new_checked = value == Qt.CheckState.Checked
             if item.checked == new_checked:
                 return True
@@ -163,7 +127,7 @@ class ModListModel(QAbstractListModel):
 
     def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
         changed_rows: list[int] = []
-        for row, item in enumerate(self._visible_items):
+        for row, item in enumerate(self._items):
             old_flags = (item.has_error, item.has_warning)
             got = diagnostics.get(item.uuid)
             if got is not None:
@@ -226,74 +190,57 @@ class ModListModel(QAbstractListModel):
     def move_row(self, source_row: int, target_row: int) -> bool:
         if source_row == target_row:
             return False
-        if not (0 <= source_row < len(self._visible_items)):
+        if not (0 <= source_row < len(self._items)):
             return False
-        if not (0 <= target_row < len(self._visible_items)):
+        if not (0 <= target_row < len(self._items)):
             return False
 
         parent = QModelIndex()
         destination_child = target_row + 1 if source_row < target_row else target_row
         self.beginMoveRows(parent, source_row, source_row, parent, destination_child)
-        item = self._visible_items.pop(source_row)
-        self._visible_items.insert(target_row, item)
+        item = self._items.pop(source_row)
+        self._items.insert(target_row, item)
         self.endMoveRows()
-        self._sync_all_to_visible()
         return True
 
-    @Slot(list)
     def commitOrder(self, new_ordered_uuids: list[str]) -> None:
         if not new_ordered_uuids:
             return
 
-        visible_uuids = [item.uuid for item in self._visible_items]
-        if visible_uuids == new_ordered_uuids:
+        item_by_uuid = {item.uuid: item for item in self._items}
+        existing_uuids = [uuid for uuid in new_ordered_uuids if uuid in item_by_uuid]
+        if not existing_uuids:
             return
 
-        old_uuids = [item.uuid for item in self._visible_items]
-        old_index_of = {uuid: i for i, uuid in enumerate(old_uuids)}
-        new_row_for_old: dict[int, int] = {}
-        for new_row, uuid in enumerate(new_ordered_uuids):
-            old_idx = old_index_of.get(uuid)
-            if old_idx is not None:
-                new_row_for_old[old_idx] = new_row
+        ordered_set = set(existing_uuids)
+        ordered_items = [item_by_uuid[uuid] for uuid in existing_uuids]
+        remaining = [item for item in self._items if item.uuid not in ordered_set]
+        new_items = ordered_items + remaining
+
+        if new_items == self._items:
+            return
+
+        old_uuid_to_row = {item.uuid: i for i, item in enumerate(self._items)}
+        new_row_for_old = {
+            old_uuid_to_row[item.uuid]: i for i, item in enumerate(new_items)
+        }
 
         persistent_indexes = self.persistentIndexList()
-        new_persistent: list[QModelIndex] = [
-            self.index(new_row_for_old[pid.row()], 0)
-            if pid.row() in new_row_for_old
-            else QModelIndex()
-            for pid in persistent_indexes
-        ]
+        new_persistent: list[QModelIndex] = []
+        for pid in persistent_indexes:
+            new_row = new_row_for_old.get(pid.row(), -1)
+            new_persistent.append(self.index(new_row, 0))
         if persistent_indexes:
             self.changePersistentIndexList(persistent_indexes, new_persistent)
 
-        item_by_uuid = {item.uuid: item for item in self._visible_items}
-        new_visible: list[ModItem] = []
-        for uuid in new_ordered_uuids:
-            item = item_by_uuid.pop(uuid, None)
-            if item is not None:
-                new_visible.append(item)
-        self._visible_items = new_visible
-
+        self._items = new_items
         self.layoutChanged.emit()
-        self._sync_all_to_visible()
-
-    def _sync_all_to_visible(self) -> None:
-        visible_uuids = {item.uuid for item in self._visible_items}
-        reordered_visible = iter(self._visible_items)
-        new_all: list[ModItem] = []
-        for item in self._all_items:
-            if item.uuid in visible_uuids:
-                new_all.append(next(reordered_visible, item))
-            else:
-                new_all.append(item)
-        self._all_items = new_all
 
     def reorder(self, ordered_uuids: list[str]) -> None:
         self.commitOrder(ordered_uuids)
 
     def load_mods(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
-        self.blockSignals(True)
+        self.beginResetModel()
         try:
             active_set = set(active_uuids)
             active_items = [
@@ -324,22 +271,20 @@ class ModListModel(QAbstractListModel):
                 )
                 for uuid in inactive_uuids
             ]
-            self._all_items = active_items + inactive_items
+            self._items = active_items + inactive_items
         finally:
-            self.blockSignals(False)
-
-        self.apply_filter()
+            self.endResetModel()
 
     def active_uuids(self) -> list[str]:
-        return [item.uuid for item in self._all_items if item.checked]
+        return [item.uuid for item in self._items if item.checked]
 
     def get_item(self, row: int) -> ModItem | None:
-        if 0 <= row < len(self._visible_items):
-            return self._visible_items[row]
+        if 0 <= row < len(self._items):
+            return self._items[row]
         return None
 
     def get_item_by_uuid(self, uuid: str) -> ModItem | None:
-        for item in self._all_items:
+        for item in self._items:
             if item.uuid == uuid:
                 return item
         return None
@@ -350,10 +295,10 @@ class ModListModel(QAbstractListModel):
         changed_rows: list[int] = []
         for row in rows:
             if (
-                0 <= row < len(self._visible_items)
-                and self._visible_items[row].checked != checked
+                0 <= row < len(self._items)
+                and self._items[row].checked != checked
             ):
-                self._visible_items[row].checked = checked
+                self._items[row].checked = checked
                 changed_rows.append(row)
         if not changed_rows:
             return

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QComboBox, QVBoxLayout, QWidget
 
 from pxmodrim.core.models.view.sidebar import SidebarEntry
-from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.models.sidebar_model import SidebarModel
+from pxmodrim.ui.theme.palette import PALETTE
 
 _QML_DIR = Path(__file__).parent
 _SIDEBAR_QML = _QML_DIR / "Sidebar.qml"
@@ -49,36 +49,8 @@ class SidebarPanel(QWidget):
         self._entries: list[SidebarEntry] = []
 
     def set_entries(self, entries: list[SidebarEntry]) -> None:
-        # Save current selection label before reset
-        old_index = -1
-        root = self._qml.rootObject()
-        if root is not None:
-            list_view = root.findChild(QObject, "listView")
-            if list_view is not None:
-                old_index = list_view.property("currentIndex")  # type: ignore[assignment]
-        old_label = (
-            self._entries[old_index].label
-            if 0 <= old_index < len(self._entries)
-            else None
-        )
-
         self._entries = entries
-        self._model.set_entries(entries)
-        root = self._qml.rootObject()
-        if root is not None and self._model.rowCount() > 0:
-            list_view = root.findChild(QObject, "listView")
-            if list_view is not None:
-                # Restore selection by matching label
-                restore_index = 0
-                if old_label is not None:
-                    for i, entry in enumerate(entries):
-                        if entry.label == old_label:
-                            restore_index = i
-                            break
-                list_view.setProperty("currentIndex", restore_index)
-
-    def update_counts(self) -> None:
-        self._model.update_counts(self._entries)
+        self._model.update_entries(entries)
 
     # ── Slots called from QML ─────────────────────────────────
 

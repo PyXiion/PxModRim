@@ -22,6 +22,9 @@ Rectangle {
         property bool itemIsHeld: false
         property int dragSourceIndex: -1
 
+        property var selectedIndices: []
+        property int anchorIndex: -1
+
         ScrollBar.vertical: ScrollBar {
             id: scrollBar
             policy: ScrollBar.AsNeeded
@@ -114,9 +117,13 @@ Rectangle {
             height: 52
             radius: Theme.radiusMd
 
-            color: ListView.isCurrentItem
-                ? Theme.elevate4
-                : ((mouseArea.containsMouse && !listView.itemIsHeld) ? Theme.elevate3 : "transparent")
+            color: {
+                if (listView.selectedIndices.indexOf(index) >= 0)
+                    return Theme.elevate4
+                if (mouseArea.containsMouse && !listView.itemIsHeld)
+                    return Theme.elevate3
+                return "transparent"
+            }
             opacity: (listView.dragSourceIndex === index && listView.itemIsHeld) ? 0.0 : 1.0
 
             MouseArea {
@@ -133,6 +140,28 @@ Rectangle {
                     mousePressed = true
                     wasDragged = false
                     dragConfirmed = false
+
+                    if (mouse.modifiers & Qt.ControlModifier) {
+                        var i = listView.selectedIndices.indexOf(index)
+                        if (i >= 0)
+                            listView.selectedIndices = listView.selectedIndices.filter(function(idx) { return idx !== index })
+                        else
+                            listView.selectedIndices = listView.selectedIndices.concat([index])
+                        listView.anchorIndex = index
+                    } else if (mouse.modifiers & Qt.ShiftModifier && listView.anchorIndex >= 0) {
+                        var start = Math.min(listView.anchorIndex, index)
+                        var end = Math.max(listView.anchorIndex, index)
+                        var range = []
+                        for (var r = start; r <= end; ++r)
+                            range.push(r)
+                        listView.selectedIndices = range
+                    } else {
+                        listView.selectedIndices = [index]
+                        listView.anchorIndex = index
+                    }
+
+                    modListPanel.selectionChanged(listView.selectedIndices)
+
                     var rootPos = delegateRect.mapToItem(root, 0, 0)
                     dragProxy.modName = model.name || ""
                     dragProxy.modPackageId = model.packageId || ""
@@ -362,5 +391,79 @@ Rectangle {
                 }
             }
         }
+    }
+
+    // ── Keyboard navigation ──
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        onActivated: navigate(false, -1)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        onActivated: navigate(false, 1)
+    }
+    Shortcut {
+        sequence: "Shift+Up"
+        context: Qt.WindowShortcut
+        onActivated: navigate(true, -1)
+    }
+    Shortcut {
+        sequence: "Shift+Down"
+        context: Qt.WindowShortcut
+        onActivated: navigate(true, 1)
+    }
+    Shortcut {
+        sequence: "Return"
+        context: Qt.WindowShortcut
+        onActivated: {
+            var sels = listView.selectedIndices
+            if (sels.length === 0 && listView.currentIndex >= 0)
+                sels = [listView.currentIndex]
+            modListPanel.toggleChecked(sels)
+        }
+    }
+    Shortcut {
+        sequence: "Ctrl+A"
+        context: Qt.WindowShortcut
+        onActivated: {
+            if (searchFocused)
+                return
+            var all = []
+            for (var i = 0; i < listView.count; ++i)
+                all.push(i)
+            listView.selectedIndices = all
+            listView.anchorIndex = listView.count - 1
+            listView.currentIndex = listView.count - 1
+            modListPanel.selectionChanged(listView.selectedIndices)
+        }
+    }
+
+    function navigate(extend, direction) {
+        if (searchFocused)
+            return
+
+        var newIdx = listView.currentIndex + direction
+        if (newIdx < 0 || newIdx >= listView.count)
+            return
+
+        if (extend) {
+            if (listView.anchorIndex < 0)
+                listView.anchorIndex = listView.currentIndex
+
+            var start = Math.min(listView.anchorIndex, newIdx)
+            var end = Math.max(listView.anchorIndex, newIdx)
+            var range = []
+            for (var i = start; i <= end; ++i)
+                range.push(i)
+            listView.selectedIndices = range
+        } else {
+            listView.selectedIndices = [newIdx]
+            listView.anchorIndex = newIdx
+        }
+
+        listView.currentIndex = newIdx
+        modListPanel.selectionChanged(listView.selectedIndices)
     }
 }

@@ -224,14 +224,48 @@ class SidebarModel(QAbstractListModel):
             )
         self.endResetModel()
 
-    def update_counts(self, entries: Sequence[object]) -> None:
+    def update_entries(self, entries: Sequence[object]) -> None:
+        if len(entries) != len(self._items):
+            self.set_entries(entries)
+            return
+
+        changed_roles: set[int] = set()
         for i, entry in enumerate(entries):
-            if i < len(self._items):
-                self._items[i].count = getattr(entry, "count", 0)
-        if self._items:
+            item = self._items[i]
+            entry_type = _detect_entry_type(entry)
+            bg, fg, icon_name, icon_color = _ENTRY_TYPES.get(
+                entry_type, _ENTRY_TYPES["provider"]
+            )
+            if entry_type == "provider":
+                icon_name = _icon_for_provider(entry)
+                label_lower = getattr(entry, "label", "").lower()
+                if "steam" in label_lower:
+                    icon_color = _PROVIDER_ICON_COLORS.get("steam", icon_color)
+                elif "local" in label_lower:
+                    icon_color = _PROVIDER_ICON_COLORS.get("local", icon_color)
+
+            new_label = getattr(entry, "label", "") or ""
+            new_count = getattr(entry, "count", 0)
+
+            if item.label != new_label:
+                item.label = new_label
+                changed_roles.add(self.LabelRole)
+            if item.count != new_count:
+                item.count = new_count
+                changed_roles.add(self.CountRole)
+            if item.badge_bg != bg:
+                item.badge_bg = bg
+                changed_roles.add(self.BadgeBgRole)
+            if item.badge_fg != fg:
+                item.badge_fg = fg
+                changed_roles.add(self.BadgeFgRole)
+
+            item.entry = entry
+
+        if changed_roles and self._items:
             top = self.index(0, 0)
             bottom = self.index(len(self._items) - 1, 0)
-            self.dataChanged.emit(top, bottom, [self.CountRole])
+            self.dataChanged.emit(top, bottom, list(changed_roles))
 
     def get_entry(self, row: int) -> object | None:
         if 0 <= row < len(self._items):
