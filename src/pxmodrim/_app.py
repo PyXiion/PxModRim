@@ -18,15 +18,16 @@ from pxmodrim.core.config import (
     load_config,
     save_config,
 )
-from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.providers import create_providers
 from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+from pxmodrim.core.services.game_launcher import GameLauncher
 from pxmodrim.core.services.sort_service import SortService
-from pxmodrim.ui.window.main_window import MainWindow
-from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
+from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
+from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
+from pxmodrim.ui.window.main_window import MainWindow
 
 
 def _exception_hook(
@@ -119,11 +120,13 @@ class App:
         self._mod_service = ModService(self._ctx, providers)
         diagnostics_service = DiagnosticsService(self._ctx)
         sort_service = SortService(self._ctx, diagnostics_service)
+        game_launcher = GameLauncher(self._ctx)
         self.main_window = MainWindow(
             self._ctx,
             self._mod_service,
             diagnostics_service,
             sort_service,
+            game_launcher,
         )
 
     async def async_run(self) -> int:
