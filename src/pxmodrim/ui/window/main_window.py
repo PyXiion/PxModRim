@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
@@ -17,26 +18,27 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.config import save_config
-from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.core.config import LaunchStrategy, save_config
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+from pxmodrim.core.services.game_launcher import GameLauncher
 from pxmodrim.core.services.sort_service import SortService
-from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.components import (
     HeaderController,
     HeaderPanel,
     SvgIconProvider,
     ToastManager,
 )
-from pxmodrim.ui.window.menu_bar import MenuBar
+from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.panels.mod_list_panel import ModListPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.panels.sidebar_panel import SidebarPanel
 from pxmodrim.ui.theme.qml_theme import Theme
+from pxmodrim.ui.window.menu_bar import MenuBar
 
 if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModDiagnosticsView
@@ -49,6 +51,7 @@ class MainWindow(QMainWindow):
         mod_service: ModService,
         diagnostics_service: DiagnosticsService,
         sort_service: SortService,
+        game_launcher: GameLauncher,
     ) -> None:
         super().__init__()
 
@@ -70,6 +73,7 @@ class MainWindow(QMainWindow):
         self._mod_service = mod_service
         self._diagnostics_service = diagnostics_service
         self._sort_service = sort_service
+        self._game_launcher = game_launcher
         self._selected_uuid: str | None = None
 
         # Wire diagnostics service signals
@@ -80,13 +84,20 @@ class MainWindow(QMainWindow):
         # ── Frameless window attempt ──
         self._is_frameless = self._try_frameless()
 
+        # QML quirks
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
         # ── Header (QML) ──
-        self._header_controller = HeaderController(is_frameless=self._is_frameless)
+        self._header_controller = HeaderController(
+            is_frameless=self._is_frameless,
+            initial_strategy=int(self._ctx.config.ui.launch_strategy),
+        )
         self._header_controller.refresh_requested.connect(self.load_mods_async)
         self._header_controller.sort_requested.connect(self._auto_sort)
         self._header_controller.save_requested.connect(self._save_mods_config)
         self._header_controller.settings_requested.connect(self._open_settings)
         self._header_controller.launch_requested.connect(self._launch_game)
+        self._header_controller.strategy_changed.connect(self._on_strategy_changed)
         self._header_controller.minimize_requested.connect(self.showMinimized)
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
@@ -231,7 +242,9 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def load_mods_async(self) -> None:
         self._toast_manager.info("Scanning mods...")
+        t0 = time.monotonic()
         await self._mod_service.discover()
+        elapsed = time.monotonic() - t0
         if not self._ctx.all_mods:
             self._toast_manager.warning("No mods found")
             return
@@ -241,6 +254,9 @@ class MainWindow(QMainWindow):
 
         await self._diagnostics_service.initialize()
         self._diagnostics_service.rebuild(self._ctx.active_uuids)
+        self._toast_manager.info(
+            f"Loaded {len(self._ctx.all_mods)} mods in {elapsed:.1f}s", 3000
+        )
 
     # ── Private slots ───────────────────────────────────────
 
@@ -268,10 +284,21 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
+        deps_to_enable = self._sort_service.resolve_missing_dependencies(
+            set(self.mod_list.active_uuids())
+        )
+        if deps_to_enable:
+            self.mod_list.enableMods(deps_to_enable)
+            self._diagnostics_service.rebuild(self.mod_list.active_uuids())
+
+        t0 = time.monotonic()
         ordered_uuids = await self._sort_service.sort_active_mods()
+        elapsed = time.monotonic() - t0
         self.mod_list.model.reorder(ordered_uuids)
         self._diagnostics_service.reorder(ordered_uuids)
-        self._toast_manager.success(f"Sorted {len(ordered_uuids)} mods", 5000)
+        self._toast_manager.success(
+            f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
+        )
 
     @asyncSlot()
     async def _save_mods_config(self) -> None:
@@ -282,8 +309,31 @@ class MainWindow(QMainWindow):
         else:
             self._toast_manager.warning("Config folder not set", 3000)
 
-    def _launch_game(self) -> None:
-        self._toast_manager.info("Launch not implemented yet")
+    @asyncSlot()
+    async def _launch_game(self) -> None:
+        logger.info("Launch requested")
+
+        ok = await self._mod_service.save_active_layout(self.mod_list.active_uuids())
+        if not ok:
+            logger.warning("Config folder not set — mod list not saved before launch")
+            self._toast_manager.warning(
+                "Config folder not set — mod list won't be saved"
+            )
+
+        success, msg = await self._game_launcher.launch()
+        if success:
+            logger.info(msg)
+            self._toast_manager.success(msg)
+        else:
+            logger.warning(msg)
+            self._toast_manager.warning(msg, 5000)
+
+    def _on_strategy_changed(self, index: int) -> None:
+        new_strategy = LaunchStrategy(index)
+        if self._ctx.config.ui.launch_strategy != new_strategy:
+            logger.info("Launch strategy changed to {}", new_strategy.name)
+            self._ctx.config.ui.launch_strategy = new_strategy
+            save_config(self._ctx.config)
 
     def _on_mod_selected(self, uuid: str) -> None:
         self._selected_uuid = uuid
@@ -315,11 +365,13 @@ class MainWindow(QMainWindow):
             return
         selected = list_view.property("currentIndex")
         if 0 <= selected < len(self.sidebar._entries):
-            self._apply_entry(self.sidebar._entries[selected])
+            self.mod_list.set_sidebar_filter(
+                self.sidebar._entries[selected].visible_uuids
+            )
 
     def _apply_entry(self, entry: SidebarEntry) -> None:
         self.mod_list.clearSelection()
-        self.mod_list.model.set_sidebar_filter(entry.visible_uuids)
+        self.mod_list.set_sidebar_filter(entry.visible_uuids)
 
     def _on_entry_selected(self, entry: SidebarEntry) -> None:
         self._apply_entry(entry)
