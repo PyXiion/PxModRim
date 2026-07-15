@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from enum import IntEnum
 from pathlib import Path
 
 import msgspec
@@ -10,6 +11,11 @@ from loguru import logger
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
 from pxmodrim.core.msgspec_hooks import dec_hook, enc_hook
 from pxmodrim.core.sort.config import SortSettings, TierConfig
+
+
+class LaunchStrategy(IntEnum):
+    DIRECT = 0
+    STEAM = 1
 
 
 def read_game_version(game_path: str | Path) -> str | None:
@@ -30,6 +36,7 @@ def read_game_version(game_path: str | Path) -> str | None:
 
 class PathConfig(msgspec.Struct):
     """Paths to the game, mods, workshop, and config directories."""
+
     game: str = ""
     local: str = ""
     workshop: str = ""
@@ -41,12 +48,15 @@ class PathConfig(msgspec.Struct):
 
 class UIPrefs(msgspec.Struct):
     """Persistent UI state preferences (expand/collapse toggles)."""
+
     deps_expanded: bool = True
     desc_expanded: bool = False
+    launch_strategy: LaunchStrategy = LaunchStrategy.DIRECT
 
 
 class AppConfig(msgspec.Struct):
     """Top-level config combining paths, UI prefs, and sort settings."""
+
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
     ui: UIPrefs = msgspec.field(default_factory=UIPrefs)
     sort: SortSettings = msgspec.field(

@@ -108,16 +108,95 @@ Rectangle {
                     onClicked: root.controller.refresh()
                 }
 
-                HeaderButton {
-                    iconName: "play"
-                    tooltip: "Launch game"
-                    bgColor: Theme.success
-                    bgHoverColor: Qt.lighter(Theme.success, 1.15)
-                    iconColor: "white"
-                    iconHoverColor: "white"
-                    onClicked: root.controller.launch()
+                // ── Launch split-button ──
+                Rectangle {
+                    id: launchBtn
+                    height: 32
+                    width: playRow.implicitWidth
+                    radius: Theme.radiusMd
+                    color: launchHover.containsMouse ? Qt.lighter(Theme.success, 1.15) : Theme.success
+
+                    Row {
+                        id: playRow
+                        height: parent.height
+                        spacing: 0
+
+                        Item {
+                            width: 28; height: parent.height
+                            Image {
+                                anchors.centerIn: parent
+                                source: "image://icons/play?color=" + encodeURIComponent("white")
+                                sourceSize.width: 16; sourceSize.height: 16
+                            }
+                        }
+
+                        Text {
+                            text: "Play"
+                            color: "white"
+                            font.pixelSize: 13
+                            font.weight: Font.Medium
+                            anchors.verticalCenter: parent.verticalCenter
+                            rightPadding: 10
+                        }
+
+                        Rectangle {
+                            width: 1; height: 18
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: Qt.rgba(1, 1, 1, 0.2)
+                        }
+
+                        Item {
+                            width: 20; height: parent.height
+                            Image {
+                                anchors.centerIn: parent
+                                source: "image://icons/chevron-down?color=" + encodeURIComponent("white")
+                                sourceSize.width: 12; sourceSize.height: 12
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        id: launchHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: function(mouse) {
+                            if (mouse.x < playRow.implicitWidth - 20) {
+                                root.controller.launch()
+                            } else {
+                                strategyMenu.popup()
+                            }
+                        }
+
+                        ToolTip {
+                            text: "Launch game\nStrategy: " + (root.controller.strategyIndex === 0 ? "Direct executable" : "Steam")
+                            visible: launchHover.containsMouse
+                            delay: 300
+                        }
+                    }
                 }
+
             }
+        }
+    }
+
+    // ── Dropdown menu (children of root, outside layouts) ──
+    Menu {
+        id: strategyMenu
+
+        MenuItem {
+            text: "Direct executable"
+            checkable: true
+            checked: root.controller.strategyIndex === 0
+            onTriggered: root.controller.setStrategy(0)
+        }
+
+        MenuItem {
+            text: "Steam"
+            checkable: true
+            checked: root.controller.strategyIndex === 1
+            onTriggered: root.controller.setStrategy(1)
         }
     }
 

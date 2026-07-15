@@ -9,17 +9,23 @@ class HeaderController(QObject):
     save_requested = Signal()
     settings_requested = Signal()
     launch_requested = Signal()
+    launch_menu_requested = Signal()
+    strategy_changed = Signal(int)
     minimize_requested = Signal()
     maximize_requested = Signal()
     close_requested = Signal()
     drag_started = Signal()
 
     def __init__(
-        self, is_frameless: bool = False, parent: QObject | None = None
+        self,
+        is_frameless: bool = False,
+        parent: QObject | None = None,
+        initial_strategy: int = 0,
     ) -> None:
         super().__init__(parent)
         self._is_frameless = is_frameless
         self._maximized = False
+        self._strategy_index: int = initial_strategy
 
     def is_frameless_getter(self) -> bool:
         return self._is_frameless
@@ -68,6 +74,23 @@ class HeaderController(QObject):
     def closeWindow(self) -> None:
         self.close_requested.emit()
 
+    @Slot(int)
+    def setStrategy(self, index: int) -> None:
+        if self._strategy_index != index:
+            self._strategy_index = index
+            self.strategy_changed.emit(index)
+
+    @Slot()
+    def showLaunchMenu(self) -> None:
+        self.launch_menu_requested.emit()
+
     @Slot()
     def dragStarted(self) -> None:
         self.drag_started.emit()
+
+    # ── QML property ────────────────────────────────────────
+
+    def _get_strategy_index(self) -> int:
+        return self._strategy_index
+
+    strategyIndex = Property(int, _get_strategy_index, notify=strategy_changed)
