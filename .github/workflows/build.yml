@@ -10,19 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: PxModRim-Linux
-            binary_name: PxModRim
-          - os: windows-latest
-            artifact_name: PxModRim-Windows
-            binary_name: PxModRim.exe
-
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -41,8 +30,7 @@ jobs:
         with:
           tool: just@1.40.0
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 patchelf ccache
@@ -53,41 +41,86 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Build with Nuitka
-        run: just build
+        run: just build-release
 
-      - name: Package distribution
-        shell: bash
-        run: |
-          cd dist
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            tar -czf ../${{ matrix.artifact_name }}.tar.gz entrypoint.dist/
-            if [ -f PxModRim-x86_64.AppImage ]; then
-              cp PxModRim-x86_64.AppImage ../
-            fi
-          else
-            7z a ../${{ matrix.artifact_name }}.zip entrypoint.dist/
-          fi
+      - name: Package tar.gz
+        run: tar -czf PxModRim-Linux.tar.gz -C dist entrypoint.dist/
+
+      - name: Copy AppImage
+        run: cp dist/PxModRim-x86_64.AppImage .
+
+      - name: Upload artifact (tar.gz)
+        uses: actions/upload-artifact@v7
+        with:
+          name: PxModRim-Linux
+          path: PxModRim-Linux.tar.gz
+
+      - name: Upload artifact (AppImage)
+        uses: actions/upload-artifact@v7
+        with:
+          name: PxModRim-Linux-AppImage
+          path: PxModRim-x86_64.AppImage
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@main
+        with:
+          python-version-file: pyproject.toml
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.40.0
+
+      - name: Install Dependencies
+        run: uv sync --locked --dev
+
+      - name: Build with Nuitka
+        run: just build-release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            ${{ matrix.artifact_name }}.*
-            PxModRim-x86_64.AppImage
+          name: PxModRim-Windows
+          path: dist/entrypoint.dist/*
 
   release:
-    needs: build
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v8
         with:
-          path: artifacts
-          merge-multiple: true
+          name: PxModRim-Linux
+          path: linux-targz
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: PxModRim-Linux-AppImage
+          path: linux-appimage
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: PxModRim-Windows
+          path: windows
+
+      - name: Package Windows release
+        run: 7z a PxModRim-Windows.zip ./windows/*
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          files: artifacts/*
+          files: |
+            linux-targz/PxModRim-Linux.tar.gz
+            linux-appimage/PxModRim-x86_64.AppImage
+            PxModRim-Windows.zip
           generate_release_notes: true
