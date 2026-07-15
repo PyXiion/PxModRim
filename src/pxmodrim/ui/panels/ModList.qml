@@ -307,6 +307,39 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
 
+                // Startup impact pill
+                Rectangle {
+                    visible: model.startupImpact > 0
+                    height: 20
+                    width: siText.width + 12
+                    radius: Theme.radiusSm
+                    color: model.startupImpact < 1.0 ? "#5cb85c" :
+                           model.startupImpact < 5.0 ? "#f0ad4e" : "#d9534f"
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Text {
+                        id: siText
+                        anchors.centerIn: parent
+                        text: Math.round(model.startupImpact * 1000) + "ms"
+                        color: "white"
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Font.Bold
+                    }
+
+                    ToolTip {
+                        text: "Startup impact: " + Math.round(model.startupImpact * 1000) + "ms"
+                        visible: siMouseArea.containsMouse
+                        delay: 300
+                    }
+
+                    MouseArea {
+                        id: siMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.WhatsThisCursor
+                    }
+                }
+
                 // Version pill
                 Rectangle {
                     visible: !!model.modVersion

@@ -23,6 +23,7 @@ from pxmodrim.core.config import (
     community_rules_file,
     detect_game_paths,
 )
+from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
 from pxmodrim.core.sort.config import SortSettings
@@ -31,14 +32,15 @@ from pxmodrim.ui.components.progress_dialog import ProgressDialog
 
 
 class SettingsPanel(QDialog):
-    def __init__(self, cfg: AppConfig) -> None:
+    def __init__(self, ctx: CoreContext) -> None:
         super().__init__()
         self.setObjectName("settingsPanel")
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.resize(700, 500)
 
-        self._config = cfg
+        self._ctx = ctx
+        self._config = ctx.config
 
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
@@ -146,6 +148,25 @@ class SettingsPanel(QDialog):
 
         layout.addWidget(cr_group)
 
+        # Startup Impact Cache group
+        si_group = QGroupBox("Startup Impact Cache")
+        si_layout = QVBoxLayout(si_group)
+
+        self.si_clear_btn = AppButton("Clear Cache")
+        self.si_clear_btn.clicked.connect(self._clear_startup_impact)
+        si_layout.addWidget(self.si_clear_btn)
+
+        self.si_status = QLineEdit()
+        self.si_status.setReadOnly(True)
+        if self._ctx.config.paths.config_folder:
+            self.si_status.setText("Cache ready")
+        else:
+            self.si_status.setText("No config folder — not available")
+            self.si_clear_btn.setEnabled(False)
+        si_layout.addWidget(self.si_status)
+
+        layout.addWidget(si_group)
+
         layout.addStretch()
         return tab
 
@@ -224,6 +245,18 @@ class SettingsPanel(QDialog):
                 self.cr_status.setText("Download failed")
         finally:
             self.cr_download_btn.setEnabled(True)
+
+    @asyncSlot()
+    async def _clear_startup_impact(self) -> None:
+        self.si_clear_btn.setEnabled(False)
+        self.si_status.setText("Clearing...")
+        try:
+            await self._ctx.mod_service.clear_startup_impact_cache()
+            self.si_status.setText("Cache cleared")
+        except Exception as exc:
+            self.si_status.setText(f"Error: {exc}")
+        finally:
+            self.si_clear_btn.setEnabled(True)
 
     def _save(self) -> None:
         self._config = AppConfig(

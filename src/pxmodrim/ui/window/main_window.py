@@ -251,6 +251,9 @@ class MainWindow(QMainWindow):
 
         self.mod_list.model.update_provider_colors(self._mod_service.provider_colors)
         self.mod_list.load_mods(self._ctx.all_mods, self._ctx.active_uuids)
+        self.mod_list.model.set_startup_impact(
+            self._mod_service.startup_impact_report
+        )
 
         await self._diagnostics_service.initialize()
         self._diagnostics_service.rebuild(self._ctx.active_uuids)
@@ -265,7 +268,7 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _open_settings(self) -> None:
-        result, dialog = await await_dialog(SettingsPanel, self._ctx.config)
+        result, dialog = await await_dialog(SettingsPanel, self._ctx)
         if result != 1:
             return
         cfg = dialog.get_config()

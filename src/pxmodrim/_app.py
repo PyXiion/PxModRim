@@ -19,11 +19,6 @@ from pxmodrim.core.config import (
     save_config,
 )
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.mod_service import ModService
-from pxmodrim.core.providers import create_providers
-from pxmodrim.core.services.diagnostics_service import DiagnosticsService
-from pxmodrim.core.services.game_launcher import GameLauncher
-from pxmodrim.core.services.sort_service import SortService
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
@@ -65,6 +60,8 @@ sys.excepthook = _exception_hook
 
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
+
+    __slots__ = ("qt_app", "_ctx", "main_window")
 
     def __init__(self) -> None:
         self.qt_app = QApplication(sys.argv)
@@ -115,18 +112,13 @@ class App:
 
     def _setup(self, cfg: AppConfig) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
-        self._ctx = CoreContext(cfg)
-        providers = create_providers(cfg.paths)
-        self._mod_service = ModService(self._ctx, providers)
-        diagnostics_service = DiagnosticsService(self._ctx)
-        sort_service = SortService(self._ctx, diagnostics_service)
-        game_launcher = GameLauncher(self._ctx)
+        self._ctx = CoreContext.create(cfg)
         self.main_window = MainWindow(
             self._ctx,
-            self._mod_service,
-            diagnostics_service,
-            sort_service,
-            game_launcher,
+            self._ctx.mod_service,
+            self._ctx.diagnostics_service,
+            self._ctx.sort_service,
+            self._ctx.game_launcher,
         )
 
     async def async_run(self) -> int:
@@ -136,14 +128,14 @@ class App:
 
         if not self._ctx.config.paths.game:
             logger.info("No game path found, showing settings dialog")
-            result, dialog = await await_dialog(SettingsPanel, self._ctx.config)
+            result, dialog = await await_dialog(SettingsPanel, self._ctx)
             new_cfg = dialog.get_config()
             if result != 1 or not new_cfg.paths.game:
                 logger.warning("No game path configured, exiting")
                 return 1
             save_config(new_cfg)
             self._ctx.update_config(new_cfg)
-            self._mod_service.reset_providers(create_providers(new_cfg.paths))
+            self._ctx.reset_providers(new_cfg.paths)
 
         await self.main_window.load_mods_async()
 

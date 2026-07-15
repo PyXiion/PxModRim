@@ -13,17 +13,24 @@ from pxmodrim.core.mods_config import parse_mods_config, write_mods_config
 from pxmodrim.core.profiler import profile
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.services.mod_discovery import resolve_active_uuids
+from pxmodrim.core.services.startup_impact_service import (
+    StartupImpactReport,
+    StartupImpactService,
+)
 from pxmodrim.core.structures import CollectionStats
 
 
 class ModService:
     """Orchestrates mod discovery and lifecycle across a set of providers."""
 
+    __slots__ = ("_ctx", "_providers", "_startup_impact_service")
+
     def __init__(self, ctx: CoreContext, providers: list[BaseModProvider]) -> None:
         self._ctx = ctx
         self._providers: dict[str, BaseModProvider] = {
             p.provider_id: p for p in providers
         }
+        self._startup_impact_service = StartupImpactService(ctx)
 
     def reset_providers(self, providers: list[BaseModProvider]) -> None:
         """Replace the current provider set with a new list."""
@@ -37,6 +44,13 @@ class ModService:
     def provider_colors(self) -> dict[str, str]:
         return {pid: p.color for pid, p in self._providers.items()}
 
+    @property
+    def startup_impact_report(self) -> StartupImpactReport | None:
+        return self._startup_impact_service.report
+
+    async def clear_startup_impact_cache(self) -> None:
+        await self._startup_impact_service.clear()
+
     async def discover(self) -> None:
         """Run all providers' discovery in sequence and load results into context."""
         with profile("discover") as t:
@@ -46,9 +60,12 @@ class ModService:
                     mods = await p.discover(self._ctx.target_version, timer=t)
                     all_mods.update(mods)
             with t("resolve_active"):
-                active = resolve_active_uuids(all_mods, self._ctx.config.paths.config_folder)
+                active = resolve_active_uuids(
+                    all_mods, self._ctx.config.paths.config_folder
+                )
             with t("ctx.load"):
                 self._ctx.load(all_mods, active)
+        await self._startup_impact_service.load()
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         return self._ctx.compute_stats(active_ids)

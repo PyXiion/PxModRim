@@ -13,12 +13,15 @@ from PySide6.QtCore import (
 )
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.services.startup_impact_service import (
+    StartupImpactReport,
+)
 
 if TYPE_CHECKING:
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class ModItem:
     mod: ListedMod
     uuid: str
@@ -28,6 +31,7 @@ class ModItem:
     has_warning: bool = False
     error_tooltip: str = ""
     warning_tooltip: str = ""
+    startup_impact_s: float = 0.0
 
 
 class ModListModel(QAbstractListModel):
@@ -40,6 +44,7 @@ class ModListModel(QAbstractListModel):
     HasWarningRole = Qt.ItemDataRole.UserRole + 7
     ErrorTooltipRole = Qt.ItemDataRole.UserRole + 8
     WarningTooltipRole = Qt.ItemDataRole.UserRole + 9
+    StartupImpactRole = Qt.ItemDataRole.UserRole + 10
 
     active_mods_changed = Signal()
 
@@ -91,6 +96,8 @@ class ModListModel(QAbstractListModel):
             return item.error_tooltip
         if role == self.WarningTooltipRole:
             return item.warning_tooltip
+        if role == self.StartupImpactRole:
+            return item.startup_impact_s
         if (
             role == Qt.ItemDataRole.ToolTipRole
             and hasattr(item.mod, "description")
@@ -124,6 +131,24 @@ class ModListModel(QAbstractListModel):
             return True
 
         return False
+
+    def set_startup_impact(self, report: StartupImpactReport | None) -> None:
+        if report is None:
+            for item in self._items:
+                item.startup_impact_s = 0.0
+        else:
+            for item in self._items:
+                mod = item.mod
+                pid = getattr(mod, "package_id", None)
+                entry = report.find(
+                    str(pid) if pid is not None else None,
+                    mod.name,
+                )
+                item.startup_impact_s = entry.total_impact_s if entry else 0.0
+
+        top = self.index(0, 0)
+        bottom = self.index(len(self._items) - 1, 0)
+        self.dataChanged.emit(top, bottom, [self.StartupImpactRole])
 
     def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
         changed_rows: list[int] = []
@@ -181,6 +206,7 @@ class ModListModel(QAbstractListModel):
             self.HasWarningRole: QByteArray(b"hasWarning"),
             self.ErrorTooltipRole: QByteArray(b"errorTooltip"),
             self.WarningTooltipRole: QByteArray(b"warningTooltip"),
+            self.StartupImpactRole: QByteArray(b"startupImpact"),
             Qt.ItemDataRole.ToolTipRole: QByteArray(b"toolTip"),
         }
 

@@ -6,14 +6,37 @@ from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.structures import CollectionStats
 
 if TYPE_CHECKING:
-    from pxmodrim.core.config import AppConfig
+    from pxmodrim.core.config import AppConfig, PathConfig
+    from pxmodrim.core.mod_service import ModService
+    from pxmodrim.core.providers.base import BaseModProvider
+    from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+    from pxmodrim.core.services.game_launcher import GameLauncher
+    from pxmodrim.core.services.sort_service import SortService
 
 # Minimum valid version string shape: "X.Y" — reject anything shorter
 _VERSION_MIN_PARTS = 2
 
 
+def _require_not_none[T](value: T | None, name: str) -> T:
+    if value is None:
+        raise RuntimeError(f"{name} accessed before initialisation")
+    return value
+
+
 class CoreContext:
     """Centralised application state for mods, config, and game version."""
+
+    __slots__ = (
+        "_cfg",
+        "_mods",
+        "_active_uuids",
+        "_game_version",
+        "_mod_service",
+        "_diagnostics_service",
+        "_sort_service",
+        "_game_launcher",
+        "_providers",
+    )
 
     def __init__(self, cfg: AppConfig) -> None:
         self._cfg = cfg
@@ -21,6 +44,11 @@ class CoreContext:
         self._active_uuids: list[str] = []
         self._game_version: str = "Unknown"
         self._refresh_game_version()
+        self._mod_service: ModService | None = None
+        self._diagnostics_service: DiagnosticsService | None = None
+        self._sort_service: SortService | None = None
+        self._game_launcher: GameLauncher | None = None
+        self._providers: list[BaseModProvider] | None = None
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         """Replace all mods and active UUIDs, taking ownership of the data."""
@@ -81,3 +109,48 @@ class CoreContext:
             if not m.valid:
                 stats.errors += 1
         return stats
+
+    # ── Factory ────────────────────────────────────────────────────────────────
+
+    @classmethod
+    def create(cls, cfg: AppConfig) -> CoreContext:
+        """Create a fully-initialised context with all core services."""
+        from pxmodrim.core.mod_service import ModService
+        from pxmodrim.core.providers import create_providers
+        from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+        from pxmodrim.core.services.game_launcher import GameLauncher
+        from pxmodrim.core.services.sort_service import SortService
+
+        ctx = cls(cfg)
+        ctx._providers = create_providers(cfg.paths)
+        ctx._diagnostics_service = DiagnosticsService(ctx)
+        ctx._mod_service = ModService(ctx, ctx._providers)
+        ctx._sort_service = SortService(ctx, ctx._diagnostics_service)
+        ctx._game_launcher = GameLauncher(ctx)
+        return ctx
+
+    # ── Service accessors ──────────────────────────────────────────────────────
+
+    @property
+    def mod_service(self) -> ModService:
+        return _require_not_none(self._mod_service, "mod_service")
+
+    @property
+    def diagnostics_service(self) -> DiagnosticsService:
+        return _require_not_none(self._diagnostics_service, "diagnostics_service")
+
+    @property
+    def sort_service(self) -> SortService:
+        return _require_not_none(self._sort_service, "sort_service")
+
+    @property
+    def game_launcher(self) -> GameLauncher:
+        return _require_not_none(self._game_launcher, "game_launcher")
+
+    def reset_providers(self, paths: PathConfig) -> None:
+        """Replace providers when the config changes (e.g. after settings dialog)."""
+        from pxmodrim.core.providers import create_providers
+
+        svc = _require_not_none(self._mod_service, "mod_service")
+        self._providers = create_providers(paths)
+        svc.reset_providers(self._providers)

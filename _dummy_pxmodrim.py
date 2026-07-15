@@ -92,6 +92,16 @@ from pxmodrim.core.services import diagnostics_service
 
 from pxmodrim.core.services import mod_discovery
 
+from pxmodrim.core.services import startup_impact_service
+
+from pxmodrim.core.services.startup_impact_service import db
+
+from pxmodrim.core.services.startup_impact_service import service
+
+from pxmodrim.core.services.startup_impact_service import parser
+
+from pxmodrim.core.services.startup_impact_service import models
+
 from pxmodrim import ui
 
 from pxmodrim.ui import progress
