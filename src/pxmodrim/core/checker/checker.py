@@ -14,14 +14,32 @@ from pxmodrim.core.checker.models import (
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
 if TYPE_CHECKING:
+    from ttimer import Timer
+
     from pxmodrim.core.checker.issues import ModIssueChecker
     from pxmodrim.core.sort.community import CommunityRule
     from pxmodrim.core.sort.config import SortSettings
-    from ttimer import Timer
 
 
 class ModChecker:
     """Orchestrates diagnostic checks across active mods."""
+
+    __slots__ = (
+        "_checkers",
+        "_settings",
+        "_target_version",
+        "_on_diagnostics_changed",
+        "_graph",
+        "_all_mods",
+        "_diagnostics",
+        "_active_mods",
+        "_uuid_to_pid",
+        "_ordered_pids",
+        "_no_version_warning",
+        "_use_this_instead",
+        "_community_rules",
+        "_cached_cycles",
+    )
 
     def __init__(
         self,

@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 
 class SortService:
+    __slots__ = ("_ctx", "_diagnostics_service")
+
     def __init__(self, ctx: CoreContext, diagnostics_service: DiagnosticsService):
         """Initialise with core context and diagnostics for topological sort."""
         self._ctx = ctx
@@ -28,7 +30,9 @@ class SortService:
             community_rules = self._diagnostics_service.community_rules
 
             def _sort() -> list[PackageId]:
-                return topological_sort(active_mods, graph, settings, community_rules, timer=t)
+                return topological_sort(
+                    active_mods, graph, settings, community_rules, timer=t
+                )
 
             sorted_pids = await asyncio.to_thread(_sort)
 

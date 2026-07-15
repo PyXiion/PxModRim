@@ -69,6 +69,8 @@ class ConstraintEdge:
 class ConstraintGraph:
     """Directed graph modelling mod dependencies, load order, incompatibilities."""
 
+    __slots__ = ("_outgoing", "_incoming", "_pid_to_index", "_ordered_pids")
+
     def __init__(self) -> None:
         self._outgoing: dict[PackageId, set[ConstraintEdge]] = {}
         self._incoming: dict[PackageId, set[ConstraintEdge]] = {}

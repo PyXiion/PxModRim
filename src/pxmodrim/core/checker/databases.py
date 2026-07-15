@@ -31,6 +31,8 @@ def use_this_instead_path() -> Path:
 class NoVersionWarningService:
     """Service to download and cache the NoVersionWarning package-ID list."""
 
+    __slots__ = ("_cache_dir", "_xml_path", "_pids")
+
     def __init__(self) -> None:
         self._cache_dir = checker_config_dir()
         self._xml_path = no_version_warning_path()
@@ -103,6 +105,8 @@ class NoVersionWarningService:
 
 class UseThisInsteadService:
     """Service to download and cache the UseThisInstead replacement database."""
+
+    __slots__ = ("_cache_dir", "_json_path", "_entries")
 
     def __init__(self) -> None:
         self._cache_dir = checker_config_dir()

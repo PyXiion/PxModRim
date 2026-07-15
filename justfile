@@ -24,7 +24,7 @@ ruff-format-fix:
 
 fix: ruff-fix ruff-format-fix
 
-check: pyright check-deps
+check: ruff-fix pyright check-deps
 
 check-deps:
     uv run python scripts/check-deps.py

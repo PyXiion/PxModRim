@@ -14,7 +14,7 @@ import msgspec
 from pxmodrim.core.constants import RIMWORLD_DLC_METADATA
 
 
-@dataclass
+@dataclass(slots=True)
 class ReplacementInfo:
     """Replacement info for a mod from the database or local data."""
 
@@ -96,9 +96,7 @@ class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
 class ModsConfig:
     """Parsed ModsConfig.xml data with active mods and known expansions."""
 
-    version: str
-    _activeMods: list[CaseInsensitiveStr]
-    _knownExpansions: list[CaseInsensitiveStr]
+    __slots__ = ("version", "_activeMods", "_knownExpansions")
 
     def __init__(
         self,
@@ -178,7 +176,7 @@ class PackageIdMod:
     package_id: CaseInsensitiveStr = CaseInsensitiveStr("invalid.mod")
 
 
-@dataclass
+@dataclass(slots=True)
 class DependencyMod(BaseMod, PackageIdMod):
     """A mod dependency with workshop URL and alternative package IDs."""
 
@@ -186,7 +184,7 @@ class DependencyMod(BaseMod, PackageIdMod):
     alternative_package_ids: set[CaseInsensitiveStr] = field(default_factory=set)
 
 
-@dataclass
+@dataclass(slots=True)
 class ListedMod(BaseMod):
     """A mod discovered from any provider with validation and path info."""
 
@@ -281,14 +279,14 @@ class ListedMod(BaseMod):
         return None
 
 
-@dataclass
+@dataclass(slots=True)
 class ScenarioMod(ListedMod):
     """A scenario mod with an optional summary."""
 
     summary: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class BaseRules:
     """Load order rules: load_after, load_before, incompatible_with, dependencies."""
 
@@ -298,7 +296,7 @@ class BaseRules:
     dependencies: dict[CaseInsensitiveStr, DependencyMod] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(slots=True)
 class Rules(BaseRules):
     """Load order rules extended with load_first and load_last flags."""
 
@@ -306,7 +304,7 @@ class Rules(BaseRules):
     load_last: bool = False
 
 
-@dataclass
+@dataclass(slots=True)
 class AboutXmlMod(ListedMod, PackageIdMod):
     """A mod with an About.xml, including authors, version, rules, and DLC metadata."""
 
@@ -365,7 +363,7 @@ class AboutXmlMod(ListedMod, PackageIdMod):
         return None
 
 
-@dataclass
+@dataclass(slots=True)
 class CompiledDependencyData:
     """Pre-computed dependency graphs and tier classification for sorting."""
 
@@ -451,7 +449,7 @@ class SteamDbSchema(msgspec.Struct):
 ModMetadata = dict[str, Any]
 
 
-@dataclass
+@dataclass(slots=True)
 class WorkshopUpdateResult:
     """Result of a workshop mod update operation."""
 

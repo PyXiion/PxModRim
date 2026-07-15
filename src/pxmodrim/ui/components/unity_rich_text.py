@@ -11,6 +11,8 @@ UNITY_SIZE_PATTERN = re.compile(r"^([+-]?\d+(?:\.\d+)?)(px|em|%)?$")
 class UnityRichTextConverter:
     """Convert Unity rich text tags to Qt-compatible HTML subset."""
 
+    __slots__ = ("_tag_stack",)
+
     def __init__(self) -> None:
         self._tag_stack: list[str] = []
 

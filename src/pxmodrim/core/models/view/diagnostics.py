@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pxmodrim.core.models.metadata.structures import ListedMod
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModDiagnosticsView:
     has_errors: bool = False
     has_warnings: bool = False
@@ -15,7 +15,7 @@ class ModDiagnosticsView:
     warning_tooltip: str = ""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModIssueView:
     category: str
     category_display_name: str
@@ -23,7 +23,7 @@ class ModIssueView:
     is_error: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModItemState:
     uuid: str
     mod: ListedMod

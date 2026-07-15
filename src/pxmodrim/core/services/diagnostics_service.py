@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pxmodrim.core.events import Event
 from pxmodrim.core.checker.checker import ModChecker
 from pxmodrim.core.checker.databases import (
     NoVersionWarningService,
@@ -18,6 +17,7 @@ from pxmodrim.core.checker.issues import (
     ReplacementIssueChecker,
 )
 from pxmodrim.core.checker.models import ModDiagnostics
+from pxmodrim.core.events import Event
 from pxmodrim.core.models.view.diagnostics import (
     ModDiagnosticsView,
     ModIssueView,
@@ -46,6 +46,18 @@ class DiagnosticsService:
     diagnostics_summary_changed: Event[dict[str, ModDiagnosticsView]]
     status_message_changed: Event[str]
     sidebar_entries_changed: Event[list[SidebarEntry]]
+
+    __slots__ = (
+        "diagnostics_summary_changed",
+        "status_message_changed",
+        "sidebar_entries_changed",
+        "_ctx",
+        "_no_version_warning_service",
+        "_use_this_instead_service",
+        "_community_rules",
+        "_last_active_uuids",
+        "_checker",
+    )
 
     def __init__(self, ctx: CoreContext) -> None:
         """Initialise diagnostics with checkers, databases, and community rules."""

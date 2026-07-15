@@ -15,6 +15,8 @@ from pxmodrim.core.context import CoreContext
 
 
 class GameLauncher:
+    __slots__ = ("_ctx",)
+
     def __init__(self, ctx: CoreContext) -> None:
         self._ctx = ctx
 

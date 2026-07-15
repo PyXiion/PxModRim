@@ -80,7 +80,7 @@ class ModListPanel(QWidget):
         self._qml.setClearColor(QColor(PALETTE["ELEVATE_1"]))
         self._qml.setAcceptDrops(True)
 
-        ctx = self._qml.engine().rootContext()
+        ctx = self._qml.rootContext()
         ctx.setContextProperty("modListPanel", self)
         ctx.setContextProperty("modListModel", self._proxy)
         self._qml.setSource(str(_MOD_LIST_QML))
@@ -216,8 +216,9 @@ class ModListPanel(QWidget):
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj is self.search_input:
+            root_ctx = self._qml.rootContext()
             if event.type() == QEvent.Type.FocusIn:
-                self._qml.engine().rootContext().setContextProperty("searchFocused", True)
+                root_ctx.setContextProperty("searchFocused", True)
             elif event.type() == QEvent.Type.FocusOut:
-                self._qml.engine().rootContext().setContextProperty("searchFocused", False)
+                root_ctx.setContextProperty("searchFocused", False)
         return super().eventFilter(obj, event)

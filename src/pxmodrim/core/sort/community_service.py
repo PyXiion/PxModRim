@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 class CommunityRulesService:
     """Service for downloading and loading community rules."""
 
+    __slots__ = ("_cache_dir", "_json_path")
+
     def __init__(self) -> None:
         self._cache_dir = config_dir()
         self._json_path = community_rules_path()
