@@ -105,7 +105,8 @@ class TestCommitOrder:
             "uuid-4",
         ]
 
-        assert model.move_row(1, 0) is True
+        moved = model.move_row(1, 0)
+        assert moved is True
 
         assert [item.uuid for item in model._visible_items] == ["uuid-3", "uuid-1"]
         assert [item.uuid for item in model._all_items] == [
