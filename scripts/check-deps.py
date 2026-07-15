@@ -21,7 +21,7 @@ SRC = "src/pxmodrim"
 ENTRYPOINTS = {"__main__", "_app"}
 
 GROUPS: dict[str, set[str]] = {
-    "core.foundation": {"core.constants", "core.structures", "core.utils", "core.xml", "core.loading"},
+    "core.foundation": {"core.constants", "core.events", "core.structures", "core.utils", "core.xml", "core.loading", "core.profiler"},
     "core.models": {"core.models"},
     "core.msgspec_hooks": {"core.msgspec_hooks"},
     "core.sort": {"core.sort"},
@@ -52,7 +52,7 @@ ALLOWED: dict[str, set[str]] = {
     "core.context": {"core.foundation", "core.models", "core.config"},
     "core.mods_config": {"core.foundation", "core.models"},
     "core.providers": {"core.foundation", "core.models", "core.config", "core.services"},
-    "core.services": {"core.foundation", "core.models", "core.checker", "core.sort", "core.context", "core.mods_config"},
+    "core.services": {"core.foundation", "core.models", "core.checker", "core.sort", "core.context", "core.config", "core.mods_config"},
     "core.mod_service": {"core.foundation", "core.models", "core.context", "core.providers", "core.services", "core.mods_config"},
     "ui.progress": set(),
     "ui.theme": {"ui.components"},

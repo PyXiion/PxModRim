@@ -13,6 +13,7 @@ dependencies = [
     "pyside6>=6.11.1",
     "qasync>=0.28.0",
     "toposort>=1.10",
+    "ttimer>=0.0.2",
 ]
 
 [project.gui-scripts]
