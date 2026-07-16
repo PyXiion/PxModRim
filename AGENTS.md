@@ -46,6 +46,10 @@ src/pxmodrim/
 - Single test: `uv run pytest tests/test_metadata/test_structures.py -v`
 - Mock providers by subclassing `BaseModProvider`
 
+## Companion mods
+- `companion-mods/PxLoadingProgress` — RimWorld companion mod for PxModRim (submodule: https://github.com/PyXiion/PxLoadingProgress)
+- `companion-mods/rimworld-utils/` — C# build infrastructure (Common.props/targets) required by PxLoadingProgress; sourced from https://github.com/ilyvion/rimworld-utils
+
 ## Stale / needs attention
 - `core/loading.py` — `LoadingState` QObject with a planned move to `ui/progress.py`. Three files still import from `core/loading` (settings_panel, community_service, progress_dialog).
 - `core/models/view/` — view models living in `core/`; potential future move to `ui/`.
