@@ -8,6 +8,7 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QComboBox, QVBoxLayout, QWidget
 
+from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.ui.models.sidebar_model import SidebarModel
 from pxmodrim.ui.theme.palette import PALETTE
@@ -19,7 +20,7 @@ _SIDEBAR_QML = _QML_DIR / "Sidebar.qml"
 class SidebarPanel(QWidget):
     entry_selected = Signal(object)  # SidebarEntry
 
-    def __init__(self, qml_engine: QQmlEngine | None = None) -> None:
+    def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -39,14 +40,16 @@ class SidebarPanel(QWidget):
         self._qml.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)
         self._qml.setClearColor(QColor(PALETTE["ELEVATE_2"]))
 
-        ctx = self._qml.rootContext()
-        ctx.setContextProperty("sidebarPanel", self)
-        ctx.setContextProperty("sidebarModel", self._model)
+        qml_ctx = self._qml.rootContext()
+        qml_ctx.setContextProperty("sidebarPanel", self)
+        qml_ctx.setContextProperty("sidebarModel", self._model)
         self._qml.setSource(str(_SIDEBAR_QML))
 
         layout.addWidget(self._qml)
 
         self._entries: list[SidebarEntry] = []
+
+        ctx.diagnostics_service.sidebar_entries_changed.connect(self.set_entries)
 
     def set_entries(self, entries: list[SidebarEntry]) -> None:
         self._entries = entries

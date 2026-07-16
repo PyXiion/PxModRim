@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -13,12 +13,6 @@ from PySide6.QtCore import (
 )
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
-from pxmodrim.core.services.startup_impact_service import (
-    StartupImpactReport,
-)
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass(slots=True)
@@ -132,19 +126,15 @@ class ModListModel(QAbstractListModel):
 
         return False
 
-    def set_startup_impact(self, report: StartupImpactReport | None) -> None:
-        if report is None:
-            for item in self._items:
-                item.startup_impact_s = 0.0
-        else:
-            for item in self._items:
-                mod = item.mod
-                pid = getattr(mod, "package_id", None)
-                entry = report.find(
-                    str(pid) if pid is not None else None,
-                    mod.name,
-                )
-                item.startup_impact_s = entry.total_impact_s if entry else 0.0
+    def set_startup_impact(self, impacts: dict[str, float] | None = None) -> None:
+        if impacts is None:
+            impacts = {}
+        for item in self._items:
+            mod = item.mod
+            pid = getattr(mod, "package_id", None)
+            item.startup_impact_s = (
+                impacts.get(str(pid), 0.0) if pid is not None else 0.0
+            )
 
         top = self.index(0, 0)
         bottom = self.index(len(self._items) - 1, 0)

@@ -96,6 +96,8 @@ from pxmodrim.core.services import startup_impact_service
 
 from pxmodrim.core.services.startup_impact_service import db
 
+from pxmodrim.core.services.startup_impact_service import labels
+
 from pxmodrim.core.services.startup_impact_service import service
 
 from pxmodrim.core.services.startup_impact_service import parser
@@ -136,6 +138,8 @@ from pxmodrim.ui.components import toast
 
 from pxmodrim.ui.components import dialogs
 
+from pxmodrim.ui.components import icon_tab_widget
+
 from pxmodrim.ui.components import header_controller
 
 from pxmodrim.ui.components import accordion_section
@@ -163,6 +167,8 @@ from pxmodrim.ui.panels import about_panel
 from pxmodrim.ui.panels import mod_list_panel
 
 from pxmodrim.ui import panels
+
+from pxmodrim.ui.panels import time_analytics_panel
 
 from pxmodrim.ui.panels import mod_info_panel
 

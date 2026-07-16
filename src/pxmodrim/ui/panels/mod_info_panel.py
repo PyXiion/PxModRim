@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
+from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -15,7 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pxmodrim.core.config import AppConfig, save_config
+from pxmodrim.core.config import save_config
+from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 from pxmodrim.ui.components import (
     AccordionSection,
@@ -24,7 +26,9 @@ from pxmodrim.ui.components import (
     MetaChipRow,
     generate_preview,
 )
+from pxmodrim.ui.components.icon_tab_widget import IconTabWidget
 from pxmodrim.ui.components.icons import icon, pixmap
+from pxmodrim.ui.panels.time_analytics_panel import TimeAnalyticsPanel
 from pxmodrim.ui.theme.palette import PALETTE
 
 if TYPE_CHECKING:
@@ -82,48 +86,58 @@ class IssueRow(QWidget):
 
 
 class ModInfoPanel(QWidget):
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(
+        self,
+        ctx: CoreContext,
+        qml_engine: QQmlEngine | None = None,
+    ) -> None:
         super().__init__()
-        self._config = config
+        self._ctx = ctx
         self._mod: ListedMod | None = None
         self._current_mod_id: str | None = None
         self._preview_task: asyncio.Task[None] | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        layout.addWidget(self._scroll)
-
-        self._content = QWidget()
-        cl = QVBoxLayout(self._content)
-        cl.setContentsMargins(0, 0, 0, 0)
-        cl.setSpacing(0)
-        self._scroll.setWidget(self._content)
-
-        # Banner
+        # Banner (persistent header, above tabs)
         self._banner = AspectRatioBanner(self, max_height=260)
         self._banner.hide()
-        cl.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
 
         # Placeholder (shown when no mod is selected)
         self._placeholder = QLabel("Select a mod to view details")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setObjectName("placeholder")
-        cl.addWidget(self._placeholder, 0, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self._placeholder, 0, Qt.AlignmentFlag.AlignTop)
 
-        # Info area
-        self._info_area = QWidget()
-        self._info_area.setObjectName("infoArea")
-        self._info_area.hide()
-        ia_layout = QVBoxLayout(self._info_area)
-        ia_layout.setContentsMargins(0, 0, 0, 0)
-        ia_layout.setSpacing(0)
-        cl.addWidget(self._info_area, stretch=1)
+        # ── Tab widget ──────────────────────────────────────────────────────────
+        self._tabs = IconTabWidget(orientation="horizontal")
+        self._tabs.hide()
+        layout.addWidget(self._tabs, 1)
 
-        # Open mod folder button
+        # ── Info tab ────────────────────────────────────────────────────────────
+        self._info_tab = QWidget()
+        info_layout = QVBoxLayout(self._info_tab)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(0)
+
+        info_scroll = QScrollArea()
+        info_scroll.setWidgetResizable(True)
+        info_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        info_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        info_scroll.viewport().setAutoFillBackground(False)
+
+        info_content = QWidget()
+        ic_layout = QVBoxLayout(info_content)
+        ic_layout.setContentsMargins(0, 0, 0, 0)
+        ic_layout.setSpacing(0)
+
+        info_scroll.setWidget(info_content)
+        info_layout.addWidget(info_scroll, 1)
+
+        # Open mod folder / URL buttons
         self._btn_container = QWidget()
         self._btn_container.setObjectName("infoButtonContainer")
         btn_layout = QHBoxLayout(self._btn_container)
@@ -173,7 +187,7 @@ class ModInfoPanel(QWidget):
         btn_layout.addStretch()
 
         self._btn_container.hide()
-        ia_layout.addWidget(self._btn_container, 0, Qt.AlignmentFlag.AlignTop)
+        ic_layout.addWidget(self._btn_container, 0, Qt.AlignmentFlag.AlignTop)
 
         # Meta chips
         self._meta_chips = MetaChipRow(
@@ -184,18 +198,18 @@ class ModInfoPanel(QWidget):
                 "source": "Source",
             }
         )
-        ia_layout.addWidget(self._meta_chips, 0, Qt.AlignmentFlag.AlignTop)
+        ic_layout.addWidget(self._meta_chips, 0, Qt.AlignmentFlag.AlignTop)
 
         # Description accordion
         self._desc_renderer = DescriptionRenderer()
         self._desc_section = AccordionSection(
             "Description",
             self._desc_renderer,
-            expanded=self._config.ui.desc_expanded,
+            expanded=self._ctx.config.ui.desc_expanded,
         )
         self._desc_section.toggled.connect(self._on_desc_toggled)
         self._desc_section.hide()
-        ia_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
+        ic_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
 
         # Dependencies accordion
         self._deps_label = QLabel("None")
@@ -206,36 +220,52 @@ class ModInfoPanel(QWidget):
         self._deps_section = AccordionSection(
             "Dependencies",
             self._deps_label,
-            expanded=self._config.ui.deps_expanded,
+            expanded=self._ctx.config.ui.deps_expanded,
         )
         self._deps_section.toggled.connect(self._on_deps_toggled)
         self._deps_section.hide()
-        ia_layout.addWidget(self._deps_section, 0, Qt.AlignmentFlag.AlignTop)
+        ic_layout.addWidget(self._deps_section, 0, Qt.AlignmentFlag.AlignTop)
+        ic_layout.addStretch()
 
-        # Issues accordion
+        self._tabs.addTab(self._info_tab, "info", "Info")
+
+        # ── Issues tab ──────────────────────────────────────────────────────────
+        self._issues_tab = QWidget()
+        issues_layout = QVBoxLayout(self._issues_tab)
+        issues_layout.setContentsMargins(0, 0, 0, 0)
+        issues_layout.setSpacing(0)
+
+        issues_scroll = QScrollArea()
+        issues_scroll.setWidgetResizable(True)
+        issues_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        issues_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        issues_scroll.viewport().setAutoFillBackground(False)
+
+        self._issues_content = QWidget()
+        self._issues_content_layout = QVBoxLayout(self._issues_content)
+        self._issues_content_layout.setContentsMargins(16, 8, 16, 8)
+        self._issues_content_layout.setSpacing(0)
+
         self._no_issues_label = QLabel("No issues detected")
         self._no_issues_label.setObjectName("issuesLabel")
         self._no_issues_label.setWordWrap(True)
         self._no_issues_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
+        self._issues_content_layout.addWidget(self._no_issues_label)
+        self._issues_content_layout.addStretch()
 
-        self._issues_container = QWidget()
-        self._issues_layout = QVBoxLayout(self._issues_container)
-        self._issues_layout.setContentsMargins(0, 0, 0, 0)
-        self._issues_layout.setSpacing(0)
-        self._issues_layout.addWidget(self._no_issues_label)
-
-        self._issues_section = AccordionSection(
-            "Issues",
-            self._issues_container,
-            expanded=True,
-        )
-        self._issues_section.hide()
-        ia_layout.addWidget(self._issues_section, 0, Qt.AlignmentFlag.AlignTop)
-        ia_layout.addStretch()
+        issues_scroll.setWidget(self._issues_content)
+        issues_layout.addWidget(issues_scroll, 1)
 
         self._current_issues: list[ModIssueView] = []
+        self._tabs.addTab(self._issues_tab, "alert-triangle", "Issues")
+
+        # ── Time analytics tab ──────────────────────────────────────────────────
+        self._time_panel = TimeAnalyticsPanel(
+            self._ctx.mod_service.startup_impact, qml_engine
+        )
+        self._tabs.addTab(self._time_panel, "clock", "Time analytics")
 
     def show_mod(self, mod: ListedMod) -> None:
         if self._preview_task and not self._preview_task.done():
@@ -250,9 +280,7 @@ class ModInfoPanel(QWidget):
 
         self._placeholder.hide()
         self._banner.show()
-        self._info_area.show()
-
-        self._scroll.verticalScrollBar().setValue(0)
+        self._tabs.show()
 
         self._banner.setTitle(mod.name)
         self._banner.setSubtitle(
@@ -309,16 +337,15 @@ class ModInfoPanel(QWidget):
         else:
             self._deps_section.hide()
 
-        # Issues — hidden until set_issues is called
-        self._issues_section.hide()
-
     def set_issues(self, issues: list[ModIssueView]) -> None:
         self._current_issues = issues
         self._show_issues(issues)
 
     def _show_issues(self, issues: list[ModIssueView]) -> None:
-        while self._issues_layout.count():
-            item = self._issues_layout.takeAt(0)
+        issues_layout = self._issues_content_layout
+
+        while issues_layout.count():
+            item = issues_layout.takeAt(0)
             if item is not None:
                 w = item.widget()
                 if w is not None and w is not self._no_issues_label:
@@ -326,14 +353,14 @@ class ModInfoPanel(QWidget):
 
         if not issues:
             self._no_issues_label.show()
-            self._issues_layout.addWidget(self._no_issues_label)
-            self._issues_section.show()
+            issues_layout.addWidget(self._no_issues_label)
+            issues_layout.addStretch()
             return
 
         self._no_issues_label.hide()
         for issue in issues:
-            self._issues_layout.addWidget(IssueRow(issue))
-        self._issues_section.show()
+            issues_layout.addWidget(IssueRow(issue))
+        issues_layout.addStretch()
 
     def _on_open_folder(self) -> None:
         if self._mod is not None and self._mod.mod_path is not None:
@@ -368,18 +395,25 @@ class ModInfoPanel(QWidget):
         except asyncio.CancelledError:
             pass
 
+    async def set_time_analytics(
+        self,
+        pid: str | None,
+        active_pids: list[str],
+    ) -> None:
+        await self._time_panel.set_data(pid, active_pids)
+
     def clear(self) -> None:
         self._mod = None
         self._current_mod_id = None
         self._placeholder.show()
         self._banner.hide()
-        self._btn_container.hide()
-        self._info_area.hide()
+        self._tabs.hide()
+        self._time_panel.clear()
 
     def _on_deps_toggled(self, expanded: bool) -> None:
-        self._config.ui.deps_expanded = expanded
-        save_config(self._config)
+        self._ctx.config.ui.deps_expanded = expanded
+        save_config(self._ctx.config)
 
     def _on_desc_toggled(self, expanded: bool) -> None:
-        self._config.ui.desc_expanded = expanded
-        save_config(self._config)
+        self._ctx.config.ui.desc_expanded = expanded
+        save_config(self._ctx.config)

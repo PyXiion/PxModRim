@@ -20,11 +20,8 @@ from qasync import asyncSlot
 
 from pxmodrim.core.config import LaunchStrategy, save_config
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.mod_service import ModService
+from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
-from pxmodrim.core.services.diagnostics_service import DiagnosticsService
-from pxmodrim.core.services.game_launcher import GameLauncher
-from pxmodrim.core.services.sort_service import SortService
 from pxmodrim.ui.components import (
     HeaderController,
     HeaderPanel,
@@ -45,14 +42,7 @@ if TYPE_CHECKING:
 
 
 class MainWindow(QMainWindow):
-    def __init__(
-        self,
-        ctx: CoreContext,
-        mod_service: ModService,
-        diagnostics_service: DiagnosticsService,
-        sort_service: SortService,
-        game_launcher: GameLauncher,
-    ) -> None:
+    def __init__(self, ctx: CoreContext) -> None:
         super().__init__()
 
         self._is_frameless: bool = False
@@ -70,14 +60,10 @@ class MainWindow(QMainWindow):
         self._qml_engine.addImageProvider("icons", SvgIconProvider())
 
         self._ctx = ctx
-        self._mod_service = mod_service
-        self._diagnostics_service = diagnostics_service
-        self._sort_service = sort_service
-        self._game_launcher = game_launcher
         self._selected_uuid: str | None = None
 
         # Wire diagnostics service signals
-        self._diagnostics_service.diagnostics_summary_changed.connect(
+        ctx.diagnostics_service.diagnostics_summary_changed.connect(
             self._on_diagnostics_summary_changed
         )
 
@@ -92,7 +78,7 @@ class MainWindow(QMainWindow):
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ctx.config.ui.launch_strategy),
         )
-        self._header_controller.refresh_requested.connect(self.load_mods_async)
+        self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
         self._header_controller.save_requested.connect(self._save_mods_config)
         self._header_controller.settings_requested.connect(self._open_settings)
@@ -134,15 +120,13 @@ class MainWindow(QMainWindow):
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(0)
 
-        self.sidebar = SidebarPanel(self._qml_engine)
+        self.sidebar = SidebarPanel(self._ctx, self._qml_engine)
         self.sidebar.setObjectName("sidebarPanel")
         self.sidebar.setFixedWidth(240)
         self.sidebar.entry_selected.connect(self._on_entry_selected)
         h_layout.addWidget(self.sidebar)
 
-        self.mod_list = ModListPanel(
-            self._mod_service.provider_colors, self._qml_engine
-        )
+        self.mod_list = ModListPanel(self._ctx, self._qml_engine)
         self.mod_list.setObjectName("modListPanel")
         self.mod_list.mod_selected.connect(self._on_mod_selected)
         self.mod_list.active_mods_changed.connect(
@@ -153,7 +137,7 @@ class MainWindow(QMainWindow):
         )
         h_layout.addWidget(self.mod_list, stretch=3)
 
-        self.mod_info = ModInfoPanel(self._ctx.config)
+        self.mod_info = ModInfoPanel(self._ctx, self._qml_engine)
         self.mod_info.setObjectName("modInfoPanel")
         self.mod_info.setMinimumWidth(300)
         h_layout.addWidget(self.mod_info, stretch=2)
@@ -166,11 +150,8 @@ class MainWindow(QMainWindow):
         self._toast_manager.resize_to_parent()
 
         # Wire deferred signal connections (widgets now exist)
-        self._diagnostics_service.status_message_changed.connect(
+        ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message
-        )
-        self._diagnostics_service.sidebar_entries_changed.connect(
-            self.sidebar.set_entries
         )
 
         # Alt key event filter (installed after all widgets exist)
@@ -240,25 +221,16 @@ class MainWindow(QMainWindow):
     # ── Public ──────────────────────────────────────────────
 
     @asyncSlot()
-    async def load_mods_async(self) -> None:
-        self._toast_manager.info("Scanning mods...")
+    async def _refresh_mods(self) -> None:
+        self._toast_manager.info("Refreshing mods...")
         t0 = time.monotonic()
-        await self._mod_service.discover()
+        await self._ctx.mod_service.reload()
         elapsed = time.monotonic() - t0
         if not self._ctx.all_mods:
             self._toast_manager.warning("No mods found")
             return
-
-        self.mod_list.model.update_provider_colors(self._mod_service.provider_colors)
-        self.mod_list.load_mods(self._ctx.all_mods, self._ctx.active_uuids)
-        self.mod_list.model.set_startup_impact(
-            self._mod_service.startup_impact_report
-        )
-
-        await self._diagnostics_service.initialize()
-        self._diagnostics_service.rebuild(self._ctx.active_uuids)
         self._toast_manager.info(
-            f"Loaded {len(self._ctx.all_mods)} mods in {elapsed:.1f}s", 3000
+            f"Reloaded {len(self._ctx.all_mods)} mods in {elapsed:.1f}s", 3000
         )
 
     # ── Private slots ───────────────────────────────────────
@@ -278,8 +250,10 @@ class MainWindow(QMainWindow):
         self._ctx.update_config(cfg)
         from pxmodrim.core.providers import create_providers
 
-        self._mod_service.reset_providers(create_providers(cfg.paths))
-        await self.load_mods_async()
+        self._ctx.mod_service.reset_providers(
+            create_providers(cfg.paths, self._ctx._pool)
+        )
+        await self._ctx.mod_service.reload()
 
     @asyncSlot()
     async def _show_about(self) -> None:
@@ -287,18 +261,18 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
-        deps_to_enable = self._sort_service.resolve_missing_dependencies(
+        deps_to_enable = self._ctx.sort_service.resolve_missing_dependencies(
             set(self.mod_list.active_uuids())
         )
         if deps_to_enable:
             self.mod_list.enableMods(deps_to_enable)
-            self._diagnostics_service.rebuild(self.mod_list.active_uuids())
+            self._ctx.diagnostics_service.rebuild(self.mod_list.active_uuids())
 
         t0 = time.monotonic()
-        ordered_uuids = await self._sort_service.sort_active_mods()
+        ordered_uuids = await self._ctx.sort_service.sort_active_mods()
         elapsed = time.monotonic() - t0
         self.mod_list.model.reorder(ordered_uuids)
-        self._diagnostics_service.reorder(ordered_uuids)
+        self._ctx.diagnostics_service.reorder(ordered_uuids)
         self._toast_manager.success(
             f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
         )
@@ -306,7 +280,7 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _save_mods_config(self) -> None:
         active_ids = self.mod_list.active_uuids()
-        ok = await self._mod_service.save_active_layout(active_ids)
+        ok = await self._ctx.mod_service.save_active_layout(active_ids)
         if ok:
             self._toast_manager.success(f"Saved {len(active_ids)} active mods", 3000)
         else:
@@ -316,14 +290,16 @@ class MainWindow(QMainWindow):
     async def _launch_game(self) -> None:
         logger.info("Launch requested")
 
-        ok = await self._mod_service.save_active_layout(self.mod_list.active_uuids())
+        ok = await self._ctx.mod_service.save_active_layout(
+            self.mod_list.active_uuids()
+        )
         if not ok:
             logger.warning("Config folder not set — mod list not saved before launch")
             self._toast_manager.warning(
                 "Config folder not set — mod list won't be saved"
             )
 
-        success, msg = await self._game_launcher.launch()
+        success, msg = await self._ctx.game_launcher.launch()
         if success:
             logger.info(msg)
             self._toast_manager.success(msg)
@@ -338,24 +314,43 @@ class MainWindow(QMainWindow):
             self._ctx.config.ui.launch_strategy = new_strategy
             save_config(self._ctx.config)
 
-    def _on_mod_selected(self, uuid: str) -> None:
+    @asyncSlot()
+    async def _on_mod_selected(self, uuid: str) -> None:
         self._selected_uuid = uuid
         item = self.mod_list.model.get_item_by_uuid(uuid)
         if item and item.mod:
             self.mod_info.show_mod(item.mod)
-            self.mod_info.set_issues(self._diagnostics_service.issues_for(uuid))
+            self.mod_info.set_issues(self._ctx.diagnostics_service.issues_for(uuid))
+            pid = getattr(item.mod, "package_id", None)
+            await self.mod_info.set_time_analytics(
+                str(pid) if pid else None,
+                self._resolve_active_pids(),
+            )
 
     @asyncSlot()
     async def _on_active_mods_changed(self) -> None:
         if self.mod_list.model.rowCount() == 0:
             return
-        self._diagnostics_service.rebuild(self.mod_list.active_uuids())
+        uuids = self.mod_list.active_uuids()
+        self._ctx.diagnostics_service.rebuild(uuids)
         await asyncio.sleep(0)
         self._apply_current_sidebar_filter()
+        if self._selected_uuid:
+            await self._on_mod_selected(self._selected_uuid)
+
+    def _resolve_active_pids(self) -> list[str]:
+        pids: list[str] = []
+        for uuid in self.mod_list.active_uuids():
+            mod = self._ctx.all_mods.get(uuid)
+            if isinstance(mod, AboutXmlMod):
+                pids.append(str(mod.package_id).lower())
+        return pids
 
     def _on_order_changed(self) -> None:
         uuids = self.mod_list.active_uuids()
-        self._diagnostics_service.reorder(uuids if uuids else self._ctx.active_uuids)
+        self._ctx.diagnostics_service.reorder(
+            uuids if uuids else self._ctx.active_uuids
+        )
 
     def _apply_current_sidebar_filter(self) -> None:
         if not hasattr(self, "sidebar") or not self.sidebar:
@@ -384,10 +379,9 @@ class MainWindow(QMainWindow):
     def _on_diagnostics_summary_changed(
         self, diagnostics: dict[str, ModDiagnosticsView]
     ) -> None:
-        self.mod_list.model.set_diagnostics(diagnostics)
         if self._selected_uuid is not None:
             self.mod_info.set_issues(
-                self._diagnostics_service.issues_for(self._selected_uuid)
+                self._ctx.diagnostics_service.issues_for(self._selected_uuid)
             )
 
     # ── Resize ───────────────────────────────────────────────

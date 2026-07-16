@@ -8,6 +8,7 @@ from .description_renderer import DescriptionRenderer
 from .header_controller import HeaderController
 from .header_panel import HeaderPanel
 from .icon_button import IconButton
+from .icon_tab_widget import IconTabWidget
 from .icons import icon, pixmap, qml_source, svg_str
 from .procedural_preview import generate_preview
 from .progress_dialog import ProgressDialog
@@ -23,6 +24,7 @@ __all__ = [
     "HeaderController",
     "HeaderPanel",
     "IconButton",
+    "IconTabWidget",
     "MetaChip",
     "MetaChipRow",
     "ProgressDialog",
