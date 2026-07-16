@@ -170,7 +170,6 @@ class ModListPanel(QWidget):
             else Qt.CheckState.Checked
         )
         self._model.setData(idx, new_state, ModListModel.CheckStateRole)
-        self._model.active_mods_changed.emit()
 
     @Slot(list)
     def toggleChecked(self, rows: list[int]) -> None:

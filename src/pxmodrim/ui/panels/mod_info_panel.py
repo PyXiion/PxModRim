@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from qasync import asyncSlot
 
 from pxmodrim.core.config import save_config
 from pxmodrim.core.context import CoreContext
@@ -117,6 +118,11 @@ class ModInfoPanel(QWidget):
         self._tabs.hide()
         layout.addWidget(self._tabs, 1)
 
+        self._setup_info_tab()
+        self._setup_issues_tab()
+        self._setup_time_analytics_tab(qml_engine)
+
+    def _setup_info_tab(self) -> None:
         # ── Info tab ────────────────────────────────────────────────────────────
         self._info_tab = QWidget()
         info_layout = QVBoxLayout(self._info_tab)
@@ -229,6 +235,7 @@ class ModInfoPanel(QWidget):
 
         self._tabs.addTab(self._info_tab, "info", "Info")
 
+    def _setup_issues_tab(self) -> None:
         # ── Issues tab ──────────────────────────────────────────────────────────
         self._issues_tab = QWidget()
         issues_layout = QVBoxLayout(self._issues_tab)
@@ -261,6 +268,7 @@ class ModInfoPanel(QWidget):
         self._current_issues: list[ModIssueView] = []
         self._tabs.addTab(self._issues_tab, "alert-triangle", "Issues")
 
+    def _setup_time_analytics_tab(self, qml_engine: QQmlEngine | None) -> None:
         # ── Time analytics tab ──────────────────────────────────────────────────
         self._time_panel = TimeAnalyticsPanel(
             self._ctx.mod_service.startup_impact, qml_engine
@@ -410,10 +418,12 @@ class ModInfoPanel(QWidget):
         self._tabs.hide()
         self._time_panel.clear()
 
-    def _on_deps_toggled(self, expanded: bool) -> None:
+    @asyncSlot(bool)
+    async def _on_deps_toggled(self, expanded: bool) -> None:
         self._ctx.config.ui.deps_expanded = expanded
-        save_config(self._ctx.config)
+        await asyncio.to_thread(save_config, self._ctx.config)
 
-    def _on_desc_toggled(self, expanded: bool) -> None:
+    @asyncSlot(bool)
+    async def _on_desc_toggled(self, expanded: bool) -> None:
         self._ctx.config.ui.desc_expanded = expanded
-        save_config(self._ctx.config)
+        await asyncio.to_thread(save_config, self._ctx.config)

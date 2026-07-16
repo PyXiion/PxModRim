@@ -25,12 +25,11 @@ from pxmodrim.core.structures import CollectionStats
 class ModService:
     """Orchestrates mod discovery and lifecycle across a set of providers."""
 
-    mods_changed: Event[None] = Event()
-
     __slots__ = (
         "_ctx",
         "_providers",
         "_startup_impact_service",
+        "mods_changed",
     )
 
     def __init__(self, ctx: CoreContext, providers: list[BaseModProvider]) -> None:
@@ -39,6 +38,7 @@ class ModService:
             p.provider_id: p for p in providers
         }
         self._startup_impact_service = StartupImpactService(ctx)
+        self.mods_changed: Event[None] = Event()
 
     @property
     def startup_impact(self) -> StartupImpactService:
