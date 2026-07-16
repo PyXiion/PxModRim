@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,8 +22,10 @@ class LocalModProvider(BaseModProvider):
     provider_id = "local"
     color = "#2ecc71"
 
-    def __init__(self, local_path: Path) -> None:
-        super().__init__(local_path)
+    def __init__(
+        self, local_path: Path, pool: ThreadPoolExecutor | None = None
+    ) -> None:
+        super().__init__(local_path, pool=pool)
 
     async def discover(
         self, target_version: str, timer: Timer | None = None
@@ -30,29 +33,29 @@ class LocalModProvider(BaseModProvider):
         """Scan local path for mods lacking `PublishedFileId.txt` (off main thread)."""
 
         def _scan(t: Timer | None) -> dict[str, ListedMod]:
-            result: dict[str, ListedMod] = {}
+            tm = t or Timer()
             if not self._path.exists():
                 logger.debug("LocalModProvider path does not exist: {}", self._path)
-                return result
+                return {}
             logger.debug("LocalModProvider scanning: {}", self._path)
-            with (t or Timer())("scan_dir"):
+            with tm("scan_dir"):
                 dirs = scan_mod_directory(self._path)
-            for d in dirs:
-                with (t or Timer())("parse_xml"):
-                    _, mod = create_listed_mod_from_path(d, target_version)
-                has_pfid = (
-                    mod.mod_path is not None
-                    and (mod.mod_path / "About/PublishedFileId.txt").exists()
-                )
-                # Local provider handles non-Steam mods
-                if not has_pfid:
-                    logger.trace(
-                        "LocalModProvider found: {} (uuid: {})", mod.name, mod.uuid
-                    )
-                    mod.provider_id = self.provider_id
-                    result[mod.uuid] = mod
-                else:
-                    logger.trace("LocalModProvider skipping Steam mod: {}", mod.name)
+
+            def _keep(d: Path) -> ListedMod | None:
+                if (d / "About/PublishedFileId.txt").exists():
+                    return None
+                _, mod = create_listed_mod_from_path(d, target_version)
+                mod.provider_id = self.provider_id
+                return mod
+
+            pool: ThreadPoolExecutor = self._pool  # type: ignore[assignment]
+            with tm("process_mods"):
+                futures = {pool.submit(_keep, d): d for d in dirs}
+                result: dict[str, ListedMod] = {}
+                for f in as_completed(futures):
+                    mod = f.result()
+                    if mod is not None:
+                        result[mod.uuid] = mod
             return result
 
         discovered = await asyncio.to_thread(_scan, timer)
@@ -66,8 +69,10 @@ class SteamCmdModProvider(BaseModProvider):
     provider_id = "steam_cmd"
     color = "#3498db"
 
-    def __init__(self, local_path: Path) -> None:
-        super().__init__(local_path)
+    def __init__(
+        self, local_path: Path, pool: ThreadPoolExecutor | None = None
+    ) -> None:
+        super().__init__(local_path, pool=pool)
 
     async def discover(
         self, target_version: str, timer: Timer | None = None
@@ -75,31 +80,29 @@ class SteamCmdModProvider(BaseModProvider):
         """Scan local path for mods with ``PublishedFileId.txt`` (off main thread)."""
 
         def _scan(t: Timer | None) -> dict[str, ListedMod]:
-            result: dict[str, ListedMod] = {}
+            tm = t or Timer()
             if not self._path.exists():
                 logger.debug("SteamCmdModProvider path does not exist: {}", self._path)
-                return result
+                return {}
             logger.debug("SteamCmdModProvider scanning: {}", self._path)
-            with (t or Timer())("scan_dir"):
+            with tm("scan_dir"):
                 dirs = scan_mod_directory(self._path)
-            for d in dirs:
-                with (t or Timer())("parse_xml"):
-                    _, mod = create_listed_mod_from_path(d, target_version)
-                has_pfid = (
-                    mod.mod_path is not None
-                    and (mod.mod_path / "About/PublishedFileId.txt").exists()
-                )
-                # Steam provider handles only Steam mods
-                if has_pfid:
-                    logger.trace(
-                        "SteamCmdModProvider found: {} (uuid: {})", mod.name, mod.uuid
-                    )
-                    mod.provider_id = self.provider_id
-                    result[mod.uuid] = mod
-                else:
-                    logger.trace(
-                        "SteamCmdModProvider skipping non-Steam mod: {}", mod.name
-                    )
+
+            def _keep(d: Path) -> ListedMod | None:
+                if not (d / "About/PublishedFileId.txt").exists():
+                    return None
+                _, mod = create_listed_mod_from_path(d, target_version)
+                mod.provider_id = self.provider_id
+                return mod
+
+            pool: ThreadPoolExecutor = self._pool  # type: ignore[assignment]
+            with tm("process_mods"):
+                futures = {pool.submit(_keep, d): d for d in dirs}
+                result: dict[str, ListedMod] = {}
+                for f in as_completed(futures):
+                    mod = f.result()
+                    if mod is not None:
+                        result[mod.uuid] = mod
             return result
 
         discovered = await asyncio.to_thread(_scan, timer)

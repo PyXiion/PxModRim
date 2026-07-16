@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ttimer import Timer
+
 from pxmodrim.core.checker.checker import ModChecker
 from pxmodrim.core.checker.databases import (
     NoVersionWarningService,
@@ -33,7 +35,6 @@ from pxmodrim.core.models.view.sidebar import (
     SidebarEntry,
     WarningModsEntry,
 )
-from pxmodrim.core.profiler import profile
 from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 if TYPE_CHECKING:
@@ -85,12 +86,18 @@ class DiagnosticsService:
 
     # ── Lifecycle ──────────────────────────────────────────────
 
-    async def initialize(self) -> None:
+    async def initialize(self, timer: Timer | None = None) -> None:
         """Load databases and community rules, then apply them to the checker."""
-        with profile("diagnostics.init") as t:
-            with t("ensure_databases"):
+        if timer is None:
+            await self._ensure_databases()
+            self._community_rules = await self._load_community_rules()
+            if self._community_rules:
+                self._checker.set_community_rules(self._community_rules)
+            return
+        with timer("diagnostics.init"):
+            with timer("ensure_databases"):
                 await self._ensure_databases()
-            with t("load_community_rules"):
+            with timer("load_community_rules"):
                 self._community_rules = await self._load_community_rules()
             if self._community_rules:
                 self._checker.set_community_rules(self._community_rules)
@@ -131,14 +138,18 @@ class DiagnosticsService:
 
     # ── Mutations ──────────────────────────────────────────────
 
-    def rebuild(self, active_uuids: list[str] | None = None) -> None:
+    def rebuild(
+        self, active_uuids: list[str] | None = None, timer: Timer | None = None
+    ) -> None:
         """Rebuild the checker for all mods with the given active UUIDs."""
-        with profile("diagnostics.rebuild") as t:
-            if active_uuids is None:
-                active_uuids = self._ctx.active_uuids
-            self._last_active_uuids = active_uuids
-            with t("checker.rebuild"):
-                self._checker.rebuild(self._ctx.all_mods, active_uuids, timer=t)
+        if active_uuids is None:
+            active_uuids = self._ctx.active_uuids
+        self._last_active_uuids = active_uuids
+        if timer is None:
+            self._checker.rebuild(self._ctx.all_mods, active_uuids)
+            return
+        with timer("diagnostics.rebuild"):
+            self._checker.rebuild(self._ctx.all_mods, active_uuids, timer=timer)
 
     def apply_active_mods_change(self, states: list[ModItemState]) -> None:
         """Apply a new active set from toggle states and rebuild diagnostics."""

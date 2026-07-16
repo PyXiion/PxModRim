@@ -1,3 +1,4 @@
+from pxmodrim.core.services.startup_impact_service.labels import metric_label
 from pxmodrim.core.services.startup_impact_service.models import (
     IMPACT_HIGH_THRESHOLD_S,
     IMPACT_WARN_THRESHOLD_S,
@@ -22,6 +23,7 @@ __all__ = [
     "StartupImpactService",
     "format_impact",
     "get_startup_impact_path",
+    "metric_label",
     "normalize_package_id",
     "parse_startup_impact",
 ]
