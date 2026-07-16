@@ -33,7 +33,9 @@ _SCHEMA = """
         total_impact_s          REAL NOT NULL DEFAULT 0,
         metrics_json            TEXT NOT NULL DEFAULT '{}',
         off_thread_metrics_json TEXT NOT NULL DEFAULT '{}',
-        off_thread_total_s      REAL NOT NULL DEFAULT 0
+        off_thread_total_s      REAL NOT NULL DEFAULT 0,
+        FOREIGN KEY (session_id)
+            REFERENCES startup_impact_sessions(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_sie_session
@@ -62,6 +64,7 @@ async def _connection_for(path: Path) -> aiosqlite.Connection:
         _connection_path = db_str
         await _connection.execute("PRAGMA journal_mode=WAL")
         await _connection.execute("PRAGMA busy_timeout=5000")
+        await _connection.execute("PRAGMA foreign_keys=ON")
         await _connection.executescript(_SCHEMA)
     return _connection
 

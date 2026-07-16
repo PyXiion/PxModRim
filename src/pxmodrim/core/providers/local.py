@@ -3,17 +3,14 @@ from __future__ import annotations
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from loguru import logger
+from ttimer import Timer
 
 from pxmodrim.core.models.metadata.parsing import create_listed_mod_from_path
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.services.mod_discovery import scan_mod_directory
-
-if TYPE_CHECKING:
-    from ttimer import Timer
 
 
 class LocalModProvider(BaseModProvider):
@@ -48,14 +45,22 @@ class LocalModProvider(BaseModProvider):
                 mod.provider_id = self.provider_id
                 return mod
 
-            pool: ThreadPoolExecutor = self._pool  # type: ignore[assignment]
-            with tm("process_mods"):
-                futures = {pool.submit(_keep, d): d for d in dirs}
-                result: dict[str, ListedMod] = {}
-                for f in as_completed(futures):
-                    mod = f.result()
-                    if mod is not None:
-                        result[mod.uuid] = mod
+            pool = self._pool
+            if pool is not None:
+                with tm("process_mods"):
+                    futures = {pool.submit(_keep, d): d for d in dirs}
+                    result: dict[str, ListedMod] = {}
+                    for f in as_completed(futures):
+                        mod = f.result()
+                        if mod is not None:
+                            result[mod.uuid] = mod
+            else:
+                with tm("process_mods"):
+                    result = {}
+                    for d in dirs:
+                        mod = _keep(d)
+                        if mod is not None:
+                            result[mod.uuid] = mod
             return result
 
         discovered = await asyncio.to_thread(_scan, timer)
@@ -95,14 +100,22 @@ class SteamCmdModProvider(BaseModProvider):
                 mod.provider_id = self.provider_id
                 return mod
 
-            pool: ThreadPoolExecutor = self._pool  # type: ignore[assignment]
-            with tm("process_mods"):
-                futures = {pool.submit(_keep, d): d for d in dirs}
-                result: dict[str, ListedMod] = {}
-                for f in as_completed(futures):
-                    mod = f.result()
-                    if mod is not None:
-                        result[mod.uuid] = mod
+            pool = self._pool
+            if pool is not None:
+                with tm("process_mods"):
+                    futures = {pool.submit(_keep, d): d for d in dirs}
+                    result: dict[str, ListedMod] = {}
+                    for f in as_completed(futures):
+                        mod = f.result()
+                        if mod is not None:
+                            result[mod.uuid] = mod
+            else:
+                with tm("process_mods"):
+                    result = {}
+                    for d in dirs:
+                        mod = _keep(d)
+                        if mod is not None:
+                            result[mod.uuid] = mod
             return result
 
         discovered = await asyncio.to_thread(_scan, timer)

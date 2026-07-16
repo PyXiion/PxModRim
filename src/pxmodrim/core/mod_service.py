@@ -95,10 +95,12 @@ class ModService:
             await fn(t)
         return t
 
-    async def initialize(self) -> None:
-        """One‑time startup initialisation: discover, init diagnostics, load impact."""
+    async def _run_refresh_pipeline(self, label: str) -> None:
+        """Discover mods, init diagnostics, and load startup impact, then rebuild
+        diagnostics and notify listeners. Shared by :meth:`initialize` and
+        :meth:`reload`."""
         timer = Timer()
-        with timer("mod_service.initialize"):
+        with timer(f"mod_service.{label}"):
             async with asyncio.TaskGroup() as tg:
                 d = tg.create_task(
                     self._timed("discover", lambda t: self.discover(timer=t))
@@ -124,34 +126,13 @@ class ModService:
         logger.debug("Profile report:\n{}", timer.render())
         self.mods_changed.emit(None)
 
+    async def initialize(self) -> None:
+        """One‑time startup initialisation: discover, init diagnostics, load impact."""
+        await self._run_refresh_pipeline("initialize")
+
     async def reload(self) -> None:
         """Full refresh triggered by the user. Same pipeline as initialize."""
-        timer = Timer()
-        with timer("mod_service.reload"):
-            async with asyncio.TaskGroup() as tg:
-                d = tg.create_task(
-                    self._timed("discover", lambda t: self.discover(timer=t))
-                )
-                diag = tg.create_task(
-                    self._timed(
-                        "diagnostics",
-                        lambda t: self._ctx.diagnostics_service.initialize(timer=t),
-                    )
-                )
-                si = tg.create_task(
-                    self._timed(
-                        "startup_impact",
-                        lambda _: self._startup_impact_service.load(),
-                    )
-                )
-            adopt(timer, d.result())
-            adopt(timer, diag.result())
-            adopt(timer, si.result())
-            self._ctx.diagnostics_service.rebuild(
-                self._ctx.active_uuids, timer=timer
-            )
-        logger.debug("Profile report:\n{}", timer.render())
-        self.mods_changed.emit(None)
+        await self._run_refresh_pipeline("reload")
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         return self._ctx.compute_stats(active_ids)

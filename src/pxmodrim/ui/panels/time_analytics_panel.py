@@ -11,6 +11,8 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 from pxmodrim.core.services.startup_impact_service import StartupImpactService
 from pxmodrim.core.services.startup_impact_service.labels import metric_label
 from pxmodrim.core.services.startup_impact_service.models import (
+    IMPACT_HIGH_THRESHOLD_S,
+    IMPACT_WARN_THRESHOLD_S,
     StartupImpactMod,
     StartupImpactReport,
 )
@@ -28,7 +30,13 @@ _COLOR_ACCENT = PALETTE["PRIMARY"]
 
 
 def _impact_color(seconds: float) -> str:
-    return _COLOR_LOW if seconds < 1.0 else _COLOR_MED if seconds < 5.0 else _COLOR_HIGH
+    return (
+        _COLOR_LOW
+        if seconds < IMPACT_WARN_THRESHOLD_S
+        else _COLOR_MED
+        if seconds < IMPACT_HIGH_THRESHOLD_S
+        else _COLOR_HIGH
+    )
 
 
 _COLOR_PRESETS = [
