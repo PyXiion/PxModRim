@@ -113,13 +113,7 @@ class App:
     def _setup(self, cfg: AppConfig) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
         self._ctx = CoreContext.create(cfg)
-        self.main_window = MainWindow(
-            self._ctx,
-            self._ctx.mod_service,
-            self._ctx.diagnostics_service,
-            self._ctx.sort_service,
-            self._ctx.game_launcher,
-        )
+        self.main_window = MainWindow(self._ctx)
 
     async def async_run(self) -> int:
         """Start main window, prompt for game path if needed, then run event loop."""
@@ -137,7 +131,7 @@ class App:
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
 
-        await self.main_window.load_mods_async()
+        await self.main_window._refresh_mods()
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)
