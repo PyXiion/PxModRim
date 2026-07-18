@@ -17,6 +17,8 @@ from pxmodrim.ui.theme.palette import PALETTE
 
 Orientation = Literal["horizontal", "vertical"]
 
+_VERTICAL_COLLAPSE_WIDTH = 80
+
 
 class _TabButton(QPushButton):
     def __init__(
@@ -28,8 +30,10 @@ class _TabButton(QPushButton):
     ) -> None:
         super().__init__(parent)
         self._icon_name = icon_name
+        self._label = label
         self._orientation = orientation
         self._active = False
+        self._collapsed = False
 
         from pxmodrim.ui.components.icons import icon
 
@@ -74,11 +78,34 @@ class _TabButton(QPushButton):
                     border-bottom-right-radius: 0px;
                 }}
             """)
-        else:
-            self.setFixedHeight(34)
+            return
+
+        if self._collapsed:
+            self.setFixedSize(48, 48)
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background: {PALETTE['ELEVATE_1']};
+                    background: transparent;
+                    border: none;
+                    color: #949ba4;
+                    padding: 0px;
+                    margin: 0px;
+                }}
+                QPushButton:hover {{
+                    background: {PALETTE['ELEVATE_4']};
+                    border-radius: 4px;
+                }}
+                QPushButton:checked {{
+                    background: {PALETTE['ELEVATE_4']};
+                    border-left: 2px solid {PALETTE['PRIMARY']};
+                    border-radius: 0px;
+                }}
+            """)
+        else:
+            self.setFixedHeight(34)
+            self.setMinimumWidth(48)
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
                     border: none;
                     color: #949ba4;
                     font-size: 11px;
@@ -90,22 +117,27 @@ class _TabButton(QPushButton):
                     background: {PALETTE['ELEVATE_4']};
                 }}
                 QPushButton:checked {{
-                    background: {PALETTE['ELEVATE_2']};
+                    background: {PALETTE['ELEVATE_4']};
                     color: {PALETTE['TEXT_MAIN']};
                     border-left: 2px solid {PALETTE['PRIMARY']};
-                    border-top: 1px solid {PALETTE['BORDER']};
-                    border-bottom: 1px solid {PALETTE['BORDER']};
-                    border-right: none;
-                    border-top-left-radius: 4px;
-                    border-bottom-left-radius: 4px;
-                    border-top-right-radius: 0px;
-                    border-bottom-right-radius: 0px;
                 }}
             """)
 
     def set_active(self, active: bool) -> None:
         self._active = active
         self.setChecked(active)
+        self._apply_style()
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        if collapsed == self._collapsed:
+            return
+        self._collapsed = collapsed
+        if collapsed:
+            self.setText("")
+            self.setToolTip(self._label)
+        else:
+            self.setText(self._label)
+            self.setToolTip("")
         self._apply_style()
 
 
@@ -151,7 +183,7 @@ class IconTabWidget(QWidget):
             self._root.setSpacing(0)
 
             self._tab_bar = QWidget()
-            self._tab_bar.setFixedWidth(140)
+            self._tab_bar.setMinimumWidth(48)
             self._tab_bar.setStyleSheet(
                 f"background: {PALETTE['ELEVATE_2']}; border: none;"
             )
@@ -165,8 +197,8 @@ class IconTabWidget(QWidget):
                 f"background: {PALETTE['ELEVATE_2']}; border: none;"
             )
 
-            self._root.addWidget(self._tab_bar)
-            self._root.addWidget(self._stack, 1)
+            self._root.addWidget(self._tab_bar, 1)
+            self._root.addWidget(self._stack, 0)
 
     def addTab(
         self, widget: QWidget, icon_name: str, label: str
@@ -221,3 +253,15 @@ class IconTabWidget(QWidget):
 
     def count(self) -> int:
         return self._stack.count()
+
+    def resizeEvent(self, event: object) -> None:
+        super().resizeEvent(event)  # type: ignore[arg-type]
+        self.update_collapsed()
+
+    def update_collapsed(self) -> None:
+        if self._orientation != "vertical":
+            return
+        width = self._tab_bar.width()
+        collapsed = width < _VERTICAL_COLLAPSE_WIDTH
+        for btn in self._buttons:
+            btn.set_collapsed(collapsed)

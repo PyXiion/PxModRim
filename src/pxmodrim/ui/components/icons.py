@@ -23,7 +23,8 @@ if TYPE_CHECKING:
         "steam",
         "local",
         "git",
-        "grid",
+        "mod_tab",
+        "steam_workshop_tab",
         "check-circle",
         "x-circle",
         "info",
@@ -161,12 +162,15 @@ _ICONS: dict[str, str] = {
         'a2 2 0 012 2z"/>'
         "</svg>"
     ),
-    "steam": (
+    "steam_workshop_tab": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
         '<circle cx="12" cy="12" r="10"/>'
-        '<path d="M8 12a4 4 0 118 0 4 4 0 01-8 0"/>'
-        '<circle cx="12" cy="12" r="2" fill="currentColor"/>'
+        '<path d="M10 8.5l-3.5 1.2a1.8 1.8 0 00-1.2 1.7v1.2a1.8 1.8 0 001.2 1.7L10 15.5'
+        'a1.8 1.8 0 002.8 0l3.5-1.2a1.8 1.8 0 001.2-1.7v-1.2a1.8 1.8 0'
+        ' 00-1.2-1.7L13 8.5a1.8 1.8 0 00-2.8 0z"/>'
+        '<circle cx="9" cy="11.5" r="1.4"/>'
+        '<circle cx="15" cy="12.5" r="1.4" fill="currentColor"/>'
         "</svg>"
     ),
     "local": (
@@ -195,6 +199,17 @@ _ICONS: dict[str, str] = {
         '<rect x="14" y="3" width="7" height="7"/>'
         '<rect x="3" y="14" width="7" height="7"/>'
         '<rect x="14" y="14" width="7" height="7"/>'
+        "</svg>"
+    ),
+    "mod_tab": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<rect x="3" y="4" width="18" height="4" rx="1"/>'
+        '<rect x="3" y="10" width="18" height="4" rx="1"/>'
+        '<rect x="3" y="16" width="18" height="4" rx="1"/>'
+        '<line x1="7" y1="6" x2="7" y2="6"/>'
+        '<line x1="7" y1="12" x2="7" y2="12"/>'
+        '<line x1="7" y1="18" x2="7" y2="18"/>'
         "</svg>"
     ),
     "check-circle": (

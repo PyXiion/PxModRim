@@ -2,17 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
 from loguru import logger
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QIcon, QKeyEvent, QKeySequence, QResizeEvent, QShortcut
+from PySide6.QtGui import (
+    QCloseEvent,
+    QIcon,
+    QKeyEvent,
+    QKeySequence,
+    QResizeEvent,
+    QShortcut,
+)
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QApplication,
-    QHBoxLayout,
     QMainWindow,
+    QSplitter,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -27,14 +36,13 @@ from pxmodrim.ui.components import (
     HeaderPanel,
     SvgIconProvider,
     ToastManager,
+    ViewRailPanel,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.panels.about_panel import AboutPanel
-from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
-from pxmodrim.ui.panels.mod_list_panel import ModListPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
-from pxmodrim.ui.panels.sidebar_panel import SidebarPanel
 from pxmodrim.ui.theme.qml_theme import Theme
+from pxmodrim.ui.views import builtin_views
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 if TYPE_CHECKING:
@@ -45,6 +53,7 @@ class MainWindow(QMainWindow):
     def __init__(self, ctx: CoreContext) -> None:
         super().__init__()
 
+        self._app_quit_callback: Callable[[], None] | None = None
         self._is_frameless: bool = False
 
         self.setWindowTitle("PxModRim")
@@ -113,36 +122,63 @@ class MainWindow(QMainWindow):
         outer_layout.addWidget(self._menu_bar)
         self._menu_bar.hide()
 
-        # Content (3-panel workspace)
-        content = QWidget()
-        content.setObjectName("contentArea")
-        h_layout = QHBoxLayout(content)
-        h_layout.setContentsMargins(0, 0, 0, 0)
-        h_layout.setSpacing(0)
+        # ── Content: vertical icon rail + stacked views ──
+        rail_tabs = [
+            {"viewId": v.view_id, "icon": v.icon_name, "label": v.label}
+            for v in builtin_views()
+        ]
+        self._rail = ViewRailPanel(rail_tabs, self._qml_engine)
+        self._rail.setObjectName("viewRail")
+        self._rail.setMinimumWidth(52)
+        self._rail.setMaximumWidth(180)
+        self._stack = QStackedWidget()
+        self._stack.setObjectName("viewStack")
 
-        self.sidebar = SidebarPanel(self._ctx, self._qml_engine)
-        self.sidebar.setObjectName("sidebarPanel")
-        self.sidebar.setFixedWidth(240)
-        self.sidebar.entry_selected.connect(self._on_entry_selected)
-        h_layout.addWidget(self.sidebar)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.setContentsMargins(0, 0, 0, 0)
+        self._splitter.setHandleWidth(1)
+        self._splitter.addWidget(self._rail)
+        self._splitter.addWidget(self._stack)
+        self._splitter.setStretchFactor(0, 0)
+        self._splitter.setStretchFactor(1, 1)
+        self._splitter.setCollapsible(0, False)
+        self._splitter.setCollapsible(1, False)
+        self._splitter.setSizes([180, self.width() - 180])
+        self._rail.currentChanged.connect(self._on_rail_tab_changed)
+        self._rail.hovered.connect(self._on_rail_hovered)
+        self._splitter.splitterMoved.connect(self._snap_rail)
 
-        self.mod_list = ModListPanel(self._ctx, self._qml_engine)
-        self.mod_list.setObjectName("modListPanel")
-        self.mod_list.mod_selected.connect(self._on_mod_selected)
-        self.mod_list.active_mods_changed.connect(
-            self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
+        self._views: list = []
+        for view_cls in builtin_views():
+            view = view_cls(self._ctx, self._qml_engine)
+            self._views.append(view)
+            self._stack.addWidget(view)
+
+        self._mods_view = next(
+            (v for v in self._views if v.view_id == "mods"), None
         )
-        self.mod_list.order_changed.connect(
-            self._on_order_changed, Qt.ConnectionType.QueuedConnection
+        if self._mods_view is not None:
+            self.sidebar = self._mods_view.sidebar
+            self.mod_list = self._mods_view.mod_list
+            self.mod_info = self._mods_view.mod_info
+            self._mods_view.entry_selected.connect(self._on_entry_selected)
+            self._mods_view.mod_selected.connect(self._on_mod_selected)
+            self._mods_view.active_mods_changed.connect(
+                self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
+            )
+            self._mods_view.order_changed.connect(
+                self._on_order_changed, Qt.ConnectionType.QueuedConnection
+            )
+
+        # Keep Steam Workshop badges in sync with the app's installed-mod set:
+        # when mods change in the app, re-badge the open workshop page live.
+        steam_view = next(
+            (v for v in self._views if v.view_id == "steam_workshop"), None
         )
-        h_layout.addWidget(self.mod_list, stretch=3)
+        if steam_view is not None and self._mods_view is not None:
+            self._mods_view.active_mods_changed.connect(steam_view.refresh_badges)
 
-        self.mod_info = ModInfoPanel(self._ctx, self._qml_engine)
-        self.mod_info.setObjectName("modInfoPanel")
-        self.mod_info.setMinimumWidth(300)
-        h_layout.addWidget(self.mod_info, stretch=2)
-
-        outer_layout.addWidget(content, stretch=1)
+        outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
 
         # ── Toast overlay (replaces status bar) ──
@@ -154,10 +190,13 @@ class MainWindow(QMainWindow):
             self._on_status_message
         )
 
-        # Alt key event filter (installed after all widgets exist)
-        app = QApplication.instance()
-        if app is not None:
-            app.installEventFilter(self)
+        # Alt key event filter. Installed on the window itself, NOT on the
+        # whole QApplication: an app-wide filter makes PySide wrap every
+        # QObject that receives an event (including WebEngine's internal
+        # widgets), and a dangling wrapper there SIGSEGVs in
+        # getWrapperForQObject. The filter only ever acts on objects whose
+        # window() is this one, so scoping to self is equivalent.
+        self.installEventFilter(self)
 
     def _try_frameless(self) -> bool:
         try:
@@ -190,6 +229,32 @@ class MainWindow(QMainWindow):
         win = self.windowHandle()
         if win is not None:
             win.startSystemMove()
+
+    def set_app_quit_callback(self, callback: Callable[[], None]) -> None:
+        """Store the callback used to end the async run loop on close."""
+        self._app_quit_callback = callback
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        # Release WebEngine views (their dedicated profiles) before the
+        # Qt widget tree is torn down. Then disconnect aboutToQuit: on this
+        # Chromium/Qt build, WebEngine registers an aboutToQuit handler
+        # that dereferences a freed object and SIGSEGVs during shutdown
+        # once the Steam tab has been opened. We drop every aboutToQuit
+        # connection (removing Chromium's) and instead fire our own quit
+        # callback directly, so the async run loop ends cleanly and the
+        # process exits without the crashing dispatch.
+        for view in self._views:
+            teardown = getattr(view, "teardown", None)
+            if callable(teardown):
+                teardown()
+
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.disconnect()
+        if self._app_quit_callback is not None:
+            self._app_quit_callback()
+        event.accept()
+        self.deleteLater()
 
     # ── Event filter (Alt → toggle menu bar) ─────────────
 
@@ -353,26 +418,39 @@ class MainWindow(QMainWindow):
         )
 
     def _apply_current_sidebar_filter(self) -> None:
-        if not hasattr(self, "sidebar") or not self.sidebar:
-            return
-        root = self.sidebar._qml.rootObject()
-        if root is None:
-            return
-        list_view = root.findChild(QObject, "listView")
-        if list_view is None:
-            return
-        selected = list_view.property("currentIndex")
-        if 0 <= selected < len(self.sidebar._entries):
-            self.mod_list.set_sidebar_filter(
-                self.sidebar._entries[selected].visible_uuids
-            )
+        if self._mods_view is not None:
+            self._mods_view.apply_current_sidebar_filter()
 
     def _apply_entry(self, entry: SidebarEntry) -> None:
-        self.mod_list.clearSelection()
-        self.mod_list.set_sidebar_filter(entry.visible_uuids)
+        if self._mods_view is not None:
+            self._mods_view.apply_sidebar_entry(entry)
 
     def _on_entry_selected(self, entry: SidebarEntry) -> None:
         self._apply_entry(entry)
+
+    def _on_rail_tab_changed(self, index: int) -> None:
+        self._stack.setCurrentIndex(index)
+        # Preload an adjacent tab (e.g. the Steam view next to Mods) so its
+        # content is already warm when the user moves to it.
+        for adjacent in (index - 1, index + 1):
+            if 0 <= adjacent < len(self._views):
+                preload = getattr(self._views[adjacent], "preload", None)
+                if callable(preload):
+                    preload()
+
+    def _on_rail_hovered(self, index: int) -> None:
+        # Preload view content (e.g. spin up Chromium for the Steam tab)
+        # when the user hovers its rail entry, so the first click is fast
+        # without paying the startup cost up front.
+        if 0 <= index < len(self._views):
+            preload = getattr(self._views[index], "preload", None)
+            if callable(preload):
+                preload()
+
+    def _snap_rail(self) -> None:
+        target = 180 if self._rail.width() >= 116 else 52
+        total = self.width()
+        self._splitter.setSizes([target, total - target])
 
     # ── Diagnostics summary callback ─────────────────────────
 

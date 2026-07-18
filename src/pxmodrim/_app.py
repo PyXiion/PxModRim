@@ -135,6 +135,7 @@ class App:
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)
+        self.main_window.set_app_quit_callback(app_close_event.set)
         await app_close_event.wait()
         return 0
 

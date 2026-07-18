@@ -38,6 +38,7 @@ GROUPS: dict[str, set[str]] = {
     "ui.components": {"ui.components"},
     "ui.models": {"ui.models"},
     "ui.panels": {"ui.panels"},
+    "ui.views": {"ui.views"},
     "ui.window": {"ui.window"},
 }
 
@@ -60,7 +61,8 @@ ALLOWED: dict[str, set[str]] = {
     "ui.components": {"ui.theme"},
     "ui.models": {"ui.theme"},
     "ui.panels": {"ui.theme", "ui.components", "ui.models"},
-    "ui.window": {"ui.theme", "ui.components", "ui.models", "ui.panels"},
+    "ui.views": {"ui.theme", "ui.components", "ui.models", "ui.panels"},
+    "ui.window": {"ui.theme", "ui.components", "ui.models", "ui.panels", "ui.views"},
 }
 
 _PREFIX_TO_GROUP: dict[str, str] = {}

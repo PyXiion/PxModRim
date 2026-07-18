@@ -15,6 +15,7 @@ from .progress_dialog import ProgressDialog
 from .responsive_meta_grid import ResponsiveMetaGrid
 from .svg_provider import SvgIconProvider
 from .toast import Toast, ToastManager
+from .view_rail_panel import ViewRailPanel
 
 __all__ = [
     "AccordionSection",
@@ -32,6 +33,7 @@ __all__ = [
     "SvgIconProvider",
     "Toast",
     "ToastManager",
+    "ViewRailPanel",
     "generate_preview",
     "icon",
     "pixmap",
