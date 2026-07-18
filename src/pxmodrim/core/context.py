@@ -170,6 +170,14 @@ class CoreContext:
         if svc is not None:
             await svc.startup_impact.close_connection()
 
+    def close_sync(self) -> None:
+        """Synchronous teardown for use after the event loop has stopped."""
+        if self._pool is not None:
+            self._pool.shutdown(wait=True)
+        svc = self._mod_service
+        if svc is not None:
+            svc.startup_impact.close_connection_sync()
+
     def reset_providers(self, paths: PathConfig) -> None:
         """Replace providers when the config changes (e.g. after settings dialog)."""
         from pxmodrim.core.providers import create_providers

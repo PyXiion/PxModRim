@@ -109,3 +109,7 @@ class StartupImpactService:
 
     async def close_connection(self) -> None:
         await self._db.close()
+
+    def close_connection_sync(self) -> None:
+        self._db.close_sync()
+

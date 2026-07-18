@@ -91,7 +91,7 @@ class StartupImpactDb:
             if self._connection is None or self._connection_path != db_str:
                 if self._connection is not None:
                     await self._connection.close()
-                conn = await aiosqlite.connect(db_str)
+                conn = await aiosqlite.connect(db_str, check_same_thread=False)
                 await conn.execute("PRAGMA journal_mode=WAL")
                 await conn.execute("PRAGMA busy_timeout=5000")
                 await conn.execute("PRAGMA foreign_keys=ON")
@@ -106,6 +106,12 @@ class StartupImpactDb:
                 await self._connection.close()
                 self._connection = None
                 self._connection_path = ""
+
+    def close_sync(self) -> None:
+        if self._connection is not None:
+            self._connection._conn.close()
+            self._connection = None
+            self._connection_path = ""
 
     async def store_report(self, path: Path, report: StartupImpactReport) -> None:
         if not path.exists():

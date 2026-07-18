@@ -142,4 +142,7 @@ class App:
         """Create a qasync event loop and run the application synchronously."""
         loop = QEventLoop()
         loop.set_exception_handler(_async_exception_handler)
-        return asyncio.run(self.async_run(), loop_factory=lambda: loop)
+        try:
+            return asyncio.run(self.async_run(), loop_factory=lambda: loop)
+        finally:
+            self._ctx.close_sync()

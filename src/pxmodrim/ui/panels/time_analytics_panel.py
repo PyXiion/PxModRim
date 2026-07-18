@@ -171,10 +171,13 @@ class TimeAnalyticsPanel(QWidget):
                 top5[-1] = (mod, True)
             else:
                 top5.append((mod, True))
-        max_impact = top5[0][0].total_impact_s if top5 else 1
+        entries = [
+            (entry, is_cur, own if is_cur else entry.total_impact_s)
+            for entry, is_cur in top5
+        ]
+        max_impact = max((val for _, _, val in entries), default=1)
         result = []
-        for entry, is_cur in top5:
-            val = own if is_cur else entry.total_impact_s
+        for entry, is_cur, val in entries:
             bar_color = _COLOR_ACCENT if is_cur else _impact_color(
                 entry.total_impact_s
             )

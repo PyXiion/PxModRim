@@ -90,6 +90,7 @@ class SteamCmdModProvider(BaseModProvider):
                 logger.debug("SteamCmdModProvider path does not exist: {}", self._path)
                 return {}
             logger.debug("SteamCmdModProvider scanning: {}", self._path)
+
             with tm("scan_dir"):
                 dirs = scan_mod_directory(self._path)
 
