@@ -8,7 +8,11 @@ from typing import Any
 
 from loguru import logger
 
-from pxmodrim.core.constants import DEFAULT_MISSING_PACKAGEID, RIMWORLD_DLC_METADATA
+from pxmodrim.core.constants import (
+    DEFAULT_MISSING_PACKAGEID,
+    RIMWORLD_DLC_METADATA,
+    RIMWORLD_STEAM_APP_ID,
+)
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     BaseRules,
@@ -174,6 +178,17 @@ def _parse_optional(
         mod.url = url
 
     mod.about_rules = create_base_rules(mod_data, target_version, prefer_versioned)
+
+    dlc_map = _get_dlc_packageid_map()
+    str_pid = str(mod.package_id)
+    if str_pid in dlc_map and dlc_map[str_pid] != RIMWORLD_STEAM_APP_ID:
+        rimworld_pid = CaseInsensitiveStr("ludeon.rimworld")
+        if rimworld_pid not in mod.about_rules.dependencies:
+            mod.about_rules.dependencies[rimworld_pid] = DependencyMod(
+                package_id=rimworld_pid,
+                name="RimWorld",
+                workshop_url="https://store.steampowered.com/app/294100/RimWorld",
+            )
 
     descriptions_by_version: bool | dict[str, str] = mod_data.get(
         "descriptionsByVersion", False

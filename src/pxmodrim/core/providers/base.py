@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,9 +17,10 @@ class BaseModProvider(ABC):
     provider_id: str
     color: str = "#808080"
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, pool: ThreadPoolExecutor | None = None) -> None:
         """Store the root filesystem path this provider scans."""
         self._path = path
+        self._pool = pool
 
     @abstractmethod
     async def discover(

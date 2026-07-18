@@ -389,6 +389,8 @@ QTabBar::tab:hover {
     color: $TEXT_MAIN;
 }
 
+
+
 /* ── Icon Buttons ── */
 QPushButton#iconBtn {
     background: transparent;

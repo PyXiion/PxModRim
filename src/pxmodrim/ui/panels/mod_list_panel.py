@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, Qt, Signal, Slot
@@ -8,6 +9,7 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
 
+from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import svg_str
 from pxmodrim.ui.models.mod_list_model import ModListModel
@@ -25,9 +27,10 @@ class ModListPanel(QWidget):
     selection_changed = Signal(list)
 
     def __init__(
-        self, provider_colors: dict[str, str], qml_engine: QQmlEngine | None = None
+        self, ctx: CoreContext, qml_engine: QQmlEngine | None = None
     ) -> None:
         super().__init__()
+        self._ctx = ctx
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -69,7 +72,7 @@ class ModListPanel(QWidget):
         layout.addWidget(search_container)
 
         # Models: source + proxy
-        self._model = ModListModel(provider_colors)
+        self._model = ModListModel({})
         self._proxy = ModListProxyModel(self._model)
         self._model.active_mods_changed.connect(self._on_model_active_changed)
 
@@ -80,16 +83,22 @@ class ModListPanel(QWidget):
         self._qml.setClearColor(QColor(PALETTE["ELEVATE_1"]))
         self._qml.setAcceptDrops(True)
 
-        ctx = self._qml.rootContext()
-        ctx.setContextProperty("modListPanel", self)
-        ctx.setContextProperty("modListModel", self._proxy)
+        qml_ctx = self._qml.rootContext()
+        qml_ctx.setContextProperty("modListPanel", self)
+        qml_ctx.setContextProperty("modListModel", self._proxy)
         self._qml.setSource(str(_MOD_LIST_QML))
 
         layout.addWidget(self._qml)
 
         # Expose search-focus state to QML for keyboard navigation gating
-        ctx.setContextProperty("searchFocused", False)
+        qml_ctx.setContextProperty("searchFocused", False)
         self.search_input.installEventFilter(self)
+
+        # Reactive bindings
+        ctx.mod_service.mods_changed.connect(self._on_mods_changed)
+        ctx.diagnostics_service.diagnostics_summary_changed.connect(
+            self._model.set_diagnostics
+        )
 
     # ── Public API ────────────────────────────────────────────
 
@@ -112,6 +121,17 @@ class ModListPanel(QWidget):
 
     def set_search_filter(self, text: str) -> None:
         self._proxy.set_search_filter(text)
+
+    # ── Reactive ──────────────────────────────────────────────
+
+    def _on_mods_changed(self, _: None = None) -> None:
+        asyncio.ensure_future(self._refresh())
+
+    async def _refresh(self) -> None:
+        self._model.update_provider_colors(self._ctx.mod_service.provider_colors)
+        self._model.load_mods(self._ctx.all_mods, self._ctx.active_uuids)
+        impacts = await self._ctx.mod_service.startup_impact.get_all_averages()
+        self._model.set_startup_impact(impacts)
 
     # ── Slots called from QML ─────────────────────────────────
 

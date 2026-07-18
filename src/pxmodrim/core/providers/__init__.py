@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,14 +12,16 @@ if TYPE_CHECKING:
     from pxmodrim.core.config import PathConfig
 
 
-def create_providers(paths: PathConfig) -> list[BaseModProvider]:
+def create_providers(
+    paths: PathConfig, pool: ThreadPoolExecutor | None = None
+) -> list[BaseModProvider]:
     """Build the default provider list from the given path configuration."""
     providers: list[BaseModProvider] = []
     if paths.game:
         providers.append(CoreModProvider(Path(paths.game)))
     if paths.local:
-        providers.append(LocalModProvider(Path(paths.local)))
-        providers.append(SteamCmdModProvider(Path(paths.local)))
+        providers.append(LocalModProvider(Path(paths.local), pool=pool))
+        providers.append(SteamCmdModProvider(Path(paths.local), pool=pool))
     return providers
 
 

@@ -313,8 +313,8 @@ Rectangle {
                     height: 20
                     width: siText.width + 12
                     radius: Theme.radiusSm
-                    color: model.startupImpact < 1.0 ? "#5cb85c" :
-                           model.startupImpact < 5.0 ? "#f0ad4e" : "#d9534f"
+                    color: model.startupImpact < 1.0 ? "#3d8b3d" :
+                           model.startupImpact < 5.0 ? "#c98a1e" : "#b23b3b"
                     anchors.verticalCenter: parent.verticalCenter
 
                     Text {

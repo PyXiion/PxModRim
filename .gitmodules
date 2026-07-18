@@ -1,0 +1,7 @@
+[submodule "companion-mods/PxLoadingProgress"]
+	path = companion-mods/PxLoadingProgress
+	url = https://github.com/PyXiion/PxLoadingProgress
+	ignore = dirty
+[submodule "companion-mods/rimworld-utils"]
+	path = companion-mods/rimworld-utils
+	url = https://github.com/ilyvion/rimworld-utils

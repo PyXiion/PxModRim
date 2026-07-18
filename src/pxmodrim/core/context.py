@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from pxmodrim.core.models.metadata.structures import ListedMod
@@ -36,6 +38,7 @@ class CoreContext:
         "_sort_service",
         "_game_launcher",
         "_providers",
+        "_pool",
     )
 
     def __init__(self, cfg: AppConfig) -> None:
@@ -49,6 +52,7 @@ class CoreContext:
         self._sort_service: SortService | None = None
         self._game_launcher: GameLauncher | None = None
         self._providers: list[BaseModProvider] | None = None
+        self._pool: ThreadPoolExecutor | None = None
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         """Replace all mods and active UUIDs, taking ownership of the data."""
@@ -116,17 +120,25 @@ class CoreContext:
     def create(cls, cfg: AppConfig) -> CoreContext:
         """Create a fully-initialised context with all core services."""
         from pxmodrim.core.mod_service import ModService
+        from pxmodrim.core.profiler import profile
         from pxmodrim.core.providers import create_providers
         from pxmodrim.core.services.diagnostics_service import DiagnosticsService
         from pxmodrim.core.services.game_launcher import GameLauncher
         from pxmodrim.core.services.sort_service import SortService
 
         ctx = cls(cfg)
-        ctx._providers = create_providers(cfg.paths)
-        ctx._diagnostics_service = DiagnosticsService(ctx)
-        ctx._mod_service = ModService(ctx, ctx._providers)
-        ctx._sort_service = SortService(ctx, ctx._diagnostics_service)
-        ctx._game_launcher = GameLauncher(ctx)
+        ctx._pool = ThreadPoolExecutor(max_workers=os.cpu_count())
+        with profile("services.create") as t:
+            with t("create_providers"):
+                ctx._providers = create_providers(cfg.paths, ctx._pool)
+            with t("diagnostics_service"):
+                ctx._diagnostics_service = DiagnosticsService(ctx)
+            with t("mod_service"):
+                ctx._mod_service = ModService(ctx, ctx._providers)
+            with t("sort_service"):
+                ctx._sort_service = SortService(ctx, ctx._diagnostics_service)
+            with t("game_launcher"):
+                ctx._game_launcher = GameLauncher(ctx)
         return ctx
 
     # ── Service accessors ──────────────────────────────────────────────────────
@@ -147,10 +159,29 @@ class CoreContext:
     def game_launcher(self) -> GameLauncher:
         return _require_not_none(self._game_launcher, "game_launcher")
 
+    async def initialize(self) -> None:
+        svc = _require_not_none(self._mod_service, "mod_service")
+        await svc.initialize()
+
+    async def close(self) -> None:
+        if self._pool is not None:
+            self._pool.shutdown(wait=True)
+        svc = self._mod_service
+        if svc is not None:
+            await svc.startup_impact.close_connection()
+
+    def close_sync(self) -> None:
+        """Synchronous teardown for use after the event loop has stopped."""
+        if self._pool is not None:
+            self._pool.shutdown(wait=True)
+        svc = self._mod_service
+        if svc is not None:
+            svc.startup_impact.close_connection_sync()
+
     def reset_providers(self, paths: PathConfig) -> None:
         """Replace providers when the config changes (e.g. after settings dialog)."""
         from pxmodrim.core.providers import create_providers
 
         svc = _require_not_none(self._mod_service, "mod_service")
-        self._providers = create_providers(paths)
+        self._providers = create_providers(paths, self._pool)
         svc.reset_providers(self._providers)
