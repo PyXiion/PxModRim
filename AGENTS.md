@@ -26,12 +26,16 @@ src/pxmodrim/
 - No comments unless explaining *why*
 - Strict UI/Logic separation: views render pixels and capture raw events. No business logic or I/O in UI components.
 - Async signal handlers **must** have `@asyncSlot()` from `qasync`
+- Always disable the button while the task is running.
 - Never `QApplication.processEvents()`, `dialog.exec()`, `QThread`, `time.sleep()`, `QTimer.singleShot(0, …)` — use `await asyncio.to_thread()`, `await await_dialog()`, `await asyncio.sleep(0)`
 - Never global singletons — constructor DI everywhere
 - Long blocking work → `await asyncio.to_thread(target)`
 - All git renames: `git mv`, never `shutil.move`
-- Create new widgets in QML only.
+- Create new widgets in QML only. ALWAYS ask the user about the widget type (Qt/QML).
 - Prefer grepping instead of running subagents when suitable.
+- Avoid O(N^2) algorithms.
+- Don't make any orphan QT objects (always pass parent).
+- Separate widget state and the widget.
 
 ## QML / SVG quirks
 - Icons via `image://icons/<name>?color=<hex>` — `SvgIconProvider` on shared `QQmlEngine`
