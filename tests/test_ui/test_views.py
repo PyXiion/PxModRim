@@ -61,6 +61,11 @@ class TestBuiltinViews:
         assert SteamWorkshopViewPanel.icon_name == "steam_workshop_tab"
         assert SteamWorkshopViewPanel.label == "Steam Workshop"
 
+    def test_constructs_with_download_sidebar(self, qapp: QApplication) -> None:
+        view = SteamWorkshopViewPanel(ctx=_ctx_stub())
+        qapp.processEvents()
+        assert view._download_sidebar is not None
+
 
 class TestSteamWorkshopView:
     def test_constructs_with_placeholder(
@@ -72,7 +77,7 @@ class TestSteamWorkshopView:
         assert isinstance(view, QWidget)
         placeholder = view.findChild(QLabel, "placeholder")
         assert placeholder is not None
-        assert "Loading" in placeholder.text()
+        assert "Initializing" in placeholder.text()
         # WebEngine must NOT be initialized until the tab is shown
         assert view._web is None
         assert view._initialized is False
@@ -139,7 +144,12 @@ class TestSteamWorkshopView:
             / "inject.js"
         ).read_text(encoding="utf-8")
         assert "updateAllModBadges" in inject_js
+        assert "__pxmSetInstalled" in inject_js
+        assert "__pxmUncheckMod" in inject_js
         assert "MutationObserver" in inject_js
+        assert "__onInstalledChanged" not in inject_js
+        assert "__onCheckedChanged" not in inject_js
+        assert "__onSingleModChecked" not in inject_js
 
     def test_refresh_badges_safe_before_init(
         self, qapp: QApplication
@@ -151,3 +161,18 @@ class TestSteamWorkshopView:
         # watcher can fire before the Steam tab is ever opened.
         view.refresh_badges()
         assert view._web is None
+
+    def test_inject_js_targets_react_dom(self) -> None:
+        inject_js = (
+            importlib_resources.files("pxmodrim.ui.views.steam_workshop")
+            / "inject.js"
+        ).read_text(encoding="utf-8")
+
+        # Steam Workshop is a React SPA with hashed class names; badges must
+        # target the stable anchors (item links + thumbnail <img>), not the
+        # removed .workshopItem markup.
+        assert 'sharedfiles/filedetails/?id=' in inject_js
+        assert "querySelector(\"img\")" in inject_js
+        assert ".workshopItem" not in inject_js
+        assert ".workshopItemTitle" not in inject_js
+        assert "rimsort-badge-hovered" not in inject_js

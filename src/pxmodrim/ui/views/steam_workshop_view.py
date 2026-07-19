@@ -1,25 +1,42 @@
 from __future__ import annotations
 
-from importlib.resources import files as resource_files
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
 from PySide6.QtCore import Qt, QUrl
+from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import (
     QWebEnginePage,
     QWebEngineProfile,
+    QWebEngineScript,
     QWebEngineSettings,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QStackedWidget, QWidget
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.views.base import BaseViewPanel
+from pxmodrim.ui.views.steam_workshop.bridge import SteamWorkshopBridge
+from pxmodrim.ui.views.steam_workshop.download_sidebar import DownloadSidebar
 
 if TYPE_CHECKING:
     from PySide6.QtQml import QQmlEngine
 
+from importlib.resources import files as resource_files
+
 _WORKSHOP_URL = "https://steamcommunity.com/workshop/browse/?appid=294100"
+
+_QWEBCHANNEL_PATH = Path("/usr/share/qt6/webchannel/qwebchannel.js")
+
+
+def _read_qwebchannel_js() -> str:
+    try:
+        return _QWEBCHANNEL_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        logger.warning("[steam] qwebchannel.js not found at {}", _QWEBCHANNEL_PATH)
+        return ""
 
 
 class SteamWorkshopViewPanel(BaseViewPanel):
@@ -37,14 +54,35 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
         self._web: QWebEngineView | None = None
         self._profile: QWebEngineProfile | None = None
+        self._channel: QWebChannel | None = None
+        self._bridge: SteamWorkshopBridge | None = None
         self._initialized = False
         self._first_load = True
 
-        self._placeholder = QLabel("Initializing Steam Workshop browser…")
+        self._installed_ids: set[str] = set()
+        self._checked_ids: dict[str, str] = {}
+
+        content = QWidget()
+        h_layout = QHBoxLayout(content)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.setSpacing(0)
+
+        self._download_sidebar = DownloadSidebar(self._qml_engine, content)
+        self._download_sidebar.download_requested.connect(self._on_download_requested)
+        self._download_sidebar.item_removed.connect(self._on_download_item_removed)
+        h_layout.addWidget(self._download_sidebar)
+
+        self._stack = QStackedWidget()
+        self._placeholder = QLabel("Initializing Steam Workshop browser\u2026")
         self._placeholder.setObjectName("placeholder")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setWordWrap(True)
-        self._root.addWidget(self._placeholder, stretch=1)
+        self._stack.addWidget(self._placeholder)
+        h_layout.addWidget(self._stack, stretch=1)
+
+        self._root.addWidget(content, stretch=1)
+
+        self._ctx.mod_service.mods_changed.connect(self._on_mods_changed)
 
     def installed_mod_ids(self) -> list[str]:
         return [
@@ -53,77 +91,97 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             if m.published_file_id
         ]
 
+    def _refresh_cached_ids(self) -> None:
+        self._installed_ids = set(self.installed_mod_ids())
+
     def _ensure_initialized(self) -> None:
         if self._initialized:
             return
         self._initialized = True
 
-        # Передаем self в качестве родителя, чтобы Qt сам корректно управлял памятью
         self._profile = QWebEngineProfile("pxmodrim-steam", self)
         settings = self._profile.settings()
 
         settings.setAttribute(QWebEngineSettings.WebAttribute.DnsPrefetchEnabled, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
         settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.HyperlinkAuditingEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.XSSAuditingEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.ErrorPageEnabled, False)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.AutoLoadIconsForPage, False)
-
-        # Включаем LocalStorage, иначе Steam сломается
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, False
+        )
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.HyperlinkAuditingEnabled, False
+        )
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.XSSAuditingEnabled, False
+        )
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.ErrorPageEnabled, False
+        )
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.AutoLoadIconsForPage, False
+        )
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
 
         self._profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
         self._profile.setHttpCacheMaximumSize(512 * 1024 * 1024)
 
-        # Создаем WebView и сразу встраиваем в структуру UI, но прячем
+        qwebchannel_src = _read_qwebchannel_js()
+        if qwebchannel_src:
+            script = QWebEngineScript()
+            script.setSourceCode(qwebchannel_src)
+            script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+            script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+            script.setRunsOnSubFrames(True)
+            self._profile.scripts().insert(script)
+
+        inject_js = (
+            resource_files("pxmodrim.ui.views.steam_workshop") / "inject.js"
+        ).read_text(encoding="utf-8")
+        script2 = QWebEngineScript()
+        script2.setSourceCode(inject_js)
+        script2.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        script2.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        script2.setRunsOnSubFrames(False)
+        self._profile.scripts().insert(script2)
+
         self._web = QWebEngineView(self)
         self._web.setObjectName("workshopWeb")
-        self._web.hide()
+        self._stack.addWidget(self._web)
 
         page = QWebEnginePage(self._profile, self._web)
         self._web.setPage(page)
 
-        # Добавляем в layout заранее, чтобы избежать прыжков интерфейса
-        self._root.addWidget(self._web, stretch=1)
+        self._bridge = SteamWorkshopBridge(self, self._web)
+        self._channel = QWebChannel(self._web)
+        self._channel.registerObject("bridge", self._bridge)
+        page.setWebChannel(self._channel)
+
+        self._bridge.download_state_changed.connect(self._on_download_state_changed)
 
         page.loadProgress.connect(self._on_page_progress)
         self._web.loadStarted.connect(self._on_load_started)
         self._web.loadFinished.connect(self._on_load_finished)
-        self._web.loadProgress.connect(self._on_load_progress)
+
+        self._refresh_cached_ids()
 
         logger.debug(f"[steam] navigating to {_WORKSHOP_URL}")
         self._web.load(QUrl(_WORKSHOP_URL))
 
     def _on_page_progress(self, progress: int) -> None:
-        if progress < 100:
-            if self._first_load:
-                self._placeholder.setText(
-                    f"Initializing Steam Workshop browser… {progress}%"
-                )
+        if progress < 100 and self._first_load:
+            self._placeholder.setText(
+                f"Initializing Steam Workshop browser\u2026 {progress}%"
+            )
 
     def preload(self) -> None:
         self._ensure_initialized()
 
-    def _run_badge_script(self) -> None:
-        if self._web is None:
-            return
-        inject_js = (
-            resource_files("pxmodrim.ui.views.steam_workshop") / "inject.js"
-        ).read_text(encoding="utf-8")
-        self._web.page().runJavaScript(
-            inject_js, 0, lambda r: logger.debug(f"[steam] badge script result: {r!r}")
-        )
-
     def refresh_badges(self) -> None:
         if self._web is None:
             return
-        ids = self.installed_mod_ids()
-        logger.debug(f"[steam] refresh_badges: {len(ids)} installed")
+        self._refresh_cached_ids()
         self._web.page().runJavaScript(
-            f"window.__pxmodrimInstalledMods = {ids!r};"
-            "if (window.updateAllModBadges) window.updateAllModBadges();",
+            f"window.__pxmSetInstalled({json.dumps(list(self._installed_ids))});",
             0,
             lambda result: logger.debug(f"[steam] refresh result: {result!r}"),
         )
@@ -131,53 +189,61 @@ class SteamWorkshopViewPanel(BaseViewPanel):
     def _on_load_started(self) -> None:
         logger.debug("[steam] loadStarted")
         if self._first_load:
-            if self._web is not None:
-                self._web.hide()
-            self._placeholder.setText("Initializing Steam Workshop browser…")
-            self._placeholder.show()
-
-    def _on_load_progress(self, progress: int) -> None:
-        if progress < 100 and self._first_load:
-            self._placeholder.setText(
-                f"Initializing Steam Workshop browser… {progress}%"
-            )
+            self._placeholder.setText("Initializing Steam Workshop browser\u2026")
+            self._stack.setCurrentWidget(self._placeholder)
 
     def _on_load_finished(self, ok: bool) -> None:
         logger.debug(f"[steam] loadFinished ok={ok}")
         if not ok:
-            if self._web is not None:
-                self._web.hide()
             self._placeholder.setText(
                 "Failed to load Steam Workshop.\n\n"
                 "Check your network connection and try again."
             )
-            self._placeholder.show()
+            self._stack.setCurrentWidget(self._placeholder)
             return
 
         self._first_load = False
-        self._placeholder.hide()
         if self._web is not None:
-            self._web.show()
+            self._stack.setCurrentWidget(self._web)
 
-        self._run_badge_script()
+    def _on_mods_changed(self, _: None) -> None:
+        if self._web is None:
+            return
         self.refresh_badges()
+
+    def _on_download_requested(self) -> None:
+        logger.debug(f"[steam] download requested: {list(self._checked_ids.keys())}")
+
+    def _on_download_item_removed(self, mod_id: str) -> None:
+        self._checked_ids.pop(mod_id, None)
+        self._download_sidebar.sync_from(self._checked_ids)
+        if self._web:
+            self._web.page().runJavaScript(
+                f"window.__pxmUncheckMod({json.dumps(mod_id)});",
+                0,
+            )
+
+    def _on_download_state_changed(
+        self, mod_id: str, title: str, checked: bool
+    ) -> None:
+        self._download_sidebar.sync_from(self._checked_ids)
 
     def showEvent(self, event: object) -> None:
         super().showEvent(event)  # type: ignore[attr-defined]
         self._ensure_initialized()
 
     def teardown(self) -> None:
-        """Безопасное уничтожение тяжелых виджетов."""
+        self._ctx.mod_service.mods_changed.disconnect(self._on_mods_changed)
+
         if self._web is None:
             return
 
         self._web.stop()
-        self._root.removeWidget(self._web)
-
-        # Вместо ручного удаления профиля через deleteLater,
-        # Qt сам очистит его, так как мы указали родителя (self) в `__init__`.
+        self._stack.removeWidget(self._web)
         self._web.setParent(None)
         self._web.deleteLater()
         self._web = None
         self._profile = None
+        self._channel = None
+        self._bridge = None
         self._initialized = False
