@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         "maximize",
         "restore",
         "chevron",
+        "chevron-left",
         "folder",
         "steam",
         "local",
@@ -155,11 +156,27 @@ _ICONS: dict[str, str] = {
         '<polyline points="9 18 15 12 9 6"/>'
         "</svg>"
     ),
+    "chevron-left": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<polyline points="15 18 9 12 15 6"/>'
+        "</svg>"
+    ),
     "folder": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
         '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9'
         'a2 2 0 012 2z"/>'
+        "</svg>"
+    ),
+    "steam": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<circle cx="12" cy="12" r="9"/>'
+        '<circle cx="12" cy="12" r="5"/>'
+        '<path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>'
+        '<path d="M5.5 5.5l1.5 1.5M17 17l1.5 1.5M18.5 5.5L17 7M7 17L5.5 18.5"/>'
+        '<circle cx="12" cy="12" r="3"/>'
         "</svg>"
     ),
     "steam_workshop_tab": (

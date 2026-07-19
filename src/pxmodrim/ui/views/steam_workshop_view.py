@@ -14,9 +14,17 @@ from PySide6.QtWebEngineCore import (
     QWebEngineSettings,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QStackedWidget, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from pxmodrim.core.context import CoreContext
+from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.views.base import BaseViewPanel
 from pxmodrim.ui.views.steam_workshop.bridge import SteamWorkshopBridge
 from pxmodrim.ui.views.steam_workshop.download_sidebar import DownloadSidebar
@@ -59,6 +67,12 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         self._initialized = False
         self._first_load = True
 
+        self._toolbar: QWidget | None = None
+        self._nav_back: IconButton | None = None
+        self._nav_forward: IconButton | None = None
+        self._nav_reload: IconButton | None = None
+        self._url_bar: QLineEdit | None = None
+
         self._installed_ids: set[str] = set()
         self._checked_ids: dict[str, str] = {}
 
@@ -72,13 +86,23 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         self._download_sidebar.item_removed.connect(self._on_download_item_removed)
         h_layout.addWidget(self._download_sidebar)
 
+        right_side = QWidget()
+        right_layout = QVBoxLayout(right_side)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+
+        self._toolbar = self._create_toolbar(right_side)
+        right_layout.addWidget(self._toolbar)
+
         self._stack = QStackedWidget()
         self._placeholder = QLabel("Initializing Steam Workshop browser\u2026")
         self._placeholder.setObjectName("placeholder")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setWordWrap(True)
         self._stack.addWidget(self._placeholder)
-        h_layout.addWidget(self._stack, stretch=1)
+        right_layout.addWidget(self._stack, stretch=1)
+
+        h_layout.addWidget(right_side, stretch=1)
 
         self._root.addWidget(content, stretch=1)
 
@@ -161,6 +185,14 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         page.loadProgress.connect(self._on_page_progress)
         self._web.loadStarted.connect(self._on_load_started)
         self._web.loadFinished.connect(self._on_load_finished)
+        page.urlChanged.connect(self._on_url_changed)
+
+        assert self._nav_back is not None
+        assert self._nav_forward is not None
+        assert self._nav_reload is not None
+        self._nav_back.clicked.connect(self._web.back)
+        self._nav_forward.clicked.connect(self._web.forward)
+        self._nav_reload.clicked.connect(self._web.reload)
 
         self._refresh_cached_ids()
 
@@ -172,6 +204,54 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             self._placeholder.setText(
                 f"Initializing Steam Workshop browser\u2026 {progress}%"
             )
+
+    def _create_toolbar(self, parent: QWidget) -> QWidget:
+        toolbar = QWidget(parent)
+        toolbar.setObjectName("workshopToolbar")
+        layout = QHBoxLayout(toolbar)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+
+        self._nav_back = IconButton("chevron-left", "Back", size=28, parent=toolbar)
+        self._nav_back.setEnabled(False)
+        layout.addWidget(self._nav_back)
+
+        self._nav_forward = IconButton("chevron", "Forward", size=28, parent=toolbar)
+        self._nav_forward.setEnabled(False)
+        layout.addWidget(self._nav_forward)
+
+        self._nav_reload = IconButton("refresh", "Reload", size=28, parent=toolbar)
+        layout.addWidget(self._nav_reload)
+
+        self._url_bar = QLineEdit(toolbar)
+        self._url_bar.setPlaceholderText("Enter a URL\u2026")
+        self._url_bar.returnPressed.connect(self._navigate_to_url)
+        layout.addWidget(self._url_bar, stretch=1)
+
+        return toolbar
+
+    def _navigate_to_url(self) -> None:
+        if self._web is None or self._url_bar is None:
+            return
+        text = self._url_bar.text().strip()
+        if not text:
+            return
+        if "://" not in text:
+            text = "https://" + text
+        self._web.load(QUrl(text))
+
+    def _on_url_changed(self, url: QUrl) -> None:
+        if self._url_bar is None:
+            return
+        self._url_bar.setText(url.toString())
+        self._update_nav_buttons()
+
+    def _update_nav_buttons(self) -> None:
+        if self._web is None or self._nav_back is None or self._nav_forward is None:
+            return
+        history = self._web.page().history()
+        self._nav_back.setEnabled(history.canGoBack())
+        self._nav_forward.setEnabled(history.canGoForward())
 
     def preload(self) -> None:
         self._ensure_initialized()
@@ -205,6 +285,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         self._first_load = False
         if self._web is not None:
             self._stack.setCurrentWidget(self._web)
+        self._update_nav_buttons()
 
     def _on_mods_changed(self, _: None) -> None:
         if self._web is None:
