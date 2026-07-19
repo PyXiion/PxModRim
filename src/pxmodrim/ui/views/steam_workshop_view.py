@@ -236,9 +236,13 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         text = self._url_bar.text().strip()
         if not text:
             return
-        if "://" not in text:
-            text = "https://" + text
-        self._web.load(QUrl(text))
+        url = QUrl.fromUserInput(text)
+        if url.scheme() == "http":
+            url.setScheme("https")
+        if not url.isValid():
+            logger.warning(f"[steam] invalid URL: {text}")
+            return
+        self._web.load(url)
 
     def _on_url_changed(self, url: QUrl) -> None:
         if self._url_bar is None:
