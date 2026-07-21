@@ -13,6 +13,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import httpx
 import msgspec
 from loguru import logger
 
@@ -69,11 +70,11 @@ def _is_junction(path: Path) -> bool:
         return False
 
 
-def _download_bytes(url: str) -> bytes:
-    import urllib.request
-
-    with urllib.request.urlopen(url) as resp:
-        return resp.read()
+async def _download_bytes(url: str) -> bytes:
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, follow_redirects=True)
+        resp.raise_for_status()
+        return resp.content
 
 
 def _extract_archive(data: bytes, url: str, dest: str) -> None:
@@ -288,7 +289,7 @@ class SteamCmdService:
 
         self.status_message_changed.emit(f"Downloading SteamCMD from {url}...")
         try:
-            data = await asyncio.to_thread(_download_bytes, url)
+            data = await _download_bytes(url)
             self.status_message_changed.emit("Extracting SteamCMD...")
             await asyncio.to_thread(
                 _extract_archive, data, url, self._install_path
@@ -319,7 +320,7 @@ class SteamCmdService:
                     f"Downloading SteamCMD from {url}..."
                 )
                 try:
-                    data = await asyncio.to_thread(_download_bytes, url)
+                    data = await _download_bytes(url)
                 except Exception as e:
                     self.status_message_changed.emit(
                         f"Failed to install SteamCMD ({type(e).__name__}): {e}"

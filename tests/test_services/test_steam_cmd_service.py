@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -288,7 +288,7 @@ class TestEnsureInstalled:
             return_value="Linux",
         ), patch(
             "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            return_value=b"",
+            new=AsyncMock(return_value=b""),
         ), patch(
             "pxmodrim.core.services.steam_cmd_service._extract_archive",
             side_effect=_fake_extract,
@@ -313,7 +313,7 @@ class TestEnsureInstalled:
             return_value="Linux",
         ), patch(
             "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            return_value=b"",
+            new=AsyncMock(return_value=b""),
         ), patch(
             "pxmodrim.core.services.steam_cmd_service._extract_archive",
             side_effect=_fake_extract,
@@ -327,7 +327,8 @@ class TestEnsureInstalled:
         Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
         Path(service.executable).write_text("#!/bin/sh\n")
         with patch(
-            "pxmodrim.core.services.steam_cmd_service._download_bytes"
+            "pxmodrim.core.services.steam_cmd_service._download_bytes",
+            new=AsyncMock(),
         ) as dl, patch(
             "pxmodrim.core.services.steam_cmd_service._extract_archive"
         ) as ex:
@@ -342,7 +343,7 @@ class TestEnsureInstalled:
             return_value="Linux",
         ), patch(
             "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            side_effect=RuntimeError("boom"),
+            new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             result = asyncio.run(service.ensure_installed())
         assert result is False
