@@ -20,6 +20,8 @@ _DL_SIDEBAR_QML = _QML_DIR / "DownloadSidebar.qml"
 class DownloadSidebar(QWidget):
     download_requested = Signal()
     item_removed = Signal(str)
+    stop_requested = Signal()
+    clear_requested = Signal()
 
     def __init__(
         self, qml_engine: QQmlEngine | None = None, parent: QWidget | None = None
@@ -49,9 +51,34 @@ class DownloadSidebar(QWidget):
     def downloadRequested(self) -> None:
         self.download_requested.emit()
 
+    @Slot()
+    def stopRequested(self) -> None:
+        self.stop_requested.emit()
+
     @Slot(str)
     def removeItem(self, mod_id: str) -> None:
         self.item_removed.emit(mod_id)
 
-    def sync_from(self, checked_ids: dict[str, str]) -> None:
-        self._model.sync_from(checked_ids)
+    @Slot()
+    def clearQueue(self) -> None:
+        self.clear_requested.emit()
+
+    def set_download_enabled(self, enabled: bool) -> None:
+        root = self._qml.rootObject()
+        if root is not None:
+            root.setProperty("downloadEnabled", enabled)
+
+    def sync_from(
+        self,
+        checked_ids: dict[str, str],
+        statuses: dict[str, str] | None = None,
+    ) -> None:
+        self._model.sync_from(checked_ids, statuses)
+
+    def set_progress(
+        self, total: int, completed: int, downloading_id: str = ""
+    ) -> None:
+        self._model.set_progress(total, completed, downloading_id)
+
+    def update_status(self, mod_id: str, status: str) -> None:
+        self._model.update_status(mod_id, status)

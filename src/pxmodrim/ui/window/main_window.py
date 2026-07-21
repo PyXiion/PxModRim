@@ -27,7 +27,8 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.config import LaunchStrategy, save_config
+from pxmodrim.core.config import save_config
+from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
@@ -42,7 +43,7 @@ from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.theme.qml_theme import Theme
-from pxmodrim.ui.views import builtin_views
+from pxmodrim.ui.ui_prefs import UIPrefs
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 if TYPE_CHECKING:
@@ -50,11 +51,12 @@ if TYPE_CHECKING:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, ctx: CoreContext) -> None:
+    def __init__(self, ctx: CoreContext, ui_prefs: UIPrefs) -> None:
         super().__init__()
 
         self._app_quit_callback: Callable[[], None] | None = None
         self._is_frameless: bool = False
+        self._ui_prefs = ui_prefs
 
         self.setWindowTitle("PxModRim")
         self.setWindowIcon(
@@ -85,7 +87,7 @@ class MainWindow(QMainWindow):
         # ── Header (QML) ──
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
-            initial_strategy=int(self._ctx.config.ui.launch_strategy),
+            initial_strategy=int(self._ui_prefs.launch_strategy),
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
@@ -123,9 +125,10 @@ class MainWindow(QMainWindow):
         self._menu_bar.hide()
 
         # ── Content: vertical icon rail + stacked views ──
+        rail_views = self._ctx.rail_views
         rail_tabs = [
             {"viewId": v.view_id, "icon": v.icon_name, "label": v.label}
-            for v in builtin_views()
+            for v in rail_views
         ]
         self._rail = ViewRailPanel(rail_tabs, self._qml_engine)
         self._rail.setObjectName("viewRail")
@@ -149,8 +152,8 @@ class MainWindow(QMainWindow):
         self._splitter.splitterMoved.connect(self._snap_rail)
 
         self._views: list = []
-        for view_cls in builtin_views():
-            view = view_cls(self._ctx, self._qml_engine)
+        for view_cls in rail_views:
+            view = view_cls(self._ctx, self._qml_engine, ui_prefs=self._ui_prefs)
             self._views.append(view)
             self._stack.addWidget(view)
 
@@ -318,6 +321,7 @@ class MainWindow(QMainWindow):
         self._ctx.mod_service.reset_providers(
             create_providers(cfg.paths, self._ctx._pool)
         )
+        self._ctx.steam_cmd_service.set_prefix(cfg.paths.steamcmd_prefix)
         await self._ctx.mod_service.reload()
 
     @asyncSlot()
@@ -364,7 +368,9 @@ class MainWindow(QMainWindow):
                 "Config folder not set — mod list won't be saved"
             )
 
-        success, msg = await self._ctx.game_launcher.launch()
+        success, msg = await self._ctx.game_launcher.launch(
+            self._ui_prefs.launch_strategy
+        )
         if success:
             logger.info(msg)
             self._toast_manager.success(msg)
@@ -374,10 +380,12 @@ class MainWindow(QMainWindow):
 
     def _on_strategy_changed(self, index: int) -> None:
         new_strategy = LaunchStrategy(index)
-        if self._ctx.config.ui.launch_strategy != new_strategy:
+        if self._ui_prefs.launch_strategy != new_strategy:
             logger.info("Launch strategy changed to {}", new_strategy.name)
-            self._ctx.config.ui.launch_strategy = new_strategy
-            save_config(self._ctx.config)
+            self._ui_prefs.launch_strategy = new_strategy
+            from pxmodrim.ui.config import save_ui_prefs
+
+            save_ui_prefs(self._ui_prefs)
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:

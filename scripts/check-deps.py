@@ -37,7 +37,10 @@ GROUPS: dict[str, set[str]] = {
     "ui.theme": {"ui.theme"},
     "ui.components": {"ui.components"},
     "ui.models": {"ui.models"},
+    "ui.ui_prefs": {"ui.ui_prefs"},
+    "ui.config": {"ui.config"},
     "ui.panels": {"ui.panels"},
+    "ui.plugins": {"ui.plugins"},
     "ui.views": {"ui.views"},
     "ui.window": {"ui.window"},
 }
@@ -60,9 +63,20 @@ ALLOWED: dict[str, set[str]] = {
     "ui.theme": {"ui.components"},
     "ui.components": {"ui.theme"},
     "ui.models": {"ui.theme"},
-    "ui.panels": {"ui.theme", "ui.components", "ui.models"},
-    "ui.views": {"ui.theme", "ui.components", "ui.models", "ui.panels"},
-    "ui.window": {"ui.theme", "ui.components", "ui.models", "ui.panels", "ui.views"},
+    "ui.ui_prefs": set(),
+    "ui.config": {"core", "ui.ui_prefs"},
+    "ui.plugins": {"core", "ui.theme", "ui.components", "ui.views"},
+    "ui.panels": {"ui.theme", "ui.components", "ui.models", "ui.config", "ui.ui_prefs", "ui.plugins"},
+    "ui.views": {"ui.theme", "ui.components", "ui.models", "ui.panels", "ui.config", "ui.ui_prefs", "ui.plugins"},
+    "ui.window": {
+        "ui.theme",
+        "ui.components",
+        "ui.models",
+        "ui.panels",
+        "ui.views",
+        "ui.config",
+        "ui.ui_prefs",
+    },
 }
 
 _PREFIX_TO_GROUP: dict[str, str] = {}

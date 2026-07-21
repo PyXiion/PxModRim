@@ -8,10 +8,4 @@ __all__ = [
     "BaseViewPanel",
     "ModsViewPanel",
     "SteamWorkshopViewPanel",
-    "builtin_views",
 ]
-
-
-def builtin_views() -> list[type[BaseViewPanel]]:
-    """Ordered list of built-in rail views. Add new views here only."""
-    return [ModsViewPanel, SteamWorkshopViewPanel]

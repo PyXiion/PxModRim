@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from enum import IntEnum
 from pathlib import Path
 
 import msgspec
@@ -11,11 +10,6 @@ from loguru import logger
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
 from pxmodrim.core.msgspec_hooks import dec_hook, enc_hook
 from pxmodrim.core.sort.config import SortSettings, TierConfig
-
-
-class LaunchStrategy(IntEnum):
-    DIRECT = 0
-    STEAM = 1
 
 
 def read_game_version(game_path: str | Path) -> str | None:
@@ -44,24 +38,31 @@ class PathConfig(msgspec.Struct):
     community_rules_file: str = ""
     no_version_warning_file: str = ""
     use_this_instead_file: str = ""
-
-
-class UIPrefs(msgspec.Struct):
-    """Persistent UI state preferences (expand/collapse toggles)."""
-
-    deps_expanded: bool = True
-    desc_expanded: bool = False
-    launch_strategy: LaunchStrategy = LaunchStrategy.DIRECT
+    steamcmd_prefix: str = ""
 
 
 class AppConfig(msgspec.Struct):
-    """Top-level config combining paths, UI prefs, and sort settings."""
+    """Top-level core config: RimWorld paths and sort settings."""
 
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
-    ui: UIPrefs = msgspec.field(default_factory=UIPrefs)
     sort: SortSettings = msgspec.field(
         default_factory=lambda: SortSettings(tier_config=TierConfig.default())
     )
+
+
+class ConfigService:
+    __slots__ = ("config", "_path")
+
+    def __init__(self, cfg: AppConfig, path: Path) -> None:
+        self.config = cfg
+        self._path = path
+
+    def save(self) -> None:
+        save_config(self.config, self._path)
+
+    @property
+    def path(self) -> Path:
+        return self._path
 
 
 def config_dir() -> Path:
@@ -91,11 +92,12 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 
 def save_config(cfg: AppConfig, path: Path | None = None) -> None:
-    """Serialize and write application config to a JSON file."""
+    """Serialize and write the core config (paths + sort) to a JSON file."""
     path = path or config_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    raw = msgspec.json.encode(cfg, enc_hook=enc_hook)
-    formatted = msgspec.json.format(raw, indent=2)
+    formatted = msgspec.json.format(
+        msgspec.json.encode(cfg, enc_hook=enc_hook), indent=2
+    )
     path.write_bytes(formatted)
     logger.info(f"Config saved to {path}")
 

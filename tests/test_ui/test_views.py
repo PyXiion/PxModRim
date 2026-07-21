@@ -9,7 +9,7 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 from pxmodrim.core.config import AppConfig
-from pxmodrim.ui.views import SteamWorkshopViewPanel, builtin_views
+from pxmodrim.ui.views import SteamWorkshopViewPanel
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
@@ -49,12 +49,18 @@ def _cfg() -> AppConfig:
     return load_config(config_file_path())
 
 
-class TestBuiltinViews:
+class TestRailViews:
     def test_registers_mods_and_steam(self) -> None:
-        ids = [v.view_id for v in builtin_views()]
-        assert "mods" in ids
-        assert "steam_workshop" in ids
-        assert ids.index("mods") < ids.index("steam_workshop")
+        from pxmodrim.ui.views.mods_view import ModsViewPanel
+        from pxmodrim.ui.views.steam_workshop_view import (
+            SteamWorkshopViewPanel,
+        )
+
+        ctx = _ctx_stub()
+        ctx.add_rail_view(ModsViewPanel)
+        ctx.add_rail_view(SteamWorkshopViewPanel)
+        ids = [v.view_id for v in ctx.rail_views]
+        assert ids == ["mods", "steam_workshop"]
 
     def test_steam_view_metadata(self) -> None:
         assert SteamWorkshopViewPanel.view_id == "steam_workshop"
@@ -146,6 +152,7 @@ class TestSteamWorkshopView:
         assert "updateAllModBadges" in inject_js
         assert "__pxmSetInstalled" in inject_js
         assert "__pxmUncheckMod" in inject_js
+        assert "__pxmClearChecked" in inject_js
         assert "MutationObserver" in inject_js
         assert "__onInstalledChanged" not in inject_js
         assert "__onCheckedChanged" not in inject_js

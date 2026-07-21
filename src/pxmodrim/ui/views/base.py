@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.theme.palette import PALETTE
+from pxmodrim.ui.ui_prefs import UIPrefs
 
 
 class BaseViewPanel(QWidget):
@@ -24,10 +25,12 @@ class BaseViewPanel(QWidget):
         ctx: CoreContext,
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
+        ui_prefs: UIPrefs | None = None,
     ) -> None:
         super().__init__(parent)
         self._ctx = ctx
         self._qml_engine = qml_engine
+        self._ui_prefs = ui_prefs or UIPrefs()
         self.setAutoFillBackground(True)
         self._root = QVBoxLayout(self)
         self._root.setContentsMargins(0, 0, 0, 0)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -29,6 +30,9 @@ from pxmodrim.core.sort.community_service import CommunityRulesService
 from pxmodrim.core.sort.config import SortSettings
 from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
+
+if TYPE_CHECKING:
+    from pxmodrim.ui.plugins.steam_cmd_plugin import SteamCmdUiPlugin
 
 
 class SettingsPanel(QDialog):
@@ -102,6 +106,33 @@ class SettingsPanel(QDialog):
         detect_btn = AppButton("Auto-detect")
         detect_btn.clicked.connect(self._auto_detect)
         form.addRow("", detect_btn)
+
+        # ── SteamCMD ────────────────────────────────────────────────────────
+        sc_group = QGroupBox("SteamCMD")
+        sc_form = QFormLayout(sc_group)
+
+        self.steamcmd_edit = QLineEdit(self._config.paths.steamcmd_prefix)
+        self.steamcmd_browse = AppButton("Browse\u2026")
+        self.steamcmd_browse.clicked.connect(self._browse_steamcmd)
+        row = QHBoxLayout()
+        row.addWidget(self.steamcmd_edit, 1)
+        row.addWidget(self.steamcmd_browse)
+        sc_form.addRow("Install path:", row)
+
+        self.steamcmd_install_btn = AppButton("Install SteamCMD")
+        self.steamcmd_install_btn.clicked.connect(self._install_steamcmd)
+        sc_form.addRow("", self.steamcmd_install_btn)
+
+        self.steamcmd_status = QLineEdit()
+        self.steamcmd_status.setReadOnly(True)
+        svc = self._ctx.steam_cmd_service
+        if svc.is_installed():
+            self.steamcmd_status.setText(f"Installed at {svc.install_path}")
+        else:
+            self.steamcmd_status.setText("Not installed")
+        sc_form.addRow("", self.steamcmd_status)
+
+        form.addRow(sc_group)
 
         return tab
 
@@ -210,6 +241,37 @@ class SettingsPanel(QDialog):
         if path:
             self.config_edit.setText(path)
 
+    def _browse_steamcmd(self) -> None:
+        path = QFileDialog.getExistingDirectory(
+            self, "Select SteamCMD install folder"
+        )
+        if path:
+            self.steamcmd_edit.setText(path)
+
+    @asyncSlot()
+    async def _install_steamcmd(self) -> None:
+        prefix = self.steamcmd_edit.text().strip()
+        if not prefix:
+            self.steamcmd_status.setText("Choose an install path first")
+            return
+        self.steamcmd_install_btn.setEnabled(False)
+        self.steamcmd_status.setText("Installing SteamCMD\u2026")
+        try:
+            plugin = cast("SteamCmdUiPlugin | None", self._ctx.plugins.get("steamcmd"))
+            if plugin is None:
+                self.steamcmd_status.setText("SteamCMD plugin not available")
+                return
+            ok = await plugin.ensure_steamcmd(self, prefix=prefix)
+            if ok:
+                svc = self._ctx.steam_cmd_service
+                self.steamcmd_status.setText(
+                    f"Installed at {svc.install_path}"
+                )
+            else:
+                self.steamcmd_status.setText("Install failed")
+        finally:
+            self.steamcmd_install_btn.setEnabled(True)
+
     def _auto_fill_local(self, game_path: str) -> None:
         if not self.local_edit.text():
             candidate = Path(game_path) / "Mods"
@@ -265,6 +327,7 @@ class SettingsPanel(QDialog):
                 local=self.local_edit.text().strip(),
                 workshop=self.workshop_edit.text().strip(),
                 config_folder=self.config_edit.text().strip(),
+                steamcmd_prefix=self.steamcmd_edit.text().strip(),
             ),
             sort=SortSettings(
                 use_alternative_package_ids=self.use_alt_ids_cb.isChecked(),

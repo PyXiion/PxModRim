@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, Signal
+
+if TYPE_CHECKING:
+    from pxmodrim.ui.ui_prefs import UIPrefs
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
@@ -30,8 +34,9 @@ class ModsViewPanel(BaseViewPanel):
         ctx: CoreContext,
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
+        ui_prefs: UIPrefs | None = None,
     ) -> None:
-        super().__init__(ctx, qml_engine, parent)
+        super().__init__(ctx, qml_engine, parent, ui_prefs)
 
         content = QWidget()
         content.setObjectName("contentArea")
@@ -56,7 +61,9 @@ class ModsViewPanel(BaseViewPanel):
         )
         h_layout.addWidget(self.mod_list, stretch=3)
 
-        self.mod_info = ModInfoPanel(self._ctx, self._qml_engine)
+        self.mod_info = ModInfoPanel(
+            self._ctx, self._qml_engine, ui_prefs=self._ui_prefs
+        )
         self.mod_info.setObjectName("modInfoPanel")
         self.mod_info.setMinimumWidth(300)
         h_layout.addWidget(self.mod_info, stretch=2)

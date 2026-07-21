@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.config import save_config
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 from pxmodrim.ui.components import (
@@ -31,6 +30,7 @@ from pxmodrim.ui.components.icon_tab_widget import IconTabWidget
 from pxmodrim.ui.components.icons import icon, pixmap
 from pxmodrim.ui.panels.time_analytics_panel import TimeAnalyticsPanel
 from pxmodrim.ui.theme.palette import PALETTE
+from pxmodrim.ui.ui_prefs import UIPrefs
 
 if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModIssueView
@@ -91,9 +91,11 @@ class ModInfoPanel(QWidget):
         self,
         ctx: CoreContext,
         qml_engine: QQmlEngine | None = None,
+        ui_prefs: UIPrefs | None = None,
     ) -> None:
         super().__init__()
         self._ctx = ctx
+        self._ui_prefs = ui_prefs or UIPrefs()
         self._mod: ListedMod | None = None
         self._current_mod_id: str | None = None
         self._preview_task: asyncio.Task[None] | None = None
@@ -211,7 +213,7 @@ class ModInfoPanel(QWidget):
         self._desc_section = AccordionSection(
             "Description",
             self._desc_renderer,
-            expanded=self._ctx.config.ui.desc_expanded,
+            expanded=self._ui_prefs.desc_expanded,
         )
         self._desc_section.toggled.connect(self._on_desc_toggled)
         self._desc_section.hide()
@@ -226,7 +228,7 @@ class ModInfoPanel(QWidget):
         self._deps_section = AccordionSection(
             "Dependencies",
             self._deps_label,
-            expanded=self._ctx.config.ui.deps_expanded,
+            expanded=self._ui_prefs.deps_expanded,
         )
         self._deps_section.toggled.connect(self._on_deps_toggled)
         self._deps_section.hide()
@@ -420,10 +422,14 @@ class ModInfoPanel(QWidget):
 
     @asyncSlot(bool)
     async def _on_deps_toggled(self, expanded: bool) -> None:
-        self._ctx.config.ui.deps_expanded = expanded
-        await asyncio.to_thread(save_config, self._ctx.config)
+        self._ui_prefs.deps_expanded = expanded
+        from pxmodrim.ui.config import save_ui_prefs
+
+        await asyncio.to_thread(save_ui_prefs, self._ui_prefs)
 
     @asyncSlot(bool)
     async def _on_desc_toggled(self, expanded: bool) -> None:
-        self._ctx.config.ui.desc_expanded = expanded
-        await asyncio.to_thread(save_config, self._ctx.config)
+        self._ui_prefs.desc_expanded = expanded
+        from pxmodrim.ui.config import save_ui_prefs
+
+        await asyncio.to_thread(save_ui_prefs, self._ui_prefs)

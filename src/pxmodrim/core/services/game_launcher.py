@@ -9,8 +9,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from pxmodrim.core.config import LaunchStrategy
-from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
+from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID, LaunchStrategy
 from pxmodrim.core.context import CoreContext
 
 
@@ -20,12 +19,11 @@ class GameLauncher:
     def __init__(self, ctx: CoreContext) -> None:
         self._ctx = ctx
 
-    async def launch(self) -> tuple[bool, str]:
+    async def launch(self, strategy: LaunchStrategy) -> tuple[bool, str]:
         if not self._ctx.config.paths.game:
             logger.warning("Launch aborted — game path not configured")
             return False, "Game path not configured"
 
-        strategy = self._ctx.config.ui.launch_strategy
         logger.info("Launching game with strategy: {}", strategy.name)
         if strategy == LaunchStrategy.DIRECT:
             return await self._launch_direct()

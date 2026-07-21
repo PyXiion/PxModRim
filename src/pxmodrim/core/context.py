@@ -5,15 +5,18 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from pxmodrim.core.models.metadata.structures import ListedMod
+from pxmodrim.core.plugin import PluginRegistry
 from pxmodrim.core.structures import CollectionStats
 
 if TYPE_CHECKING:
-    from pxmodrim.core.config import AppConfig, PathConfig
+    from pxmodrim.core.config import AppConfig, ConfigService, PathConfig
     from pxmodrim.core.mod_service import ModService
+    from pxmodrim.core.plugin import Plugin
     from pxmodrim.core.providers.base import BaseModProvider
     from pxmodrim.core.services.diagnostics_service import DiagnosticsService
     from pxmodrim.core.services.game_launcher import GameLauncher
     from pxmodrim.core.services.sort_service import SortService
+    from pxmodrim.core.services.steam_cmd_service import SteamCmdService
 
 # Minimum valid version string shape: "X.Y" — reject anything shorter
 _VERSION_MIN_PARTS = 2
@@ -39,6 +42,10 @@ class CoreContext:
         "_game_launcher",
         "_providers",
         "_pool",
+        "_steam_cmd_service",
+        "_config_service",
+        "_plugins",
+        "_rail_views",
     )
 
     def __init__(self, cfg: AppConfig) -> None:
@@ -53,6 +60,10 @@ class CoreContext:
         self._game_launcher: GameLauncher | None = None
         self._providers: list[BaseModProvider] | None = None
         self._pool: ThreadPoolExecutor | None = None
+        self._steam_cmd_service: SteamCmdService | None = None
+        self._config_service: ConfigService | None = None
+        self._plugins = PluginRegistry()
+        self._rail_views: list[type] = []
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         """Replace all mods and active UUIDs, taking ownership of the data."""
@@ -119,14 +130,19 @@ class CoreContext:
     @classmethod
     def create(cls, cfg: AppConfig) -> CoreContext:
         """Create a fully-initialised context with all core services."""
+        from pxmodrim.core.config import ConfigService, config_file_path
         from pxmodrim.core.mod_service import ModService
         from pxmodrim.core.profiler import profile
         from pxmodrim.core.providers import create_providers
-        from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+        from pxmodrim.core.services.diagnostics_service import (
+            DiagnosticsService,
+        )
         from pxmodrim.core.services.game_launcher import GameLauncher
         from pxmodrim.core.services.sort_service import SortService
 
+
         ctx = cls(cfg)
+        ctx._config_service = ConfigService(cfg, config_file_path())
         ctx._pool = ThreadPoolExecutor(max_workers=os.cpu_count())
         with profile("services.create") as t:
             with t("create_providers"):
@@ -139,6 +155,14 @@ class CoreContext:
                 ctx._sort_service = SortService(ctx, ctx._diagnostics_service)
             with t("game_launcher"):
                 ctx._game_launcher = GameLauncher(ctx)
+            with t("steam_cmd_service"):
+                from pxmodrim.core.services.steam_cmd_service import (
+                    SteamCmdService,
+                )
+
+                ctx._steam_cmd_service = SteamCmdService(
+                    ctx, ctx._config_service
+                )
         return ctx
 
     # ── Service accessors ──────────────────────────────────────────────────────
@@ -158,6 +182,10 @@ class CoreContext:
     @property
     def game_launcher(self) -> GameLauncher:
         return _require_not_none(self._game_launcher, "game_launcher")
+
+    @property
+    def steam_cmd_service(self) -> SteamCmdService:
+        return _require_not_none(self._steam_cmd_service, "steam_cmd_service")
 
     async def initialize(self) -> None:
         svc = _require_not_none(self._mod_service, "mod_service")
@@ -185,3 +213,19 @@ class CoreContext:
         svc = _require_not_none(self._mod_service, "mod_service")
         self._providers = create_providers(paths, self._pool)
         svc.reset_providers(self._providers)
+
+    # ── Plugin system ──────────────────────────────────────────────────────────
+
+    def register_plugin(self, plugin: Plugin) -> None:
+        self._plugins.register(plugin, self)
+
+    def add_rail_view(self, view_cls: type) -> None:
+        self._rail_views.append(view_cls)
+
+    @property
+    def plugins(self) -> PluginRegistry:
+        return self._plugins
+
+    @property
+    def rail_views(self) -> tuple[type, ...]:
+        return tuple(self._rail_views)
