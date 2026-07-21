@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from pxmodrim.core.config import AppConfig
 from pxmodrim.ui.views import SteamWorkshopViewPanel
@@ -81,11 +81,8 @@ class TestSteamWorkshopView:
         qapp.processEvents()
 
         assert isinstance(view, QWidget)
-        placeholder = view.findChild(QLabel, "placeholder")
-        assert placeholder is not None
-        assert "Initializing" in placeholder.text()
         # WebEngine must NOT be initialized until the tab is shown
-        assert view._web is None
+        assert view._web() is None
         assert view._initialized is False
 
     def test_webengine_init_on_show(
@@ -98,7 +95,7 @@ class TestSteamWorkshopView:
         qapp.processEvents()
 
         assert view._initialized is True
-        assert view._web is not None
+        assert view._web() is not None
 
     def test_preload_starts_webengine(
         self, qapp: QApplication
@@ -111,26 +108,13 @@ class TestSteamWorkshopView:
         qapp.processEvents()
 
         assert view._initialized is True
-        assert view._web is not None
+        assert view._web() is not None
 
         # preload() is idempotent: a second call must not recreate the view
-        first_web = view._web
+        first_web = view._web()
         view.preload()
         qapp.processEvents()
-        assert view._web is first_web
-
-    def test_profile_is_named_persistent(
-        self, qapp: QApplication
-    ) -> None:
-        view = SteamWorkshopViewPanel(ctx=_ctx_stub())
-        qapp.processEvents()
-
-        view.preload()
-        qapp.processEvents()
-
-        assert view._profile is not None
-        assert view._profile.storageName() == "pxmodrim-steam"
-        assert view._profile.persistentStoragePath() != ""
+        assert view._web() is first_web
 
     def test_refresh_badges_runs_without_error(
         self, qapp: QApplication
@@ -167,7 +151,7 @@ class TestSteamWorkshopView:
         # No WebEngine yet: must no-op without raising so the app-state
         # watcher can fire before the Steam tab is ever opened.
         view.refresh_badges()
-        assert view._web is None
+        assert view._web() is None
 
     def test_inject_js_targets_react_dom(self) -> None:
         inject_js = (

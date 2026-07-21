@@ -429,6 +429,7 @@ class SteamCmdService:
             await done.wait()
         finally:
             worker.wait()
+            worker.quit()
             self._worker = None
 
     def cancel(self) -> None:
