@@ -267,8 +267,8 @@ def _vdf_find_rimworld(vdf_path: Path, steam_id: str) -> Path | None:
                 if game.is_dir():
                     return game
 
-    except Exception:
-        pass
+    except OSError:
+        logger.warning("Failed to parse libraryfolders.vdf")
     return None
 
 

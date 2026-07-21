@@ -3,6 +3,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
 
+from loguru import logger
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -152,7 +153,7 @@ class AboutPanel(QDialog):
                 label.setObjectName("creditItem")
                 layout.addWidget(label)
             except PackageNotFoundError:
-                pass
+                logger.debug("Package not found: {}", dep)
 
         layout.addStretch()
         return tab
