@@ -19,7 +19,8 @@ def _kill(proc: subprocess.Popen[str]) -> None:
     try:
         if proc.poll() is None:
             if hasattr(os, "killpg"):
-                os.killpg(os.getpgid(proc.pid), 15)
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(os.getpgid(proc.pid), 15)
             else:
                 proc.terminate()
     except OSError as e:

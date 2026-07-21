@@ -324,7 +324,7 @@ class SteamCmdService:
             data = await _download_bytes(url)
             self.status_message_changed.emit("Extracting SteamCMD...")
             await asyncio.to_thread(_extract_archive, data, url, self._install_path)
-        except Exception as e:  # noqa: BLE001
+        except (httpx.HTTPError, ValueError, OSError) as e:
             logger.error("[steamcmd] download/extraction failed: {}", e)
             self.status_message_changed.emit(
                 f"Failed to install SteamCMD ({type(e).__name__}): {e}"
@@ -350,7 +350,7 @@ class SteamCmdService:
                 self.status_message_changed.emit(f"Downloading SteamCMD from {url}...")
                 try:
                     data = await _download_bytes(url)
-                except Exception as e:
+                except (httpx.HTTPError, OSError) as e:
                     logger.error("[steamcmd] download failed: {}", e)
                     self.status_message_changed.emit(
                         f"Failed to install SteamCMD ({type(e).__name__}): {e}"
@@ -364,7 +364,7 @@ class SteamCmdService:
                     await asyncio.to_thread(
                         _extract_archive, data, url, self._install_path
                     )
-                except Exception as e:
+                except (ValueError, OSError) as e:
                     logger.error("[steamcmd] extraction failed: {}", e)
                     self.status_message_changed.emit(
                         f"Failed to install SteamCMD ({type(e).__name__}): {e}"

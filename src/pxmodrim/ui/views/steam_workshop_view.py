@@ -280,7 +280,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             len(result.succeeded),
             len(result.failed),
         )
-        for mid in (*result.succeeded, *result.failed):
+        for mid in result.succeeded:
             self._checked_ids.pop(mid, None)
             self._download_statuses.pop(mid, None)
         self._current_downloading_id = ""
