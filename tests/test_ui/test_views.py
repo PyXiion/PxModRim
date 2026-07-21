@@ -5,7 +5,8 @@ from importlib import resources as importlib_resources
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
+from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from pxmodrim.core.config import AppConfig
@@ -49,6 +50,28 @@ def _cfg() -> AppConfig:
     return load_config(config_file_path())
 
 
+def _wait_for_qml_ready(view: SteamWorkshopViewPanel, timeout: int = 5000) -> None:
+    """Wait for ``QQuickWidget`` to have a valid root object.
+
+    Uses ``QEventLoop`` + the ``statusChanged`` signal — no polling.
+    """
+    if view._qml.rootObject() is not None:
+        return
+    if view._qml.status() == QQuickWidget.Status.Ready:
+        return
+
+    loop = QEventLoop()
+    QTimer.singleShot(timeout, loop.quit)
+
+    def _on_status(status: QQuickWidget.Status) -> None:
+        if status == QQuickWidget.Status.Ready:
+            loop.quit()
+
+    view._qml.statusChanged.connect(_on_status)
+    loop.exec()
+    view._qml.statusChanged.disconnect(_on_status)
+
+
 class TestRailViews:
     def test_registers_mods_and_steam(self) -> None:
         from pxmodrim.ui.views.mods_view import ModsViewPanel
@@ -74,9 +97,7 @@ class TestRailViews:
 
 
 class TestSteamWorkshopView:
-    def test_constructs_with_placeholder(
-        self, qapp: QApplication
-    ) -> None:
+    def test_constructs_with_placeholder(self, qapp: QApplication) -> None:
         view = SteamWorkshopViewPanel(ctx=_ctx_stub())
         qapp.processEvents()
 
@@ -85,27 +106,23 @@ class TestSteamWorkshopView:
         assert view._web() is None
         assert view._initialized is False
 
-    def test_webengine_init_on_show(
-        self, qapp: QApplication
-    ) -> None:
+    def test_webengine_init_on_show(self, qapp: QApplication) -> None:
         view = SteamWorkshopViewPanel(ctx=_ctx_stub())
         qapp.processEvents()
 
         view.show()
-        qapp.processEvents()
+        _wait_for_qml_ready(view)
 
         assert view._initialized is True
         assert view._web() is not None
 
-    def test_preload_starts_webengine(
-        self, qapp: QApplication
-    ) -> None:
+    def test_preload_starts_webengine(self, qapp: QApplication) -> None:
         view = SteamWorkshopViewPanel(ctx=_ctx_stub())
         qapp.processEvents()
 
         # preload() must initialize WebEngine without a show event
         view.preload()
-        qapp.processEvents()
+        _wait_for_qml_ready(view)
 
         assert view._initialized is True
         assert view._web() is not None
@@ -116,9 +133,7 @@ class TestSteamWorkshopView:
         qapp.processEvents()
         assert view._web() is first_web
 
-    def test_refresh_badges_runs_without_error(
-        self, qapp: QApplication
-    ) -> None:
+    def test_refresh_badges_runs_without_error(self, qapp: QApplication) -> None:
         view = SteamWorkshopViewPanel(ctx=_ctx_stub())
         qapp.processEvents()
 
@@ -130,8 +145,7 @@ class TestSteamWorkshopView:
         qapp.processEvents()
 
         inject_js = (
-            importlib_resources.files("pxmodrim.ui.views.steam_workshop")
-            / "inject.js"
+            importlib_resources.files("pxmodrim.ui.views.steam_workshop") / "inject.js"
         ).read_text(encoding="utf-8")
         assert "updateAllModBadges" in inject_js
         assert "__pxmSetInstalled" in inject_js
@@ -142,9 +156,7 @@ class TestSteamWorkshopView:
         assert "__onCheckedChanged" not in inject_js
         assert "__onSingleModChecked" not in inject_js
 
-    def test_refresh_badges_safe_before_init(
-        self, qapp: QApplication
-    ) -> None:
+    def test_refresh_badges_safe_before_init(self, qapp: QApplication) -> None:
         view = SteamWorkshopViewPanel(ctx=_ctx_stub())
         qapp.processEvents()
 
@@ -155,15 +167,14 @@ class TestSteamWorkshopView:
 
     def test_inject_js_targets_react_dom(self) -> None:
         inject_js = (
-            importlib_resources.files("pxmodrim.ui.views.steam_workshop")
-            / "inject.js"
+            importlib_resources.files("pxmodrim.ui.views.steam_workshop") / "inject.js"
         ).read_text(encoding="utf-8")
 
         # Steam Workshop is a React SPA with hashed class names; badges must
         # target the stable anchors (item links + thumbnail <img>), not the
         # removed .workshopItem markup.
-        assert 'sharedfiles/filedetails/?id=' in inject_js
-        assert "querySelector(\"img\")" in inject_js
+        assert "sharedfiles/filedetails/?id=" in inject_js
+        assert 'querySelector("img")' in inject_js
         assert ".workshopItem" not in inject_js
         assert ".workshopItemTitle" not in inject_js
         assert "rimsort-badge-hovered" not in inject_js

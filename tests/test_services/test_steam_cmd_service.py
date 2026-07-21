@@ -5,12 +5,14 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import msgspec
 import pytest
 from PySide6.QtWidgets import QApplication
 from qasync import QEventLoop
 
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
+from pxmodrim.core.msgspec_hooks import dec_hook
 from pxmodrim.core.services.steam_cmd_service import (
     STEAMCMD_BATCH_SIZE,
     SteamCmdItemStatus,
@@ -105,7 +107,7 @@ class TestBuildDownloadScript:
         ):
             script = service._build_download_script(["111", "222"])
         text = Path(script).read_text(encoding="utf-8")
-        assert 'force_install_dir' in text
+        assert "force_install_dir" in text
         assert "login anonymous" in text
         assert "workshop_download_item 294100 111" in text
         assert "workshop_download_item 294100 222" in text
@@ -159,9 +161,7 @@ def service_local(ctx_with_local: CoreContext, cfg_path: Path) -> SteamCmdServic
 
 
 class TestEnsureSymlink:
-    def test_creates_link(
-        self, service_local: SteamCmdService, tmp_path: Path
-    ) -> None:
+    def test_creates_link(self, service_local: SteamCmdService, tmp_path: Path) -> None:
         asyncio.run(service_local.ensure_symlink())
         dst = Path(service_local.symlink_target)
         assert dst.is_symlink()
@@ -201,9 +201,7 @@ class TestEnsureSymlink:
         with pytest.raises(SymlinkConflictError):
             asyncio.run(service.ensure_symlink())
 
-    def test_explicit_target(
-        self, service: SteamCmdService, tmp_path: Path
-    ) -> None:
+    def test_explicit_target(self, service: SteamCmdService, tmp_path: Path) -> None:
         target = tmp_path / "custom_local"
         target.mkdir()
         asyncio.run(service.ensure_symlink(target))
@@ -244,9 +242,7 @@ class TestSetPrefix:
             str(Path("steamapps", "workshop", "content"))
         )
         exe = "steamcmd.exe" if sys.platform == "win32" else "steamcmd.sh"
-        assert service.executable == str(
-            Path(new_prefix) / "steamcmd" / exe
-        )
+        assert service.executable == str(Path(new_prefix) / "steamcmd" / exe)
 
     def test_ensure_installed_uses_new_prefix(
         self, service: SteamCmdService, tmp_path: Path
@@ -274,32 +270,37 @@ class TestEnsureInstalled:
         ):
             assert asyncio.run(service.ensure_installed()) is False
 
-    def test_persists_prefix(
-        self, service: SteamCmdService, tmp_path: Path
-    ) -> None:
+    def test_persists_prefix(self, service: SteamCmdService, tmp_path: Path) -> None:
         new_prefix = str(tmp_path / "new_prefix")
 
         def _fake_extract(data, url, dest):
             Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
             Path(service.executable).write_text("#!/bin/sh\n")
 
-        with patch(
-            "pxmodrim.core.services.steam_cmd_service.platform.system",
-            return_value="Linux",
-        ), patch(
-            "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            new=AsyncMock(return_value=b""),
-        ), patch(
-            "pxmodrim.core.services.steam_cmd_service._extract_archive",
-            side_effect=_fake_extract,
+        with (
+            patch(
+                "pxmodrim.core.services.steam_cmd_service.platform.system",
+                return_value="Linux",
+            ),
+            patch(
+                "pxmodrim.core.services.steam_cmd_service._download_bytes",
+                new=AsyncMock(return_value=b""),
+            ),
+            patch(
+                "pxmodrim.core.services.steam_cmd_service._extract_archive",
+                side_effect=_fake_extract,
+            ),
         ):
             result = asyncio.run(service.ensure_installed(prefix=new_prefix))
         assert result is True
         assert service.prefix == new_prefix
         assert service._ctx.config.paths.steamcmd_prefix == new_prefix
-        text = Path(service._config.path).read_text(encoding="utf-8")
-        assert '"steamcmd_prefix"' in text
-        assert new_prefix in text
+        cfg = msgspec.json.decode(
+            Path(service._config.path).read_bytes(),
+            type=AppConfig,
+            dec_hook=dec_hook,
+        )
+        assert cfg.paths.steamcmd_prefix == new_prefix
 
     def test_installs_when_missing(
         self, service: SteamCmdService, tmp_path: Path
@@ -308,15 +309,19 @@ class TestEnsureInstalled:
             Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
             Path(service.executable).write_text("#!/bin/sh\n")
 
-        with patch(
-            "pxmodrim.core.services.steam_cmd_service.platform.system",
-            return_value="Linux",
-        ), patch(
-            "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            new=AsyncMock(return_value=b""),
-        ), patch(
-            "pxmodrim.core.services.steam_cmd_service._extract_archive",
-            side_effect=_fake_extract,
+        with (
+            patch(
+                "pxmodrim.core.services.steam_cmd_service.platform.system",
+                return_value="Linux",
+            ),
+            patch(
+                "pxmodrim.core.services.steam_cmd_service._download_bytes",
+                new=AsyncMock(return_value=b""),
+            ),
+            patch(
+                "pxmodrim.core.services.steam_cmd_service._extract_archive",
+                side_effect=_fake_extract,
+            ),
         ):
             result = asyncio.run(service.ensure_installed())
         assert result is True
@@ -326,24 +331,28 @@ class TestEnsureInstalled:
     ) -> None:
         Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
         Path(service.executable).write_text("#!/bin/sh\n")
-        with patch(
-            "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            new=AsyncMock(),
-        ) as dl, patch(
-            "pxmodrim.core.services.steam_cmd_service._extract_archive"
-        ) as ex:
+        with (
+            patch(
+                "pxmodrim.core.services.steam_cmd_service._download_bytes",
+                new=AsyncMock(),
+            ) as dl,
+            patch("pxmodrim.core.services.steam_cmd_service._extract_archive") as ex,
+        ):
             result = asyncio.run(service.ensure_installed())
         assert result is True
         dl.assert_not_called()
         ex.assert_not_called()
 
     def test_download_failure_returns_false(self, service: SteamCmdService) -> None:
-        with patch(
-            "pxmodrim.core.services.steam_cmd_service.platform.system",
-            return_value="Linux",
-        ), patch(
-            "pxmodrim.core.services.steam_cmd_service._download_bytes",
-            new=AsyncMock(side_effect=RuntimeError("boom")),
+        with (
+            patch(
+                "pxmodrim.core.services.steam_cmd_service.platform.system",
+                return_value="Linux",
+            ),
+            patch(
+                "pxmodrim.core.services.steam_cmd_service._download_bytes",
+                new=AsyncMock(side_effect=RuntimeError("boom")),
+            ),
         ):
             result = asyncio.run(service.ensure_installed())
         assert result is False
@@ -352,20 +361,35 @@ class TestEnsureInstalled:
 @pytest.fixture
 def fake_steamcmd(tmp_path: Path) -> Path:
     """A fake 'steamcmd' that prints RimSort-style output for ids 111/222/333."""
-    script = tmp_path / "steamcmd.sh"
-    script.write_text(
-        "#!/bin/sh\n"
-        "echo 'Downloading item 111...'\n"
-        "sleep 0.3\n"
-        "echo 'Success. Downloaded item 111'\n"
-        "echo 'Downloading item 222...'\n"
-        "sleep 0.3\n"
-        "echo 'Success. Downloaded item 222'\n"
-        "echo 'Downloading item 333...'\n"
-        "sleep 0.3\n"
-        "echo 'ERROR! Download item 333'\n"
-    )
-    script.chmod(0o755)
+    if sys.platform == "win32":
+        script = tmp_path / "steamcmd.bat"
+        script.write_text(
+            "@echo off\n"
+            "echo Downloading item 111...\n"
+            "ping -n 2 127.0.0.1 > nul\n"
+            "echo Success. Downloaded item 111\n"
+            "echo Downloading item 222...\n"
+            "ping -n 2 127.0.0.1 > nul\n"
+            "echo Success. Downloaded item 222\n"
+            "echo Downloading item 333...\n"
+            "ping -n 2 127.0.0.1 > nul\n"
+            "echo ERROR! Download item 333\n"
+        )
+    else:
+        script = tmp_path / "steamcmd.sh"
+        script.write_text(
+            "#!/bin/sh\n"
+            "echo 'Downloading item 111...'\n"
+            "sleep 0.3\n"
+            "echo 'Success. Downloaded item 111'\n"
+            "echo 'Downloading item 222...'\n"
+            "sleep 0.3\n"
+            "echo 'Success. Downloaded item 222'\n"
+            "echo 'Downloading item 333...'\n"
+            "sleep 0.3\n"
+            "echo 'ERROR! Download item 333'\n"
+        )
+        script.chmod(0o755)
     return script
 
 
@@ -398,9 +422,7 @@ class TestDownloadMods:
         service.download_item_status_changed.connect(statuses.append)
         service.download_finished.connect(result.append)
         run_async(
-            service.download_mods(
-                ["111", "222", "333"], validate=False
-            ),
+            service.download_mods(["111", "222", "333"], validate=False),
             qapp,
         )
 
@@ -429,9 +451,7 @@ class TestDownloadMods:
         timer = threading.Timer(0.1, _cancel_soon)
         timer.start()
         run_async(
-            service.download_mods(
-                ["111", "222"], validate=False
-            ),
+            service.download_mods(["111", "222"], validate=False),
             qapp,
         )
         timer.cancel()

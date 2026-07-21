@@ -30,7 +30,6 @@ STEAMCMD_BATCH_SIZE = 25
 
 
 class SymlinkConflictError(ValueError):
-
     """
     Raised when ``ensure_symlink`` finds an existing file or directory.
     """
@@ -38,6 +37,7 @@ class SymlinkConflictError(ValueError):
 
 def _remove_symlink_conflict(dst: Path, forced: bool) -> None:
     if dst.is_symlink() or (sys.platform == "win32" and _is_junction(dst)):
+        logger.info("[steamcmd] removing symlink conflict: {}", dst)
         dst.unlink()
     elif dst.is_dir() or dst.exists():
         if not forced:
@@ -83,6 +83,8 @@ def _is_junction(path: Path) -> bool:
         import ctypes
 
         attrs = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+        if attrs == 0xFFFFFFFF:
+            return False
         return bool(attrs & 0x400)
     except (AttributeError, OSError):
         return False
@@ -107,6 +109,10 @@ def _extract_archive(data: bytes, url: str, dest: str) -> None:
         with zipfile.ZipFile(BytesIO(data)) as archive:
             unsafe = [m for m in archive.infolist() if not _is_safe_member(m)]
             if unsafe:
+                for m in unsafe:
+                    logger.warning(
+                        "[steamcmd] rejecting unsafe archive member: {}", m.filename
+                    )
                 raise ValueError(
                     f"Unsafe zip entries detected: {[m.filename for m in unsafe]}"
                 )
@@ -115,6 +121,10 @@ def _extract_archive(data: bytes, url: str, dest: str) -> None:
         with tarfile.open(fileobj=BytesIO(data), mode="r:gz") as archive:
             unsafe = [m for m in archive.getmembers() if not _is_safe_member(m)]
             if unsafe:
+                for m in unsafe:
+                    logger.warning(
+                        "[steamcmd] rejecting unsafe archive member: {}", m.name
+                    )
                 raise ValueError(
                     f"Unsafe tar entries detected: {[m.name for m in unsafe]}"
                 )
@@ -273,7 +283,6 @@ class SteamCmdService:
         logger.debug("[steamcmd] {}", msg)
         self.status_message_changed.emit(msg)
 
-
     # ── Installation ──────────────────────────────────────────────────────────
 
     async def ensure_installed(
@@ -298,6 +307,7 @@ class SteamCmdService:
         system = platform.system()
         url = _STEAMCMD_URLS.get(system)
         if url is None:
+            logger.warning("[steamcmd] unsupported platform: {}", system)
             self.status_message_changed.emit(
                 f"SteamCMD is not supported on platform: {system}"
             )
@@ -313,10 +323,9 @@ class SteamCmdService:
         try:
             data = await _download_bytes(url)
             self.status_message_changed.emit("Extracting SteamCMD...")
-            await asyncio.to_thread(
-                _extract_archive, data, url, self._install_path
-            )
+            await asyncio.to_thread(_extract_archive, data, url, self._install_path)
         except Exception as e:  # noqa: BLE001
+            logger.error("[steamcmd] download/extraction failed: {}", e)
             self.status_message_changed.emit(
                 f"Failed to install SteamCMD ({type(e).__name__}): {e}"
             )
@@ -338,12 +347,11 @@ class SteamCmdService:
             loading_state.step()
 
             with loading_state.task("Downloading SteamCMD\u2026", total_steps=1):
-                self.status_message_changed.emit(
-                    f"Downloading SteamCMD from {url}..."
-                )
+                self.status_message_changed.emit(f"Downloading SteamCMD from {url}...")
                 try:
                     data = await _download_bytes(url)
                 except Exception as e:
+                    logger.error("[steamcmd] download failed: {}", e)
                     self.status_message_changed.emit(
                         f"Failed to install SteamCMD ({type(e).__name__}): {e}"
                     )
@@ -357,6 +365,7 @@ class SteamCmdService:
                         _extract_archive, data, url, self._install_path
                     )
                 except Exception as e:
+                    logger.error("[steamcmd] extraction failed: {}", e)
                     self.status_message_changed.emit(
                         f"Failed to install SteamCMD ({type(e).__name__}): {e}"
                     )
@@ -366,9 +375,7 @@ class SteamCmdService:
             loading_state.step()
 
             if self.is_installed():
-                self.status_message_changed.emit(
-                    "SteamCMD installed successfully."
-                )
+                self.status_message_changed.emit("SteamCMD installed successfully.")
                 return True
             self.status_message_changed.emit(
                 "SteamCMD installation completed but executable not found."
