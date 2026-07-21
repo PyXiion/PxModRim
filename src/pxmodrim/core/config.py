@@ -42,6 +42,7 @@ class PathConfig(msgspec.Struct):
 
 
 class AppConfig(msgspec.Struct):
+
     """Top-level core config: RimWorld paths and sort settings."""
 
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
@@ -54,6 +55,7 @@ class ConfigService:
     __slots__ = ("config", "_path")
 
     def __init__(self, cfg: AppConfig, path: Path) -> None:
+        """Initialize with the given app config and file path."""
         self.config = cfg
         self._path = path
 

@@ -16,6 +16,7 @@ class SteamWorkshopBridge(QObject):
     def __init__(
         self, panel: SteamWorkshopViewPanel, parent: QObject | None = None
     ) -> None:
+        """Initialize the bridge with a reference to the parent workshop panel."""
         super().__init__(parent)
         self._panel = panel
 

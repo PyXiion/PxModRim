@@ -26,6 +26,7 @@ class DownloadSidebar(QWidget):
     def __init__(
         self, qml_engine: QQmlEngine | None = None, parent: QWidget | None = None
     ) -> None:
+        """Initialize the download sidebar with queue model and QML view."""
         super().__init__(parent)
         self.setObjectName("downloadSidebar")
         self.setFixedWidth(240)

@@ -1,4 +1,4 @@
-(function () {
+(function pxmodrimMain() {
     "use strict";
 
     // Prevent double initialization
@@ -26,7 +26,6 @@
     let _bridgeReady = false;
     let _badgeRaf = null;
 
-    // Styles (combined into one block to reduce page repaints)
     const CSS_STYLES = `
         /* Instant-hide styles to prevent flicker */
         #global_header, header, .sharedfiles_item_page_header { display: none !important; }
@@ -399,23 +398,14 @@
         createDetailButton();
     }
 
-    // ── Script entry point (guard against atDocumentCreation timing) ──
-    function startScript() {
-        // Inject styles directly into the HTML root since HEAD is guaranteed absent at this phase
+    function injectStyles() {
         const style = document.createElement("style");
         style.id = "pxmodrim-styles";
         style.textContent = CSS_STYLES;
         document.documentElement.appendChild(style);
-
-        console.log("[pxmodrim] Base styles injected at Document Creation. Starting lifecycle...");
-
-        setupWebChannel();
-        initObservers();
     }
 
-    if (document.documentElement) {
-        startScript();
-    } else {
+    function waitForRoot() {
         const rootWaiter = new MutationObserver(() => {
             if (document.documentElement) {
                 rootWaiter.disconnect();
@@ -423,5 +413,18 @@
             }
         });
         rootWaiter.observe(document, { childList: true });
+    }
+
+    function startScript() {
+        injectStyles();
+        console.log("[pxmodrim] Base styles injected at Document Creation. Starting lifecycle...");
+        setupWebChannel();
+        initObservers();
+    }
+
+    if (document.documentElement) {
+        startScript();
+    } else {
+        waitForRoot();
     }
 })();

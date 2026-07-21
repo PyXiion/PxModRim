@@ -10,7 +10,9 @@ from pxmodrim.ui.ui_prefs import UIPrefs
 
 
 class BaseViewPanel(QWidget):
-    """UI-side whole-window view contributed to the left icon rail.
+
+    """
+    UI-side whole-window view contributed to the left icon rail.
 
     Core never imports this; views are discovered entirely within ``ui/``.
     Subclasses must define ``view_id``, ``icon_name`` and ``label``.

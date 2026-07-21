@@ -30,8 +30,26 @@ STEAMCMD_BATCH_SIZE = 25
 
 
 class SymlinkConflictError(ValueError):
-    """Raised when ``ensure_symlink(forced=False)`` hits a real file/directory
-    at the target path (as opposed to an existing symlink)."""
+
+    """
+    Raised when ``ensure_symlink`` finds an existing file or directory.
+    """
+
+
+def _remove_symlink_conflict(dst: Path, forced: bool) -> None:
+    if dst.is_symlink() or (sys.platform == "win32" and _is_junction(dst)):
+        dst.unlink()
+    elif dst.is_dir() or dst.exists():
+        if not forced:
+            raise SymlinkConflictError(
+                f"A real {'directory' if dst.is_dir() else 'file'} "
+                f"exists at the symlink target ({dst}). "
+                "Use forced=True to overwrite."
+            )
+        if dst.is_dir():
+            shutil.rmtree(dst)
+        else:
+            dst.unlink()
 
 
 class SteamCmdProgress(msgspec.Struct):
@@ -77,13 +95,29 @@ async def _download_bytes(url: str) -> bytes:
         return resp.content
 
 
+def _is_safe_member(member: tarfile.TarInfo | zipfile.ZipInfo) -> bool:
+    path = member.name if isinstance(member, tarfile.TarInfo) else member.filename
+    resolved = Path(path).resolve()
+    return not resolved.is_absolute() and ".." not in resolved.parts
+
+
 def _extract_archive(data: bytes, url: str, dest: str) -> None:
     os.makedirs(dest, exist_ok=True)
     if ".zip" in url:
         with zipfile.ZipFile(BytesIO(data)) as archive:
+            unsafe = [m for m in archive.infolist() if not _is_safe_member(m)]
+            if unsafe:
+                raise ValueError(
+                    f"Unsafe zip entries detected: {[m.filename for m in unsafe]}"
+                )
             archive.extractall(dest)
     elif ".tar.gz" in url:
         with tarfile.open(fileobj=BytesIO(data), mode="r:gz") as archive:
+            unsafe = [m for m in archive.getmembers() if not _is_safe_member(m)]
+            if unsafe:
+                raise ValueError(
+                    f"Unsafe tar entries detected: {[m.name for m in unsafe]}"
+                )
             archive.extractall(dest)
     else:
         raise ValueError(f"Unsupported SteamCMD archive URL: {url}")
@@ -117,6 +151,7 @@ class SteamCmdService:
         config_service: ConfigService,
         runner_factory: Callable[..., DownloadRunner] | None = None,
     ) -> None:
+        """Initialize the SteamCMD service with core context and config."""
         self.status_message_changed = Event()
         self.download_progress = Event()
         self.download_item_status_changed = Event()
@@ -213,8 +248,9 @@ class SteamCmdService:
     async def ensure_symlink(
         self, target: str | Path | None = None, forced: bool = False
     ) -> None:
-        """Symlink SteamCMD workshop content to *target*, raising
-        ``SymlinkConflictError`` when a real dir/file already exists at the
+        """
+        Symlink SteamCMD workshop content to *target*, raising
+        ``SymlinkConflictError`` when a real dir or file already exists at the
         target path and *forced* is ``False``.
 
         When *forced* is ``True`` an existing real directory or file is
@@ -229,21 +265,7 @@ class SteamCmdService:
             )
 
         dst = Path(self.symlink_target)
-        if dst.is_symlink() or (
-            sys.platform == "win32" and _is_junction(dst)
-        ):
-            dst.unlink()
-        elif dst.is_dir() or dst.exists():
-            if not forced:
-                raise SymlinkConflictError(
-                    f"A real {'directory' if dst.is_dir() else 'file'} "
-                    f"exists at the symlink target ({dst}). "
-                    "Use forced=True to overwrite."
-                )
-            if dst.is_dir():
-                shutil.rmtree(dst)
-            else:
-                dst.unlink()
+        _remove_symlink_conflict(dst, forced)
 
         dst.parent.mkdir(parents=True, exist_ok=True)
         os.symlink(target_str, dst, target_is_directory=True)

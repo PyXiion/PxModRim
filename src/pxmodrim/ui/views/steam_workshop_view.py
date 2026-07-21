@@ -57,6 +57,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         parent: QWidget | None = None,
         ui_prefs: UIPrefs | None = None,
     ) -> None:
+        """Initialize the Steam Workshop view with download sidebar and web view."""
         super().__init__(ctx, qml_engine, parent, ui_prefs=ui_prefs)
 
         self._bridge: SteamWorkshopBridge | None = None

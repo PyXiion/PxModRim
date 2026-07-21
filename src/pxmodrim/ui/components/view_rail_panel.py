@@ -24,6 +24,7 @@ class ViewRailPanel(QQuickWidget):
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
     ) -> None:
+        """Initialize the icon rail with tab entries."""
         super().__init__(qml_engine, parent)  # type: ignore[arg-type]
         self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)

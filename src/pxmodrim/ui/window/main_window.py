@@ -52,39 +52,42 @@ if TYPE_CHECKING:
 
 class MainWindow(QMainWindow):
     def __init__(self, ctx: CoreContext, ui_prefs: UIPrefs) -> None:
+        """Initialize the main application window."""
         super().__init__()
 
         self._app_quit_callback: Callable[[], None] | None = None
         self._is_frameless: bool = False
         self._ui_prefs = ui_prefs
+        self._ctx = ctx
+        self._selected_uuid: str | None = None
 
+        self._setup_window_basics()
+        self._setup_qml()
+        self._setup_header_and_shortcuts()
+        self._setup_content_and_views()
+        self._setup_toast_and_events()
+
+    def _setup_window_basics(self) -> None:
         self.setWindowTitle("PxModRim")
         self.setWindowIcon(
             QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         )
         self.resize(1400, 850)
 
-        # Register theme singleton + SVG icon provider on a shared QML engine
+        self._ctx.diagnostics_service.diagnostics_summary_changed.connect(
+            self._on_diagnostics_summary_changed
+        )
+
+        self._is_frameless = self._try_frameless()
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+    def _setup_qml(self) -> None:
         self._qml_engine = QQmlEngine(self)
         self._theme = Theme(self)
         self._qml_engine.rootContext().setContextProperty("Theme", self._theme)
         self._qml_engine.addImageProvider("icons", SvgIconProvider())
 
-        self._ctx = ctx
-        self._selected_uuid: str | None = None
-
-        # Wire diagnostics service signals
-        ctx.diagnostics_service.diagnostics_summary_changed.connect(
-            self._on_diagnostics_summary_changed
-        )
-
-        # ── Frameless window attempt ──
-        self._is_frameless = self._try_frameless()
-
-        # QML quirks
-        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-
-        # ── Header (QML) ──
+    def _setup_header_and_shortcuts(self) -> None:
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ui_prefs.launch_strategy),
@@ -102,30 +105,27 @@ class MainWindow(QMainWindow):
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
 
-        # ── Menu bar (hidden by default, toggled via Alt) ──
         self._menu_bar = MenuBar()
         self._menu_bar.settings_requested.connect(self._open_settings)
         self._menu_bar.about_requested.connect(self._show_about)
 
-        # ── Keyboard shortcuts ──
         QShortcut(QKeySequence("Ctrl+,"), self, self._open_settings)
         QShortcut(QKeySequence("Ctrl+Q"), self, self.close)
         QShortcut(QKeySequence("F5"), self, self._header_controller.refresh)
         QShortcut(QKeySequence("Ctrl+S"), self, self._header_controller.save)
 
-        # ── Outer container ──
+    def _setup_content_and_views(self) -> None:
+        rail_views = self._ctx.rail_views
+
         outer = QWidget()
         outer.setObjectName("outerContainer")
         outer_layout = QVBoxLayout(outer)
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
-
         outer_layout.addWidget(self._header)
         outer_layout.addWidget(self._menu_bar)
         self._menu_bar.hide()
 
-        # ── Content: vertical icon rail + stacked views ──
-        rail_views = self._ctx.rail_views
         rail_tabs = [
             {"viewId": v.view_id, "icon": v.icon_name, "label": v.label}
             for v in rail_views
@@ -173,8 +173,6 @@ class MainWindow(QMainWindow):
                 self._on_order_changed, Qt.ConnectionType.QueuedConnection
             )
 
-        # Keep Steam Workshop badges in sync with the app's installed-mod set:
-        # when mods change in the app, re-badge the open workshop page live.
         steam_view = next(
             (v for v in self._views if v.view_id == "steam_workshop"), None
         )
@@ -184,21 +182,14 @@ class MainWindow(QMainWindow):
         outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
 
-        # ── Toast overlay (replaces status bar) ──
+    def _setup_toast_and_events(self) -> None:
         self._toast_manager = ToastManager(self.centralWidget())
         self._toast_manager.resize_to_parent()
 
-        # Wire deferred signal connections (widgets now exist)
-        ctx.diagnostics_service.status_message_changed.connect(
+        self._ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message
         )
 
-        # Alt key event filter. Installed on the window itself, NOT on the
-        # whole QApplication: an app-wide filter makes PySide wrap every
-        # QObject that receives an event (including WebEngine's internal
-        # widgets), and a dangling wrapper there SIGSEGVs in
-        # getWrapperForQObject. The filter only ever acts on objects whose
-        # window() is this one, so scoping to self is equivalent.
         self.installEventFilter(self)
 
     def _try_frameless(self) -> bool:

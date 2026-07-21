@@ -1,3 +1,5 @@
+"""UI view panels for PxModRim."""
+
 from __future__ import annotations
 
 from pxmodrim.ui.views.base import BaseViewPanel

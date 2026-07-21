@@ -36,6 +36,7 @@ class ModsViewPanel(BaseViewPanel):
         parent: QWidget | None = None,
         ui_prefs: UIPrefs | None = None,
     ) -> None:
+        """Initialize mods view with sidebar, mod list, and mod info panels."""
         super().__init__(ctx, qml_engine, parent, ui_prefs)
 
         content = QWidget()

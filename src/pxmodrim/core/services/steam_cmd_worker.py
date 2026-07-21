@@ -16,8 +16,6 @@ _LOGON_RE = re.compile(r"ERROR! Not logged on\.")
 
 
 def _kill(proc: subprocess.Popen[str]) -> None:
-    import contextlib
-
     try:
         if proc.poll() is None:
             if hasattr(os, "killpg"):
@@ -43,6 +41,7 @@ class SteamCmdDownloadWorker(QThread):
         script_builder,
         parent: Any = None,
     ) -> None:
+        """Initialize the SteamCMD download worker thread."""
         super().__init__(parent)
         self._steamcmd = steamcmd
         self._steam_path = steam_path

@@ -4,7 +4,9 @@ from typing import Any, cast
 
 
 class Plugin:
-    """Base class for all plugins.
+
+    """
+    Base class for all plugins.
 
     ``setup(ctx)`` is called synchronously at register time.  Use it to
     register views, connect signals, etc.  ``init(ctx)`` is async and runs
@@ -20,6 +22,7 @@ class Plugin:
 
 class PluginRegistry:
     def __init__(self) -> None:
+        """Initialize the plugin registry with an empty plugin map."""
         self._plugins: dict[str, Plugin] = {}
 
     def register(self, plugin: Plugin, ctx: Any = None) -> None:

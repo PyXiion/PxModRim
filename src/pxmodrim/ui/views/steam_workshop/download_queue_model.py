@@ -25,6 +25,7 @@ class DownloadQueueModel(QAbstractListModel):
     downloading_id_changed = Signal(str)
 
     def __init__(self, parent: QObject | None = None) -> None:
+        """Initialize the download queue model with empty state."""
         super().__init__(parent)
         self._items: list[dict[str, str]] = []
         self._progress_total = 0
