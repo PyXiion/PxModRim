@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import traceback
 from importlib.resources import files as resource_files
@@ -8,8 +9,17 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
+
+# Qt6 defaults to PassThrough, which causes QtWebEngine to render at
+# integer buffer-scale (e.g. 1×) while the compositor upscales fractionally
+# (e.g. 1.25×, 1.5×) – results in pixelated content.
+# Rounding down (< 0.75) avoids the blurred upscale at the cost of smaller UI;
+# this matches the workaround used by Anki and qutebrowser for QTBUG-113574.
+os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "RoundPreferFloor")
+os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
 from pxmodrim.core.config import (
     AppConfig,
@@ -67,6 +77,7 @@ class App:
     __slots__ = ("qt_app", "_ctx", "_ui_prefs", "main_window")
 
     def __init__(self) -> None:
+        QtWebEngineQuick.initialize()
         self.qt_app = QApplication(sys.argv)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         self.qt_app.setWindowIcon(icon)
