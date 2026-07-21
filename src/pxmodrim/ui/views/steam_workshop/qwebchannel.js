@@ -48,7 +48,7 @@ var QWebChannel = function(transport, initCallback, converters)
     this.addConverter = function(converter)
     {
         if (typeof converter === "string") {
-            if (converterRegistry.hasOwnProperty(converter))
+            if (Object.prototype.hasOwnProperty.call(converterRegistry, converter))
                 this.usedConverters.push(converterRegistry[converter]);
             else
                 console.error("Converter '" + converter + "' not found");
