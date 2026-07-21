@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from loguru import logger
@@ -46,15 +45,9 @@ from importlib.resources import files as resource_files
 
 _WORKSHOP_URL = "https://steamcommunity.com/workshop/browse/?appid=294100"
 
-_QWEBCHANNEL_PATH = Path("/usr/share/qt6/webchannel/qwebchannel.js")
-
-
-def _read_qwebchannel_js() -> str:
-    try:
-        return _QWEBCHANNEL_PATH.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        logger.warning("[steam] qwebchannel.js not found at {}", _QWEBCHANNEL_PATH)
-        return ""
+_QWEBCHANNEL_JS = (
+    resource_files("pxmodrim.ui.views.steam_workshop") / "qwebchannel.js"
+).read_text(encoding="utf-8")
 
 
 class SteamWorkshopViewPanel(BaseViewPanel):
@@ -179,14 +172,12 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         self._profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
         self._profile.setHttpCacheMaximumSize(512 * 1024 * 1024)
 
-        qwebchannel_src = _read_qwebchannel_js()
-        if qwebchannel_src:
-            script = QWebEngineScript()
-            script.setSourceCode(qwebchannel_src)
-            script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
-            script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
-            script.setRunsOnSubFrames(True)
-            self._profile.scripts().insert(script)
+        script = QWebEngineScript()
+        script.setSourceCode(_QWEBCHANNEL_JS)
+        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        script.setRunsOnSubFrames(True)
+        self._profile.scripts().insert(script)
 
         inject_js = (
             resource_files("pxmodrim.ui.views.steam_workshop") / "inject.js"

@@ -77,10 +77,6 @@ class SteamCmdUiPlugin(Plugin):
             )
             return False
         except SymlinkConflictError as exc:
-            if forced:
-                await svc.ensure_symlink(local, forced=True)
-                return True
-
             result, _ = await await_dialog(
                 QMessageBox,
                 QMessageBox.Icon.Warning,

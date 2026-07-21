@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import subprocess
@@ -88,6 +89,9 @@ class SteamCmdDownloadWorker(QThread):
                     )
                 proc.wait()
                 proc = None
+
+                with contextlib.suppress(OSError):
+                    os.remove(script)
         except Exception as e:  # noqa: BLE001
             self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
         finally:

@@ -288,6 +288,8 @@
     };
 
     // ── Async QWebChannel bridge setup ──────────────────────────────────
+    let _wcRetries = 0;
+    const _WC_MAX_RETRIES = 100;
     function setupWebChannel() {
         if (typeof QWebChannel !== "undefined" && typeof qt !== "undefined" && qt.webChannelTransport) {
             new QWebChannel(qt.webChannelTransport, function (channel) {
@@ -322,7 +324,12 @@
                 });
             });
         } else {
-            // Script injected at atDocumentCreation; the Qt environment object may load slightly later
+            _wcRetries++;
+            if (_wcRetries >= _WC_MAX_RETRIES) {
+                console.warn("[pxmodrim] QWebChannel not available after " + _WC_MAX_RETRIES + " retries; giving up.");
+                return;
+            }
+            // Qt environment object may load slightly later
             setTimeout(setupWebChannel, 30);
         }
     }

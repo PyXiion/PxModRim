@@ -6,6 +6,7 @@ import platform
 import shutil
 import sys
 import tarfile
+import tempfile
 import zipfile
 from collections.abc import Callable
 from io import BytesIO
@@ -188,7 +189,7 @@ class SteamCmdService:
     def _build_download_script(
         self, publishedfileids: list[str], validate: bool = False
     ) -> str:
-        download_cmd = "workshop_download_item 294100"
+        download_cmd = f"workshop_download_item {RIMWORLD_STEAM_APP_ID}"
         script_lines = [
             f'force_install_dir "{self._steam_path}"',
             "login anonymous",
@@ -200,12 +201,11 @@ class SteamCmdService:
                 script_lines.append(f"{download_cmd} {pfid}")
         script_lines.append("quit\n")
 
-        from tempfile import gettempdir
-
-        script_path = str(Path(gettempdir()) / "steamcmd_script.txt")
-        with open(script_path, "w", encoding="utf-8") as fh:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix="_steamcmd_script.txt", delete=False, encoding="utf-8"
+        ) as fh:
             fh.write("\n".join(script_lines))
-        return script_path
+            return fh.name
 
     # ── Symlink ──────────────────────────────────────────────────────────────
 
@@ -228,30 +228,28 @@ class SteamCmdService:
             )
 
         dst = Path(self.symlink_target)
-        try:
-            if dst.is_symlink() or (
-                sys.platform == "win32" and _is_junction(dst)
-            ):
+        if dst.is_symlink() or (
+            sys.platform == "win32" and _is_junction(dst)
+        ):
+            dst.unlink()
+        elif dst.is_dir() or dst.exists():
+            if not forced:
+                raise SymlinkConflictError(
+                    f"A real {'directory' if dst.is_dir() else 'file'} "
+                    f"exists at the symlink target ({dst}). "
+                    "Use forced=True to overwrite."
+                )
+            if dst.is_dir():
+                shutil.rmtree(dst)
+            else:
                 dst.unlink()
-            elif dst.is_dir() or dst.exists():
-                if not forced:
-                    raise SymlinkConflictError(
-                        f"A real {'directory' if dst.is_dir() else 'file'} "
-                        f"exists at the symlink target ({dst}). "
-                        "Use forced=True to overwrite."
-                    )
-                if dst.is_dir():
-                    shutil.rmtree(dst)
-                else:
-                    dst.unlink()
 
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(target_str, dst, target_is_directory=True)
-            msg = f"Created SteamCMD symlink: {dst} -> {target_str}"
-            logger.debug("[steamcmd] {}", msg)
-            self.status_message_changed.emit(msg)
-        except OSError:
-            raise
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        os.symlink(target_str, dst, target_is_directory=True)
+        msg = f"Created SteamCMD symlink: {dst} -> {target_str}"
+        logger.debug("[steamcmd] {}", msg)
+        self.status_message_changed.emit(msg)
+
 
     # ── Installation ──────────────────────────────────────────────────────────
 
