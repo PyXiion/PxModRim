@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
                 return True
             logger.info("Frameless not supported, using native frame")
             return False
-        except Exception as exc:
+        except (OSError, AttributeError) as exc:
             logger.warning("Failed to set frameless window: {}", exc)
             return False
 

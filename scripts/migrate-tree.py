@@ -197,7 +197,7 @@ def _rewrite_imports() -> None:
     for filepath in files:
         try:
             original = filepath.read_text(encoding="utf-8")
-        except Exception as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             print(f"  WARN cannot read {filepath}: {exc}", file=sys.stderr)
             continue
 

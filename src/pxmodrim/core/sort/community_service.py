@@ -80,7 +80,7 @@ class CommunityRulesService:
                                     task.step(50)
                                     return self._json_path
 
-        except Exception as e:
+        except (OSError, zipfile.BadZipFile, httpx.HTTPError) as e:
             import logging
 
             logging.getLogger(__name__).warning(

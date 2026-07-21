@@ -21,7 +21,7 @@ def load_ui_prefs(path: Path | None = None) -> UIPrefs:
         return UIPrefs()
     try:
         return msgspec.json.decode(path.read_bytes(), type=UIPrefs)
-    except Exception as e:
+    except (OSError, msgspec.DecodeError) as e:
         from loguru import logger
 
         logger.warning(f"Failed to load UI prefs from {path}: {e}")

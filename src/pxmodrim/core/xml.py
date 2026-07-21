@@ -43,7 +43,7 @@ def xml_path_to_json(path: str) -> dict[str, Any]:
         tree = ET.parse(path)
         root = tree.getroot()
         return etree_to_dict(root)
-    except Exception as e:
+    except (OSError, ET.ParseError) as e:
         logger.error(f"Error parsing XML file {path}: {e}")
         return {}
 

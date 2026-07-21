@@ -23,8 +23,8 @@ def _kill(proc: subprocess.Popen[str]) -> None:
                 os.killpg(os.getpgid(proc.pid), 15)
             else:
                 proc.terminate()
-    except Exception:
-        with contextlib.suppress(Exception):
+    except OSError:
+        with contextlib.suppress(OSError):
             proc.kill()
 
 

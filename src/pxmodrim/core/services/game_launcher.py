@@ -56,7 +56,7 @@ class GameLauncher:
                 start_new_session=True,
             )
             return True, "Game launched"
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.warning("Direct launch failed: {}", e)
             return False, f"Failed to launch: {e}"
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
 
 from PySide6.QtCore import Qt
@@ -151,7 +151,7 @@ class AboutPanel(QDialog):
                 label = QLabel(f"{dep} {ver}  —  {lic}")
                 label.setObjectName("creditItem")
                 layout.addWidget(label)
-            except Exception:
+            except PackageNotFoundError:
                 pass
 
         layout.addStretch()

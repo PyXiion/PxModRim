@@ -62,7 +62,7 @@ def parse_mods_config(path: Path) -> ModsConfig | None:
             activeMods=active_mods,
             knownExpansions=known_expansions,
         )
-    except Exception as e:
+    except (KeyError, TypeError) as e:
         logger.error(f"Failed to parse ModsConfig.xml: {e}")
         return None
 

@@ -315,7 +315,7 @@ class SettingsPanel(QDialog):
         try:
             await self._ctx.mod_service.startup_impact.clear()
             self.si_status.setText("Cache cleared")
-        except Exception as exc:
+        except OSError as exc:
             self.si_status.setText(f"Error: {exc}")
         finally:
             self.si_clear_btn.setEnabled(True)

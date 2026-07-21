@@ -23,7 +23,7 @@ def read_game_version(game_path: str | Path) -> str | None:
         return None
     try:
         return path.read_text(encoding="utf-8").strip()
-    except Exception:
+    except OSError:
         logger.warning("Failed to read game version from {}", path)
         return None
 
@@ -86,7 +86,7 @@ def load_config(path: Path | None = None) -> AppConfig:
     try:
         raw = path.read_bytes()
         return msgspec.json.decode(raw, type=AppConfig, dec_hook=dec_hook)
-    except Exception as e:
+    except (OSError, msgspec.DecodeError) as e:
         logger.warning(f"Failed to load config from {path}: {e}")
         return AppConfig()
 

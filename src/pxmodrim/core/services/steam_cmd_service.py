@@ -64,7 +64,7 @@ def _is_junction(path: Path) -> bool:
 
         attrs = ctypes.windll.kernel32.GetFileAttributesW(str(path))
         return bool(attrs & 0x400)
-    except Exception:
+    except (AttributeError, OSError):
         return False
 
 
@@ -295,7 +295,7 @@ class SteamCmdService:
             await asyncio.to_thread(
                 _extract_archive, data, url, self._install_path
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.status_message_changed.emit(
                 f"Failed to install SteamCMD ({type(e).__name__}): {e}"
             )
