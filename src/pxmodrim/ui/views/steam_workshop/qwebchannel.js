@@ -132,7 +132,7 @@ var QWebChannel = function(transport, initCallback, converters)
 
     this.handleResponse = function(message)
     {
-        if (!message.hasOwnProperty("id")) {
+        if (!Object.prototype.hasOwnProperty.call(message, "id")) {
             console.error("Invalid response message received: ", JSON.stringify(message));
             return;
         }
