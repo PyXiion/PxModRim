@@ -68,6 +68,7 @@ class MainWindow(QMainWindow):
         self._setup_toast_and_events()
 
     def _setup_window_basics(self) -> None:
+        logger.debug("main_window: setting up window basics")
         self.setWindowTitle("PxModRim")
         self.setWindowIcon(
             QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
@@ -82,12 +83,14 @@ class MainWindow(QMainWindow):
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
     def _setup_qml(self) -> None:
+        logger.debug("main_window: setting up QML engine and theme")
         self._qml_engine = QQmlEngine(self)
         self._theme = Theme(self)
         self._qml_engine.rootContext().setContextProperty("Theme", self._theme)
         self._qml_engine.addImageProvider("icons", SvgIconProvider())
 
     def _setup_header_and_shortcuts(self) -> None:
+        logger.debug("main_window: setting up header and shortcuts")
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ui_prefs.launch_strategy),
@@ -115,6 +118,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+S"), self, self._header_controller.save)
 
     def _setup_content_and_views(self) -> None:
+        logger.debug("main_window: setting up content and views")
         rail_views = self._ctx.rail_views
 
         outer = QWidget()
@@ -183,6 +187,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(outer)
 
     def _setup_toast_and_events(self) -> None:
+        logger.debug("main_window: setting up toast manager and events")
         self._toast_manager = ToastManager(self.centralWidget())
         self._toast_manager.resize_to_parent()
 
@@ -229,6 +234,7 @@ class MainWindow(QMainWindow):
         self._app_quit_callback = callback
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        logger.info("main_window: shutting down")
         # Release WebEngine views (their dedicated profiles) before the
         # Qt widget tree is torn down. Then disconnect aboutToQuit: on this
         # Chromium/Qt build, WebEngine registers an aboutToQuit handler
@@ -286,6 +292,7 @@ class MainWindow(QMainWindow):
         await self._ctx.mod_service.reload()
         elapsed = time.monotonic() - t0
         if not self._ctx.all_mods:
+            logger.warning("No mods found after refresh ({:.1f}s)", elapsed)
             self._toast_manager.warning("No mods found")
             return
         self._toast_manager.info(
@@ -325,6 +332,9 @@ class MainWindow(QMainWindow):
             set(self.mod_list.active_uuids())
         )
         if deps_to_enable:
+            logger.info(
+                "auto-sort: enabling {} missing dependencies", len(deps_to_enable)
+            )
             self.mod_list.enableMods(deps_to_enable)
             self._ctx.diagnostics_service.rebuild(self.mod_list.active_uuids())
 
@@ -333,6 +343,7 @@ class MainWindow(QMainWindow):
         elapsed = time.monotonic() - t0
         self.mod_list.model.reorder(ordered_uuids)
         self._ctx.diagnostics_service.reorder(ordered_uuids)
+        logger.info("auto-sort: {} mods sorted in {:.1f}s", len(ordered_uuids), elapsed)
         self._toast_manager.success(
             f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
         )
@@ -425,9 +436,14 @@ class MainWindow(QMainWindow):
             self._mods_view.apply_sidebar_entry(entry)
 
     def _on_entry_selected(self, entry: SidebarEntry) -> None:
+        logger.debug(
+            "main_window: sidebar entry selected: {}",
+            entry.label if entry else None,
+        )
         self._apply_entry(entry)
 
     def _on_rail_tab_changed(self, index: int) -> None:
+        logger.debug("main_window: rail tab changed to {}", index)
         self._stack.setCurrentIndex(index)
         # Preload an adjacent tab (e.g. the Steam view next to Mods) so its
         # content is already warm when the user moves to it.

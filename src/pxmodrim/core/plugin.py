@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from loguru import logger
+
 
 class Plugin:
 
@@ -26,6 +28,7 @@ class PluginRegistry:
         self._plugins: dict[str, Plugin] = {}
 
     def register(self, plugin: Plugin, ctx: Any = None) -> None:
+        logger.debug("plugin registered: {}", plugin.name)
         self._plugins[plugin.name] = plugin
         if ctx is not None:
             plugin.setup(ctx)
@@ -34,9 +37,13 @@ class PluginRegistry:
         return cast(T | None, self._plugins.get(name))
 
     async def init_all(self, ctx: Any) -> None:
+        logger.info("initializing {} plugins...", len(self._plugins))
         for p in self._plugins.values():
             await p.init(ctx)
+        logger.info("all plugins initialized")
 
     async def shutdown_all(self) -> None:
+        logger.info("shutting down {} plugins...", len(self._plugins))
         for p in reversed(list(self._plugins.values())):
             await p.shutdown()
+        logger.info("all plugins shut down")

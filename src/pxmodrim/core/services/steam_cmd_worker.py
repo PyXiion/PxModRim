@@ -22,7 +22,8 @@ def _kill(proc: subprocess.Popen[str]) -> None:
                 os.killpg(os.getpgid(proc.pid), 15)
             else:
                 proc.terminate()
-    except OSError:
+    except OSError as e:
+        logger.debug("[steamcmd] kill error (expected if already dead): {}", e)
         with contextlib.suppress(OSError):
             proc.kill()
 
@@ -50,6 +51,7 @@ class SteamCmdDownloadWorker(QThread):
         self._stopped = False
 
     def cancel(self) -> None:
+        logger.debug("[steamcmd] worker cancel requested")
         self._stopped = True
 
     def run(self) -> None:
@@ -124,6 +126,7 @@ class SteamCmdDownloadWorker(QThread):
             self.item_status.emit(pid, "error")
             return
         if _LOGON_RE.search(text):
+            logger.warning("[steamcmd] logon failed")
             self.status.emit("SteamCMD failed to log in anonymously.")
             return
         logger.trace(f"[steamcmd] {text}")
