@@ -9,8 +9,8 @@ from typing import Any
 from loguru import logger
 from PySide6.QtCore import QThread, Signal
 
-_DOWNLOADING_RE = re.compile(r"Downloading item (\d+)\.\.\.")
-_SUCCESS_RE = re.compile(r"Success\. Downloaded item (\d+)")
+_DOWNLOADING_RE = re.compile(r"Downloading item (\d+)\s*[.…]{3,}")
+_SUCCESS_RE = re.compile(r"Success[.…]*\s*Downloaded item (\d+)")
 _ERROR_RE = re.compile(r"ERROR! Download item (\d+)")
 _LOGON_RE = re.compile(r"ERROR! Not logged on\.")
 
@@ -90,10 +90,19 @@ class SteamCmdDownloadWorker(QThread):
                         total, completed, "", ""
                     )
                 proc.wait()
+                if proc.returncode != 0:
+                    msg = f"SteamCMD exited with code {proc.returncode}"
+                    logger.warning("[steamcmd] {}", msg)
+                    self.status.emit(msg)
                 proc = None
 
                 with contextlib.suppress(OSError):
                     os.remove(script)
+
+            if not self._stopped and any(self._batches) and not succeeded and not failed:  # noqa: E501
+                self.status.emit(
+                    "SteamCMD produced no recognizable output. Check logs for details."
+                )
         except Exception as e:  # noqa: BLE001
             self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
         finally:
@@ -110,11 +119,14 @@ class SteamCmdDownloadWorker(QThread):
         text = line.strip()
         m = _DOWNLOADING_RE.search(text)
         if m:
-            self.item_status.emit(m.group(1), "downloading")
+            pid = m.group(1)
+            logger.debug("[steamcmd] download start: {}", pid)
+            self.item_status.emit(pid, "downloading")
             return
         m = _SUCCESS_RE.search(text)
         if m:
             pid = m.group(1)
+            logger.debug("[steamcmd] download success: {}", pid)
             if pid not in succeeded:
                 succeeded.append(pid)
             self.item_status.emit(pid, "success")
@@ -122,6 +134,7 @@ class SteamCmdDownloadWorker(QThread):
         m = _ERROR_RE.search(text)
         if m:
             pid = m.group(1)
+            logger.debug("[steamcmd] download error: {} (raw: {})", pid, text)
             if pid not in failed:
                 failed.append(pid)
             self.item_status.emit(pid, "error")
@@ -130,4 +143,8 @@ class SteamCmdDownloadWorker(QThread):
             logger.warning("[steamcmd] logon failed")
             self.status.emit("SteamCMD failed to log in anonymously.")
             return
-        logger.trace(f"[steamcmd] {text}")
+        if re.search(r"(?i)(error|fail|denied|timeout|unable|cannot|not found)", text):
+            logger.warning("[steamcmd] {}", text)
+            self.status.emit(f"SteamCMD: {text}")
+        else:
+            logger.debug("[steamcmd] {}", text)

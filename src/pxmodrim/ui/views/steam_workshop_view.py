@@ -263,6 +263,14 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         )
         self._download_sidebar.sync_from(self._checked_ids, self._download_statuses)
 
+    def _on_deps_fetched(self, mod_id: str, json_result: str) -> None:
+        web = self._web()
+        if web is not None:
+            web.runJavaScript(  # pyright: ignore[reportAttributeAccessIssue]
+                f"window.__pxmDepsFetched({json.dumps(mod_id)}, {json_result});",
+                lambda _result: None,
+            )
+
     def _on_steam_progress(self, progress: SteamCmdProgress) -> None:
         self._download_sidebar.set_progress(
             progress.total, progress.completed, self._current_downloading_id
@@ -310,6 +318,12 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             self._ctx.mod_service.mods_changed.disconnect(self._on_mods_changed)
         except (TypeError, RuntimeError):
             pass
+
+        if self._bridge is not None:
+            try:
+                self._bridge.download_state_changed.disconnect(self._on_download_state_changed)
+            except (TypeError, RuntimeError):
+                pass
 
         if not self._initialized:
             return

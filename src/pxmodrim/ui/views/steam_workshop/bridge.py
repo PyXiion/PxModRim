@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
+import httpx
 from loguru import logger
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
@@ -43,6 +45,38 @@ class SteamWorkshopBridge(QObject):
     @Slot(result="QStringList")
     def get_checked_ids(self) -> list[str]:
         return list(self._panel._checked_ids.keys())
+
+    @Slot(str)
+    def fetch_mod_deps(self, mod_id: str) -> None:
+        """Kick off an async fetch of the dependency tree for *mod_id*.
+
+        Result is delivered via ``_on_deps_fetched`` on the panel, which
+        calls ``window.__pxmDepsFetched`` in the web view.
+        """
+        asyncio.create_task(self._do_fetch_deps(mod_id))
+
+    async def _do_fetch_deps(self, mod_id: str) -> None:
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(self._sync_fetch_deps, mod_id),
+                timeout=15.0,
+            )
+            json_result = result if result else "null"
+        except Exception as e:
+            logger.warning("[steam] fetch_mod_deps failed for {}: {}", mod_id, e)
+            json_result = "null"
+        self._panel._on_deps_fetched(mod_id, json_result)
+
+    def _sync_fetch_deps(self, mod_id: str) -> str | None:
+        url = f"https://deps.modrim.pyxiion.ru/deps?id={mod_id}"
+        with httpx.Client(timeout=10) as client:
+            resp = client.get(url, headers={"User-Agent": "PxModRim/1.0"})
+            if resp.status_code != 200:
+                logger.warning(
+                    "[steam] fetch_mod_deps HTTP {} for {}", resp.status_code, mod_id
+                )
+                return None
+            return resp.text
 
     @Slot(str)
     def open_in_browser(self, url: str) -> None:

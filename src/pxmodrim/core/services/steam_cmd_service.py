@@ -98,9 +98,8 @@ async def _download_bytes(url: str) -> bytes:
 
 
 def _is_safe_member(member: tarfile.TarInfo | zipfile.ZipInfo) -> bool:
-    path = member.name if isinstance(member, tarfile.TarInfo) else member.filename
-    resolved = Path(path).resolve()
-    return not resolved.is_absolute() and ".." not in resolved.parts
+    name = member.name if isinstance(member, tarfile.TarInfo) else member.filename
+    return not os.path.isabs(name) and ".." not in Path(name).parts
 
 
 def _extract_archive(data: bytes, url: str, dest: str) -> None:
@@ -277,6 +276,7 @@ class SteamCmdService:
         dst = Path(self.symlink_target)
         _remove_symlink_conflict(dst, forced)
 
+        Path(target_str).mkdir(parents=True, exist_ok=True)
         dst.parent.mkdir(parents=True, exist_ok=True)
         os.symlink(target_str, dst, target_is_directory=True)
         msg = f"Created SteamCMD symlink: {dst} -> {target_str}"
@@ -324,7 +324,7 @@ class SteamCmdService:
             data = await _download_bytes(url)
             self.status_message_changed.emit("Extracting SteamCMD...")
             await asyncio.to_thread(_extract_archive, data, url, self._install_path)
-        except (httpx.HTTPError, ValueError, OSError) as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("[steamcmd] download/extraction failed: {}", e)
             self.status_message_changed.emit(
                 f"Failed to install SteamCMD ({type(e).__name__}): {e}"

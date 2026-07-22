@@ -172,9 +172,10 @@ class TestSteamWorkshopView:
 
         # Steam Workshop is a React SPA with hashed class names; badges must
         # target the stable anchors (item links + thumbnail <img>), not the
-        # removed .workshopItem markup.
+        # removed .workshopItem markup. However, .workshopItemTitle is a stable
+        # semantic class used for mod titles on detail pages (used by DOM strategy).
         assert "sharedfiles/filedetails/?id=" in inject_js
         assert 'querySelector("img")' in inject_js
-        assert ".workshopItem" not in inject_js
-        assert ".workshopItemTitle" not in inject_js
+        assert 'class="workshopItem"' not in inject_js
+        assert "class='workshopItem'" not in inject_js
         assert "rimsort-badge-hovered" not in inject_js

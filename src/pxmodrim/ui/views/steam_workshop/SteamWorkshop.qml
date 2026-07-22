@@ -199,7 +199,6 @@ Rectangle {
 
                 onLoadingChanged: function(loadRequest) {
                     if (loadRequest.status === WebEngineView.LoadStartedStatus) {
-                        root._firstLoad = true
                         root._placeholderText = "Initializing Steam Workshop browser\u2026"
                         root._showError = false
                     } else if (loadRequest.status === WebEngineView.LoadSucceededStatus) {
