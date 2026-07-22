@@ -36,7 +36,7 @@ class SymlinkConflictError(ValueError):
 
 
 def _remove_symlink_conflict(dst: Path, forced: bool) -> None:
-    if dst.is_symlink() or (sys.platform == "win32" and _is_junction(dst)):
+    if dst.is_symlink() or (sys.platform == "win32" and os.path.isjunction(dst)):
         logger.info("[steamcmd] removing symlink conflict: {}", dst)
         dst.unlink()
     elif dst.is_dir() or dst.exists():
@@ -74,20 +74,6 @@ _STEAMCMD_URLS = {
     "Linux": "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz",
     "Windows": "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip",
 }
-
-
-def _is_junction(path: Path) -> bool:
-    if sys.platform != "win32":
-        return False
-    try:
-        import ctypes
-
-        attrs = ctypes.windll.kernel32.GetFileAttributesW(str(path))
-        if attrs == 0xFFFFFFFF:
-            return False
-        return bool(attrs & 0x400)
-    except (AttributeError, OSError):
-        return False
 
 
 async def _download_bytes(url: str) -> bytes:
@@ -255,7 +241,7 @@ class SteamCmdService:
     # ── Symlink ──────────────────────────────────────────────────────────────
 
     async def ensure_symlink(
-        self, target: str | Path | None = None, forced: bool = False
+        self, forced: bool = False
     ) -> None:
         """
         Symlink SteamCMD workshop content to *target*, raising
@@ -265,10 +251,9 @@ class SteamCmdService:
         When *forced* is ``True`` an existing real directory or file is
         removed before the symlink is created.
         """
-        if target is None:
-            target = self._ctx.config.paths.local
-        target_str = str(target) if not isinstance(target, str) else target
-        if not target_str:
+        # TODO: should make it a function arg later
+        target = self._ctx.config.paths.local
+        if not target:
             raise SymlinkConflictError(
                 "Local mods path is not configured; cannot create SteamCMD symlink."
             )
@@ -276,10 +261,10 @@ class SteamCmdService:
         dst = Path(self.symlink_target)
         _remove_symlink_conflict(dst, forced)
 
-        Path(target_str).mkdir(parents=True, exist_ok=True)
+        Path(target).mkdir(parents=True, exist_ok=True)
         dst.parent.mkdir(parents=True, exist_ok=True)
-        os.symlink(target_str, dst, target_is_directory=True)
-        msg = f"Created SteamCMD symlink: {dst} -> {target_str}"
+        os.symlink(target, dst, target_is_directory=True)
+        msg = f"Created SteamCMD symlink: {dst} -> {target}"
         logger.debug("[steamcmd] {}", msg)
         self.status_message_changed.emit(msg)
 
@@ -299,9 +284,6 @@ class SteamCmdService:
 
         if self.is_installed() and not reinstall:
             logger.debug(f"[steamcmd] already installed at {self._executable}")
-            if loading_state is not None:
-                with loading_state.task("SteamCMD", total_steps=1):
-                    loading_state.step()
             return True
 
         system = platform.system()
@@ -311,9 +293,6 @@ class SteamCmdService:
             self.status_message_changed.emit(
                 f"SteamCMD is not supported on platform: {system}"
             )
-            if loading_state is not None:
-                with loading_state.task("SteamCMD", total_steps=1):
-                    loading_state.step()
             return False
 
         if loading_state is not None:
@@ -391,13 +370,9 @@ class SteamCmdService:
         titles: dict[str, str] | None = None,
     ) -> None:
         if not publishedfileids:
-            self.status_message_changed.emit("No mods selected for download.")
-            return
+            raise ValueError("No mods selected for download.")
         if not self.is_installed():
-            self.status_message_changed.emit(
-                "SteamCMD is not installed; cannot download mods."
-            )
-            return
+            raise ValueError("SteamCMD is not installed; cannot download mods.")
 
         titles = titles or {}
         batches = self.split_batches(publishedfileids)
