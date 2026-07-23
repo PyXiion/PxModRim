@@ -433,7 +433,7 @@ def _create_about_mod_from_xml(
     """Parse an About.xml file and return a validated AboutXmlMod with its path set."""
     try:
         mod_data = xml_path_to_json(str(mod_xml_path))
-    except Exception:
+    except (OSError, TypeError):
         logger.error(f"Unable to parse {mod_xml_path}: {traceback.format_exc()}")
         return False, AboutXmlMod(valid=False)
 

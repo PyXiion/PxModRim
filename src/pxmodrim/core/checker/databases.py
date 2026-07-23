@@ -61,7 +61,7 @@ class NoVersionWarningService:
             result: set[PackageId] = {PackageId(mid) for mid in mod_ids}
             logger.info(f"Loaded {len(result)} No Version Warning entries")
             return result
-        except Exception as e:
+        except (KeyError, TypeError, ValueError) as e:
             logger.error(f"Failed to load No Version Warning DB: {e}")
             return set()
 

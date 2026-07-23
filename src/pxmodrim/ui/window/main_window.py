@@ -2,23 +2,33 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
 from loguru import logger
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QIcon, QKeyEvent, QKeySequence, QResizeEvent, QShortcut
+from PySide6.QtGui import (
+    QCloseEvent,
+    QIcon,
+    QKeyEvent,
+    QKeySequence,
+    QResizeEvent,
+    QShortcut,
+)
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QApplication,
-    QHBoxLayout,
     QMainWindow,
+    QSplitter,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.config import LaunchStrategy, save_config
+from pxmodrim.core.config import save_config
+from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
@@ -27,14 +37,13 @@ from pxmodrim.ui.components import (
     HeaderPanel,
     SvgIconProvider,
     ToastManager,
+    ViewRailPanel,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.panels.about_panel import AboutPanel
-from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
-from pxmodrim.ui.panels.mod_list_panel import ModListPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
-from pxmodrim.ui.panels.sidebar_panel import SidebarPanel
 from pxmodrim.ui.theme.qml_theme import Theme
+from pxmodrim.ui.ui_prefs import UIPrefs
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 if TYPE_CHECKING:
@@ -42,41 +51,49 @@ if TYPE_CHECKING:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, ctx: CoreContext) -> None:
+    def __init__(self, ctx: CoreContext, ui_prefs: UIPrefs) -> None:
+        """Initialize the main application window."""
         super().__init__()
 
+        self._app_quit_callback: Callable[[], None] | None = None
         self._is_frameless: bool = False
+        self._ui_prefs = ui_prefs
+        self._ctx = ctx
+        self._selected_uuid: str | None = None
 
+        self._setup_window_basics()
+        self._setup_qml()
+        self._setup_header_and_shortcuts()
+        self._setup_content_and_views()
+        self._setup_toast_and_events()
+
+    def _setup_window_basics(self) -> None:
+        logger.debug("main_window: setting up window basics")
         self.setWindowTitle("PxModRim")
         self.setWindowIcon(
             QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         )
         self.resize(1400, 850)
 
-        # Register theme singleton + SVG icon provider on a shared QML engine
+        self._ctx.diagnostics_service.diagnostics_summary_changed.connect(
+            self._on_diagnostics_summary_changed
+        )
+
+        self._is_frameless = self._try_frameless()
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+    def _setup_qml(self) -> None:
+        logger.debug("main_window: setting up QML engine and theme")
         self._qml_engine = QQmlEngine(self)
         self._theme = Theme(self)
         self._qml_engine.rootContext().setContextProperty("Theme", self._theme)
         self._qml_engine.addImageProvider("icons", SvgIconProvider())
 
-        self._ctx = ctx
-        self._selected_uuid: str | None = None
-
-        # Wire diagnostics service signals
-        ctx.diagnostics_service.diagnostics_summary_changed.connect(
-            self._on_diagnostics_summary_changed
-        )
-
-        # ── Frameless window attempt ──
-        self._is_frameless = self._try_frameless()
-
-        # QML quirks
-        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-
-        # ── Header (QML) ──
+    def _setup_header_and_shortcuts(self) -> None:
+        logger.debug("main_window: setting up header and shortcuts")
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
-            initial_strategy=int(self._ctx.config.ui.launch_strategy),
+            initial_strategy=int(self._ui_prefs.launch_strategy),
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
@@ -91,73 +108,94 @@ class MainWindow(QMainWindow):
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
 
-        # ── Menu bar (hidden by default, toggled via Alt) ──
         self._menu_bar = MenuBar()
         self._menu_bar.settings_requested.connect(self._open_settings)
         self._menu_bar.about_requested.connect(self._show_about)
 
-        # ── Keyboard shortcuts ──
         QShortcut(QKeySequence("Ctrl+,"), self, self._open_settings)
         QShortcut(QKeySequence("Ctrl+Q"), self, self.close)
         QShortcut(QKeySequence("F5"), self, self._header_controller.refresh)
         QShortcut(QKeySequence("Ctrl+S"), self, self._header_controller.save)
 
-        # ── Outer container ──
+    def _setup_content_and_views(self) -> None:
+        logger.debug("main_window: setting up content and views")
+        rail_views = self._ctx.rail_views
+
         outer = QWidget()
         outer.setObjectName("outerContainer")
         outer_layout = QVBoxLayout(outer)
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
-
         outer_layout.addWidget(self._header)
         outer_layout.addWidget(self._menu_bar)
         self._menu_bar.hide()
 
-        # Content (3-panel workspace)
-        content = QWidget()
-        content.setObjectName("contentArea")
-        h_layout = QHBoxLayout(content)
-        h_layout.setContentsMargins(0, 0, 0, 0)
-        h_layout.setSpacing(0)
+        rail_tabs = [
+            {"viewId": v.view_id, "icon": v.icon_name, "label": v.label}
+            for v in rail_views
+        ]
+        self._rail = ViewRailPanel(rail_tabs, self._qml_engine)
+        self._rail.setObjectName("viewRail")
+        self._rail.setMinimumWidth(52)
+        self._rail.setMaximumWidth(180)
+        self._stack = QStackedWidget()
+        self._stack.setObjectName("viewStack")
 
-        self.sidebar = SidebarPanel(self._ctx, self._qml_engine)
-        self.sidebar.setObjectName("sidebarPanel")
-        self.sidebar.setFixedWidth(240)
-        self.sidebar.entry_selected.connect(self._on_entry_selected)
-        h_layout.addWidget(self.sidebar)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.setContentsMargins(0, 0, 0, 0)
+        self._splitter.setHandleWidth(1)
+        self._splitter.addWidget(self._rail)
+        self._splitter.addWidget(self._stack)
+        self._splitter.setStretchFactor(0, 0)
+        self._splitter.setStretchFactor(1, 1)
+        self._splitter.setCollapsible(0, False)
+        self._splitter.setCollapsible(1, False)
+        self._splitter.setSizes([180, self.width() - 180])
+        self._rail.currentChanged.connect(self._on_rail_tab_changed)
+        self._rail.hovered.connect(self._on_rail_hovered)
+        self._splitter.splitterMoved.connect(self._snap_rail)
 
-        self.mod_list = ModListPanel(self._ctx, self._qml_engine)
-        self.mod_list.setObjectName("modListPanel")
-        self.mod_list.mod_selected.connect(self._on_mod_selected)
-        self.mod_list.active_mods_changed.connect(
-            self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
+        self._views: list = []
+        for view_cls in rail_views:
+            view = view_cls(self._ctx, self._qml_engine, ui_prefs=self._ui_prefs)
+            self._views.append(view)
+            self._stack.addWidget(view)
+
+        self._mods_view = next(
+            (v for v in self._views if v.view_id == "mods"), None
         )
-        self.mod_list.order_changed.connect(
-            self._on_order_changed, Qt.ConnectionType.QueuedConnection
+        if self._mods_view is not None:
+            self.sidebar = self._mods_view.sidebar
+            self.mod_list = self._mods_view.mod_list
+            self.mod_info = self._mods_view.mod_info
+            self._mods_view.entry_selected.connect(self._on_entry_selected)
+            self._mods_view.mod_selected.connect(self._on_mod_selected)
+            self._mods_view.active_mods_changed.connect(
+                self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
+            )
+            self._mods_view.order_changed.connect(
+                self._on_order_changed, Qt.ConnectionType.QueuedConnection
+            )
+
+        steam_view = next(
+            (v for v in self._views if v.view_id == "steam_workshop"), None
         )
-        h_layout.addWidget(self.mod_list, stretch=3)
+        if steam_view is not None and self._mods_view is not None:
+            self._mods_view.active_mods_changed.connect(steam_view.refresh_badges)
 
-        self.mod_info = ModInfoPanel(self._ctx, self._qml_engine)
-        self.mod_info.setObjectName("modInfoPanel")
-        self.mod_info.setMinimumWidth(300)
-        h_layout.addWidget(self.mod_info, stretch=2)
-
-        outer_layout.addWidget(content, stretch=1)
+        outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
 
-        # ── Toast overlay (replaces status bar) ──
+    def _setup_toast_and_events(self) -> None:
+        logger.debug("main_window: setting up toast manager and events")
         self._toast_manager = ToastManager(self.centralWidget())
         self._toast_manager.resize_to_parent()
 
-        # Wire deferred signal connections (widgets now exist)
-        ctx.diagnostics_service.status_message_changed.connect(
+        self._ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message
         )
 
-        # Alt key event filter (installed after all widgets exist)
-        app = QApplication.instance()
-        if app is not None:
-            app.installEventFilter(self)
+        self.installEventFilter(self)
 
     def _try_frameless(self) -> bool:
         try:
@@ -173,7 +211,7 @@ class MainWindow(QMainWindow):
                 return True
             logger.info("Frameless not supported, using native frame")
             return False
-        except Exception as exc:
+        except (OSError, AttributeError) as exc:
             logger.warning("Failed to set frameless window: {}", exc)
             return False
 
@@ -190,6 +228,33 @@ class MainWindow(QMainWindow):
         win = self.windowHandle()
         if win is not None:
             win.startSystemMove()
+
+    def set_app_quit_callback(self, callback: Callable[[], None]) -> None:
+        """Store the callback used to end the async run loop on close."""
+        self._app_quit_callback = callback
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        logger.info("main_window: shutting down")
+        # Release WebEngine views (their dedicated profiles) before the
+        # Qt widget tree is torn down. Then disconnect aboutToQuit: on this
+        # Chromium/Qt build, WebEngine registers an aboutToQuit handler
+        # that dereferences a freed object and SIGSEGVs during shutdown
+        # once the Steam tab has been opened. We drop every aboutToQuit
+        # connection (removing Chromium's) and instead fire our own quit
+        # callback directly, so the async run loop ends cleanly and the
+        # process exits without the crashing dispatch.
+        for view in self._views:
+            teardown = getattr(view, "teardown", None)
+            if callable(teardown):
+                teardown()
+
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.disconnect()
+        if self._app_quit_callback is not None:
+            self._app_quit_callback()
+        event.accept()
+        self.deleteLater()
 
     # ── Event filter (Alt → toggle menu bar) ─────────────
 
@@ -227,6 +292,7 @@ class MainWindow(QMainWindow):
         await self._ctx.mod_service.reload()
         elapsed = time.monotonic() - t0
         if not self._ctx.all_mods:
+            logger.warning("No mods found after refresh ({:.1f}s)", elapsed)
             self._toast_manager.warning("No mods found")
             return
         self._toast_manager.info(
@@ -253,6 +319,7 @@ class MainWindow(QMainWindow):
         self._ctx.mod_service.reset_providers(
             create_providers(cfg.paths, self._ctx._pool)
         )
+        self._ctx.steam_cmd_service.set_prefix(cfg.paths.steamcmd_prefix)
         await self._ctx.mod_service.reload()
 
     @asyncSlot()
@@ -265,6 +332,9 @@ class MainWindow(QMainWindow):
             set(self.mod_list.active_uuids())
         )
         if deps_to_enable:
+            logger.info(
+                "auto-sort: enabling {} missing dependencies", len(deps_to_enable)
+            )
             self.mod_list.enableMods(deps_to_enable)
             self._ctx.diagnostics_service.rebuild(self.mod_list.active_uuids())
 
@@ -273,6 +343,7 @@ class MainWindow(QMainWindow):
         elapsed = time.monotonic() - t0
         self.mod_list.model.reorder(ordered_uuids)
         self._ctx.diagnostics_service.reorder(ordered_uuids)
+        logger.info("auto-sort: {} mods sorted in {:.1f}s", len(ordered_uuids), elapsed)
         self._toast_manager.success(
             f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
         )
@@ -299,7 +370,9 @@ class MainWindow(QMainWindow):
                 "Config folder not set — mod list won't be saved"
             )
 
-        success, msg = await self._ctx.game_launcher.launch()
+        success, msg = await self._ctx.game_launcher.launch(
+            self._ui_prefs.launch_strategy
+        )
         if success:
             logger.info(msg)
             self._toast_manager.success(msg)
@@ -309,10 +382,12 @@ class MainWindow(QMainWindow):
 
     def _on_strategy_changed(self, index: int) -> None:
         new_strategy = LaunchStrategy(index)
-        if self._ctx.config.ui.launch_strategy != new_strategy:
+        if self._ui_prefs.launch_strategy != new_strategy:
             logger.info("Launch strategy changed to {}", new_strategy.name)
-            self._ctx.config.ui.launch_strategy = new_strategy
-            save_config(self._ctx.config)
+            self._ui_prefs.launch_strategy = new_strategy
+            from pxmodrim.ui.config import save_ui_prefs
+
+            save_ui_prefs(self._ui_prefs)
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:
@@ -353,26 +428,44 @@ class MainWindow(QMainWindow):
         )
 
     def _apply_current_sidebar_filter(self) -> None:
-        if not hasattr(self, "sidebar") or not self.sidebar:
-            return
-        root = self.sidebar._qml.rootObject()
-        if root is None:
-            return
-        list_view = root.findChild(QObject, "listView")
-        if list_view is None:
-            return
-        selected = list_view.property("currentIndex")
-        if 0 <= selected < len(self.sidebar._entries):
-            self.mod_list.set_sidebar_filter(
-                self.sidebar._entries[selected].visible_uuids
-            )
+        if self._mods_view is not None:
+            self._mods_view.apply_current_sidebar_filter()
 
     def _apply_entry(self, entry: SidebarEntry) -> None:
-        self.mod_list.clearSelection()
-        self.mod_list.set_sidebar_filter(entry.visible_uuids)
+        if self._mods_view is not None:
+            self._mods_view.apply_sidebar_entry(entry)
 
     def _on_entry_selected(self, entry: SidebarEntry) -> None:
+        logger.debug(
+            "main_window: sidebar entry selected: {}",
+            entry.label if entry else None,
+        )
         self._apply_entry(entry)
+
+    def _on_rail_tab_changed(self, index: int) -> None:
+        logger.debug("main_window: rail tab changed to {}", index)
+        self._stack.setCurrentIndex(index)
+        # Preload an adjacent tab (e.g. the Steam view next to Mods) so its
+        # content is already warm when the user moves to it.
+        for adjacent in (index - 1, index + 1):
+            if 0 <= adjacent < len(self._views):
+                preload = getattr(self._views[adjacent], "preload", None)
+                if callable(preload):
+                    preload()
+
+    def _on_rail_hovered(self, index: int) -> None:
+        # Preload view content (e.g. spin up Chromium for the Steam tab)
+        # when the user hovers its rail entry, so the first click is fast
+        # without paying the startup cost up front.
+        if 0 <= index < len(self._views):
+            preload = getattr(self._views[index], "preload", None)
+            if callable(preload):
+                preload()
+
+    def _snap_rail(self) -> None:
+        target = 180 if self._rail.width() >= 116 else 52
+        total = self.width()
+        self._splitter.setSizes([target, total - target])
 
     # ── Diagnostics summary callback ─────────────────────────
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import traceback
 from importlib.resources import files as resource_files
@@ -8,8 +9,17 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
+
+# Qt6 defaults to PassThrough, which causes QtWebEngine to render at
+# integer buffer-scale (e.g. 1×) while the compositor upscales fractionally
+# (e.g. 1.25×, 1.5×) – results in pixelated content.
+# Rounding down (< 0.75) avoids the blurred upscale at the cost of smaller UI;
+# this matches the workaround used by Anki and qutebrowser for QTBUG-113574.
+os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "RoundPreferFloor")
+os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
 from pxmodrim.core.config import (
     AppConfig,
@@ -20,8 +30,11 @@ from pxmodrim.core.config import (
 )
 from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.config import load_ui_prefs
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
+from pxmodrim.ui.plugins import SteamCmdUiPlugin
 from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
+from pxmodrim.ui.views.mods_view import ModsViewPanel
 from pxmodrim.ui.window.main_window import MainWindow
 
 
@@ -61,9 +74,10 @@ sys.excepthook = _exception_hook
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
-    __slots__ = ("qt_app", "_ctx", "main_window")
+    __slots__ = ("qt_app", "_ctx", "_ui_prefs", "main_window")
 
     def __init__(self) -> None:
+        QtWebEngineQuick.initialize()
         self.qt_app = QApplication(sys.argv)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         self.qt_app.setWindowIcon(icon)
@@ -112,8 +126,11 @@ class App:
 
     def _setup(self, cfg: AppConfig) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
+        self._ui_prefs = load_ui_prefs()
         self._ctx = CoreContext.create(cfg)
-        self.main_window = MainWindow(self._ctx)
+        self._ctx.add_rail_view(ModsViewPanel)
+        self._ctx.register_plugin(SteamCmdUiPlugin())
+        self.main_window = MainWindow(self._ctx, self._ui_prefs)
 
     async def async_run(self) -> int:
         """Start main window, prompt for game path if needed, then run event loop."""
@@ -130,12 +147,16 @@ class App:
             save_config(new_cfg)
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
+            self._ctx.steam_cmd_service.set_prefix(new_cfg.paths.steamcmd_prefix)
 
+        await self._ctx.plugins.init_all(self._ctx)
         await self.main_window._refresh_mods()
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)
+        self.main_window.set_app_quit_callback(app_close_event.set)
         await app_close_event.wait()
+        await self._ctx.plugins.shutdown_all()
         return 0
 
     def run(self) -> int:

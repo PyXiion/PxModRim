@@ -1,19 +1,21 @@
 # PxModRim — Agent guide
 
 ## Workflow
-1. `just check` — ruff lint, pyright, dependency check
+1. `just check` — ruff lint + fix, pyright, dependency check
 2. `just test` — run tests
-3. Done
+3. `just ci` — `check` then `test` (matches CI pipeline)
 
+For quick fix cycles: `just fix` (ruff lint fix + format).
+
+## Environment
 Project uses **uv**, **Python 3.12**, **PySide6 + qasync**. Task runner is **just** (`just` to list).
-All just tasks install needed dependencies.
+All just tasks auto-install deps. For manual setup: `uv sync --locked --dev` (CI uses `--locked`).
 
 ## Entrypoints
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)
 - `uv run python -m pxmodrim`
 
 ## Module layout
-
 ```
 src/pxmodrim/
 ├── _app.py              # composition root: DI assembly, Fusion + QPalette
@@ -26,12 +28,16 @@ src/pxmodrim/
 - No comments unless explaining *why*
 - Strict UI/Logic separation: views render pixels and capture raw events. No business logic or I/O in UI components.
 - Async signal handlers **must** have `@asyncSlot()` from `qasync`
+- Always disable the button while the task is running.
 - Never `QApplication.processEvents()`, `dialog.exec()`, `QThread`, `time.sleep()`, `QTimer.singleShot(0, …)` — use `await asyncio.to_thread()`, `await await_dialog()`, `await asyncio.sleep(0)`
 - Never global singletons — constructor DI everywhere
 - Long blocking work → `await asyncio.to_thread(target)`
 - All git renames: `git mv`, never `shutil.move`
-- Create new widgets in QML only.
+- Create new widgets in QML only. ALWAYS ask the user about the widget type (Qt/QML).
 - Prefer grepping instead of running subagents when suitable.
+- Avoid O(N^2) algorithms.
+- Don't make any orphan Qt objects (always pass parent).
+- Separate widget state and the widget.
 
 ## QML / SVG quirks
 - Icons via `image://icons/<name>?color=<hex>` — `SvgIconProvider` on shared `QQmlEngine`

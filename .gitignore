@@ -55,6 +55,9 @@ ltex.dictionary*
 # Translation cache
 .translation_cache.json
 
+# Dummy import validation
+_dummy_pxmodrim.py
+
 # OpenCode
 .opencode/**
 opencode.json

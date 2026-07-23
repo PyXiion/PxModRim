@@ -61,22 +61,23 @@ class ModService:
         own = timer is None
         if own:
             timer = Timer()
-        async with asyncio.TaskGroup() as tg:
-            provs = [
-                tg.create_task(self._discover_one(p))
-                for p in self._providers.values()
-            ]
-        all_mods: dict[str, ListedMod] = {}
-        for coro in provs:
-            mods, child = coro.result()
-            adopt(timer, child)
-            all_mods.update(mods)
-        with timer("resolve_active"):
-            active = resolve_active_uuids(
-                all_mods, self._ctx.config.paths.config_folder
-            )
-        with timer("ctx.load"):
-            self._ctx.load(all_mods, active)
+        with timer("discover"):
+            async with asyncio.TaskGroup() as tg:
+                provs = [
+                    tg.create_task(self._discover_one(p))
+                    for p in self._providers.values()
+                ]
+            all_mods: dict[str, ListedMod] = {}
+            for coro in provs:
+                mods, child = coro.result()
+                adopt(timer, child)
+                all_mods.update(mods)
+            with timer("resolve_active"):
+                active = resolve_active_uuids(
+                    all_mods, self._ctx.config.paths.config_folder
+                )
+            with timer("ctx.load"):
+                self._ctx.load(all_mods, active)
         if own:
             logger.debug("Profile report:\n{}", timer.render())
 
