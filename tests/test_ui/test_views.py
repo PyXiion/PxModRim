@@ -5,8 +5,8 @@ from importlib import resources as importlib_resources
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
-from PySide6.QtQuickWidgets import QQuickWidget
+from PySide6.QtCore import QCoreApplication
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from pxmodrim.core.config import AppConfig
@@ -51,25 +51,14 @@ def _cfg() -> AppConfig:
 
 
 def _wait_for_qml_ready(view: SteamWorkshopViewPanel, timeout: int = 5000) -> None:
-    """Wait for ``QQuickWidget`` to have a valid root object.
-
-    Uses ``QEventLoop`` + the ``statusChanged`` signal — no polling.
-    """
-    if view._qml.rootObject() is not None:
-        return
-    if view._qml.status() == QQuickWidget.Status.Ready:
-        return
-
-    loop = QEventLoop()
-    QTimer.singleShot(timeout, loop.quit)
-
-    def _on_status(status: QQuickWidget.Status) -> None:
-        if status == QQuickWidget.Status.Ready:
-            loop.quit()
-
-    view._qml.statusChanged.connect(_on_status)
-    loop.exec()
-    view._qml.statusChanged.disconnect(_on_status)
+    """Wait for ``QQuickWidget`` to have a valid root object."""
+    elapsed = 0
+    step = 50
+    while elapsed < timeout:
+        if view._qml.rootObject() is not None and view._web() is not None:
+            return
+        QTest.qWait(step)
+        elapsed += step
 
 
 class TestRailViews:
