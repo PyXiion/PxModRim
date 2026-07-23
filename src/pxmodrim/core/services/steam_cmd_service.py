@@ -88,7 +88,8 @@ def _is_safe_member(member: tarfile.TarInfo | zipfile.ZipInfo) -> bool:
     return not os.path.isabs(name) and ".." not in Path(name).parts
 
 
-def _reject_unsafe_members(archive: zipfile.ZipFile | tarfile.TarFile) -> None:
+def _safe_members(archive: zipfile.ZipFile | tarfile.TarFile) -> list:
+    """Return only safe archive members, raising if any are unsafe."""
     if isinstance(archive, zipfile.ZipFile):
         members = archive.infolist()
         name_attr = "filename"
@@ -98,28 +99,27 @@ def _reject_unsafe_members(archive: zipfile.ZipFile | tarfile.TarFile) -> None:
         name_attr = "name"
         kind = "tar"
     unsafe = [m for m in members if not _is_safe_member(m)]
-    if not unsafe:
-        return
-    for m in unsafe:
-        logger.warning(
-            "[steamcmd] rejecting unsafe archive member: {}", getattr(m, name_attr)
+    if unsafe:
+        for m in unsafe:
+            logger.warning(
+                "[steamcmd] rejecting unsafe archive member: {}",
+                getattr(m, name_attr),
+            )
+        raise ValueError(
+            f"Unsafe {kind} entries detected: "
+            f"{[getattr(m, name_attr) for m in unsafe]}"
         )
-    raise ValueError(
-        f"Unsafe {kind} entries detected: "
-        f"{[getattr(m, name_attr) for m in unsafe]}"
-    )
+    return members
 
 
 def _extract_archive(data: bytes, url: str, dest: str) -> None:
     os.makedirs(dest, exist_ok=True)
     if ".zip" in url:
         with zipfile.ZipFile(BytesIO(data)) as archive:
-            _reject_unsafe_members(archive)
-            archive.extractall(dest)
+            archive.extractall(dest, members=_safe_members(archive))
     elif ".tar.gz" in url:
         with tarfile.open(fileobj=BytesIO(data), mode="r:gz") as archive:
-            _reject_unsafe_members(archive)
-            archive.extractall(dest)
+            archive.extractall(dest, members=_safe_members(archive))
     else:
         raise ValueError(f"Unsupported SteamCMD archive URL: {url}")
 
