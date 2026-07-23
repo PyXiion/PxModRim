@@ -1,6 +1,11 @@
 (function pxmodrimMain() {
     "use strict";
-    console.log("[pxmodrim] SCRIPT LOADED");
+
+    const DEBUG = false;
+    const log = DEBUG ? console.log.bind(console, "[pxmodrim]") : () => {};
+    const warn = console.warn.bind(console, "[pxmodrim]");
+
+    log("SCRIPT LOADED");
 
     // Prevent double initialization
     if (window.__pxmodrimInited) return;
@@ -15,11 +20,11 @@
         onStateChange: null,
     };
 
-    const BadgeState = {
+    const BadgeState = Object.freeze({
         INSTALLED: "installed",
         CHECKED: "checked",
         DEFAULT: "default",
-    };
+    });
 
     let _installedIds = window.__pxmodrim.installedIds;
     let _checkedIds = window.__pxmodrim.checkedIds;
@@ -28,17 +33,26 @@
     let _bridgeReadyPromise = null;
     let _badgeRaf = null;
     let _activeRoute = null;
-    let _depCache = new Map();
-    let _depFetching = new Set();
-    let _depFetchAborters = new Map();
-    const DEPTH_MAX = 3;
-    const DEP_SECTION_ID = "pxmodrim-deps";
-    const DEP_SOLO_LINK_ID = "pxmodrim-solo-link";
-    let _isResolvingDeps = false;
-    let _loadingDeps = false;
-    let _detailInjectedUrl = null;
-    let _depSectionInjectedUrl = null;
-    let _createDepSectionRunning = false;
+
+    const Config = Object.freeze({
+        DEPTH_MAX: 3,
+        DEP_SECTION_ID: "pxmodrim-deps",
+        DEP_SOLO_LINK_ID: "pxmodrim-solo-link",
+    });
+
+    const DepState = {
+        cache: new Map(),
+        fetching: new Set(),
+        aborters: new Map(),
+    };
+
+    const DetailState = {
+        injectedUrl: null,
+        wrapperEl: null,
+        loadingDeps: false,
+        resolvingDeps: false,
+        createDepSectionRunning: false,
+    };
 
     const CSS_STYLES = `
         /* Instant-hide styles to prevent flicker */
@@ -252,6 +266,18 @@
         .rimsort-btn-hidden {
             display: none !important;
         }
+        .rimsort-loading-placeholder {
+            width: 100%;
+            height: 36px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 100%);
+            background-size: 200% 100%;
+            animation: rimsort-loading-shimmer 1.2s ease-in-out infinite;
+        }
+        @keyframes rimsort-loading-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     `;
 
     // ── Route dispatcher ──────────────────────────────────────────────────
@@ -260,6 +286,12 @@
             name: "details",
             match: (url) => url.startsWith("https://steamcommunity.com/sharedfiles/filedetails/?id="),
             init() {
+                const placeholder = createPlaceholder();
+                const anchor = document.getElementById("SubscribeItemBtn")
+                    || document.querySelector(".game_area_purchase_game");
+                if (anchor) {
+                    anchor.insertAdjacentElement("afterend", placeholder);
+                }
                 createDetailButton();
                 createDepSection();
             },
@@ -268,11 +300,10 @@
                 if (document.getElementById("SubscribeItemBtn") && !document.getElementById("pxmodrim-subscribe-btn")) {
                     createDetailButton();
                 }
-                if (_depSectionInjectedUrl !== currentUrl) {
-                    // URL changed, let init handle it
+                if (DetailState.injectedUrl !== currentUrl) {
                     return;
                 }
-                if (document.getElementById("RequiredItems") && !document.getElementById(DEP_SECTION_ID)) {
+                if (document.getElementById("RequiredItems") && !document.getElementById(Config.DEP_SECTION_ID)) {
                     createDepSection();
                 }
             },
@@ -345,17 +376,20 @@
         }
     }
 
-    function setDetailBtnVisuals(el, state) {
+    function setDetailBtnVisuals(el, state, defaultLabel) {
         el.className = "rimsort-detail-btn";
         if (state === "installed") {
             el.classList.add("rimsort-mod-installed");
-            el.innerHTML = "Installed";
+            el.textContent = "Installed";
+            el.style.pointerEvents = "none";
         } else if (state === "checked") {
             el.classList.add("rimsort-mod-checked");
-            el.innerHTML = "\u2713 In Queue";
+            el.textContent = "\u2713 In Queue";
+            el.style.pointerEvents = "";
         } else {
             el.classList.add("rimsort-mod-default");
-            el.innerHTML = "Add to Queue";
+            el.textContent = defaultLabel || "Add to Queue";
+            el.style.pointerEvents = "";
         }
     }
 
@@ -445,17 +479,40 @@
     window.__pxmPendingDeps = {};
 
     window.__pxmDepsFetched = function (modId, tree) {
-        console.log(`[pxmodrim] __pxmDepsFetched called for ${modId}, result:`, tree);
+        log(`__pxmDepsFetched called for ${modId}, result:`, tree);
         const resolve = window.__pxmPendingDeps[modId];
         if (resolve) {
-            const valid = tree && tree.id;
-            console.log(`[pxmodrim] __pxmDepsFetched for ${modId}: valid=${valid}, deps=${tree?.deps?.length ?? 0}`);
+            const valid = tree != null;
+            log(`__pxmDepsFetched for ${modId}: valid=${valid}, itemsCount=${tree?.totalItemsLoaded ?? 0}`);
             resolve(valid ? tree : null);
             delete window.__pxmPendingDeps[modId];
         } else {
-            console.warn(`[pxmodrim] __pxmDepsFetched: no pending resolve for ${modId}`);
+            warn(`__pxmDepsFetched: no pending resolve for ${modId}`);
         }
     };
+
+    // ── Flat items map → tree converter ──────────────────────────────────────
+    function convertItemsToTree(items, rootId, maxDepth = Config.DEPTH_MAX) {
+        function buildNode(id, depth, seen) {
+            if (seen.has(id)) {
+                return { id, title: items[id]?.title || `Mod ${id}`, deps: [] };
+            }
+            if (depth >= maxDepth) {
+                const item = items[id];
+                if (!item) return { id, title: `Mod ${id}`, deps: [] };
+                return { id: item.id, title: item.title || `Mod ${id}`, deps: [] };
+            }
+            seen.add(id);
+            const item = items[id];
+            if (!item) return { id, title: `Mod ${id}`, deps: [] };
+            return {
+                id: item.id,
+                title: item.title || `Mod ${id}`,
+                deps: (item.deps || []).map(depId => buildNode(depId, depth + 1, new Set(seen))),
+            };
+        }
+        return buildNode(rootId, 0, new Set());
+    }
 
     // ── Dependency resolution strategies (Strategy Pattern) ────────────────────
 
@@ -463,18 +520,34 @@
         name: "api",
         async fetch(modId) {
             try {
-                console.log(`[pxmodrim] apiStrategy: waiting for bridge for ${modId}`);
                 await waitForBridge(8000);
-                console.log(`[pxmodrim] apiStrategy: bridge ready, calling fetch_mod_deps for ${modId}`);
-                const result = await new Promise((resolve) => {
-                    window.__pxmPendingDeps[modId] = resolve;
-                    _bridge.fetch_mod_deps(modId);
-                    console.log(`[pxmodrim] apiStrategy: fetch_mod_deps called for ${modId}, waiting for __pxmDepsFetched...`);
-                });
-                console.log(`[pxmodrim] apiStrategy: Promise resolved for ${modId}, tree=`, result ? result.id : null);
-                return result;
+
+                const MAX_ATTEMPTS = 30;
+
+                for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+                    const result = await new Promise((resolve) => {
+                        window.__pxmPendingDeps[modId] = resolve;
+                        _bridge.fetch_mod_deps(modId);
+                    });
+
+                    if (!result || !result.items || !result.rootId) {
+                        warn(`apiStrategy: invalid response for ${modId}`);
+                        return null;
+                    }
+
+                    if (result.isComplete) {
+                        log(`apiStrategy: complete for ${modId} after ${attempt + 1} attempt(s)`);
+                        return convertItemsToTree(result.items, result.rootId);
+                    }
+
+                    log(`apiStrategy: incomplete for ${modId} (${result.totalItemsLoaded} items), retry ${attempt + 1}/30`);
+                    await new Promise(r => setTimeout(r, 300));
+                }
+
+                warn(`apiStrategy: still incomplete after 30 attempts for ${modId}`);
+                return null;
             } catch (e) {
-                console.warn("[pxmodrim] API deps failed:", e);
+                warn("API deps failed:", e);
                 return null;
             }
         }
@@ -483,40 +556,40 @@
     const domStrategy = {
         name: "dom",
         async fetch(modId) {
-            console.log(`[pxmodrim] domStrategy: building tree for ${modId}`);
+            log(`domStrategy: building tree for ${modId}`);
             return await buildDomDepTree(modId, 0, new Set());
         }
     };
 
     async function buildDomDepTree(modId, depth, seen) {
-        if (depth >= DEPTH_MAX) {
-            console.log(`[pxmodrim] buildDomDepTree depth limit for ${modId}`);
+        if (depth >= Config.DEPTH_MAX) {
+            log(`buildDomDepTree depth limit for ${modId}`);
             return null;
         }
         if (seen.has(modId)) {
-            console.log(`[pxmodrim] buildDomDepTree circular for ${modId}`);
+            log(`buildDomDepTree circular for ${modId}`);
             return null;
         }
         seen.add(modId);
 
-        let tree = _depCache.get(modId);
+        let tree = DepState.cache.get(modId);
         if (tree) {
-            console.log(`[pxmodrim] buildDomDepTree cache hit for ${modId}`);
+            log(`buildDomDepTree cache hit for ${modId}`);
             return tree;
         }
 
-        if (_depFetching.has(modId)) {
-            console.log(`[pxmodrim] buildDomDepTree waiting for ${modId}`);
-            while (_depFetching.has(modId)) {
+        if (DepState.fetching.has(modId)) {
+            log(`buildDomDepTree waiting for ${modId}`);
+            while (DepState.fetching.has(modId)) {
                 await new Promise(r => setTimeout(r, 50));
             }
-            tree = _depCache.get(modId);
+            tree = DepState.cache.get(modId);
             if (tree) return tree;
         }
 
-        _depFetching.add(modId);
+        DepState.fetching.add(modId);
         const controller = new AbortController();
-        _depFetchAborters.set(modId, controller);
+        DepState.aborters.set(modId, controller);
         try {
             const resp = await fetch(`https://steamcommunity.com/sharedfiles/filedetails/?id=${modId}`, { signal: controller.signal });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -536,40 +609,40 @@
                 else tree.deps.push({ id: dep.id, title: dep.title, deps: [] });
             }
 
-            _depCache.set(modId, tree);
+            DepState.cache.set(modId, tree);
             return tree;
         } catch (e) {
             if (e.name === "AbortError") return null;
-            console.warn(`[pxmodrim] DOM dep fetch failed for ${modId}:`, e);
+            warn(`DOM dep fetch failed for ${modId}:`, e);
             return null;
         } finally {
-            _depFetching.delete(modId);
-            _depFetchAborters.delete(modId);
+            DepState.fetching.delete(modId);
+            DepState.aborters.delete(modId);
         }
     }
 
     async function resolveDepTree(modId) {
-        const cached = _depCache.get(modId);
+        const cached = DepState.cache.get(modId);
         if (cached) {
-            console.log(`[pxmodrim] resolveDepTree cache hit for ${modId}`);
+            log(`resolveDepTree cache hit for ${modId}`);
             return cached;
         }
 
         for (const strategy of [apiStrategy, domStrategy]) {
             try {
-                console.log(`[pxmodrim] resolveDepTree trying ${strategy.name} for ${modId}`);
+                log(`resolveDepTree trying ${strategy.name} for ${modId}`);
                 const tree = await strategy.fetch(modId);
                 if (tree) {
-                    console.log(`[pxmodrim] resolveDepTree ${strategy.name} succeeded for ${modId}`);
-                    _depCache.set(modId, tree);
+                    log(`resolveDepTree ${strategy.name} succeeded for ${modId}`);
+                    DepState.cache.set(modId, tree);
                     return tree;
                 }
-                console.log(`[pxmodrim] resolveDepTree ${strategy.name} returned null for ${modId}`);
+                log(`resolveDepTree ${strategy.name} returned null for ${modId}`);
             } catch (e) {
-                console.warn(`[pxmodrim] ${strategy.name} strategy failed for ${modId}:`, e);
+                warn(`${strategy.name} strategy failed for ${modId}:`, e);
             }
         }
-        console.warn(`[pxmodrim] resolveDepTree all strategies failed for ${modId}`);
+        warn(`resolveDepTree all strategies failed for ${modId}`);
         return null;
     }
 
@@ -588,14 +661,14 @@
     }
 
     function cancelPendingDepFetches() {
-        _depFetchAborters.forEach((controller) => controller.abort());
-        _depFetchAborters.clear();
-        _depFetching.clear();
+        DepState.aborters.forEach((controller) => controller.abort());
+        DepState.aborters.clear();
+        DepState.fetching.clear();
     }
 
     async function queueModWithDeps(modId, title) {
-        if (_isResolvingDeps) return;
-        _isResolvingDeps = true;
+        if (DetailState.resolvingDeps) return;
+        DetailState.resolvingDeps = true;
 
         const btn = document.getElementById("pxmodrim-subscribe-btn");
         if (btn) {
@@ -614,7 +687,7 @@
                 if (_bridge) _bridge.toggle_download_checked(dep.id, dep.title, true);
             }
         } else {
-            console.warn("[pxmodrim] Failed to resolve deps for", modId);
+            warn("Failed to resolve deps for", modId);
         }
 
         if (btn) {
@@ -623,7 +696,7 @@
         }
         refreshAllDepsBadges();
         updateSoloLinkVisibility();
-        _isResolvingDeps = false;
+        DetailState.resolvingDeps = false;
     }
 
     function queueModSolo(modId, title) {
@@ -644,7 +717,7 @@
     }
 
     function updateSoloLinkVisibility() {
-        const soloLink = document.getElementById(DEP_SOLO_LINK_ID);
+        const soloLink = document.getElementById(Config.DEP_SOLO_LINK_ID);
         const requiredContainer = document.getElementById("RequiredItems");
         const btn = document.getElementById("pxmodrim-subscribe-btn");
         if (!soloLink) return;
@@ -657,132 +730,79 @@
         }
     }
 
-    async function createDepSection() {
-        if (_createDepSectionRunning) {
-            console.log(`[pxmodrim] createDepSection already running, skipping`);
-            return;
+    function insertAfterSection(el) {
+        const after = document.getElementById("pxmodrim-subscribe-btn")
+            || document.getElementById("SubscribeItemBtn");
+        if (after && after.parentElement) {
+            after.parentElement.insertBefore(el, after.nextSibling);
+            return true;
         }
-        _createDepSectionRunning = true;
-        const currentUrl = window.location.href;
-        console.log(`[pxmodrim] createDepSection START, url=${currentUrl}`);
-        if (_depSectionInjectedUrl !== currentUrl) {
-            _depSectionInjectedUrl = currentUrl;
-            const existing = document.getElementById(DEP_SECTION_ID);
-            if (existing) existing.remove();
-        } else if (document.getElementById(DEP_SECTION_ID)) {
-            refreshAllDepsBadges();
-            updateSoloLinkVisibility();
-            _createDepSectionRunning = false;
-            return;
-        }
+        return false;
+    }
 
-        const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
-        console.log(`[pxmodrim] createDepSection modId=${modId}`);
-        if (!modId) {
-            _createDepSectionRunning = false;
-            return;
-        }
+    function createPlaceholder() {
+        const el = document.createElement("div");
+        el.className = "rimsort-loading-placeholder";
+        return el;
+    }
 
-        // Insert loading placeholder and hide buttons
-        const loadingId = "pxmodrim-dep-loading";
-        const loading = document.createElement("div");
-        loading.id = loadingId;
-        loading.className = "rimsort-dep-loading-container";
-        loading.innerHTML = '<div class="rimsort-dep-spinner"></div><span>Resolving dependencies...</span>';
-
-        const removeLoading = () => {
-            const el = document.getElementById(loadingId);
-            if (el) el.remove();
-        };
-
-        const hideButtons = () => {
-            const wrapper = document.querySelector("#pxmodrim-subscribe-btn")?.closest("div[style*='flex']");
-            if (wrapper) {
-                wrapper.classList.add("rimsort-btn-hidden");
+    function createLoadingPlaceholder(el, promise) {
+        promise.then(replacement => {
+            if (!el.parentNode) return;
+            if (replacement) {
+                el.replaceWith(replacement);
+            } else {
+                el.remove();
             }
-        };
-        // Loading div will be inserted once buttons area exists.  Before that we
-        // hide any existing wrapper and set a flag so createDetailButton hides new ones.
-        _loadingDeps = true;
-        hideButtons();
-        console.log(`[pxmodrim] createDepSection: starting resolveDepTree for ${modId}`);
+        }).catch(() => el.parentNode?.remove());
+    }
 
-        const loadingInterval = setInterval(() => {
-            const wrapper = document.querySelector("#pxmodrim-subscribe-btn")?.closest("div[style*='flex']");
-            if (wrapper) {
-                wrapper.classList.add("rimsort-btn-hidden");
-                clearInterval(loadingInterval);
-            }
-            const btn = document.getElementById("SubscribeItemBtn");
-            if (btn && btn.parentElement && !document.getElementById(loadingId)) {
-                btn.parentElement.insertBefore(loading, btn.nextSibling);
-                console.log(`[pxmodrim] createDepSection: loading div inserted after SubscribeItemBtn`);
-                clearInterval(loadingInterval);
-            } else if (document.body && !document.getElementById(loadingId)) {
-                document.body.appendChild(loading);
-                console.log(`[pxmodrim] createDepSection: loading div appended to body`);
-                clearInterval(loadingInterval);
-            }
-        }, 30);
-
-        const tree = await resolveDepTree(modId);
-        console.log(`[pxmodrim] createDepSection: resolveDepTree returned`, tree ? `id=${tree.id} deps=${tree.deps?.length}` : `null`);
-        clearInterval(loadingInterval);
-        removeLoading();
-        _loadingDeps = false;
-
-        // Show buttons again
-        document.querySelectorAll(".rimsort-btn-hidden").forEach(el => el.classList.remove("rimsort-btn-hidden"));
+    function buildDepSection(tree) {
+        const section = document.createElement("div");
+        section.id = Config.DEP_SECTION_ID;
+        section.className = "rimsort-deps-section";
 
         if (tree && tree.deps?.length) {
-            const section = document.createElement("div");
-            section.id = DEP_SECTION_ID;
-            section.className = "rimsort-deps-section";
-
             const header = document.createElement("div");
             header.className = "rimsort-deps-header";
             header.textContent = `Dependencies (${tree.deps.length}):`;
             section.appendChild(header);
-
             const list = document.createElement("div");
             list.className = "rimsort-dep-list";
             renderDepTree(list, tree.deps, 0, new Set());
             section.appendChild(list);
-
-            const btn = document.getElementById("pxmodrim-subscribe-btn") || document.getElementById("SubscribeItemBtn");
-            if (btn && btn.parentElement) {
-                btn.parentElement.insertBefore(section, btn.nextSibling);
-            } else if (document.body) {
-                document.body.appendChild(section);
-            }
-            updateSoloLinkVisibility();
-            _createDepSectionRunning = false;
-            return;
+            return section;
         }
 
-        // Fallback: scrape immediate deps from current page DOM
-        const requiredContainer = document.getElementById("RequiredItems");
-        if (!requiredContainer) {
-            _createDepSectionRunning = false;
-            return;
+        // Authoritative empty result from API — no need for DOM fallback
+        if (tree) {
+            const header = document.createElement("div");
+            header.className = "rimsort-deps-header";
+            header.textContent = "No dependencies found";
+            section.appendChild(header);
+            const list = document.createElement("div");
+            list.className = "rimsort-dep-list";
+            const empty = document.createElement("div");
+            empty.className = "rimsort-dep-empty";
+            empty.textContent = "This mod has no required items";
+            empty.style.padding = "8px";
+            empty.style.color = "#888";
+            list.appendChild(empty);
+            section.appendChild(list);
+            return section;
         }
-        const deps = scrapeDepsFromContainer(requiredContainer);
 
-        const section = document.createElement("div");
-        section.id = DEP_SECTION_ID;
-        section.className = "rimsort-deps-section";
-
+        const required = document.getElementById("RequiredItems");
+        if (!required) return null;
+        const deps = scrapeDepsFromContainer(required);
         const header = document.createElement("div");
         header.className = "rimsort-deps-header";
         header.textContent = deps.length ? `Dependencies (${deps.length}):` : "No dependencies found";
         section.appendChild(header);
-
         const list = document.createElement("div");
         list.className = "rimsort-dep-list";
         if (deps.length) {
-            deps.forEach((dep) => {
-                renderDepNode(list, dep, 0, new Set());
-            });
+            deps.forEach(d => list.appendChild(createDepNode({ id: d.id, title: d.title, deps: [] }, 0)));
         } else {
             const empty = document.createElement("div");
             empty.className = "rimsort-dep-empty";
@@ -792,16 +812,55 @@
             list.appendChild(empty);
         }
         section.appendChild(list);
+        return section;
+    }
 
-        const btn = document.getElementById("pxmodrim-subscribe-btn") || document.getElementById("SubscribeItemBtn");
-        if (btn && btn.parentElement) {
-            btn.parentElement.insertBefore(section, btn.nextSibling);
-        } else if (document.body) {
-            document.body.appendChild(section);
+    async function createDepSection() {
+        if (DetailState.createDepSectionRunning) return;
+        DetailState.createDepSectionRunning = true;
+
+        try {
+            const currentUrl = window.location.href;
+
+            if (DetailState.injectedUrl !== currentUrl) {
+                DetailState.injectedUrl = currentUrl;
+                DetailState.createDepSectionRunning = false;
+                DetailState.wrapperEl = null;
+                const existing = document.getElementById(Config.DEP_SECTION_ID);
+                if (existing) existing.remove();
+            } else if (document.getElementById(Config.DEP_SECTION_ID)) {
+                refreshAllDepsBadges();
+                updateSoloLinkVisibility();
+                return;
+            }
+
+            const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
+            if (!modId) return;
+
+            // Loading state
+            const wrapper = document.querySelector("#pxmodrim-subscribe-btn")?.closest("div[style*='flex']");
+            DetailState.wrapperEl = wrapper || null;
+            DetailState.loadingDeps = true;
+            if (wrapper) wrapper.classList.add("rimsort-btn-hidden");
+
+            const loading = document.createElement("div");
+            loading.className = "rimsort-dep-loading-container";
+            loading.innerHTML = '<div class="rimsort-dep-spinner"></div><span>Resolving dependencies...</span>';
+            insertAfterSection(loading);
+
+            const tree = await resolveDepTree(modId);
+
+            // Remove loading state
+            loading.remove();
+            if (DetailState.wrapperEl) DetailState.wrapperEl.classList.remove("rimsort-btn-hidden");
+            DetailState.loadingDeps = false;
+
+            const section = buildDepSection(tree);
+            if (section) insertAfterSection(section);
+            updateSoloLinkVisibility();
+        } finally {
+            DetailState.createDepSectionRunning = false;
         }
-        updateSoloLinkVisibility();
-        console.log(`[pxmodrim] createDepSection END, section created`);
-        _createDepSectionRunning = false;
     }
 
     function createDepNode(dep, depth) {
@@ -809,7 +868,7 @@
         node.className = "rimsort-dep-node";
         node.style.paddingLeft = `${depth * 16}px`;
 
-        const hasChildren = dep.deps && dep.deps.length > 0 && depth + 1 < DEPTH_MAX;
+        const hasChildren = dep.deps && dep.deps.length > 0 && depth + 1 < Config.DEPTH_MAX;
 
         const expand = document.createElement("span");
         expand.className = "rimsort-dep-expand";
@@ -864,11 +923,11 @@
             container.appendChild(node);
 
             if (dep.deps && dep.deps.length) {
-                if (depth + 1 >= DEPTH_MAX) {
+                if (depth + 1 >= Config.DEPTH_MAX) {
                     const maxDepth = document.createElement("div");
                     maxDepth.className = "rimsort-dep-maxdepth";
                     maxDepth.style.paddingLeft = `${(depth + 1) * 16}px`;
-                    maxDepth.textContent = `${dep.deps.length} required item(s) (max depth ${DEPTH_MAX})`;
+                    maxDepth.textContent = `${dep.deps.length} required item(s) (max depth ${Config.DEPTH_MAX})`;
                     container.appendChild(maxDepth);
                 } else {
                     const childrenContainer = document.createElement("div");
@@ -876,60 +935,6 @@
                     childrenContainer.style.display = "none";
                     renderDepTree(childrenContainer, dep.deps, depth + 1, new Set(seenIds));
                     container.appendChild(childrenContainer);
-                }
-            }
-        });
-    }
-
-    // Legacy renderDepNode for fallback (not used when API strategy succeeds)
-    function renderDepNode(container, dep, depth, seenIds) {
-        if (seenIds.has(dep.id)) {
-            const circ = document.createElement("div");
-            circ.className = "rimsort-dep-circular";
-            circ.textContent = `↻ ${dep.title} (circular)`;
-            container.appendChild(circ);
-            return;
-        }
-        seenIds.add(dep.id);
-
-        const node = document.createElement("div");
-        node.className = "rimsort-dep-node";
-        node.style.paddingLeft = `${depth * 16}px`;
-
-        const expand = document.createElement("span");
-        expand.className = "rimsort-dep-expand";
-        expand.textContent = "▸";
-        expand.title = "Expand to see dependencies";
-
-        const badge = document.createElement("span");
-        badge.className = "rimsort-dep-badge";
-        badge.dataset.modid = dep.id;
-        badge.title = dep.id;
-        setBadgeVisuals(badge, getDepBadgeState(dep.id));
-
-        badge.addEventListener("click", makeBadgeClickHandler(badge, dep.id, () => dep.title));
-
-        const titleLink = document.createElement("a");
-        titleLink.className = "rimsort-dep-title";
-        titleLink.href = `https://steamcommunity.com/sharedfiles/filedetails/?id=${dep.id}`;
-        titleLink.target = "_blank";
-        titleLink.rel = "noopener noreferrer";
-        titleLink.textContent = dep.title;
-        titleLink.title = dep.title;
-
-        node.appendChild(expand);
-        node.appendChild(badge);
-        node.appendChild(titleLink);
-        container.appendChild(node);
-
-        expand.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (expand.classList.contains("empty")) return;
-            if (expand.classList.contains("expanded")) {
-                expand.classList.remove("expanded");
-                const children = node.nextElementSibling;
-                if (children && children.classList.contains("rimsort-dep-children")) {
-                    children.style.display = "none";
                 }
             }
         });
@@ -976,17 +981,17 @@
                 window.updateModBadge(modId, BadgeState.DEFAULT);
             }
         });
-        console.log(`[pxmodrim] Badges updated: links=${links.length} installed=${badged}`);
+        log(`Badges updated: links=${links.length} installed=${badged}`);
     };
 
     function createDetailButton() {
         const currentUrl = window.location.href;
-        if (_detailInjectedUrl !== currentUrl) {
-            // New detail page - reset injection state
-            _detailInjectedUrl = currentUrl;
+        if (DetailState.injectedUrl !== currentUrl) {
+            DetailState.injectedUrl = currentUrl;
+            DetailState.wrapperEl = null;
             const existing = document.getElementById("pxmodrim-subscribe-btn");
             if (existing) existing.remove();
-            const existingSection = document.getElementById(DEP_SECTION_ID);
+            const existingSection = document.getElementById(Config.DEP_SECTION_ID);
             if (existingSection) existingSection.remove();
         }
 
@@ -1016,30 +1021,18 @@
         btn.id = "pxmodrim-subscribe-btn";
         btn.style.textAlign = "center";
 
-        const requiredContainer = document.getElementById("RequiredItems");
-        const hasDeps = !!requiredContainer;
+        const hasDeps = !!document.getElementById("RequiredItems");
 
         function updateButtonVisuals() {
-            const state = getDetailButtonState(modId);
-            if (state === "installed") {
-                btn.className = "rimsort-detail-btn rimsort-mod-installed";
-                btn.textContent = "Installed";
-                btn.style.pointerEvents = "none";
-            } else if (state === "checked") {
-                btn.className = "rimsort-detail-btn rimsort-mod-checked";
-                btn.textContent = "✓ In Queue";
-            } else {
-                btn.className = "rimsort-detail-btn rimsort-mod-default";
-                btn.textContent = hasDeps ? "Add to Queue (with deps)" : "Add to Queue";
-            }
+            setDetailBtnVisuals(btn, getDetailButtonState(modId),
+                hasDeps ? "Add to Queue (with deps)" : "Add to Queue");
         }
 
         btn.addEventListener("click", function (e) {
             e.preventDefault();
             e.stopPropagation();
-
             if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
-            if (_isResolvingDeps) return;
+            if (DetailState.resolvingDeps) return;
 
             btn.classList.add("pressed");
             requestAnimationFrame(() => btn.classList.remove("pressed"));
@@ -1056,14 +1049,14 @@
         });
 
         updateButtonVisuals();
-        if (_loadingDeps) {
+        if (DetailState.loadingDeps) {
             wrapper.classList.add("rimsort-btn-hidden");
         }
         wrapper.appendChild(btn);
 
         if (hasDeps) {
             const soloLink = document.createElement("a");
-            soloLink.id = DEP_SOLO_LINK_ID;
+            soloLink.id = Config.DEP_SOLO_LINK_ID;
             soloLink.className = "rimsort-solo-link";
             soloLink.textContent = "Queue only this mod";
             soloLink.href = "#";
@@ -1071,7 +1064,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
-                if (_isResolvingDeps) return;
+                if (DetailState.resolvingDeps) return;
                 queueModSolo(modId, title);
             });
             wrapper.appendChild(soloLink);
@@ -1079,6 +1072,7 @@
         }
 
         oldBtn.insertAdjacentElement("afterend", wrapper);
+        document.querySelector(".rimsort-loading-placeholder")?.remove();
         return true;
     }
 
@@ -1129,7 +1123,7 @@
                 _bridgeReady = true;
                 window.__pxmodrim.bridge = _bridge;
                 window.__pxmodrim.bridgeReady = true;
-                console.log("[pxmodrim] QWebChannel connection established");
+                log("QWebChannel connection established");
                 resolveBridgeReady();
 
                 let initInstalled = false;
@@ -1159,7 +1153,7 @@
         } else {
             _wcRetries++;
             if (_wcRetries >= _WC_MAX_RETRIES) {
-                console.warn("[pxmodrim] QWebChannel not available after " + _WC_MAX_RETRIES + " retries; giving up.");
+                warn("QWebChannel not available after " + _WC_MAX_RETRIES + " retries; giving up.");
                 return;
             }
             // Qt environment object may load slightly later
@@ -1169,21 +1163,12 @@
 
     // ── Steam DOM cleanup ────────────────────────────────────────────────
     function runDomCleanup() {
-        document.querySelector("#global_header")?.remove();
-        document.querySelector("header")?.remove();
-        document.querySelector(".sharedfiles_item_page_header")?.remove();
-
-        const h1 = document.querySelector("h1");
-        if (h1 && h1.textContent.trim() === "RimWorld") {
-            let t = h1;
-            for (let i = 0; i < 5 && t.parentElement; i++) { t = t.parentElement; }
-            t?.remove();
-        }
-
+        // Remove grid-area children that cause layout issues.
+        // Only operates on footer elements — never touches React-managed DOM.
         const footer = document.getElementById("footer");
         footer?.querySelectorAll("[style*='--grid-area']").forEach((el) => {
             const area = el.style.getPropertyValue("--grid-area");
-            if (area && area !== "main") el.parentElement?.removeChild(el);
+            if (area && area !== "main") el.remove();
         });
     }
 
@@ -1198,9 +1183,9 @@
 
     // ── Safe MutationObserver init after root is ready ─────────────────────
     function initObservers() {
-        console.log("[pxmodrim] initObservers START");
+        log("initObservers START");
         _activeRoute = getActiveRoute();
-        console.log("[pxmodrim] Active route:", _activeRoute?.name, _activeRoute?.match(window.location.href));
+        log("Active route:", _activeRoute?.name, _activeRoute?.match(window.location.href));
 
         const mainObserver = new MutationObserver((mutations) => {
             _activeRoute.onMutation(mutations);
@@ -1235,7 +1220,7 @@
 
     function startScript() {
         injectStyles();
-        console.log("[pxmodrim] Base styles injected at Document Creation. Starting lifecycle...");
+        log("Base styles injected at Document Creation. Starting lifecycle...");
         setupWebChannel();
         initObservers();
     }
