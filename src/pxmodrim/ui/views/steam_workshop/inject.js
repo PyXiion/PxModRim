@@ -24,6 +24,7 @@
         INSTALLED: "installed",
         CHECKED: "checked",
         DEFAULT: "default",
+        RESOLVING: "resolving",
     });
 
     let _installedIds = window.__pxmodrim.installedIds;
@@ -56,6 +57,7 @@
     let _bridgeDataReject = null;
     let _bridgeDataPromise = null;
     let _depsLoading = false;
+    const _resolveTreeLocks = new Set();
 
     function waitForBridgeData(timeoutMs = 15000) {
         if (!_bridgeDataPromise) {
@@ -137,6 +139,7 @@
         .rimsort-mod-installed { background-color: #4CAF50; cursor: default; opacity: 1; visibility: visible; }
         .rimsort-mod-checked { background-color: #FFA500; cursor: pointer; opacity: 1; visibility: visible; }
         .rimsort-mod-default { background-color: #2196F3; cursor: pointer; }
+        .rimsort-mod-resolving { background-color: #555; cursor: wait; opacity: 1; visibility: visible; pointer-events: none; }
         .rimsort-tile:hover .rimsort-modstatus-badge { opacity: 1; visibility: visible; }
 
         /* Detail page button styles */
@@ -391,7 +394,7 @@
     }
 
     function setBadgeVisuals(badge, status) {
-        badge.classList.remove("rimsort-mod-installed", "rimsort-mod-checked", "rimsort-mod-default");
+        badge.classList.remove("rimsort-mod-installed", "rimsort-mod-checked", "rimsort-mod-default", "rimsort-mod-resolving");
         if (status === BadgeState.INSTALLED) {
             badge.title = "Already installed";
             badge.innerHTML = "&#10003;";
@@ -400,6 +403,10 @@
             badge.title = "Preparing to download";
             badge.innerHTML = "&#8722;";
             badge.classList.add("rimsort-mod-checked");
+        } else if (status === BadgeState.RESOLVING) {
+            badge.title = "Resolving dependencies...";
+            badge.innerHTML = '<div class="rimsort-dep-spinner" style="width:14px;height:14px;border-width:2px;"></div>';
+            badge.classList.add("rimsort-mod-resolving");
         } else {
             badge.title = "Add to list";
             badge.innerHTML = "+";
@@ -437,23 +444,43 @@
     }
 
     function makeBadgeClickHandler(badge, modId, getTitle) {
-        return (e) => {
+        return async (e) => {
             e.stopPropagation();
             e.preventDefault();
             if (!_bridge) return;
             if (badge.classList.contains("rimsort-mod-installed")) return;
+            if (badge.classList.contains("rimsort-mod-resolving")) return;
             badge.classList.add("pressed");
             setTimeout(() => badge.classList.remove("pressed"), 150);
             if (badge.classList.contains("rimsort-mod-default")) {
+                setBadgeVisuals(badge, BadgeState.RESOLVING);
+
+                const title = getTitle();
+                const tree = await resolveDepTree(modId);
+
                 _checkedIds.add(modId);
+                if (_bridge) _bridge.toggle_download_checked(modId, title, true);
+
+                if (tree) {
+                    const allDeps = flattenDepTree(tree, new Set([modId]));
+                    for (const dep of allDeps) {
+                        _checkedIds.add(dep.id);
+                        if (_bridge) _bridge.toggle_download_checked(dep.id, dep.title, true);
+                    }
+                } else {
+                    warn(`Failed to resolve deps for badge ${modId}`);
+                }
+
                 setBadgeVisuals(badge, BadgeState.CHECKED);
-                _bridge.toggle_download_checked(modId, getTitle(), true);
+                refreshAllDepsBadges();
+                window.updateAllModBadges();
             } else if (badge.classList.contains("rimsort-mod-checked")) {
                 _checkedIds.delete(modId);
                 setBadgeVisuals(badge, BadgeState.DEFAULT);
                 _bridge.toggle_download_checked(modId, "", false);
+                refreshAllDepsBadges();
+                window.updateAllModBadges();
             }
-            refreshAllDepsBadges();
         };
     }
 
@@ -659,22 +686,35 @@
             return cached;
         }
 
-        for (const strategy of [apiStrategy, domStrategy]) {
-            try {
-                log(`resolveDepTree trying ${strategy.name} for ${modId}`);
-                const tree = await strategy.fetch(modId);
-                if (tree) {
-                    log(`resolveDepTree ${strategy.name} succeeded for ${modId}`);
-                    DepState.cache.set(modId, tree);
-                    return tree;
-                }
-                log(`resolveDepTree ${strategy.name} returned null for ${modId}`);
-            } catch (e) {
-                warn(`${strategy.name} strategy failed for ${modId}:`, e);
+        if (_resolveTreeLocks.has(modId)) {
+            log(`resolveDepTree waiting for concurrent fetch of ${modId}`);
+            while (_resolveTreeLocks.has(modId)) {
+                await new Promise(r => setTimeout(r, 50));
             }
+            return DepState.cache.get(modId) || null;
         }
-        warn(`resolveDepTree all strategies failed for ${modId}`);
-        return null;
+
+        _resolveTreeLocks.add(modId);
+        try {
+            for (const strategy of [apiStrategy, domStrategy]) {
+                try {
+                    log(`resolveDepTree trying ${strategy.name} for ${modId}`);
+                    const tree = await strategy.fetch(modId);
+                    if (tree) {
+                        log(`resolveDepTree ${strategy.name} succeeded for ${modId}`);
+                        DepState.cache.set(modId, tree);
+                        return tree;
+                    }
+                    log(`resolveDepTree ${strategy.name} returned null for ${modId}`);
+                } catch (e) {
+                    warn(`${strategy.name} strategy failed for ${modId}:`, e);
+                }
+            }
+            warn(`resolveDepTree all strategies failed for ${modId}`);
+            return null;
+        } finally {
+            _resolveTreeLocks.delete(modId);
+        }
     }
 
     function flattenDepTree(node, seen) {
