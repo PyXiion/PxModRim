@@ -88,31 +88,37 @@ def _is_safe_member(member: tarfile.TarInfo | zipfile.ZipInfo) -> bool:
     return not os.path.isabs(name) and ".." not in Path(name).parts
 
 
+def _reject_unsafe_members(archive: zipfile.ZipFile | tarfile.TarFile) -> None:
+    if isinstance(archive, zipfile.ZipFile):
+        members = archive.infolist()
+        name_attr = "filename"
+        kind = "zip"
+    else:
+        members = archive.getmembers()
+        name_attr = "name"
+        kind = "tar"
+    unsafe = [m for m in members if not _is_safe_member(m)]
+    if not unsafe:
+        return
+    for m in unsafe:
+        logger.warning(
+            "[steamcmd] rejecting unsafe archive member: {}", getattr(m, name_attr)
+        )
+    raise ValueError(
+        f"Unsafe {kind} entries detected: "
+        f"{[getattr(m, name_attr) for m in unsafe]}"
+    )
+
+
 def _extract_archive(data: bytes, url: str, dest: str) -> None:
     os.makedirs(dest, exist_ok=True)
     if ".zip" in url:
         with zipfile.ZipFile(BytesIO(data)) as archive:
-            unsafe = [m for m in archive.infolist() if not _is_safe_member(m)]
-            if unsafe:
-                for m in unsafe:
-                    logger.warning(
-                        "[steamcmd] rejecting unsafe archive member: {}", m.filename
-                    )
-                raise ValueError(
-                    f"Unsafe zip entries detected: {[m.filename for m in unsafe]}"
-                )
+            _reject_unsafe_members(archive)
             archive.extractall(dest)
     elif ".tar.gz" in url:
         with tarfile.open(fileobj=BytesIO(data), mode="r:gz") as archive:
-            unsafe = [m for m in archive.getmembers() if not _is_safe_member(m)]
-            if unsafe:
-                for m in unsafe:
-                    logger.warning(
-                        "[steamcmd] rejecting unsafe archive member: {}", m.name
-                    )
-                raise ValueError(
-                    f"Unsafe tar entries detected: {[m.name for m in unsafe]}"
-                )
+            _reject_unsafe_members(archive)
             archive.extractall(dest)
     else:
         raise ValueError(f"Unsupported SteamCMD archive URL: {url}")
@@ -241,7 +247,7 @@ class SteamCmdService:
     # ── Symlink ──────────────────────────────────────────────────────────────
 
     async def ensure_symlink(
-        self, forced: bool = False
+        self, target: str, forced: bool = False
     ) -> None:
         """
         Symlink SteamCMD workshop content to *target*, raising
@@ -251,8 +257,6 @@ class SteamCmdService:
         When *forced* is ``True`` an existing real directory or file is
         removed before the symlink is created.
         """
-        # TODO: should make it a function arg later
-        target = self._ctx.config.paths.local
         if not target:
             raise SymlinkConflictError(
                 "Local mods path is not configured; cannot create SteamCMD symlink."

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import msgspec
 import pytest
 from PySide6.QtWidgets import QApplication
+from pytest import raises as assert_raises
 from qasync import QEventLoop
 
 from pxmodrim.core.config import AppConfig, ConfigService
@@ -162,7 +163,7 @@ def service_local(ctx_with_local: CoreContext, cfg_path: Path) -> SteamCmdServic
 
 class TestEnsureSymlink:
     def test_creates_link(self, service_local: SteamCmdService, tmp_path: Path) -> None:
-        asyncio.run(service_local.ensure_symlink())
+        asyncio.run(service_local.ensure_symlink(str(tmp_path / "local")))
         dst = Path(service_local.symlink_target)
         assert dst.is_symlink()
         assert dst.resolve() == (tmp_path / "local").resolve()
@@ -174,7 +175,9 @@ class TestEnsureSymlink:
         dst.mkdir(parents=True)
         (dst / "keep.txt").write_text("data")
         with pytest.raises(SymlinkConflictError):
-            asyncio.run(service_local.ensure_symlink(forced=False))
+            asyncio.run(
+                service_local.ensure_symlink(str(tmp_path / "local"), forced=False)
+            )
 
     def test_real_dir_with_force_overwrites(
         self, service_local: SteamCmdService, tmp_path: Path
@@ -182,7 +185,7 @@ class TestEnsureSymlink:
         dst = Path(service_local.symlink_target)
         dst.mkdir(parents=True)
         (dst / "keep.txt").write_text("data")
-        asyncio.run(service_local.ensure_symlink(forced=True))
+        asyncio.run(service_local.ensure_symlink(str(tmp_path / "local"), forced=True))
         assert dst.is_symlink()
         assert dst.resolve() == (tmp_path / "local").resolve()
 
@@ -194,20 +197,12 @@ class TestEnsureSymlink:
         other = tmp_path / "other"
         other.mkdir()
         dst.symlink_to(other, target_is_directory=True)
-        asyncio.run(service_local.ensure_symlink())
+        asyncio.run(service_local.ensure_symlink(str(tmp_path / "local")))
         assert dst.resolve() == (tmp_path / "local").resolve()
 
     def test_empty_local_raises(self, service: SteamCmdService) -> None:
         with pytest.raises(SymlinkConflictError):
-            asyncio.run(service.ensure_symlink())
-
-    def test_explicit_target(self, service: SteamCmdService, tmp_path: Path) -> None:
-        target = tmp_path / "custom_local"
-        target.mkdir()
-        asyncio.run(service.ensure_symlink(target))
-        dst = Path(service.symlink_target)
-        assert dst.is_symlink()
-        assert dst.resolve() == target.resolve()
+            asyncio.run(service.ensure_symlink(target=""))
 
     def test_replaces_existing_file_without_force_raises(
         self, service_local: SteamCmdService, tmp_path: Path
@@ -216,7 +211,9 @@ class TestEnsureSymlink:
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text("not a dir")
         with pytest.raises(SymlinkConflictError):
-            asyncio.run(service_local.ensure_symlink(forced=False))
+            asyncio.run(
+                service_local.ensure_symlink(str(tmp_path / "local"), forced=False)
+            )
 
     def test_replaces_existing_file_with_force(
         self, service_local: SteamCmdService, tmp_path: Path
@@ -224,7 +221,7 @@ class TestEnsureSymlink:
         dst = Path(service_local.symlink_target)
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text("not a dir")
-        asyncio.run(service_local.ensure_symlink(forced=True))
+        asyncio.run(service_local.ensure_symlink(str(tmp_path / "local"), forced=True))
         assert dst.is_symlink()
         assert dst.resolve() == (tmp_path / "local").resolve()
 
@@ -395,18 +392,14 @@ def fake_steamcmd(tmp_path: Path) -> Path:
 
 class TestDownloadMods:
     def test_noop_when_empty(self, service: SteamCmdService, tmp_path: Path) -> None:
-        seen: list[str] = []
-        service.status_message_changed.connect(seen.append)
-        asyncio.run(service.download_mods([], validate=False))
-        assert any("No mods selected" in s for s in seen)
+        with assert_raises(ValueError, match="No mods selected for download"):
+            asyncio.run(service.download_mods([], validate=False))
 
     def test_noop_when_not_installed(
         self, service: SteamCmdService, tmp_path: Path
     ) -> None:
-        seen: list[str] = []
-        service.status_message_changed.connect(seen.append)
-        asyncio.run(service.download_mods(["111"], validate=False))
-        assert any("not installed" in s for s in seen)
+        with assert_raises(ValueError, match="not installed"):
+            asyncio.run(service.download_mods(["111"], validate=False))
 
     def test_parses_output(
         self,

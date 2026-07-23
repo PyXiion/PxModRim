@@ -23,7 +23,8 @@ class SteamCmdUiPlugin(Plugin):
         self._ctx = ctx
         ctx.add_rail_view(SteamWorkshopViewPanel)
 
-    async def init(self, ctx: CoreContext) -> None: ...
+    async def init(self, ctx: CoreContext) -> None:
+        ...
 
     async def shutdown(self) -> None:
         pass
@@ -32,6 +33,7 @@ class SteamCmdUiPlugin(Plugin):
     async def ensure_steamcmd(
         self, parent: QWidget, prefix: str | None = None
     ) -> bool:
+        """Prompt user to install SteamCMD if missing."""
         svc = self._ctx.steam_cmd_service
         if svc.is_installed():
             return True
