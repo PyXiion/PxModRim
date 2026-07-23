@@ -217,7 +217,7 @@
                 setBadgeVisuals(badge, BadgeState.RESOLVING);
 
                 const title = getTitle();
-                const tree = await resolveDepTree(modId);
+                const tree = await getDepsFor(modId);
 
                 const toggles = [{ id: modId, title }];
                 _checkedIds.add(modId);
@@ -442,15 +442,15 @@
         }
     }
 
-    async function resolveDepTree(modId) {
+    async function getDepsFor(modId) {
         const cached = DepState.cache.get(modId);
         if (cached) {
-            log(`resolveDepTree cache hit for ${modId}`);
+            log(`getDepsFor cache hit for ${modId}`);
             return cached;
         }
 
         if (_resolveTreeLocks.has(modId)) {
-            log(`resolveDepTree waiting for concurrent fetch of ${modId}`);
+            log(`getDepsFor waiting for concurrent fetch of ${modId}`);
             while (_resolveTreeLocks.has(modId)) {
                 await new Promise(r => setTimeout(r, 50));
             }
@@ -461,19 +461,19 @@
         try {
             for (const strategy of [apiStrategy, domStrategy]) {
                 try {
-                    log(`resolveDepTree trying ${strategy.name} for ${modId}`);
+                    log(`getDepsFor trying ${strategy.name} for ${modId}`);
                     const tree = await strategy.fetch(modId);
                     if (tree) {
-                        log(`resolveDepTree ${strategy.name} succeeded for ${modId}`);
+                        log(`getDepsFor ${strategy.name} succeeded for ${modId}`);
                         DepState.cache.set(modId, tree);
                         return tree;
                     }
-                    log(`resolveDepTree ${strategy.name} returned null for ${modId}`);
+                    log(`getDepsFor ${strategy.name} returned null for ${modId}`);
                 } catch (e) {
                     warn(`${strategy.name} strategy failed for ${modId}:`, e);
                 }
             }
-            warn(`resolveDepTree all strategies failed for ${modId}`);
+            warn(`getDepsFor all strategies failed for ${modId}`);
             return null;
         } finally {
             _resolveTreeLocks.delete(modId);
@@ -513,7 +513,7 @@
         _checkedIds.add(modId);
 
         const toggles = [{ id: modId, title }];
-        const tree = await resolveDepTree(modId);
+        const tree = await getDepsFor(modId);
         if (tree) {
             const allDeps = flattenDepTree(tree, new Set([modId]));
             for (const dep of allDeps) {
@@ -900,7 +900,7 @@
         container.insertAdjacentElement("afterend", loading);
 
         try {
-            const tree = await resolveDepTree(modId);
+            const tree = await getDepsFor(modId);
 
             loading.remove();
             const section = buildDepSection(tree);
