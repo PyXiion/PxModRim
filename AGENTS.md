@@ -1,19 +1,21 @@
 # PxModRim — Agent guide
 
 ## Workflow
-1. `just check` — ruff lint, pyright, dependency check
+1. `just check` — ruff lint + fix, pyright, dependency check
 2. `just test` — run tests
-3. Done
+3. `just ci` — `check` then `test` (matches CI pipeline)
 
+For quick fix cycles: `just fix` (ruff lint fix + format).
+
+## Environment
 Project uses **uv**, **Python 3.12**, **PySide6 + qasync**. Task runner is **just** (`just` to list).
-All just tasks install needed dependencies.
+All just tasks auto-install deps. For manual setup: `uv sync --locked --dev` (CI uses `--locked`).
 
 ## Entrypoints
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)
 - `uv run python -m pxmodrim`
 
 ## Module layout
-
 ```
 src/pxmodrim/
 ├── _app.py              # composition root: DI assembly, Fusion + QPalette
@@ -34,7 +36,7 @@ src/pxmodrim/
 - Create new widgets in QML only. ALWAYS ask the user about the widget type (Qt/QML).
 - Prefer grepping instead of running subagents when suitable.
 - Avoid O(N^2) algorithms.
-- Don't make any orphan QT objects (always pass parent).
+- Don't make any orphan Qt objects (always pass parent).
 - Separate widget state and the widget.
 
 ## QML / SVG quirks

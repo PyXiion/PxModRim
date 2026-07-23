@@ -59,59 +59,62 @@ class SteamCmdDownloadWorker(QThread):
         succeeded: list[str] = []
         failed: list[str] = []
         total = sum(len(b) for b in self._batches)
-        completed = 0
         logger.info(
             f"[steamcmd] worker started: {total} items in {len(self._batches)} batches"
         )
-        proc: subprocess.Popen[str] | None = None
         try:
             for batch in self._batches:
                 if self._stopped:
                     break
-                os.makedirs(self._steam_path, exist_ok=True)
-                script = self._script_builder(batch)
-                logger.debug(f"[steamcmd] spawning: {self._steamcmd} batch={batch}")
-                proc = subprocess.Popen(
-                    [self._steamcmd, f'+runscript "{script}"'],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    cwd=self._steam_path,
-                    start_new_session=True,
-                )
-                assert proc.stdout is not None
-                for line in proc.stdout:
-                    if self._stopped:
-                        _kill(proc)
-                        break
-                    self._parse_line(line, succeeded, failed)
-                    completed = len(succeeded) + len(failed)
-                    self.progress.emit(
-                        total, completed, "", ""
-                    )
-                proc.wait()
-                if proc.returncode != 0:
-                    msg = f"SteamCMD exited with code {proc.returncode}"
-                    logger.warning("[steamcmd] {}", msg)
-                    self.status.emit(msg)
-                proc = None
-
-                with contextlib.suppress(OSError):
-                    os.remove(script)
-
+                self._run_batch(batch, succeeded, failed, total)
             if not self._stopped and any(self._batches) and not succeeded and not failed:  # noqa: E501
                 self.status.emit(
                     "SteamCMD produced no recognizable output. Check logs for details."
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
-        finally:
-            if proc is not None:
-                _kill(proc)
         logger.info(
             f"[steamcmd] worker done: {len(succeeded)} ok, {len(failed)} failed"
         )
         self.finished.emit(succeeded, failed)
+
+    def _run_batch(
+        self,
+        batch: list[str],
+        succeeded: list[str],
+        failed: list[str],
+        total: int,
+    ) -> None:
+        os.makedirs(self._steam_path, exist_ok=True)
+        script = self._script_builder(batch)
+        logger.debug(f"[steamcmd] spawning: {self._steamcmd} batch={batch}")
+        proc = subprocess.Popen(
+            [self._steamcmd, f'+runscript "{script}"'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=self._steam_path,
+            start_new_session=True,
+        )
+        assert proc.stdout is not None
+        try:
+            for line in proc.stdout:
+                if self._stopped:
+                    _kill(proc)
+                    break
+                self._parse_line(line, succeeded, failed)
+                completed = len(succeeded) + len(failed)
+                self.progress.emit(total, completed, "", "")
+            proc.wait()
+            if proc.returncode != 0:
+                msg = f"SteamCMD exited with code {proc.returncode}"
+                logger.warning("[steamcmd] {}", msg)
+                self.status.emit(msg)
+        finally:
+            if proc.poll() is None:
+                _kill(proc)
+        with contextlib.suppress(OSError):
+            os.remove(script)
 
     def _parse_line(
         self, line: str, succeeded: list[str], failed: list[str]

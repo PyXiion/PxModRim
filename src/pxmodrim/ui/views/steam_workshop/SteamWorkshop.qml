@@ -190,7 +190,7 @@ Rectangle {
 
                     var inj = WebEngine.script()
                     inj.name = "inject"
-                    inj.sourceCode = _injectCode
+                    inj.sourceCode = "var CSS_STYLES = " + JSON.stringify(_injectCSS) + ";\n" + _injectCode
                     inj.injectionPoint = WebEngineScript.DocumentCreation
                     inj.worldId = WebEngineScript.MainWorld
                     inj.runsOnSubFrames = false

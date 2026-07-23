@@ -47,8 +47,8 @@ class SteamWorkshopBridge(QObject):
                 self._panel._checked_ids[mod_id] = title
             else:
                 self._panel._checked_ids.pop(mod_id, None)
-            self.download_state_changed.emit(mod_id, title, checked)
         if mod_ids:
+            self.download_state_changed.emit(mod_ids[-1], titles[-1], checked)
             logger.debug(
                 f"[steam] batch_toggle_download_checked: {len(mod_ids)} mods"
                 f" checked={checked} queue_size={len(self._panel._checked_ids)}"
@@ -74,8 +74,7 @@ class SteamWorkshopBridge(QObject):
     async def _do_fetch_deps(self, mod_id: str) -> None:
         try:
             result = await asyncio.wait_for(
-                asyncio.to_thread(self._sync_fetch_deps, mod_id),
-                timeout=15.0,
+                self._async_fetch_deps(mod_id), timeout=30.0
             )
             json_result = result if result else "null"
         except Exception as e:
@@ -83,10 +82,10 @@ class SteamWorkshopBridge(QObject):
             json_result = "null"
         self._panel._on_deps_fetched(mod_id, json_result)
 
-    def _sync_fetch_deps(self, mod_id: str) -> str | None:
+    async def _async_fetch_deps(self, mod_id: str) -> str | None:
         url = f"https://deps.modrim.pyxiion.ru/deps?id={mod_id}"
-        with httpx.Client(timeout=10) as client:
-            resp = client.get(url, headers={"User-Agent": "PxModRim/1.0"})
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers={"User-Agent": "PxModRim/1.0"})
             if resp.status_code != 200:
                 logger.warning(
                     "[steam] fetch_mod_deps HTTP {} for {}", resp.status_code, mod_id
