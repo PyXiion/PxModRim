@@ -1,7 +1,7 @@
 (function pxmodrimMain() {
     "use strict";
 
-    const DEBUG = false;
+    const DEBUG = true;
     const log = DEBUG ? console.log.bind(console, "[pxmodrim]") : () => {};
     const warn = console.warn.bind(console, "[pxmodrim]");
 
@@ -48,18 +48,68 @@
 
     const DetailState = {
         injectedUrl: null,
-        wrapperEl: null,
-        loadingDeps: false,
         resolvingDeps: false,
-        createDepSectionRunning: false,
     };
+
+    let _bridgeDataReady = false;
+    let _bridgeDataResolve = null;
+    let _bridgeDataReject = null;
+    let _bridgeDataPromise = null;
+    let _depsLoading = false;
+
+    function waitForBridgeData(timeoutMs = 15000) {
+        if (!_bridgeDataPromise) {
+            _bridgeDataPromise = new Promise((resolve, reject) => {
+                _bridgeDataResolve = resolve;
+                _bridgeDataReject = reject;
+                setTimeout(() => {
+                    _bridgeDataPromise = null;
+                    _bridgeDataResolve = null;
+                    _bridgeDataReject = null;
+                    reject(new Error("Bridge data timeout"));
+                }, timeoutMs);
+            });
+        }
+        if (_bridgeDataReady) {
+            _bridgeDataResolve?.();
+        }
+        return _bridgeDataPromise;
+    }
 
     const CSS_STYLES = `
         /* Instant-hide styles to prevent flicker */
         #global_header, header, .sharedfiles_item_page_header { display: none !important; }
         #footer [style*='--grid-area'] { display: none !important; }
-        /* Hide original Steam Subscribe button to avoid React hydration conflicts */
-        #SubscribeItemBtn { display: none !important; }
+        /* Loading placeholder button — replaces Steam button while bridge data loads */
+        .rimsort-loading-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 36px;
+            border-radius: 6px;
+            pointer-events: none;
+            background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 100%);
+            background-size: 200% 100%;
+            animation: rimsort-loading-shimmer 1.2s ease-in-out infinite;
+        }
+        .rimsort-error-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 36px;
+            border-radius: 6px;
+            pointer-events: none;
+            background-color: #d32f2f;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        @keyframes rimsort-loading-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
 
         /* Grid badge styles */
         .rimsort-modstatus-badge {
@@ -263,21 +313,8 @@
             color: #fff;
             border-color: rgba(255,255,255,0.2);
         }
-        .rimsort-btn-hidden {
-            display: none !important;
-        }
-        .rimsort-loading-placeholder {
-            width: 100%;
-            height: 36px;
-            border-radius: 6px;
-            background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 100%);
-            background-size: 200% 100%;
-            animation: rimsort-loading-shimmer 1.2s ease-in-out infinite;
-        }
-        @keyframes rimsort-loading-shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
+
+
     `;
 
     // ── Route dispatcher ──────────────────────────────────────────────────
@@ -286,25 +323,19 @@
             name: "details",
             match: (url) => url.startsWith("https://steamcommunity.com/sharedfiles/filedetails/?id="),
             init() {
-                const placeholder = createPlaceholder();
-                const anchor = document.getElementById("SubscribeItemBtn")
-                    || document.querySelector(".game_area_purchase_game");
-                if (anchor) {
-                    anchor.insertAdjacentElement("afterend", placeholder);
-                }
                 createDetailButton();
-                createDepSection();
             },
             onMutation() {
                 const currentUrl = window.location.href;
                 if (document.getElementById("SubscribeItemBtn") && !document.getElementById("pxmodrim-subscribe-btn")) {
                     createDetailButton();
+                    return;
                 }
                 if (DetailState.injectedUrl !== currentUrl) {
                     return;
                 }
                 if (document.getElementById("RequiredItems") && !document.getElementById(Config.DEP_SECTION_ID)) {
-                    createDepSection();
+                    createDetailButton();
                 }
             },
         },
@@ -730,31 +761,75 @@
         }
     }
 
-    function insertAfterSection(el) {
-        const after = document.getElementById("pxmodrim-subscribe-btn")
-            || document.getElementById("SubscribeItemBtn");
-        if (after && after.parentElement) {
-            after.parentElement.insertBefore(el, after.nextSibling);
-            return true;
-        }
-        return false;
-    }
+    function createLoadingPlaceholder(loadingFactory, afterLoadedFactory, event) {
+        const loadingEl = loadingFactory();
+        const container = document.createElement("div");
+        container.id = "pxmodrim-loading-container";
+        container.style.display = "flex";
+        container.style.flexDirection = "column";
+        container.style.gap = "8px";
+        container.appendChild(loadingEl);
 
-    function createPlaceholder() {
-        const el = document.createElement("div");
-        el.className = "rimsort-loading-placeholder";
-        return el;
-    }
-
-    function createLoadingPlaceholder(el, promise) {
-        promise.then(replacement => {
-            if (!el.parentNode) return;
-            if (replacement) {
-                el.replaceWith(replacement);
-            } else {
-                el.remove();
+        event().then(
+            () => afterLoadedFactory(loadingEl, container),
+            () => {
+                warn("Bridge data timeout — showing error state");
+                loadingEl.className = "rimsort-error-btn";
+                loadingEl.textContent = "ERROR";
             }
-        }).catch(() => el.parentNode?.remove());
+        );
+
+        return container;
+    }
+
+    function finalizeButton(btn, container, modId, title, hasDeps) {
+        btn.id = "pxmodrim-subscribe-btn";
+        btn.className = "rimsort-detail-btn";
+        btn.style.textAlign = "center";
+
+        function updateButtonVisuals() {
+            setDetailBtnVisuals(btn, getDetailButtonState(modId),
+                hasDeps ? "Add to Queue (with deps)" : "Add to Queue");
+        }
+
+        btn.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
+            if (DetailState.resolvingDeps) return;
+
+            btn.classList.add("pressed");
+            requestAnimationFrame(() => btn.classList.remove("pressed"));
+
+            const state = getDetailButtonState(modId);
+            if (state === "checked") {
+                _checkedIds.delete(modId);
+                updateButtonVisuals();
+                _bridge.toggle_download_checked(modId, "", false);
+                updateSoloLinkVisibility();
+            } else {
+                queueModWithDeps(modId, title);
+            }
+        });
+
+        updateButtonVisuals();
+
+        if (hasDeps) {
+            const soloLink = document.createElement("a");
+            soloLink.id = Config.DEP_SOLO_LINK_ID;
+            soloLink.className = "rimsort-solo-link";
+            soloLink.textContent = "Queue only this mod";
+            soloLink.href = "#";
+            soloLink.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
+                if (DetailState.resolvingDeps) return;
+                queueModSolo(modId, title);
+            });
+            container.appendChild(soloLink);
+            updateSoloLinkVisibility();
+        }
     }
 
     function buildDepSection(tree) {
@@ -813,54 +888,6 @@
         }
         section.appendChild(list);
         return section;
-    }
-
-    async function createDepSection() {
-        if (DetailState.createDepSectionRunning) return;
-        DetailState.createDepSectionRunning = true;
-
-        try {
-            const currentUrl = window.location.href;
-
-            if (DetailState.injectedUrl !== currentUrl) {
-                DetailState.injectedUrl = currentUrl;
-                DetailState.createDepSectionRunning = false;
-                DetailState.wrapperEl = null;
-                const existing = document.getElementById(Config.DEP_SECTION_ID);
-                if (existing) existing.remove();
-            } else if (document.getElementById(Config.DEP_SECTION_ID)) {
-                refreshAllDepsBadges();
-                updateSoloLinkVisibility();
-                return;
-            }
-
-            const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
-            if (!modId) return;
-
-            // Loading state
-            const wrapper = document.querySelector("#pxmodrim-subscribe-btn")?.closest("div[style*='flex']");
-            DetailState.wrapperEl = wrapper || null;
-            DetailState.loadingDeps = true;
-            if (wrapper) wrapper.classList.add("rimsort-btn-hidden");
-
-            const loading = document.createElement("div");
-            loading.className = "rimsort-dep-loading-container";
-            loading.innerHTML = '<div class="rimsort-dep-spinner"></div><span>Resolving dependencies...</span>';
-            insertAfterSection(loading);
-
-            const tree = await resolveDepTree(modId);
-
-            // Remove loading state
-            loading.remove();
-            if (DetailState.wrapperEl) DetailState.wrapperEl.classList.remove("rimsort-btn-hidden");
-            DetailState.loadingDeps = false;
-
-            const section = buildDepSection(tree);
-            if (section) insertAfterSection(section);
-            updateSoloLinkVisibility();
-        } finally {
-            DetailState.createDepSectionRunning = false;
-        }
     }
 
     function createDepNode(dep, depth) {
@@ -984,96 +1011,92 @@
         log(`Badges updated: links=${links.length} installed=${badged}`);
     };
 
-    function createDetailButton() {
+    async function createDetailButton() {
         const currentUrl = window.location.href;
         if (DetailState.injectedUrl !== currentUrl) {
             DetailState.injectedUrl = currentUrl;
-            DetailState.wrapperEl = null;
-            const existing = document.getElementById("pxmodrim-subscribe-btn");
-            if (existing) existing.remove();
-            const existingSection = document.getElementById(Config.DEP_SECTION_ID);
-            if (existingSection) existingSection.remove();
+            document.getElementById("pxmodrim-subscribe-btn")?.remove();
+            document.getElementById(Config.DEP_SECTION_ID)?.remove();
+            document.getElementById("pxmodrim-loading-container")?.remove();
         }
 
         let btn = document.getElementById("pxmodrim-subscribe-btn");
+        let container;
+
         if (btn) {
             const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
             if (modId) setDetailBtnVisuals(btn, getDetailButtonState(modId));
             updateSoloLinkVisibility();
-            return true;
+            container = btn.closest("div[style*='flex']") || btn.parentElement;
+        } else if (document.getElementById("pxmodrim-loading-container")) {
+            return;
+        } else {
+            const steamBtn = document.getElementById("SubscribeItemBtn");
+            if (!steamBtn) return;
+
+            const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
+            if (!modId) return;
+
+            const h1 = document.querySelector(".game_area_purchase_game h1");
+            const title = h1 ? h1.textContent.replace(/Subscribe to download\s*/i, "").trim() : "";
+            const hasDeps = !!document.getElementById("RequiredItems");
+
+            if (_bridgeDataReady) {
+                container = document.createElement("div");
+                container.style.display = "flex";
+                container.style.flexDirection = "column";
+                container.style.gap = "8px";
+                btn = document.createElement("a");
+                container.appendChild(btn);
+                finalizeButton(btn, container, modId, title, hasDeps);
+                steamBtn.replaceWith(container);
+            } else {
+                container = createLoadingPlaceholder(
+                    () => {
+                        const el = document.createElement("a");
+                        el.className = "rimsort-loading-btn";
+                        el.textContent = "Loading...";
+                        return el;
+                    },
+                    (loadingEl, ctr) => {
+                        finalizeButton(loadingEl, ctr, modId, title, hasDeps);
+                        createDetailButton();
+                    },
+                    () => waitForBridgeData(10000)
+                );
+                steamBtn.replaceWith(container);
+                return;
+            }
         }
 
-        const oldBtn = document.getElementById("SubscribeItemBtn");
-        if (!oldBtn) return false;
+        if (!document.getElementById("RequiredItems")) return;
 
         const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
-        if (!modId) return false;
+        if (!modId) return;
 
-        const h1 = document.querySelector(".game_area_purchase_game h1");
-        const title = h1 ? h1.textContent.replace(/Subscribe to download\s*/i, "").trim() : "";
-
-        const wrapper = document.createElement("div");
-        wrapper.style.display = "flex";
-        wrapper.style.flexDirection = "column";
-        wrapper.style.gap = "8px";
-
-        btn = document.createElement("a");
-        btn.id = "pxmodrim-subscribe-btn";
-        btn.style.textAlign = "center";
-
-        const hasDeps = !!document.getElementById("RequiredItems");
-
-        function updateButtonVisuals() {
-            setDetailBtnVisuals(btn, getDetailButtonState(modId),
-                hasDeps ? "Add to Queue (with deps)" : "Add to Queue");
-        }
-
-        btn.addEventListener("click", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
-            if (DetailState.resolvingDeps) return;
-
-            btn.classList.add("pressed");
-            requestAnimationFrame(() => btn.classList.remove("pressed"));
-
-            const state = getDetailButtonState(modId);
-            if (state === "checked") {
-                _checkedIds.delete(modId);
-                updateButtonVisuals();
-                _bridge.toggle_download_checked(modId, "", false);
-                updateSoloLinkVisibility();
-            } else {
-                queueModWithDeps(modId, title);
-            }
-        });
-
-        updateButtonVisuals();
-        if (DetailState.loadingDeps) {
-            wrapper.classList.add("rimsort-btn-hidden");
-        }
-        wrapper.appendChild(btn);
-
-        if (hasDeps) {
-            const soloLink = document.createElement("a");
-            soloLink.id = Config.DEP_SOLO_LINK_ID;
-            soloLink.className = "rimsort-solo-link";
-            soloLink.textContent = "Queue only this mod";
-            soloLink.href = "#";
-            soloLink.addEventListener("click", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
-                if (DetailState.resolvingDeps) return;
-                queueModSolo(modId, title);
-            });
-            wrapper.appendChild(soloLink);
+        if (document.getElementById(Config.DEP_SECTION_ID)) {
+            refreshAllDepsBadges();
             updateSoloLinkVisibility();
+            return;
         }
 
-        oldBtn.insertAdjacentElement("afterend", wrapper);
-        document.querySelector(".rimsort-loading-placeholder")?.remove();
-        return true;
+        if (_depsLoading) return;
+        _depsLoading = true;
+        const loading = document.createElement("div");
+        loading.className = "rimsort-dep-loading-container";
+        loading.innerHTML = '<div class="rimsort-dep-spinner"></div><span>Resolving dependencies...</span>';
+        container.insertAdjacentElement("afterend", loading);
+
+        try {
+            const tree = await resolveDepTree(modId);
+
+            loading.remove();
+            const section = buildDepSection(tree);
+            if (section) container.insertAdjacentElement("afterend", section);
+            updateSoloLinkVisibility();
+        } finally {
+            _depsLoading = false;
+        }
     }
 
     // ── Python integration points (external calls) ────────────────────────
@@ -1131,6 +1154,8 @@
 
                 const renderInitialState = () => {
                     if (initInstalled && initChecked) {
+                        _bridgeDataReady = true;
+                        _bridgeDataResolve?.();
                         _activeRoute.init();
                         refreshAllDepsBadges();
                     }
