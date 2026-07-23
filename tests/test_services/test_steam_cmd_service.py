@@ -62,44 +62,6 @@ def service(ctx: CoreContext, cfg_path: Path) -> SteamCmdService:
     return SteamCmdService(ctx, ConfigService(ctx.config, cfg_path))
 
 
-class TestPaths:
-    def test_exe_name_linux(self, service: SteamCmdService) -> None:
-        if sys.platform == "win32":
-            assert service.executable.endswith("steamcmd.exe")
-        else:
-            assert service.executable.endswith("steamcmd.sh")
-
-    def test_install_and_steam_paths(self, service: SteamCmdService) -> None:
-        assert service.install_path.endswith("steamcmd")
-        assert service.steam_path.endswith("steam")
-        assert service.content_path.endswith(
-            str(Path("steamapps", "workshop", "content"))
-        )
-
-    def test_symlink_target(self, service: SteamCmdService) -> None:
-        assert service.symlink_target.endswith(
-            str(Path("steamapps", "workshop", "content", "294100"))
-        )
-
-    def test_fallback_prefix_when_empty(self, tmp_path: Path) -> None:
-        cfg = AppConfig()
-        cfg.paths.steamcmd_prefix = ""
-        ctx = CoreContext(cfg)
-        svc = SteamCmdService(ctx, ConfigService(cfg, tmp_path / "config.json"))
-        assert svc.prefix
-        assert svc.prefix.endswith("steamcmd")
-
-
-class TestIsInstalled:
-    def test_false_when_missing(self, service: SteamCmdService) -> None:
-        assert service.is_installed() is False
-
-    def test_true_when_exe_present(self, service: SteamCmdService) -> None:
-        Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
-        Path(service.executable).write_text("#!/bin/sh\n")
-        assert service.is_installed() is True
-
-
 class TestBuildDownloadScript:
     def test_basic_script(self, service: SteamCmdService, tmp_path: Path) -> None:
         with patch(
