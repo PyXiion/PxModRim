@@ -5,3 +5,4 @@ exclude_paths:
   - "pnpm-lock.yaml"
   - "rimsort-original/**"
   - "tests/**"
+  - "**/qwebchannel.js"
