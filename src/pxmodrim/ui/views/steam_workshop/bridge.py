@@ -38,6 +38,22 @@ class SteamWorkshopBridge(QObject):
         )
         self.download_state_changed.emit(mod_id, title, checked)
 
+    @Slot(list, list, bool)
+    def batch_toggle_download_checked(
+        self, mod_ids: list[str], titles: list[str], checked: bool
+    ) -> None:
+        for mod_id, title in zip(mod_ids, titles, strict=True):
+            if checked:
+                self._panel._checked_ids[mod_id] = title
+            else:
+                self._panel._checked_ids.pop(mod_id, None)
+            self.download_state_changed.emit(mod_id, title, checked)
+        if mod_ids:
+            logger.debug(
+                f"[steam] batch_toggle_download_checked: {len(mod_ids)} mods"
+                f" checked={checked} queue_size={len(self._panel._checked_ids)}"
+            )
+
     @Slot(result="QStringList")
     def get_installed_ids(self) -> list[str]:
         return list(self._panel._installed_ids)

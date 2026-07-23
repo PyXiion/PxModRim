@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 from importlib.resources import files as resource_files
 from pathlib import Path
@@ -40,6 +41,10 @@ _QWEBCHANNEL_JS = (
 
 _INJECT_JS = (
     resource_files("pxmodrim.ui.views.steam_workshop") / "inject.js"
+).read_text(encoding="utf-8")
+
+_INJECT_CSS = (
+    resource_files("pxmodrim.ui.views.steam_workshop") / "inject.css"
 ).read_text(encoding="utf-8")
 
 
@@ -135,6 +140,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         qml_ctx.setContextProperty("steamWorkshopPanel", self)
         qml_ctx.setContextProperty("_qwebchannelCode", _QWEBCHANNEL_JS)
         qml_ctx.setContextProperty("_injectCode", _INJECT_JS)
+        qml_ctx.setContextProperty("_injectCSS", _INJECT_CSS)
 
         self._qml.setSource(_STEAM_WORKSHOP_QML)
 
@@ -311,19 +317,15 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         logger.debug("[steam] view teardown")
         svc = self._ctx.steam_cmd_service
 
-        try:
+        with contextlib.suppress(TypeError, RuntimeError):
             svc.download_progress.disconnect(self._on_steam_progress)
             svc.download_item_status_changed.disconnect(self._on_steam_item_status)
             svc.download_finished.disconnect(self._on_steam_finished)
             self._ctx.mod_service.mods_changed.disconnect(self._on_mods_changed)
-        except (TypeError, RuntimeError):
-            pass
 
         if self._bridge is not None:
-            try:
+            with contextlib.suppress(TypeError, RuntimeError):
                 self._bridge.download_state_changed.disconnect(self._on_download_state_changed)
-            except (TypeError, RuntimeError):
-                pass
 
         if not self._initialized:
             return
