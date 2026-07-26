@@ -82,9 +82,7 @@ class StartupImpactService:
         return await self._db.get_all_averages(db.db_path(config_dir()))
 
     async def base_game_average(self) -> float:
-        return await self._db.get_average(
-            db.db_path(config_dir()), _BASE_GAME_PID
-        )
+        return await self._db.get_average(db.db_path(config_dir()), _BASE_GAME_PID)
 
     async def snapshot(
         self, active_pids: list[str], selected_pid: str | None = None
@@ -112,4 +110,3 @@ class StartupImpactService:
 
     def close_connection_sync(self) -> None:
         self._db.close_sync()
-

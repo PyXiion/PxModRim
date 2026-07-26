@@ -29,7 +29,6 @@ from qasync import asyncSlot
 
 from pxmodrim.core.config import save_config
 from pxmodrim.core.constants import LaunchStrategy
-from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.ui.components import (
@@ -40,10 +39,10 @@ from pxmodrim.ui.components import (
     ViewRailPanel,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.theme.qml_theme import Theme
-from pxmodrim.ui.ui_prefs import UIPrefs
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 if TYPE_CHECKING:
@@ -51,14 +50,15 @@ if TYPE_CHECKING:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, ctx: CoreContext, ui_prefs: UIPrefs) -> None:
+    def __init__(self, app_ctx: AppContext) -> None:
         """Initialize the main application window."""
         super().__init__()
 
         self._app_quit_callback: Callable[[], None] | None = None
         self._is_frameless: bool = False
-        self._ui_prefs = ui_prefs
-        self._ctx = ctx
+        self._app_ctx = app_ctx
+        self._ctx = app_ctx.core
+        self._ui_prefs = app_ctx.ui_prefs
         self._selected_uuid: str | None = None
 
         self._setup_window_basics()
@@ -119,7 +119,7 @@ class MainWindow(QMainWindow):
 
     def _setup_content_and_views(self) -> None:
         logger.debug("main_window: setting up content and views")
-        rail_views = self._ctx.rail_views
+        rail_views = self._app_ctx.rail_views
 
         outer = QWidget()
         outer.setObjectName("outerContainer")
@@ -157,13 +157,11 @@ class MainWindow(QMainWindow):
 
         self._views: list = []
         for view_cls in rail_views:
-            view = view_cls(self._ctx, self._qml_engine, ui_prefs=self._ui_prefs)
+            view = view_cls(self._ctx, self._qml_engine, app_ctx=self._app_ctx)
             self._views.append(view)
             self._stack.addWidget(view)
 
-        self._mods_view = next(
-            (v for v in self._views if v.view_id == "mods"), None
-        )
+        self._mods_view = next((v for v in self._views if v.view_id == "mods"), None)
         if self._mods_view is not None:
             self.sidebar = self._mods_view.sidebar
             self.mod_list = self._mods_view.mod_list
@@ -176,12 +174,6 @@ class MainWindow(QMainWindow):
             self._mods_view.order_changed.connect(
                 self._on_order_changed, Qt.ConnectionType.QueuedConnection
             )
-
-        steam_view = next(
-            (v for v in self._views if v.view_id == "steam_workshop"), None
-        )
-        if steam_view is not None and self._mods_view is not None:
-            self._mods_view.active_mods_changed.connect(steam_view.refresh_badges)
 
         outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
@@ -314,12 +306,7 @@ class MainWindow(QMainWindow):
             logger.warning("Settings saved without a game path")
         save_config(cfg)
         self._ctx.update_config(cfg)
-        from pxmodrim.core.providers import create_providers
-
-        self._ctx.mod_service.reset_providers(
-            create_providers(cfg.paths, self._ctx._pool)
-        )
-        self._ctx.steam_cmd_service.set_prefix(cfg.paths.steamcmd_prefix)
+        self._ctx.reset_providers(cfg.paths)
         await self._ctx.mod_service.reload()
 
     @asyncSlot()

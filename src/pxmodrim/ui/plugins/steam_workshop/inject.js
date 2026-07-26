@@ -14,8 +14,6 @@
 
     // Global shared state for Python integration
     window.__pxmodrim = {
-        bridge: null,
-        bridgeReady: false,
         installedIds: new Set(),
         checkedIds: new Set(),
         onStateChange: null,
@@ -30,9 +28,6 @@
 
     let _installedIds = window.__pxmodrim.installedIds;
     let _checkedIds = window.__pxmodrim.checkedIds;
-    let _bridge = null;
-    let _bridgeReady = false;
-    let _bridgeReadyPromise = null;
     let _badgeRaf = null;
     let _activeRoute = null;
 
@@ -208,7 +203,6 @@
         return async (e) => {
             e.stopPropagation();
             e.preventDefault();
-            if (!_bridge) return;
             if (badge.classList.contains("rimsort-mod-installed")) return;
             if (badge.classList.contains("rimsort-mod-resolving")) return;
             badge.classList.add("pressed");
@@ -240,7 +234,7 @@
             } else if (badge.classList.contains("rimsort-mod-checked")) {
                 _checkedIds.delete(modId);
                 setBadgeVisuals(badge, BadgeState.DEFAULT);
-                _bridge.toggle_download_checked(modId, "", false);
+                callAction("toggle_download_checked", { mod_id: modId, title: "", checked: "0" });
                 refreshAllDepsBadges();
                 window.updateAllModBadges();
             }
@@ -262,35 +256,6 @@
             if (modId) deps.push({ id: modId, title: title || `Mod ${modId}` });
         });
         return deps;
-    }
-
-    let _bridgeReadyResolve = null;
-    let _bridgeReadyReject = null;
-
-    function waitForBridge(timeoutMs = 10000) {
-        if (_bridgeReady) return Promise.resolve();
-        if (!_bridgeReadyPromise) {
-            _bridgeReadyPromise = new Promise((resolve, reject) => {
-                _bridgeReadyResolve = resolve;
-                _bridgeReadyReject = reject;
-                setTimeout(() => {
-                    _bridgeReadyPromise = null;
-                    _bridgeReadyResolve = null;
-                    _bridgeReadyReject = null;
-                    reject(new Error("Bridge connection timeout"));
-                }, timeoutMs);
-            });
-        }
-        return _bridgeReadyPromise;
-    }
-
-    function resolveBridgeReady() {
-        if (_bridgeReadyResolve) {
-            _bridgeReadyResolve();
-            _bridgeReadyResolve = null;
-            _bridgeReadyReject = null;
-            _bridgeReadyPromise = null;
-        }
     }
 
     // ── Async bridge result dispatch ─────────────────────────────────────
@@ -341,14 +306,12 @@
         name: "api",
         async fetch(modId) {
             try {
-                await waitForBridge(8000);
-
                 const MAX_ATTEMPTS = 30;
 
                 for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
                     const result = await new Promise((resolve) => {
                         window.__pxmPendingDeps[modId] = resolve;
-                        _bridge.fetch_mod_deps(modId);
+                        callAction("fetch_mod_deps", { mod_id: modId });
                     });
 
                     if (!result || !result.items || !result.rootId) {
@@ -537,7 +500,7 @@
 
     function queueModSolo(modId, title) {
         _checkedIds.add(modId);
-        if (_bridge) _bridge.toggle_download_checked(modId, title, true);
+        callAction("toggle_download_checked", { mod_id: modId, title, checked: "1" });
         const btn = document.getElementById("pxmodrim-subscribe-btn");
         if (btn) setDetailBtnVisuals(btn, getDetailButtonState(modId));
         refreshAllDepsBadges();
@@ -545,10 +508,14 @@
     }
 
     function batchToggleChecked(mods, checked) {
-        if (!_bridge || !mods.length) return;
+        if (!mods.length) return;
         const ids = mods.map(m => m.id);
         const titles = mods.map(m => m.title);
-        _bridge.batch_toggle_download_checked(ids, titles, checked);
+        callAction("batch_toggle_download_checked", {
+            mod_ids: JSON.stringify(ids),
+            titles: JSON.stringify(titles),
+            checked: checked ? "1" : "0",
+        });
     }
 
     function refreshAllDepsBadges() {
@@ -607,7 +574,7 @@
         btn.addEventListener("click", function (e) {
             e.preventDefault();
             e.stopPropagation();
-            if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
+            if (btn.classList.contains("rimsort-mod-installed")) return;
             if (DetailState.resolvingDeps) return;
 
             btn.classList.add("pressed");
@@ -617,7 +584,7 @@
             if (state === "checked") {
                 _checkedIds.delete(modId);
                 updateButtonVisuals();
-                _bridge.toggle_download_checked(modId, "", false);
+                callAction("toggle_download_checked", { mod_id: modId, title: "", checked: "0" });
                 updateSoloLinkVisibility();
             } else {
                 queueModWithDeps(modId, title);
@@ -635,7 +602,7 @@
             soloLink.addEventListener("click", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (!_bridge || btn.classList.contains("rimsort-mod-installed")) return;
+                if (btn.classList.contains("rimsort-mod-installed")) return;
                 if (DetailState.resolvingDeps) return;
                 queueModSolo(modId, title);
             });
@@ -782,6 +749,7 @@
     // ── UI component management ──────────────────────────────────────────
     window.updateModBadge = function (modId, status) {
         if (_activeRoute?.name !== "grid") return;
+        log("updateModBadge modId=" + modId + " status=" + status);
 
         const link = document.querySelector(`a[href*="sharedfiles/filedetails/?id=${modId}"]`);
         if (!link) return;
@@ -805,6 +773,7 @@
     };
 
     window.updateAllModBadges = function () {
+        log("updateAllModBadges ENTER");
         const links = document.querySelectorAll('a[href*="sharedfiles/filedetails/?id="]');
         let badged = 0;
         links.forEach((link) => {
@@ -824,6 +793,7 @@
     };
 
     async function createDetailButton() {
+        log("createDetailButton ENTER url=" + window.location.href);
         const currentUrl = window.location.href;
         if (DetailState.injectedUrl !== currentUrl) {
             DetailState.injectedUrl = currentUrl;
@@ -915,7 +885,7 @@
     window.__pxmSetInstalled = function (modIds) {
         _installedIds.clear();
         (modIds || []).forEach(id => _installedIds.add(id));
-        if (_bridgeReady) {
+        if (_bridgeDataReady) {
             window.updateAllModBadges();
             refreshAllDepsBadges();
             window.__pxmodrim.onStateChange?.();
@@ -948,54 +918,20 @@
         refreshAllDepsBadges();
     };
 
-    // ── Async QWebChannel bridge setup ──────────────────────────────────
-    let _wcRetries = 0;
-    const _WC_MAX_RETRIES = 100;
-    function setupWebChannel() {
-        if (typeof QWebChannel !== "undefined" && typeof qt !== "undefined" && qt.webChannelTransport) {
-            new QWebChannel(qt.webChannelTransport, function (channel) {
-                _bridge = channel.objects.bridge;
-                _bridgeReady = true;
-                window.__pxmodrim.bridge = _bridge;
-                window.__pxmodrim.bridgeReady = true;
-                log("QWebChannel connection established");
-                resolveBridgeReady();
+    function callAction(method, params = {}) {
+        const q = new URLSearchParams(params).toString();
+        new Image().src = "pxmodrim://action/" + method + (q ? "?" + q : "");
+    }
 
-                let initInstalled = false;
-                let initChecked = false;
+    function initState() {
+        log("initState ENTER");
+        log("initState installed=" + _installedIds.size + " checked=" + _checkedIds.size);
 
-                const renderInitialState = () => {
-                    if (initInstalled && initChecked) {
-                        _bridgeDataReady = true;
-                        _bridgeDataResolve?.();
-                        _activeRoute.init();
-                        refreshAllDepsBadges();
-                    }
-                };
-
-                _bridge.get_installed_ids(function (ids) {
-                    _installedIds.clear();
-                    (ids || []).forEach(id => _installedIds.add(id));
-                    initInstalled = true;
-                    renderInitialState();
-                });
-
-                _bridge.get_checked_ids(function (ids) {
-                    _checkedIds.clear();
-                    (ids || []).forEach(id => _checkedIds.add(id));
-                    initChecked = true;
-                    renderInitialState();
-                });
-            });
-        } else {
-            _wcRetries++;
-            if (_wcRetries >= _WC_MAX_RETRIES) {
-                warn("QWebChannel not available after " + _WC_MAX_RETRIES + " retries; giving up.");
-                return;
-            }
-            // Qt environment object may load slightly later
-            setTimeout(setupWebChannel, 30);
-        }
+        _bridgeDataReady = true;
+        _bridgeDataResolve?.();
+        if (_activeRoute) _activeRoute.init();
+        refreshAllDepsBadges();
+        log("initState DONE");
     }
 
     // ── Steam DOM cleanup ────────────────────────────────────────────────
@@ -1014,7 +950,7 @@
         if (_activeRoute?.name !== "grid") return;
         _badgeRaf = requestAnimationFrame(() => {
             _badgeRaf = null;
-            if (_bridgeReady) window.updateAllModBadges();
+            if (_bridgeDataReady) window.updateAllModBadges();
         });
     }
 
@@ -1033,9 +969,12 @@
             childList: true,
             subtree: true,
         });
+        log("initObservers OBSERVER ATTACHED");
 
         runDomCleanup();
+        log("initObservers CALLING _activeRoute.init()");
         _activeRoute.init();
+        log("initObservers DONE");
     }
 
     function injectStyles() {
@@ -1056,10 +995,12 @@
     }
 
     function startScript() {
+        log("startScript ENTER");
         injectStyles();
         log("Base styles injected at Document Creation. Starting lifecycle...");
-        setupWebChannel();
         initObservers();
+        initState();
+        log("startScript DONE");
     }
 
     if (document.documentElement) {

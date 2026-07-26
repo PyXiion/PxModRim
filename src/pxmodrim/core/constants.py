@@ -8,6 +8,8 @@ RIMWORLD_STEAM_APP_ID = "294100"
 class LaunchStrategy(IntEnum):
     DIRECT = 0
     STEAM = 1
+
+
 DEFAULT_MISSING_PACKAGEID = "missing.packageid"
 
 RIMWORLD_DLC_METADATA: dict[str, dict[str, str]] = {

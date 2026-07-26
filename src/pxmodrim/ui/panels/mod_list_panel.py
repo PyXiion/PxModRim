@@ -26,9 +26,7 @@ class ModListPanel(QWidget):
     order_changed = Signal()
     selection_changed = Signal(list)
 
-    def __init__(
-        self, ctx: CoreContext, qml_engine: QQmlEngine | None = None
-    ) -> None:
+    def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
         super().__init__()
         self._ctx = ctx
         layout = QVBoxLayout(self)

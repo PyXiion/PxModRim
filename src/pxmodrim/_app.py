@@ -9,6 +9,7 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
+from PySide6.QtWebEngineCore import QWebEngineUrlScheme
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
@@ -31,8 +32,8 @@ from pxmodrim.core.config import (
 from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.config import load_ui_prefs
+from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
-from pxmodrim.ui.plugins import SteamCmdUiPlugin
 from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
 from pxmodrim.ui.views.mods_view import ModsViewPanel
 from pxmodrim.ui.window.main_window import MainWindow
@@ -71,13 +72,26 @@ def _async_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> 
 sys.excepthook = _exception_hook
 
 
+def _register_pxmodrim_scheme() -> None:
+    scheme = QWebEngineUrlScheme(b"pxmodrim")
+    scheme.setFlags(
+        QWebEngineUrlScheme.Flag.SecureScheme
+        | QWebEngineUrlScheme.Flag.ContentSecurityPolicyIgnored
+    )
+    QWebEngineUrlScheme.registerScheme(scheme)
+
+
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
-    __slots__ = ("qt_app", "_ctx", "_ui_prefs", "main_window")
+    __slots__ = (
+        "qt_app", "_ctx", "_app_ctx", "_ui_prefs", "main_window",
+    )
 
     def __init__(self) -> None:
+        _register_pxmodrim_scheme()
         QtWebEngineQuick.initialize()
+
         self.qt_app = QApplication(sys.argv)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         self.qt_app.setWindowIcon(icon)
@@ -126,11 +140,25 @@ class App:
 
     def _setup(self, cfg: AppConfig) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
+
         self._ui_prefs = load_ui_prefs()
         self._ctx = CoreContext.create(cfg)
-        self._ctx.add_rail_view(ModsViewPanel)
-        self._ctx.register_plugin(SteamCmdUiPlugin())
-        self.main_window = MainWindow(self._ctx, self._ui_prefs)
+        self._app_ctx = AppContext(self._ctx, self._ui_prefs)
+        self._app_ctx.add_rail_view(ModsViewPanel)
+
+        disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
+        disabled = {n.strip() for n in disabled_raw.split(",") if n.strip()}
+
+        if "steamcmd" not in disabled:
+            from pxmodrim.core.services.steam_cmd_service import SteamCmdService
+            self._ctx.register_plugin(SteamCmdService())
+
+        if "steamworkshop" not in disabled:
+            from pxmodrim.ui.plugins import SteamCmdUiPlugin
+            self._app_ctx.register_plugin(SteamCmdUiPlugin())
+
+        self._app_ctx.setup_all()
+        self.main_window = MainWindow(self._app_ctx)
 
     async def async_run(self) -> int:
         """Start main window, prompt for game path if needed, then run event loop."""
@@ -147,16 +175,15 @@ class App:
             save_config(new_cfg)
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
-            self._ctx.steam_cmd_service.set_prefix(new_cfg.paths.steamcmd_prefix)
 
-        await self._ctx.plugins.init_all(self._ctx)
+        await self._app_ctx.init_all()
         await self.main_window._refresh_mods()
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)
         self.main_window.set_app_quit_callback(app_close_event.set)
         await app_close_event.wait()
-        await self._ctx.plugins.shutdown_all()
+        await self._app_ctx.shutdown_all()
         return 0
 
     def run(self) -> int:

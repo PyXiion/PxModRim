@@ -1,7 +1,6 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import QtWebChannel
 import QtWebEngine
 
 Rectangle {
@@ -157,17 +156,6 @@ Rectangle {
                 id: webView
                 objectName: "workshopWeb"
                 anchors.fill: parent
-                webChannel: WebChannel {
-                    id: webChannel
-                    objectName: "workshopWebChannel"
-                }
-
-                profile: WebEngineProfile {
-                    storageName: "pxmodrim-steam"
-                    httpCacheType: WebEngineProfile.DiskHttpCache
-                    httpCacheMaximumSize: 536870912
-                }
-
                 settings {
                     pluginsEnabled: false
                     pdfViewerEnabled: false
@@ -179,30 +167,13 @@ Rectangle {
 
                 url: "https://steamcommunity.com/workshop/browse/?appid=294100"
 
-                Component.onCompleted: {
-                    var qc = WebEngine.script()
-                    qc.name = "qwebchannel"
-                    qc.sourceCode = _qwebchannelCode
-                    qc.injectionPoint = WebEngineScript.DocumentCreation
-                    qc.worldId = WebEngineScript.MainWorld
-                    qc.runsOnSubFrames = true
-                    webView.userScripts.insert(qc)
-
-                    var inj = WebEngine.script()
-                    inj.name = "inject"
-                    inj.sourceCode = "var CSS_STYLES = " + JSON.stringify(_injectCSS) + ";\n" + _injectCode
-                    inj.injectionPoint = WebEngineScript.DocumentCreation
-                    inj.worldId = WebEngineScript.MainWorld
-                    inj.runsOnSubFrames = false
-                    webView.userScripts.insert(inj)
-                }
-
                 onLoadingChanged: function(loadRequest) {
                     if (loadRequest.status === WebEngineView.LoadStartedStatus) {
                         root._placeholderText = "Initializing Steam Workshop browser\u2026"
                         root._showError = false
                     } else if (loadRequest.status === WebEngineView.LoadSucceededStatus) {
                         root._firstLoad = false
+                        steamWorkshopPanel.onPageLoaded()
                     } else if (loadRequest.status === WebEngineView.LoadFailedStatus) {
                         console.warn("[steam] load failed:", loadRequest.url, loadRequest.errorString,
                                      "domain:", loadRequest.errorDomain, "code:", loadRequest.errorCode)

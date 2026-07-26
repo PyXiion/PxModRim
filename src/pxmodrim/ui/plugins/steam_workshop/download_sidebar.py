@@ -8,10 +8,10 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from pxmodrim.ui.theme.palette import PALETTE
-from pxmodrim.ui.views.steam_workshop.download_queue_model import (
+from pxmodrim.ui.plugins.steam_workshop.download_queue_model import (
     DownloadQueueModel,
 )
+from pxmodrim.ui.theme.palette import PALETTE
 
 _QML_DIR = Path(__file__).parent
 _DL_SIDEBAR_QML = _QML_DIR / "DownloadSidebar.qml"

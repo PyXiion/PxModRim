@@ -17,12 +17,13 @@ import httpx
 import msgspec
 from loguru import logger
 
-from pxmodrim.core.config import ConfigService, config_dir
+from pxmodrim.core.config import config_dir, save_config
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
-from pxmodrim.core.context import CoreContext
 from pxmodrim.core.events import Event
+from pxmodrim.core.plugin import Plugin
 
 if TYPE_CHECKING:
+    from pxmodrim.core.context import CoreContext
     from pxmodrim.core.loading import LoadingState
     from pxmodrim.core.services.download_proto import DownloadRunner
 
@@ -106,8 +107,7 @@ def _safe_members(archive: zipfile.ZipFile | tarfile.TarFile) -> list:
                 getattr(m, name_attr),
             )
         raise ValueError(
-            f"Unsafe {kind} entries detected: "
-            f"{[getattr(m, name_attr) for m in unsafe]}"
+            f"Unsafe {kind} entries detected: {[getattr(m, name_attr) for m in unsafe]}"
         )
     return members
 
@@ -124,7 +124,9 @@ def _extract_archive(data: bytes, url: str, dest: str) -> None:
         raise ValueError(f"Unsupported SteamCMD archive URL: {url}")
 
 
-class SteamCmdService:
+class SteamCmdService(Plugin):
+    name = "steamcmd"
+
     status_message_changed: Event[str]
     download_progress: Event[SteamCmdProgress]
     download_item_status_changed: Event[SteamCmdItemStatus]
@@ -136,82 +138,66 @@ class SteamCmdService:
         "download_item_status_changed",
         "download_finished",
         "_ctx",
-        "_config",
-        "_prefix",
-        "_install_path",
-        "_steam_path",
-        "_content_path",
-        "_executable",
         "_worker",
         "_runner_factory",
     )
 
     def __init__(
         self,
-        ctx: CoreContext,
-        config_service: ConfigService,
         runner_factory: Callable[..., DownloadRunner] | None = None,
     ) -> None:
-        """Initialize the SteamCMD service with core context and config."""
         self.status_message_changed = Event()
         self.download_progress = Event()
         self.download_item_status_changed = Event()
         self.download_finished = Event()
 
-        self._ctx = ctx
-        self._config = config_service
-        prefix = ctx.config.paths.steamcmd_prefix or str(config_dir() / "steamcmd")
-        self._derive_paths(prefix)
+        self._ctx: CoreContext | None = None
         self._worker = None
         self._runner_factory = runner_factory
 
-    # ── Path derivation ───────────────────────────────────────────────────────
+    # ── Plugin interface ──────────────────────────────────
 
-    def _derive_paths(self, prefix: str) -> None:
-        self._prefix = prefix
-        self._install_path = str(Path(prefix) / "steamcmd")
-        self._steam_path = str(Path(prefix) / "steam")
-        self._content_path = str(
-            Path(self._steam_path) / "steamapps" / "workshop" / "content"
-        )
-        exe_name = "steamcmd.exe" if sys.platform == "win32" else "steamcmd.sh"
-        self._executable = str(Path(self._install_path) / exe_name)
+    def setup(self, ctx: CoreContext) -> None:
+        self._ctx = ctx
+
+    async def init(self, ctx: CoreContext) -> None: ...
+
+    async def shutdown(self) -> None:
+        self.cancel()
 
     # ── Properties ─────────────────────────────────────────────────────────────
 
     @property
     def prefix(self) -> str:
-        return self._prefix
+        if self._ctx is None:
+            return ""
+        return self._ctx.config.paths.steamcmd_prefix or str(config_dir() / "steamcmd")
 
     @property
     def install_path(self) -> str:
-        return self._install_path
+        return str(Path(self.prefix) / "steamcmd")
 
     @property
     def steam_path(self) -> str:
-        return self._steam_path
+        return str(Path(self.prefix) / "steam")
 
     @property
     def content_path(self) -> str:
-        return self._content_path
+        return str(Path(self.steam_path) / "steamapps" / "workshop" / "content")
 
     @property
     def executable(self) -> str:
-        return self._executable
+        exe_name = "steamcmd.exe" if sys.platform == "win32" else "steamcmd.sh"
+        return str(Path(self.install_path) / exe_name)
 
     @property
     def symlink_target(self) -> str:
-        return str(Path(self._content_path) / RIMWORLD_STEAM_APP_ID)
+        return str(Path(self.content_path) / RIMWORLD_STEAM_APP_ID)
 
     # ── State ──────────────────────────────────────────────────────────────────
 
     def is_installed(self) -> bool:
-        return os.path.exists(self._executable)
-
-    def set_prefix(self, prefix: str) -> None:
-        if not prefix:
-            prefix = str(config_dir() / "steamcmd")
-        self._derive_paths(prefix)
+        return os.path.exists(self.executable)
 
     # ── Batch helpers ─────────────────────────────────────────────────────────
 
@@ -228,7 +214,7 @@ class SteamCmdService:
     ) -> str:
         download_cmd = f"workshop_download_item {RIMWORLD_STEAM_APP_ID}"
         script_lines = [
-            f'force_install_dir "{self._steam_path}"',
+            f'force_install_dir "{self.steam_path}"',
             "login anonymous",
         ]
         for pfid in publishedfileids:
@@ -246,9 +232,7 @@ class SteamCmdService:
 
     # ── Symlink ──────────────────────────────────────────────────────────────
 
-    async def ensure_symlink(
-        self, target: str, forced: bool = False
-    ) -> None:
+    async def ensure_symlink(self, target: str, forced: bool = False) -> None:
         """
         Symlink SteamCMD workshop content to *target*, raising
         ``SymlinkConflictError`` when a real dir or file already exists at the
@@ -281,13 +265,15 @@ class SteamCmdService:
         *,
         loading_state: LoadingState | None = None,
     ) -> bool:
+        ctx = self._ctx
+        assert ctx is not None
         if prefix:
-            self._derive_paths(prefix)
-            self._ctx.config.paths.steamcmd_prefix = prefix
-            self._config.save()
+            ctx.config.paths.steamcmd_prefix = prefix
 
         if self.is_installed() and not reinstall:
-            logger.debug(f"[steamcmd] already installed at {self._executable}")
+            logger.debug(f"[steamcmd] already installed at {self.executable}")
+            if prefix:
+                save_config(ctx.config)
             return True
 
         system = platform.system()
@@ -300,13 +286,16 @@ class SteamCmdService:
             return False
 
         if loading_state is not None:
-            return await self._ensure_with_progress(url, loading_state)
+            ok = await self._ensure_with_progress(url, loading_state)
+            if ok and prefix:
+                save_config(ctx.config)
+            return ok
 
         self.status_message_changed.emit(f"Downloading SteamCMD from {url}...")
         try:
             data = await _download_bytes(url)
             self.status_message_changed.emit("Extracting SteamCMD...")
-            await asyncio.to_thread(_extract_archive, data, url, self._install_path)
+            await asyncio.to_thread(_extract_archive, data, url, self.install_path)
         except Exception as e:  # noqa: BLE001
             logger.error("[steamcmd] download/extraction failed: {}", e)
             self.status_message_changed.emit(
@@ -316,6 +305,8 @@ class SteamCmdService:
 
         if self.is_installed():
             self.status_message_changed.emit("SteamCMD installed successfully.")
+            if prefix:
+                save_config(ctx.config)
             return True
         self.status_message_changed.emit(
             "SteamCMD installation completed but executable not found."
@@ -345,7 +336,7 @@ class SteamCmdService:
                 self.status_message_changed.emit("Extracting SteamCMD...")
                 try:
                     await asyncio.to_thread(
-                        _extract_archive, data, url, self._install_path
+                        _extract_archive, data, url, self.install_path
                     )
                 except (ValueError, OSError) as e:
                     logger.error("[steamcmd] extraction failed: {}", e)
@@ -393,8 +384,8 @@ class SteamCmdService:
 
         factory = self._runner_factory or SteamCmdDownloadWorker
         worker = factory(
-            self._executable,
-            self._steam_path,
+            self.executable,
+            self.steam_path,
             batches,
             _script_builder,
             None,

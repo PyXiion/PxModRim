@@ -61,11 +61,7 @@ class ModListModel(QAbstractListModel):
         index: QModelIndex | QPersistentModelIndex,
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if (
-            not index.isValid()
-            or index.row() < 0
-            or index.row() >= len(self._items)
-        ):
+        if not index.isValid() or index.row() < 0 or index.row() >= len(self._items):
             return None
 
         item = self._items[index.row()]
@@ -107,11 +103,7 @@ class ModListModel(QAbstractListModel):
         value: Any,
         role: int = Qt.ItemDataRole.EditRole,
     ) -> bool:
-        if (
-            not index.isValid()
-            or index.row() < 0
-            or index.row() >= len(self._items)
-        ):
+        if not index.isValid() or index.row() < 0 or index.row() >= len(self._items):
             return False
 
         if role == self.CheckStateRole:
@@ -310,10 +302,7 @@ class ModListModel(QAbstractListModel):
             return
         changed_rows: list[int] = []
         for row in rows:
-            if (
-                0 <= row < len(self._items)
-                and self._items[row].checked != checked
-            ):
+            if 0 <= row < len(self._items) and self._items[row].checked != checked:
                 self._items[row].checked = checked
                 changed_rows.append(row)
         if not changed_rows:

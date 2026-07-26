@@ -42,7 +42,6 @@ class PathConfig(msgspec.Struct):
 
 
 class AppConfig(msgspec.Struct):
-
     """Top-level core config: RimWorld paths and sort settings."""
 
     paths: PathConfig = msgspec.field(default_factory=PathConfig)

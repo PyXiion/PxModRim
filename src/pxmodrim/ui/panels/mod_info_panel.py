@@ -246,7 +246,9 @@ class ModInfoPanel(QWidget):
 
         issues_scroll = QScrollArea()
         issues_scroll.setWidgetResizable(True)
-        issues_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        issues_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         issues_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         issues_scroll.viewport().setAutoFillBackground(False)
 

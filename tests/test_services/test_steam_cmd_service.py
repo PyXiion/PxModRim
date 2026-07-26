@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -11,7 +12,7 @@ from PySide6.QtWidgets import QApplication
 from pytest import raises as assert_raises
 from qasync import QEventLoop
 
-from pxmodrim.core.config import AppConfig, ConfigService
+from pxmodrim.core.config import AppConfig
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.msgspec_hooks import dec_hook
 from pxmodrim.core.services.steam_cmd_service import (
@@ -49,17 +50,17 @@ def qapp():
 
 
 @pytest.fixture
-def ctx(tmp_path: Path, cfg_path: Path) -> CoreContext:
+def ctx(tmp_path: Path) -> CoreContext:
     cfg = AppConfig()
     cfg.paths.steamcmd_prefix = str(tmp_path / "scmd")
-    ctx = CoreContext(cfg)
-    ctx._config_service = ConfigService(cfg, cfg_path)
-    return ctx
+    return CoreContext(cfg)
 
 
 @pytest.fixture
-def service(ctx: CoreContext, cfg_path: Path) -> SteamCmdService:
-    return SteamCmdService(ctx, ConfigService(ctx.config, cfg_path))
+def service(ctx: CoreContext) -> SteamCmdService:
+    svc = SteamCmdService()
+    svc.setup(ctx)
+    return svc
 
 
 class TestBuildDownloadScript:
@@ -106,21 +107,18 @@ class TestSplitBatches:
 
 
 @pytest.fixture
-def ctx_with_local(tmp_path: Path, cfg_path: Path) -> CoreContext:
+def ctx_with_local(tmp_path: Path) -> CoreContext:
     cfg = AppConfig()
     cfg.paths.steamcmd_prefix = str(tmp_path / "scmd")
     cfg.paths.local = str(tmp_path / "local")
-    ctx = CoreContext(cfg)
-    ctx._config_service = ConfigService(cfg, cfg_path)
-    return ctx
+    return CoreContext(cfg)
 
 
 @pytest.fixture
-def service_local(ctx_with_local: CoreContext, cfg_path: Path) -> SteamCmdService:
-    return SteamCmdService(
-        ctx_with_local,
-        ConfigService(ctx_with_local.config, cfg_path),
-    )
+def service_local(ctx_with_local: CoreContext) -> SteamCmdService:
+    svc = SteamCmdService()
+    svc.setup(ctx_with_local)
+    return svc
 
 
 class TestEnsureSymlink:
@@ -188,33 +186,35 @@ class TestEnsureSymlink:
         assert dst.resolve() == (tmp_path / "local").resolve()
 
 
-class TestSetPrefix:
-    def test_recomputes_derived_paths(
+class TestConfigDerivedPaths:
+    def test_reflects_config_prefix(
         self, service: SteamCmdService, tmp_path: Path
     ) -> None:
-        new_prefix = str(tmp_path / "new_steamcmd")
-        service.set_prefix(new_prefix)
-        assert service.prefix == new_prefix
-        assert service.install_path == str(Path(new_prefix) / "steamcmd")
-        assert service.steam_path == str(Path(new_prefix) / "steam")
+        assert service._ctx is not None
+        ctx = service._ctx
+        prefix = str(tmp_path / "custom_prefix")
+        ctx.config.paths.steamcmd_prefix = prefix
+        assert service.prefix == prefix
+        assert service.install_path == str(Path(prefix) / "steamcmd")
+        assert service.steam_path == str(Path(prefix) / "steam")
         assert service.content_path.endswith(
             str(Path("steamapps", "workshop", "content"))
         )
         exe = "steamcmd.exe" if sys.platform == "win32" else "steamcmd.sh"
-        assert service.executable == str(Path(new_prefix) / "steamcmd" / exe)
+        assert service.executable == str(Path(prefix) / "steamcmd" / exe)
 
-    def test_ensure_installed_uses_new_prefix(
+    def test_ensure_installed_saves_new_prefix(
         self, service: SteamCmdService, tmp_path: Path
     ) -> None:
-        new_prefix = str(tmp_path / "prefix_for_install")
-        service.set_prefix(new_prefix)
+        prefix = str(tmp_path / "prefix_for_install")
         Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
         Path(service.executable).write_text("#!/bin/sh\n")
-        assert asyncio.run(service.ensure_installed()) is True
-        assert service.prefix == new_prefix
+        assert asyncio.run(service.ensure_installed(prefix=prefix)) is True
+        assert service.prefix == prefix
 
     def test_empty_falls_back_to_config_dir(self, service: SteamCmdService) -> None:
-        service.set_prefix("")
+        assert service._ctx is not None
+        service._ctx.config.paths.steamcmd_prefix = ""
         assert service.prefix
         assert service.prefix.endswith("steamcmd")
         is_windows_exe = service.executable.endswith("steamcmd.exe")
@@ -229,7 +229,9 @@ class TestEnsureInstalled:
         ):
             assert asyncio.run(service.ensure_installed()) is False
 
-    def test_persists_prefix(self, service: SteamCmdService, tmp_path: Path) -> None:
+    def test_persists_prefix(
+        self, service: SteamCmdService, tmp_path: Path, cfg_path: Path
+    ) -> None:
         new_prefix = str(tmp_path / "new_prefix")
 
         def _fake_extract(data, url, dest):
@@ -249,13 +251,19 @@ class TestEnsureInstalled:
                 "pxmodrim.core.services.steam_cmd_service._extract_archive",
                 side_effect=_fake_extract,
             ),
+            patch(
+                "pxmodrim.core.services.steam_cmd_service.config_file_path",
+                return_value=cfg_path,
+            ),
         ):
             result = asyncio.run(service.ensure_installed(prefix=new_prefix))
         assert result is True
         assert service.prefix == new_prefix
-        assert service._ctx.config.paths.steamcmd_prefix == new_prefix
+        ctx = service._ctx
+        assert ctx is not None
+        assert ctx.config.paths.steamcmd_prefix == new_prefix
         cfg = msgspec.json.decode(
-            Path(service._config.path).read_bytes(),
+            cfg_path.read_bytes(),
             type=AppConfig,
             dec_hook=dec_hook,
         )
@@ -370,7 +378,11 @@ class TestDownloadMods:
         qapp: QApplication,
         tmp_path: Path,
     ) -> None:
-        service._executable = str(fake_steamcmd)
+        assert service._ctx is not None
+        service._ctx.config.paths.steamcmd_prefix = str(tmp_path)
+        Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(fake_steamcmd), service.executable)
+        Path(service.executable).chmod(0o755)
 
         statuses: list[SteamCmdItemStatus] = []
         result: list[SteamCmdResult] = []
@@ -395,7 +407,11 @@ class TestDownloadMods:
     ) -> None:
         import threading
 
-        service._executable = str(fake_steamcmd)
+        assert service._ctx is not None
+        service._ctx.config.paths.steamcmd_prefix = str(tmp_path)
+        Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(fake_steamcmd), service.executable)
+        Path(service.executable).chmod(0o755)
 
         result: list[SteamCmdResult] = []
         service.download_finished.connect(result.append)

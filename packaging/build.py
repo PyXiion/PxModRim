@@ -16,6 +16,7 @@ def get_standalone_args(release: bool = False) -> list[str]:
         "nuitka",
         "--standalone",
         "--enable-plugin=pyside6",
+        "--include-qt-plugins=qml",
         "--include-package-data=pxmodrim",
         f"--output-dir={project_root / 'dist'}",
         "--assume-yes-for-downloads",
@@ -40,7 +41,24 @@ def get_standalone_args(release: bool = False) -> list[str]:
     return args
 
 
-def copy_qml_plugins(project_root: Path) -> None:
+def _clean_debug_artifacts(base_dir: Path) -> None:
+    for obj_dir in base_dir.rglob("objects-RelWithDebInfo"):
+        shutil.rmtree(obj_dir)
+        print(f"Removed {obj_dir}")
+
+
+def clean_qml_debug_artifacts() -> None:
+    for qml_dir in Path(".venv").rglob("**/PySide6/Qt/qml"):
+        _clean_debug_artifacts(qml_dir)
+
+
+def copy_missing_libs(project_root: Path) -> None:
+    dist_dir = project_root / "dist" / "entrypoint.dist"
+
+    qml_dir = dist_dir / "PySide6" / "qml"
+    if qml_dir.exists():
+        _clean_debug_artifacts(qml_dir)
+
     venv_qml = None
     for pattern in [
         ".venv/**/PySide6/Qt/qml",
@@ -55,21 +73,8 @@ def copy_qml_plugins(project_root: Path) -> None:
         print("Warning: PySide6 QML not found in venv, skipping")
         return
 
-    dist_qml = project_root / "dist" / "entrypoint.dist" / "PySide6" / "Qt" / "qml"
-    if dist_qml.exists():
-        shutil.rmtree(dist_qml)
-    dist_qml.parent.mkdir(parents=True, exist_ok=True)
-
-    shutil.copytree(venv_qml, dist_qml)
-    print(f"Copied QML plugins from {venv_qml} to {dist_qml}")
-
-    for obj_dir in dist_qml.rglob("objects-RelWithDebInfo"):
-        shutil.rmtree(obj_dir)
-        print(f"Removed {obj_dir}")
-
     venv_lib = venv_qml.parent / "lib"
-    dist_dir = project_root / "dist" / "entrypoint.dist"
-    
+
     required_libs = [
         "libQt6QmlModels.so.6",
         "libQt6QuickTemplates2.so.6",
@@ -77,7 +82,7 @@ def copy_qml_plugins(project_root: Path) -> None:
         "libQt6QuickControls2Impl.so.6",
         "libQt6QuickLayouts.so.6",
     ]
-    
+
     for lib_name in required_libs:
         src = venv_lib / lib_name
         dst = dist_dir / lib_name
@@ -140,6 +145,9 @@ def main() -> None:
     project_root = Path(__file__).parent.parent
     system = platform.system()
 
+    print("Step 0: Cleaning QML debug artifacts...")
+    clean_qml_debug_artifacts()
+
     print(f"Step 1: Building standalone (release={release})...")
     args = get_standalone_args(release=release)
     print(f"Running: {' '.join(args)}")
@@ -148,8 +156,8 @@ def main() -> None:
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    print("\nStep 2: Copying QML plugins and missing libraries...")
-    copy_qml_plugins(project_root)
+    print("\nStep 2: Copying missing libraries...")
+    copy_missing_libs(project_root)
 
     dist_dir = project_root / "dist" / "entrypoint.dist"
     output_name = "PxModRim"
