@@ -48,21 +48,21 @@ if _we_verbose is not None:
         "qt.webenginecontext.*=true",
     )
 
-from pxmodrim.core.config import (
+from pxmodrim.core.config import (  # noqa: E402
     AppConfig,
     config_file_path,
     detect_game_paths,
     load_config,
     save_config,
 )
-from pxmodrim.core.context import CoreContext
-from pxmodrim.ui.components.dialogs import await_dialog
-from pxmodrim.ui.config import load_ui_prefs
-from pxmodrim.ui.context import AppContext
-from pxmodrim.ui.panels.settings_panel import SettingsPanel
-from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
-from pxmodrim.ui.views.mods_view import ModsViewPanel
-from pxmodrim.ui.window.main_window import MainWindow
+from pxmodrim.core.context import CoreContext  # noqa: E402
+from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
+from pxmodrim.ui.config import load_ui_prefs  # noqa: E402
+from pxmodrim.ui.context import AppContext  # noqa: E402
+from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
+from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet  # noqa: E402
+from pxmodrim.ui.views.mods_view import ModsViewPanel  # noqa: E402
+from pxmodrim.ui.window.main_window import MainWindow  # noqa: E402
 
 
 def _exception_hook(

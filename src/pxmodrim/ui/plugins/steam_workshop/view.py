@@ -5,12 +5,10 @@ from importlib.resources import files as resource_files
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from PySide6 import QtQuickWidgets
 from loguru import logger
 from PySide6.QtCore import QObject, QUrl, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQuickWidgets import QQuickWidget
-from PySide6.QtWebEngineCore import QWebEngineProfile
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 from qasync import asyncSlot
 
@@ -156,8 +154,8 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             logger.warning("[steam] no plugin, skipping url scheme handler")
             return
         self._action_handler = SteamWorkshopActionHandler(self._plugin)
-        
-        profile.installUrlSchemeHandler(b"pxmodrim", self._action_handler)
+
+        profile.installUrlSchemeHandler(b"pxmodrim", self._action_handler)  # pyright: ignore[reportAttributeAccessIssue]
         logger.debug("[steam] url scheme handler installed on dedicated profile")
 
     @Slot()

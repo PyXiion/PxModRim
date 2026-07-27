@@ -61,7 +61,7 @@ ALLOWED: dict[str, set[str]] = {
     "core.services": {"core.foundation", "core.models", "core.checker", "core.sort", "core.context", "core.config", "core.mods_config"},
     "core.mod_service": {"core.foundation", "core.models", "core.context", "core.providers", "core.services", "core.mods_config"},
     "ui.progress": set(),
-    "ui.context": set(),
+    "ui.context": {"ui.ui_prefs"},
     "ui.theme": {"ui.components"},
     "ui.components": {"ui.theme"},
     "ui.models": {"ui.theme"},

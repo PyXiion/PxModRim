@@ -98,9 +98,12 @@ class SteamWorkshopActionHandler(QWebEngineUrlSchemeHandler):
             result = await asyncio.wait_for(
                 self._plugin.fetch_mod_deps(mod_id), timeout=30.0
             )
-            logger.debug("[steam] _do_fetch_deps_reply got result: {} chars", len(result) if result else 0)
+            char_count = len(result) if result else 0
+            logger.debug(
+                "[steam] _do_fetch_deps_reply got result: {} chars", char_count
+            )
             data = json.loads(result) if result else None
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[steam] _do_fetch_deps_reply timeout: {}", mod_id)
             data = None
         except Exception as exc:

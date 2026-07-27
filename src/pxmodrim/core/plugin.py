@@ -34,7 +34,7 @@ class PluginRegistry:
         logger.debug("plugin registered: {}", plugin.name)
         self._plugins[plugin.name] = plugin
 
-    def get[T](self, name: str) -> T | None:  # type: ignore[reportInvalidTypeVarUse]
+    def get(self, name: str) -> Plugin | None:
         return self._plugins.get(name)
 
     @property
