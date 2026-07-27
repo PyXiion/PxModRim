@@ -252,7 +252,7 @@ class TestEnsureInstalled:
                 side_effect=_fake_extract,
             ),
             patch(
-                "pxmodrim.core.services.steam_cmd_service.config_file_path",
+                "pxmodrim.core.config.config_file_path",
                 return_value=cfg_path,
             ),
         ):

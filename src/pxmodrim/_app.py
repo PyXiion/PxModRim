@@ -37,6 +37,17 @@ from qasync import QEventLoop  # noqa: E402
 os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "RoundPreferFloor")
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
+_we_verbose = os.environ.get("PX_WEBENGINE_VERBOSE")
+if _we_verbose is not None:
+    os.environ.setdefault(
+        "QTWEBENGINE_CHROMIUM_FLAGS",
+        f"--enable-logging --v={_we_verbose}",
+    )
+    os.environ.setdefault(
+        "QT_LOGGING_RULES",
+        "qt.webenginecontext.*=true",
+    )
+
 from pxmodrim.core.config import (
     AppConfig,
     config_file_path,
@@ -86,6 +97,10 @@ def _async_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> 
 
 sys.excepthook = _exception_hook
 
+
+def _parse_disabled_plugins() -> set[str]:
+    disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
+    return {n.strip() for n in disabled_raw.split(",") if n.strip()}
 
 
 class App:
@@ -152,8 +167,7 @@ class App:
         self._app_ctx = AppContext(self._ctx, self._ui_prefs)
         self._app_ctx.add_rail_view(ModsViewPanel)
 
-        disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
-        disabled = {n.strip() for n in disabled_raw.split(",") if n.strip()}
+        disabled = _parse_disabled_plugins()
 
         if "steamcmd" not in disabled:
             from pxmodrim.core.services.steam_cmd_service import SteamCmdService
