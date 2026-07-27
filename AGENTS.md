@@ -25,19 +25,21 @@ src/pxmodrim/
 
 ## Key conventions
 - `from __future__ import annotations` in every file
-- No comments unless explaining *why*
-- Strict UI/Logic separation: views render pixels and capture raw events. No business logic or I/O in UI components.
+- No comments unless explaining *why*. *What* comments are allowed for long sections of code.
+- Strict UI/Logic separation: views render pixels and capture raw events. No business logic or I/O in UI components. 
+  **Core layer must know nothing about UI.** Layers must know nothing about plugins.
 - Async signal handlers **must** have `@asyncSlot()` from `qasync`
 - Always disable the button while the task is running.
 - Never `QApplication.processEvents()`, `dialog.exec()`, `QThread`, `time.sleep()`, `QTimer.singleShot(0, …)` — use `await asyncio.to_thread()`, `await await_dialog()`, `await asyncio.sleep(0)`
 - Never global singletons — constructor DI everywhere
 - Long blocking work → `await asyncio.to_thread(target)`
 - All git renames: `git mv`, never `shutil.move`
-- Create new widgets in QML only. ALWAYS ask the user about the widget type (Qt/QML).
+- ALWAYS ask the user about the widget type (Qt/QML).
 - Prefer grepping instead of running subagents when suitable.
 - Avoid O(N^2) algorithms.
 - Don't make any orphan Qt objects (always pass parent).
 - Separate widget state and the widget.
+- 
 
 ## QML / SVG quirks
 - Icons via `image://icons/<name>?color=<hex>` — `SvgIconProvider` on shared `QQmlEngine`
@@ -59,6 +61,7 @@ src/pxmodrim/
 ## Stale / needs attention
 - `core/loading.py` — `LoadingState` QObject with a planned move to `ui/progress.py`. Three files still import from `core/loading` (settings_panel, community_service, progress_dialog).
 - `core/models/view/` — view models living in `core/`; potential future move to `ui/`.
+- Config UI has an if for SteamCMD plugin. I plan make it into the plugin system later.
 
 ## For AI PRs
 AI-generated PRs must include:
