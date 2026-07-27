@@ -10,9 +10,24 @@ from types import TracebackType
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWebEngineCore import QWebEngineUrlScheme
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
-from PySide6.QtWidgets import QApplication, QMessageBox
-from qasync import QEventLoop
+
+
+def _register_pxmodrim_scheme() -> None:
+    scheme = QWebEngineUrlScheme(b"pxmodrim")
+    scheme.setFlags(
+        QWebEngineUrlScheme.Flag.SecureScheme
+        | QWebEngineUrlScheme.Flag.ContentSecurityPolicyIgnored
+        | QWebEngineUrlScheme.Flag.FetchApiAllowed
+        | QWebEngineUrlScheme.Flag.CorsEnabled
+    )
+    QWebEngineUrlScheme.registerScheme(scheme)
+
+
+_register_pxmodrim_scheme()
+
+from PySide6.QtWebEngineQuick import QtWebEngineQuick  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
+from qasync import QEventLoop  # noqa: E402
 
 # Qt6 defaults to PassThrough, which causes QtWebEngine to render at
 # integer buffer-scale (e.g. 1×) while the compositor upscales fractionally
@@ -72,14 +87,6 @@ def _async_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> 
 sys.excepthook = _exception_hook
 
 
-def _register_pxmodrim_scheme() -> None:
-    scheme = QWebEngineUrlScheme(b"pxmodrim")
-    scheme.setFlags(
-        QWebEngineUrlScheme.Flag.SecureScheme
-        | QWebEngineUrlScheme.Flag.ContentSecurityPolicyIgnored
-    )
-    QWebEngineUrlScheme.registerScheme(scheme)
-
 
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
@@ -89,7 +96,6 @@ class App:
     )
 
     def __init__(self) -> None:
-        _register_pxmodrim_scheme()
         QtWebEngineQuick.initialize()
 
         self.qt_app = QApplication(sys.argv)

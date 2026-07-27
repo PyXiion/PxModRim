@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, unquote
 
-from PySide6.QtCore import QBuffer
+from loguru import logger
+from PySide6.QtCore import QBuffer, QByteArray, QTimer
 from PySide6.QtWebEngineCore import (
     QWebEngineUrlRequestJob,
     QWebEngineUrlSchemeHandler,
@@ -25,9 +27,11 @@ class SteamWorkshopActionHandler(QWebEngineUrlSchemeHandler):
             "toggle_download_checked": self._handle_toggle_download_checked,
             "batch_toggle_download_checked": self._handle_batch_toggle_download_checked,
             "fetch_mod_deps": self._handle_fetch_mod_deps,
+            "initReady": self._handle_init_ready,
         }
 
     def requestStarted(self, job: _Job) -> None:
+        logger.info("Request started: {}", job.requestUrl().toString())
         url = job.requestUrl()
         parts = url.path().strip("/").split("/")
         if not parts:
@@ -50,6 +54,10 @@ class SteamWorkshopActionHandler(QWebEngineUrlSchemeHandler):
         handler(job, params)
 
     def _reply_json(self, job: _Job, data: object) -> None:
+        job.setAdditionalResponseHeaders({
+            QByteArray(b"Access-Control-Allow-Origin"): QByteArray(b"*"),
+            QByteArray(b"Access-Control-Allow-Methods"): QByteArray(b"GET"),
+        })
         buf = QBuffer(parent=self)
         buf.open(QBuffer.OpenModeFlag.ReadWrite)
         buf.write(json.dumps(data).encode("utf-8"))
@@ -76,6 +84,31 @@ class SteamWorkshopActionHandler(QWebEngineUrlSchemeHandler):
 
     def _handle_fetch_mod_deps(self, job: _Job, params: dict) -> None:
         mod_id = params.get("mod_id", "")
-        if mod_id:
-            self._plugin.fetch_mod_deps(mod_id)
+        if not mod_id:
+            self._reply_json(job, {"error": "missing mod_id"})
+            return
+        logger.debug("[steam] fetch_mod_deps RPC: {}", mod_id)
+        QTimer.singleShot(
+            0, lambda: asyncio.ensure_future(self._do_fetch_deps_reply(job, mod_id))
+        )
+
+    async def _do_fetch_deps_reply(self, job: _Job, mod_id: str) -> None:
+        try:
+            logger.debug("[steam] _do_fetch_deps_reply start: {}", mod_id)
+            result = await asyncio.wait_for(
+                self._plugin.fetch_mod_deps(mod_id), timeout=30.0
+            )
+            logger.debug("[steam] _do_fetch_deps_reply got result: {} chars", len(result) if result else 0)
+            data = json.loads(result) if result else None
+        except asyncio.TimeoutError:
+            logger.warning("[steam] _do_fetch_deps_reply timeout: {}", mod_id)
+            data = None
+        except Exception as exc:
+            logger.warning("[steam] _do_fetch_deps_reply error: {} — {}", mod_id, exc)
+            data = None
+        self._reply_json(job, data)
+        logger.debug("[steam] _do_fetch_deps_reply done: {}", mod_id)
+
+    def _handle_init_ready(self, job: _Job, _params: dict) -> None:
+        self._plugin.sync_all()
         self._reply_json(job, {"ok": True})

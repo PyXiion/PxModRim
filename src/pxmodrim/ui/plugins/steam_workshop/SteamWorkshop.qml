@@ -156,6 +156,17 @@ Rectangle {
                 id: webView
                 objectName: "workshopWeb"
                 anchors.fill: parent
+
+                profile: WebEngineProfile {
+                    storageName: "pxmodrim-steam"
+                    httpCacheType: WebEngineProfile.DiskHttpCache
+                    httpCacheMaximumSize: 536870912
+                    offTheRecord: false
+                }
+
+                // url is set in Component.onCompleted after user script injection
+                // to ensure the script runs on the initial page load
+
                 settings {
                     pluginsEnabled: false
                     pdfViewerEnabled: false
@@ -165,7 +176,19 @@ Rectangle {
                     localStorageEnabled: true
                 }
 
-                url: "https://steamcommunity.com/workshop/browse/?appid=294100"
+                Component.onCompleted: {
+                    var inj = WebEngine.script()
+                    inj.name = "inject"
+                    inj.sourceCode = _injectCode
+                    inj.injectionPoint = WebEngineScript.DocumentCreation
+                    inj.worldId = WebEngineScript.MainWorld
+                    inj.runsOnSubFrames = false
+                    webView.userScripts.insert(inj)
+
+                    webView.url = "https://steamcommunity.com/workshop/browse/?appid=294100"
+
+                    steamWorkshopPanel.onProfileReady(webView.profile)
+                }
 
                 onLoadingChanged: function(loadRequest) {
                     if (loadRequest.status === WebEngineView.LoadStartedStatus) {
@@ -173,7 +196,6 @@ Rectangle {
                         root._showError = false
                     } else if (loadRequest.status === WebEngineView.LoadSucceededStatus) {
                         root._firstLoad = false
-                        steamWorkshopPanel.onPageLoaded()
                     } else if (loadRequest.status === WebEngineView.LoadFailedStatus) {
                         console.warn("[steam] load failed:", loadRequest.url, loadRequest.errorString,
                                      "domain:", loadRequest.errorDomain, "code:", loadRequest.errorCode)

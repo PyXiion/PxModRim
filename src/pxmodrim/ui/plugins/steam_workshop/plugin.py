@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
-from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING, NamedTuple, cast
 
 import httpx
 from loguru import logger
-from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineScript
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 from pxmodrim.core.events import Event
@@ -17,9 +14,6 @@ from pxmodrim.core.plugin import Plugin
 from pxmodrim.core.services.steam_cmd_service import SymlinkConflictError
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
-from pxmodrim.ui.plugins.steam_workshop.action_handler import (
-    SteamWorkshopActionHandler,
-)
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
@@ -31,10 +25,6 @@ if TYPE_CHECKING:
     )
     from pxmodrim.ui.context import AppContext
 
-
-class DepsResult(NamedTuple):
-    mod_id: str
-    json_result: str
 
 
 class SidebarSync(NamedTuple):
@@ -53,21 +43,11 @@ class ItemStatus(NamedTuple):
     status: str
 
 
-_INJECT_JS = (
-    resource_files("pxmodrim.ui.plugins.steam_workshop") / "inject.js"
-).read_text(encoding="utf-8")
-
-_INJECT_CSS = (
-    resource_files("pxmodrim.ui.plugins.steam_workshop") / "inject.css"
-).read_text(encoding="utf-8")
-
-
 class SteamCmdUiPlugin(Plugin):
     name = "steamworkshop"
     dependencies = ["steamcmd"]
 
     badges_refresh_requested: Event[list[str]]
-    deps_result_ready: Event[DepsResult]
     sidebar_sync_requested: Event[SidebarSync]
     progress_updated: Event[ProgressInfo]
     item_status_changed: Event[ItemStatus]
@@ -79,7 +59,6 @@ class SteamCmdUiPlugin(Plugin):
 
     def __init__(self) -> None:
         self.badges_refresh_requested = Event()
-        self.deps_result_ready = Event()
         self.sidebar_sync_requested = Event()
         self.progress_updated = Event()
         self.item_status_changed = Event()
@@ -89,7 +68,6 @@ class SteamCmdUiPlugin(Plugin):
 
         self._core: CoreContext | None = None
         self._app_ctx: AppContext | None = None
-        self._action_handler: SteamWorkshopActionHandler | None = None
 
         self._installed_ids: set[str] = set()
         self._checked_ids: dict[str, str] = {}
@@ -112,22 +90,7 @@ class SteamCmdUiPlugin(Plugin):
         self._svc.download_finished.connect(self._on_steam_finished)
 
     async def init(self, ctx: AppContext) -> None:
-        profile = QWebEngineProfile.defaultProfile()
-        profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
-        profile.setHttpCacheMaximumSize(536870912)
-
-        self._action_handler = SteamWorkshopActionHandler(self)
-        profile.installUrlSchemeHandler(b"pxmodrim", self._action_handler)
-
         self._refresh_cached_ids()
-
-        inj = QWebEngineScript()
-        inj.setName("inject")
-        inj.setSourceCode(f"var CSS_STYLES = {json.dumps(_INJECT_CSS)};\n{_INJECT_JS}")
-        inj.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
-        inj.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
-        inj.setRunsOnSubFrames(False)
-        profile.scripts().insert(inj)
 
     async def shutdown(self) -> None:
         if self._core is None:
@@ -161,9 +124,6 @@ class SteamCmdUiPlugin(Plugin):
             self.sidebar_sync_requested.emit(
                 SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
             )
-
-    def fetch_mod_deps(self, mod_id: str) -> None:
-        asyncio.create_task(self._do_fetch_deps(mod_id))
 
     # ── Sidebar callbacks (called by view) ───────────────
 
@@ -321,18 +281,7 @@ class SteamCmdUiPlugin(Plugin):
             if m.published_file_id
         }
 
-    async def _do_fetch_deps(self, mod_id: str) -> None:
-        try:
-            result = await asyncio.wait_for(
-                self._async_fetch_deps(mod_id), timeout=30.0
-            )
-            json_result = result if result else "null"
-        except Exception:
-            logger.warning("[steam] fetch_mod_deps failed for {}", mod_id)
-            json_result = "null"
-        self.deps_result_ready.emit(DepsResult(mod_id, json_result))
-
-    async def _async_fetch_deps(self, mod_id: str) -> str | None:
+    async def fetch_mod_deps(self, mod_id: str) -> str | None:
         url = f"https://deps.modrim.pyxiion.ru/deps?id={mod_id}"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers={"User-Agent": "PxModRim/1.0"})

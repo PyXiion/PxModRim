@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pxmodrim.ui.plugins.steam_workshop.plugin import (
-    DepsResult,
     ItemStatus,
     ProgressInfo,
     SidebarSync,
@@ -10,7 +9,6 @@ from pxmodrim.ui.plugins.steam_workshop.plugin import (
 from pxmodrim.ui.plugins.steam_workshop.view import SteamWorkshopViewPanel
 
 __all__ = [
-    "DepsResult",
     "ItemStatus",
     "ProgressInfo",
     "SidebarSync",

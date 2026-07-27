@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import json
+from importlib.resources import files as resource_files
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from PySide6 import QtQuickWidgets
 from loguru import logger
 from PySide6.QtCore import QObject, QUrl, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQuickWidgets import QQuickWidget
+from PySide6.QtWebEngineCore import QWebEngineProfile
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
+from pxmodrim.ui.plugins.steam_workshop.action_handler import (
+    SteamWorkshopActionHandler,
+)
 from pxmodrim.ui.plugins.steam_workshop.download_sidebar import DownloadSidebar
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.views.base import BaseViewPanel
@@ -21,7 +27,6 @@ if TYPE_CHECKING:
 
     from pxmodrim.ui.context import AppContext
     from pxmodrim.ui.plugins.steam_workshop.plugin import (
-        DepsResult,
         ItemStatus,
         ProgressInfo,
         SidebarSync,
@@ -32,6 +37,16 @@ _WORKSHOP_URL = "https://steamcommunity.com/workshop/browse/?appid=294100"
 
 _QML_DIR = Path(__file__).parent
 _STEAM_WORKSHOP_QML = str(_QML_DIR / "SteamWorkshop.qml")
+
+_INJECT_JS = (
+    resource_files("pxmodrim.ui.plugins.steam_workshop") / "inject.js"
+).read_text(encoding="utf-8")
+
+_INJECT_CSS = (
+    resource_files("pxmodrim.ui.plugins.steam_workshop") / "inject.css"
+).read_text(encoding="utf-8")
+
+_INJECTION = f"var CSS_STYLES = {json.dumps(_INJECT_CSS)};\n{_INJECT_JS}"
 
 
 class SteamWorkshopViewPanel(BaseViewPanel):
@@ -50,6 +65,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
         self._plugin: SteamCmdUiPlugin | None = None
         self._initialized = False
+        self._action_handler: SteamWorkshopActionHandler | None = None
 
         content = QWidget()
         h_layout = QHBoxLayout(content)
@@ -110,7 +126,6 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             self._plugin.badges_refresh_requested.connect(
                 self._push_badges_to_js
             )
-            self._plugin.deps_result_ready.connect(self._push_deps_to_js)
             self._plugin.sidebar_sync_requested.connect(self._on_sidebar_sync)
             self._plugin.progress_updated.connect(self._on_progress_updated)
             self._plugin.item_status_changed.connect(
@@ -128,16 +143,22 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
         qml_ctx = self._qml.rootContext()
         qml_ctx.setContextProperty("steamWorkshopPanel", self)
+        qml_ctx.setContextProperty("_injectCode", _INJECTION)
 
         self._qml.setSource(_STEAM_WORKSHOP_QML)
 
     # ── QML-invokable slots ──────────────────────────────
 
-    @Slot()
-    def onPageLoaded(self) -> None:
-        logger.debug("[steam] page loaded")
-        if self._plugin is not None:
-            self._plugin.sync_all()
+    @Slot(QObject)
+    def onProfileReady(self, profile: QObject) -> None:
+        logger.debug("[steam] profile ready")
+        if self._plugin is None:
+            logger.warning("[steam] no plugin, skipping url scheme handler")
+            return
+        self._action_handler = SteamWorkshopActionHandler(self._plugin)
+        
+        profile.installUrlSchemeHandler(b"pxmodrim", self._action_handler)
+        logger.debug("[steam] url scheme handler installed on dedicated profile")
 
     @Slot()
     def navigateHome(self) -> None:
@@ -168,12 +189,8 @@ class SteamWorkshopViewPanel(BaseViewPanel):
     # ── Plugin event handlers ────────────────────────────
 
     def _push_badges_to_js(self, ids: list[str]) -> None:
-        self._run_js(f"window.__pxmSetInstalled({json.dumps(ids)});")
-
-    def _push_deps_to_js(self, result: DepsResult) -> None:
-        mod_id_json = json.dumps(result.mod_id)
-        js = f"window.__pxmDepsFetched({mod_id_json}, {result.json_result});"
-        self._run_js(js)
+        js = json.dumps(ids)
+        self._run_js(f"if (window.__pxmSetInstalled) window.__pxmSetInstalled({js})")
 
     def _push_uncheck_to_js(self, mod_id: str) -> None:
         self._run_js(f"window.__pxmUncheckMod({json.dumps(mod_id)});")

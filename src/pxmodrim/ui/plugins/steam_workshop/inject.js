@@ -46,6 +46,7 @@
     const DetailState = {
         injectedUrl: null,
         resolvingDeps: false,
+        depsInjected: false,
     };
 
     let _bridgeDataReady = false;
@@ -84,7 +85,36 @@
             init() {
                 createDetailButton();
             },
-            onMutation() {
+            onMutation(mutations) {
+                const RELEVANT_IDS = new Set([
+                    "SubscribeItemBtn",
+                    "RequiredItems",
+                    "pxmodrim-subscribe-btn",
+                    Config.DEP_SECTION_ID,
+                    "pxmodrim-loading-container",
+                    "pxmodrim-solo-link",
+                ]);
+                const hasRelevant = mutations.some(m => {
+                    if (m.type === "childList") {
+                        for (const list of [m.addedNodes, m.removedNodes]) {
+                            for (const node of list) {
+                                if (node.nodeType !== Node.ELEMENT_NODE) continue;
+                                if (RELEVANT_IDS.has(node.id)) return true;
+                                if (node.querySelector?.("[id]")) {
+                                    const nested = node.querySelector(
+                                        "#SubscribeItemBtn,#RequiredItems,#pxmodrim-subscribe-btn," +
+                                        "#" + CSS.escape(Config.DEP_SECTION_ID)
+                                    );
+                                    if (nested) return true;
+                                }
+                            }
+                        }
+                    }
+                    if (m.type === "attributes" && RELEVANT_IDS.has(m.target.id)) return true;
+                    return false;
+                });
+                if (!hasRelevant) return;
+
                 const currentUrl = window.location.href;
                 if (document.getElementById("SubscribeItemBtn") && !document.getElementById("pxmodrim-subscribe-btn")) {
                     createDetailButton();
@@ -93,7 +123,9 @@
                 if (DetailState.injectedUrl !== currentUrl) {
                     return;
                 }
-                if (document.getElementById("RequiredItems") && !document.getElementById(Config.DEP_SECTION_ID)) {
+                if (document.getElementById("RequiredItems")
+                    && !document.getElementById(Config.DEP_SECTION_ID)
+                    && !DetailState.depsInjected) {
                     createDetailButton();
                 }
             },
@@ -234,7 +266,7 @@
             } else if (badge.classList.contains("rimsort-mod-checked")) {
                 _checkedIds.delete(modId);
                 setBadgeVisuals(badge, BadgeState.DEFAULT);
-                callAction("toggle_download_checked", { mod_id: modId, title: "", checked: "0" });
+                notifyAction("toggle_download_checked", { mod_id: modId, title: "", checked: "0" });
                 refreshAllDepsBadges();
                 window.updateAllModBadges();
             }
@@ -258,24 +290,7 @@
         return deps;
     }
 
-    // ── Async bridge result dispatch ─────────────────────────────────────
-    // Stores Promise resolves for pending dep fetches. Python calls
-    // window.__pxmDepsFetched(modId, jsonResult) via runJavaScript when
-    // the async HTTP fetch completes.
-    window.__pxmPendingDeps = {};
 
-    window.__pxmDepsFetched = function (modId, tree) {
-        log(`__pxmDepsFetched called for ${modId}, result:`, tree);
-        const resolve = window.__pxmPendingDeps[modId];
-        if (resolve) {
-            const valid = tree != null;
-            log(`__pxmDepsFetched for ${modId}: valid=${valid}, itemsCount=${tree?.totalItemsLoaded ?? 0}`);
-            resolve(valid ? tree : null);
-            delete window.__pxmPendingDeps[modId];
-        } else {
-            warn(`__pxmDepsFetched: no pending resolve for ${modId}`);
-        }
-    };
 
     // ── Flat items map → tree converter ──────────────────────────────────────
     function convertItemsToTree(items, rootId, maxDepth = Config.DEPTH_MAX) {
@@ -306,32 +321,19 @@
         name: "api",
         async fetch(modId) {
             try {
-                const MAX_ATTEMPTS = 30;
-
-                for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-                    const result = await new Promise((resolve) => {
-                        window.__pxmPendingDeps[modId] = resolve;
-                        callAction("fetch_mod_deps", { mod_id: modId });
-                    });
-
-                    if (!result || !result.items || !result.rootId) {
-                        warn(`apiStrategy: invalid response for ${modId}`);
-                        return null;
-                    }
-
-                    if (result.isComplete) {
-                        log(`apiStrategy: complete for ${modId} after ${attempt + 1} attempt(s)`);
-                        return convertItemsToTree(result.items, result.rootId);
-                    }
-
-                    log(`apiStrategy: incomplete for ${modId} (${result.totalItemsLoaded} items), retry ${attempt + 1}/30`);
-                    await new Promise(r => setTimeout(r, 300));
+                const result = await callAction("fetch_mod_deps", { mod_id: modId });
+                if (!result || !result.items || !result.rootId) {
+                    warn(`apiStrategy: invalid response for ${modId}`, result);
+                    return null;
                 }
-
-                warn(`apiStrategy: still incomplete after 30 attempts for ${modId}`);
-                return null;
+                if (!result.isComplete) {
+                    warn(`apiStrategy: incomplete for ${modId}`);
+                    return null;
+                }
+                log(`apiStrategy: complete for ${modId}`);
+                return convertItemsToTree(result.items, result.rootId);
             } catch (e) {
-                warn("API deps failed:", e);
+                warn(`apiStrategy: failed for ${modId}:`, e);
                 return null;
             }
         }
@@ -500,7 +502,7 @@
 
     function queueModSolo(modId, title) {
         _checkedIds.add(modId);
-        callAction("toggle_download_checked", { mod_id: modId, title, checked: "1" });
+        notifyAction("toggle_download_checked", { mod_id: modId, title, checked: "1" });
         const btn = document.getElementById("pxmodrim-subscribe-btn");
         if (btn) setDetailBtnVisuals(btn, getDetailButtonState(modId));
         refreshAllDepsBadges();
@@ -511,7 +513,7 @@
         if (!mods.length) return;
         const ids = mods.map(m => m.id);
         const titles = mods.map(m => m.title);
-        callAction("batch_toggle_download_checked", {
+        notifyAction("batch_toggle_download_checked", {
             mod_ids: JSON.stringify(ids),
             titles: JSON.stringify(titles),
             checked: checked ? "1" : "0",
@@ -584,7 +586,7 @@
             if (state === "checked") {
                 _checkedIds.delete(modId);
                 updateButtonVisuals();
-                callAction("toggle_download_checked", { mod_id: modId, title: "", checked: "0" });
+                notifyAction("toggle_download_checked", { mod_id: modId, title: "", checked: "0" });
                 updateSoloLinkVisibility();
             } else {
                 queueModWithDeps(modId, title);
@@ -793,91 +795,101 @@
     };
 
     async function createDetailButton() {
-        log("createDetailButton ENTER url=" + window.location.href);
-        const currentUrl = window.location.href;
-        if (DetailState.injectedUrl !== currentUrl) {
-            DetailState.injectedUrl = currentUrl;
-            document.getElementById("pxmodrim-subscribe-btn")?.remove();
-            document.getElementById(Config.DEP_SECTION_ID)?.remove();
-            document.getElementById("pxmodrim-loading-container")?.remove();
-        }
+        if (createDetailButton._running) return;
+        createDetailButton._running = true;
+        try {
+            log("createDetailButton ENTER url=" + window.location.href);
+            const currentUrl = window.location.href;
+            if (DetailState.injectedUrl !== currentUrl) {
+                DetailState.injectedUrl = currentUrl;
+                DetailState.depsInjected = false;
+                document.getElementById("pxmodrim-subscribe-btn")?.remove();
+                document.getElementById(Config.DEP_SECTION_ID)?.remove();
+                document.getElementById("pxmodrim-loading-container")?.remove();
+            }
 
-        let btn = document.getElementById("pxmodrim-subscribe-btn");
-        let container;
+            let btn = document.getElementById("pxmodrim-subscribe-btn");
+            let container;
 
-        if (btn) {
-            const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
-            if (modId) setDetailBtnVisuals(btn, getDetailButtonState(modId));
-            updateSoloLinkVisibility();
-            container = btn.closest("div[style*='flex']") || btn.parentElement;
-        } else if (document.getElementById("pxmodrim-loading-container")) {
-            return;
-        } else {
-            const steamBtn = document.getElementById("SubscribeItemBtn");
-            if (!steamBtn) return;
+            if (btn) {
+                const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
+                if (modId) setDetailBtnVisuals(btn, getDetailButtonState(modId));
+                updateSoloLinkVisibility();
+                container = btn.closest("div[style*='flex']") || btn.parentElement;
+            } else if (document.getElementById("pxmodrim-loading-container")) {
+                return;
+            } else {
+                const steamBtn = document.getElementById("SubscribeItemBtn");
+                if (!steamBtn) return;
+
+                const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
+                if (!modId) return;
+
+                const h1 = document.querySelector(".game_area_purchase_game h1");
+                const title = h1 ? h1.textContent.replace(/Subscribe to download\s*/i, "").trim() : "";
+                const hasDeps = !!document.getElementById("RequiredItems");
+
+                if (_bridgeDataReady) {
+                    container = document.createElement("div");
+                    container.style.display = "flex";
+                    container.style.flexDirection = "column";
+                    container.style.gap = "8px";
+                    btn = document.createElement("a");
+                    container.appendChild(btn);
+                    finalizeButton(btn, container, modId, title, hasDeps);
+                    steamBtn.replaceWith(container);
+                } else {
+                    container = createLoadingPlaceholder(
+                        () => {
+                            const el = document.createElement("a");
+                            el.className = "rimsort-loading-btn";
+                            el.textContent = "Loading...";
+                            return el;
+                        },
+                        (loadingEl, ctr) => {
+                            finalizeButton(loadingEl, ctr, modId, title, hasDeps);
+                            createDetailButton();
+                        },
+                        () => waitForBridgeData(10000)
+                    );
+                    steamBtn.replaceWith(container);
+                    return;
+                }
+            }
+
+            if (!document.getElementById("RequiredItems")) return;
 
             const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
             if (!modId) return;
 
-            const h1 = document.querySelector(".game_area_purchase_game h1");
-            const title = h1 ? h1.textContent.replace(/Subscribe to download\s*/i, "").trim() : "";
-            const hasDeps = !!document.getElementById("RequiredItems");
-
-            if (_bridgeDataReady) {
-                container = document.createElement("div");
-                container.style.display = "flex";
-                container.style.flexDirection = "column";
-                container.style.gap = "8px";
-                btn = document.createElement("a");
-                container.appendChild(btn);
-                finalizeButton(btn, container, modId, title, hasDeps);
-                steamBtn.replaceWith(container);
-            } else {
-                container = createLoadingPlaceholder(
-                    () => {
-                        const el = document.createElement("a");
-                        el.className = "rimsort-loading-btn";
-                        el.textContent = "Loading...";
-                        return el;
-                    },
-                    (loadingEl, ctr) => {
-                        finalizeButton(loadingEl, ctr, modId, title, hasDeps);
-                        createDetailButton();
-                    },
-                    () => waitForBridgeData(10000)
-                );
-                steamBtn.replaceWith(container);
+            if (document.getElementById(Config.DEP_SECTION_ID)) {
+                refreshAllDepsBadges();
+                updateSoloLinkVisibility();
                 return;
             }
-        }
 
-        if (!document.getElementById("RequiredItems")) return;
+            if (_depsLoading) return;
+            _depsLoading = true;
+            const loading = document.createElement("div");
+            loading.className = "rimsort-dep-loading-container";
+            loading.innerHTML = '<div class="rimsort-dep-spinner"></div><span>Resolving dependencies...</span>';
+            container.insertAdjacentElement("afterend", loading);
 
-        const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
-        if (!modId) return;
+            try {
+                const tree = await getDepsFor(modId);
 
-        if (document.getElementById(Config.DEP_SECTION_ID)) {
-            refreshAllDepsBadges();
-            updateSoloLinkVisibility();
-            return;
-        }
-
-        if (_depsLoading) return;
-        _depsLoading = true;
-        const loading = document.createElement("div");
-        loading.className = "rimsort-dep-loading-container";
-        loading.innerHTML = '<div class="rimsort-dep-spinner"></div><span>Resolving dependencies...</span>';
-        container.insertAdjacentElement("afterend", loading);
-
-        try {
-            const tree = await getDepsFor(modId);
-
-            loading.remove();
-            const section = buildDepSection(tree);
-            if (section) container.insertAdjacentElement("afterend", section);
-            updateSoloLinkVisibility();
+                loading.remove();
+                const section = buildDepSection(tree);
+                if (section) {
+                    container.insertAdjacentElement("afterend", section);
+                    DetailState.depsInjected = true;
+                }
+                updateSoloLinkVisibility();
+            } finally {
+                _depsLoading = false;
+            }
         } finally {
-            _depsLoading = false;
+            createDetailButton._running = false;
         }
     }
 
@@ -918,9 +930,31 @@
         refreshAllDepsBadges();
     };
 
-    function callAction(method, params = {}) {
+    async function callAction(method, params = {}) {
         const q = new URLSearchParams(params).toString();
-        new Image().src = "pxmodrim://action/" + method + (q ? "?" + q : "");
+        const url = `pxmodrim://api/${method}` + (q ? `?${q}` : ``);
+        let resp;
+        try {
+            resp = await fetch(url);
+        } catch (e) {
+            console.error(
+                `[pxmodrim] callAction ${method} FAILED\n` +
+                `  url: ${url}\n` +
+                `  name: ${e.name}\n` +
+                `  message: ${e.message}\n` +
+                `  cause: ${JSON.stringify(e.cause)}\n` +
+                `  stack: ${(e.stack || "").split("\n").slice(0, 3).join("\n")}`
+            );
+            throw e;
+        }
+        if (!resp.ok) throw new Error(`RPC ${method} failed: ${resp.status}`);
+        return resp.json();
+    }
+
+    function notifyAction(method, params = {}) {
+        const q = new URLSearchParams(params).toString();
+        const url = `pxmodrim://api/${method}` + (q ? `?${q}` : ``);
+        fetch(url).catch(() => {});
     }
 
     function initState() {
@@ -931,6 +965,7 @@
         _bridgeDataResolve?.();
         if (_activeRoute) _activeRoute.init();
         refreshAllDepsBadges();
+        notifyAction("initReady");
         log("initState DONE");
     }
 
