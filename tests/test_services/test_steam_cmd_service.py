@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import shutil
 import sys
+from contextlib import nullcontext
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 import msgspec
 import pytest
@@ -381,17 +382,29 @@ class TestDownloadMods:
         assert service._ctx is not None
         service._ctx.config.paths.steamcmd_prefix = str(tmp_path)
         Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(str(fake_steamcmd), service.executable)
-        Path(service.executable).chmod(0o755)
+        if sys.platform == "win32":
+            _exec_path = Path(service.executable).with_suffix(".cmd")
+            shutil.copy2(str(fake_steamcmd), _exec_path)
+            _exe_mock = patch.object(
+                SteamCmdService,
+                "executable",
+                new_callable=PropertyMock,
+                return_value=str(_exec_path),
+            )
+        else:
+            shutil.copy2(str(fake_steamcmd), service.executable)
+            Path(service.executable).chmod(0o755)
+            _exe_mock = nullcontext()
 
         statuses: list[SteamCmdItemStatus] = []
         result: list[SteamCmdResult] = []
         service.download_item_status_changed.connect(statuses.append)
         service.download_finished.connect(result.append)
-        run_async(
-            service.download_mods(["111", "222", "333"], validate=False),
-            qapp,
-        )
+        with _exe_mock:
+            run_async(
+                service.download_mods(["111", "222", "333"], validate=False),
+                qapp,
+            )
 
         assert result and set(result[0].succeeded) == {"111", "222"}
         assert result[0].failed == ["333"]
@@ -410,8 +423,19 @@ class TestDownloadMods:
         assert service._ctx is not None
         service._ctx.config.paths.steamcmd_prefix = str(tmp_path)
         Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(str(fake_steamcmd), service.executable)
-        Path(service.executable).chmod(0o755)
+        if sys.platform == "win32":
+            _exec_path = Path(service.executable).with_suffix(".cmd")
+            shutil.copy2(str(fake_steamcmd), _exec_path)
+            _exe_mock = patch.object(
+                SteamCmdService,
+                "executable",
+                new_callable=PropertyMock,
+                return_value=str(_exec_path),
+            )
+        else:
+            shutil.copy2(str(fake_steamcmd), service.executable)
+            Path(service.executable).chmod(0o755)
+            _exe_mock = nullcontext()
 
         result: list[SteamCmdResult] = []
         service.download_finished.connect(result.append)
@@ -421,10 +445,11 @@ class TestDownloadMods:
 
         timer = threading.Timer(0.1, _cancel_soon)
         timer.start()
-        run_async(
-            service.download_mods(["111", "222"], validate=False),
-            qapp,
-        )
+        with _exe_mock:
+            run_async(
+                service.download_mods(["111", "222"], validate=False),
+                qapp,
+            )
         timer.cancel()
 
         assert result
