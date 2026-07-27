@@ -182,8 +182,8 @@ class App:
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
 
-        await self._app_ctx.init_all()
         await self._app_ctx.refresh_mods()
+        await self._app_ctx.init_all()
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)

@@ -170,7 +170,7 @@ class SteamCmdService(Plugin):
     @property
     def prefix(self) -> str:
         if self._ctx is None:
-            return ""
+            raise RuntimeError("SteamCmdService accessed before setup()")
         return self._ctx.config.paths.steamcmd_prefix or str(config_dir() / "steamcmd")
 
     @property
