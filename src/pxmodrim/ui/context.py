@@ -59,6 +59,10 @@ class AppContext:
         await self._core.plugins.init_all(self._core)
         await self._plugins.init_all(self)
 
+    async def refresh_mods(self) -> int:
+        await self._core.mod_service.reload()
+        return len(self._core.all_mods)
+
     async def shutdown_all(self) -> None:
         await self._plugins.shutdown_all()
         await self._core.plugins.shutdown_all()

@@ -280,16 +280,11 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _refresh_mods(self) -> None:
         self._toast_manager.info("Refreshing mods...")
-        t0 = time.monotonic()
-        await self._ctx.mod_service.reload()
-        elapsed = time.monotonic() - t0
-        if not self._ctx.all_mods:
-            logger.warning("No mods found after refresh ({:.1f}s)", elapsed)
+        count = await self._app_ctx.refresh_mods()
+        if not count:
             self._toast_manager.warning("No mods found")
             return
-        self._toast_manager.info(
-            f"Reloaded {len(self._ctx.all_mods)} mods in {elapsed:.1f}s", 3000
-        )
+        self._toast_manager.success(f"Reloaded {count} mods")
 
     # ── Private slots ───────────────────────────────────────
 
