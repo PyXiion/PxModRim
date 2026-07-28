@@ -58,6 +58,9 @@ ltex.dictionary*
 # Dummy import validation
 _dummy_pxmodrim.py
 
+# Generated JavaScript (built from ts/ sources)
+src/pxmodrim/ui/plugins/steam_workshop/inject.js
+
 # OpenCode
 .opencode/**
 opencode.json

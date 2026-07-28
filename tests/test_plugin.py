@@ -23,7 +23,6 @@ class _RecorderPlugin(Plugin):
 
 
 class TestPluginRegistryToposort:
-
     def test_empty_registry(self) -> None:
         reg = PluginRegistry()
         order: list[str] = []
@@ -85,7 +84,6 @@ class TestPluginRegistryToposort:
 
 
 class TestParseDisabledPlugins:
-
     def test_empty(self) -> None:
         with patch.dict(os.environ, {"PX_DISABLED_PLUGINS": ""}):
             assert _parse_disabled_plugins() == set()

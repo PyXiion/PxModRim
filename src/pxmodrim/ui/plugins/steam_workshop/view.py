@@ -13,9 +13,7 @@ from PySide6.QtWidgets import QHBoxLayout, QWidget
 from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
-from pxmodrim.ui.plugins.steam_workshop.action_handler import (
-    SteamWorkshopActionHandler,
-)
+from pxmodrim.ui.plugins.steam_workshop.bridge_obj import PxModRimBridge
 from pxmodrim.ui.plugins.steam_workshop.download_sidebar import DownloadSidebar
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.views.base import BaseViewPanel
@@ -63,7 +61,6 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
         self._plugin: SteamCmdUiPlugin | None = None
         self._initialized = False
-        self._action_handler: SteamWorkshopActionHandler | None = None
 
         content = QWidget()
         h_layout = QHBoxLayout(content)
@@ -111,52 +108,32 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             self._download_sidebar.download_requested.connect(
                 self._on_download_requested
             )
-            self._download_sidebar.stop_requested.connect(
-                self._plugin.stop_download
-            )
-            self._download_sidebar.item_removed.connect(
-                self._plugin.remove_item
-            )
-            self._download_sidebar.clear_requested.connect(
-                self._plugin.clear_queue
-            )
+            self._download_sidebar.stop_requested.connect(self._plugin.stop_download)
+            self._download_sidebar.item_removed.connect(self._plugin.remove_item)
+            self._download_sidebar.clear_requested.connect(self._plugin.clear_queue)
 
-            self._plugin.badges_refresh_requested.connect(
-                self._push_badges_to_js
-            )
+            self._plugin.badges_refresh_requested.connect(self._push_badges_to_js)
             self._plugin.sidebar_sync_requested.connect(self._on_sidebar_sync)
             self._plugin.progress_updated.connect(self._on_progress_updated)
-            self._plugin.item_status_changed.connect(
-                self._on_item_status_changed
-            )
+            self._plugin.item_status_changed.connect(self._on_item_status_changed)
             self._plugin.download_busy_changed.connect(
                 lambda busy: self._download_sidebar.set_download_enabled(not busy)
             )
-            self._plugin.uncheck_mod_requested.connect(
-                self._push_uncheck_to_js
-            )
-            self._plugin.clear_checked_requested.connect(
-                self._push_clear_checked_to_js
-            )
+            self._plugin.uncheck_mod_requested.connect(self._push_uncheck_to_js)
+            self._plugin.clear_checked_requested.connect(self._push_clear_checked_to_js)
+
+        self._bridge: PxModRimBridge | None = None
+        if self._plugin is not None:
+            self._bridge = PxModRimBridge(self._plugin)
 
         qml_ctx = self._qml.rootContext()
         qml_ctx.setContextProperty("steamWorkshopPanel", self)
+        qml_ctx.setContextProperty("_bridge", self._bridge)
         qml_ctx.setContextProperty("_injectCode", _INJECTION)
 
         self._qml.setSource(_STEAM_WORKSHOP_QML)
 
     # ── QML-invokable slots ──────────────────────────────
-
-    @Slot(QObject)
-    def onProfileReady(self, profile: QObject) -> None:
-        logger.debug("[steam] profile ready")
-        if self._plugin is None:
-            logger.warning("[steam] no plugin, skipping url scheme handler")
-            return
-        self._action_handler = SteamWorkshopActionHandler(self._plugin)
-
-        profile.installUrlSchemeHandler(b"pxmodrim", self._action_handler)  # pyright: ignore[reportAttributeAccessIssue]
-        logger.debug("[steam] url scheme handler installed on dedicated profile")
 
     @Slot()
     def navigateHome(self) -> None:

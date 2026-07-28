@@ -4,10 +4,13 @@ pytest_opts := "--doctest-modules --no-qt-log"
 @default:
     just --list
 
-run: dev-setup
+build-js:
+    uv run python scripts/build-inject-js.py
+
+run: build-js dev-setup
     LOGURU_LEVEL=DEBUG uv run python -m pxmodrim
 
-test: dev-setup
+test: build-js dev-setup
     uv run pytest {{pytest_opts}} -s
 
 test-verbose: dev-setup
@@ -24,7 +27,7 @@ ruff-format-fix:
 
 fix: ruff-fix ruff-format-fix
 
-check: ruff-fix pyright check-deps
+check: ruff-fix build-js pyright check-deps
 
 check-deps:
     uv run python scripts/check-deps.py
@@ -40,7 +43,7 @@ linux-copy-desktop:
     sed "s|Icon=pxmodrim|Icon={{justfile_directory()}}/src/pxmodrim/ui/assets/logo.svg|" packaging/linux/pxmodrim.desktop > ~/.local/share/applications/pxmodrim.desktop
     kbuildsycoca6 --noincremental
 
-build:
+build: build-js
     uv run python packaging/build.py
 
 build-release:

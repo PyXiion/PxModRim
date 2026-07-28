@@ -2,6 +2,7 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import QtWebEngine
+import QtWebChannel 1.15
 
 Rectangle {
     id: root
@@ -152,9 +153,20 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
+            WebChannel {
+                id: channel
+
+                Component.onCompleted: {
+                    if (_bridge) {
+                        channel.registerObject("bridge", _bridge)
+                    }
+                }
+            }
+
             WebEngineView {
                 id: webView
                 objectName: "workshopWeb"
+                webChannel: channel
                 anchors.fill: parent
 
                 profile: WebEngineProfile {
@@ -186,8 +198,6 @@ Rectangle {
                     webView.userScripts.insert(inj)
 
                     webView.url = "https://steamcommunity.com/workshop/browse/?appid=294100"
-
-                    steamWorkshopPanel.onProfileReady(webView.profile)
                 }
 
                 onLoadingChanged: function(loadRequest) {

@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
 
 
-
 class SidebarSync(NamedTuple):
     checked_ids: dict[str, str]
     statuses: dict[str, str]
@@ -97,7 +96,9 @@ class SteamCmdUiPlugin(Plugin):
             return
         with contextlib.suppress(ValueError):
             self._svc.download_progress.disconnect(self._on_steam_progress)
-            self._svc.download_item_status_changed.disconnect(self._on_steam_item_status)
+            self._svc.download_item_status_changed.disconnect(
+                self._on_steam_item_status
+            )
             self._svc.download_finished.disconnect(self._on_steam_finished)
             self._core.mod_service.mods_changed.disconnect(self._on_mods_changed)
 

@@ -62,10 +62,7 @@ class PluginRegistry:
 
     def _toposort(self) -> list[Plugin]:
         data = {
-            name: {
-                dep for dep in plugin.dependencies
-                if dep in self._plugins
-            }
+            name: {dep for dep in plugin.dependencies if dep in self._plugins}
             for name, plugin in self._plugins.items()
         }
         levels = list(toposort.toposort(data))
