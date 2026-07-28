@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import time
 from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
@@ -27,7 +25,6 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.config import save_config
 from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
@@ -168,12 +165,6 @@ class MainWindow(QMainWindow):
             self.mod_info = self._mods_view.mod_info
             self._mods_view.entry_selected.connect(self._on_entry_selected)
             self._mods_view.mod_selected.connect(self._on_mod_selected)
-            self._mods_view.active_mods_changed.connect(
-                self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
-            )
-            self._mods_view.order_changed.connect(
-                self._on_order_changed, Qt.ConnectionType.QueuedConnection
-            )
 
         outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
@@ -299,7 +290,7 @@ class MainWindow(QMainWindow):
         cfg = dialog.get_config()
         if not cfg.paths.game:
             logger.warning("Settings saved without a game path")
-        save_config(cfg)
+        self._ctx.config_service.save("config.json", cfg)
         self._ctx.update_config(cfg)
         self._ctx.reset_providers(cfg.paths)
         await self._ctx.mod_service.reload()
@@ -310,25 +301,8 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
-        deps_to_enable = self._ctx.sort_service.resolve_missing_dependencies(
-            set(self.mod_list.active_uuids())
-        )
-        if deps_to_enable:
-            logger.info(
-                "auto-sort: enabling {} missing dependencies", len(deps_to_enable)
-            )
-            self.mod_list.enableMods(deps_to_enable)
-            self._ctx.diagnostics_service.rebuild(self.mod_list.active_uuids())
-
-        t0 = time.monotonic()
-        ordered_uuids = await self._ctx.sort_service.sort_active_mods()
-        elapsed = time.monotonic() - t0
-        self.mod_list.model.reorder(ordered_uuids)
-        self._ctx.diagnostics_service.reorder(ordered_uuids)
-        logger.info("auto-sort: {} mods sorted in {:.1f}s", len(ordered_uuids), elapsed)
-        self._toast_manager.success(
-            f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
-        )
+        count, elapsed = await self._ctx.auto_sort()
+        self._toast_manager.success(f"Sorted {count} mods in {elapsed:.1f}s", 5000)
 
     @asyncSlot()
     async def _save_mods_config(self) -> None:
@@ -369,7 +343,7 @@ class MainWindow(QMainWindow):
             self._ui_prefs.launch_strategy = new_strategy
             from pxmodrim.ui.config import save_ui_prefs
 
-            save_ui_prefs(self._ui_prefs)
+            save_ui_prefs(self._ui_prefs, self._ctx.config_service)
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:
@@ -384,17 +358,6 @@ class MainWindow(QMainWindow):
                 self._resolve_active_pids(),
             )
 
-    @asyncSlot()
-    async def _on_active_mods_changed(self) -> None:
-        if self.mod_list.model.rowCount() == 0:
-            return
-        uuids = self.mod_list.active_uuids()
-        self._ctx.diagnostics_service.rebuild(uuids)
-        await asyncio.sleep(0)
-        self._apply_current_sidebar_filter()
-        if self._selected_uuid:
-            await self._on_mod_selected(self._selected_uuid)
-
     def _resolve_active_pids(self) -> list[str]:
         pids: list[str] = []
         for uuid in self.mod_list.active_uuids():
@@ -402,12 +365,6 @@ class MainWindow(QMainWindow):
             if isinstance(mod, AboutXmlMod):
                 pids.append(str(mod.package_id).lower())
         return pids
-
-    def _on_order_changed(self) -> None:
-        uuids = self.mod_list.active_uuids()
-        self._ctx.diagnostics_service.reorder(
-            uuids if uuids else self._ctx.active_uuids
-        )
 
     def _apply_current_sidebar_filter(self) -> None:
         if self._mods_view is not None:
@@ -454,6 +411,7 @@ class MainWindow(QMainWindow):
     def _on_diagnostics_summary_changed(
         self, diagnostics: dict[str, ModDiagnosticsView]
     ) -> None:
+        self._apply_current_sidebar_filter()
         if self._selected_uuid is not None:
             self.mod_info.set_issues(
                 self._ctx.diagnostics_service.issues_for(self._selected_uuid)

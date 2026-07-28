@@ -9,22 +9,6 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWebEngineCore import QWebEngineUrlScheme
-
-
-def _register_pxmodrim_scheme() -> None:
-    scheme = QWebEngineUrlScheme(b"pxmodrim")
-    scheme.setFlags(
-        QWebEngineUrlScheme.Flag.SecureScheme
-        | QWebEngineUrlScheme.Flag.ContentSecurityPolicyIgnored
-        | QWebEngineUrlScheme.Flag.FetchApiAllowed
-        | QWebEngineUrlScheme.Flag.CorsEnabled
-    )
-    QWebEngineUrlScheme.registerScheme(scheme)
-
-
-_register_pxmodrim_scheme()
-
 from PySide6.QtWebEngineQuick import QtWebEngineQuick  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 from qasync import QEventLoop  # noqa: E402
@@ -50,10 +34,9 @@ if _we_verbose is not None:
 
 from pxmodrim.core.config import (  # noqa: E402
     AppConfig,
-    config_file_path,
+    ConfigService,
+    config_dir,
     detect_game_paths,
-    load_config,
-    save_config,
 )
 from pxmodrim.core.context import CoreContext  # noqa: E402
 from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
@@ -107,7 +90,11 @@ class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
     __slots__ = (
-        "qt_app", "_ctx", "_app_ctx", "_ui_prefs", "main_window",
+        "qt_app",
+        "_ctx",
+        "_app_ctx",
+        "_ui_prefs",
+        "main_window",
     )
 
     def __init__(self) -> None:
@@ -149,21 +136,22 @@ class App:
         except (FileNotFoundError, KeyError) as exc:
             logger.warning("Failed to load theme: {}", exc)
 
-        cfg = load_config(config_file_path())
+        config_svc = ConfigService(config_dir())
+        cfg = config_svc.load("config.json", AppConfig)
         if not cfg.paths.game:
             logger.info("No game path in config, attempting auto-detect")
             detected = detect_game_paths()
             if detected.game:
                 cfg.paths = detected
-                save_config(cfg)
+                config_svc.save("config.json", cfg)
 
-        self._setup(cfg)
+        self._setup(cfg, config_svc)
 
-    def _setup(self, cfg: AppConfig) -> None:
+    def _setup(self, cfg: AppConfig, config_svc: ConfigService) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
 
-        self._ui_prefs = load_ui_prefs()
-        self._ctx = CoreContext.create(cfg)
+        self._ui_prefs = load_ui_prefs(config_svc)
+        self._ctx = CoreContext.create(cfg, config_svc)
         self._app_ctx = AppContext(self._ctx, self._ui_prefs)
         self._app_ctx.add_rail_view(ModsViewPanel)
 
@@ -171,10 +159,12 @@ class App:
 
         if "steamcmd" not in disabled:
             from pxmodrim.core.services.steam_cmd_service import SteamCmdService
+
             self._ctx.register_plugin(SteamCmdService())
 
         if "steamworkshop" not in disabled:
             from pxmodrim.ui.plugins import SteamCmdUiPlugin
+
             self._app_ctx.register_plugin(SteamCmdUiPlugin())
 
         self._app_ctx.setup_all()
@@ -192,7 +182,7 @@ class App:
             if result != 1 or not new_cfg.paths.game:
                 logger.warning("No game path configured, exiting")
                 return 1
-            save_config(new_cfg)
+            self._ctx.config_service.save("config.json", new_cfg)
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
 

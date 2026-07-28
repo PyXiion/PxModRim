@@ -7,15 +7,13 @@ from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import AsyncMock, PropertyMock, patch
 
-import msgspec
 import pytest
 from PySide6.QtWidgets import QApplication
 from pytest import raises as assert_raises
 from qasync import QEventLoop
 
-from pxmodrim.core.config import AppConfig
+from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.msgspec_hooks import dec_hook
 from pxmodrim.core.services.steam_cmd_service import (
     STEAMCMD_BATCH_SIZE,
     SteamCmdItemStatus,
@@ -23,11 +21,6 @@ from pxmodrim.core.services.steam_cmd_service import (
     SteamCmdService,
     SymlinkConflictError,
 )
-
-
-@pytest.fixture
-def cfg_path(tmp_path: Path) -> Path:
-    return tmp_path / "config.json"
 
 
 def run_async(coro, app: QApplication):
@@ -54,7 +47,7 @@ def qapp():
 def ctx(tmp_path: Path) -> CoreContext:
     cfg = AppConfig()
     cfg.paths.steamcmd_prefix = str(tmp_path / "scmd")
-    return CoreContext(cfg)
+    return CoreContext(cfg, ConfigService(tmp_path))
 
 
 @pytest.fixture
@@ -112,7 +105,7 @@ def ctx_with_local(tmp_path: Path) -> CoreContext:
     cfg = AppConfig()
     cfg.paths.steamcmd_prefix = str(tmp_path / "scmd")
     cfg.paths.local = str(tmp_path / "local")
-    return CoreContext(cfg)
+    return CoreContext(cfg, ConfigService(tmp_path))
 
 
 @pytest.fixture
@@ -230,9 +223,7 @@ class TestEnsureInstalled:
         ):
             assert asyncio.run(service.ensure_installed()) is False
 
-    def test_persists_prefix(
-        self, service: SteamCmdService, tmp_path: Path, cfg_path: Path
-    ) -> None:
+    def test_persists_prefix(self, service: SteamCmdService, tmp_path: Path) -> None:
         new_prefix = str(tmp_path / "new_prefix")
 
         def _fake_extract(data, url, dest):
@@ -252,10 +243,6 @@ class TestEnsureInstalled:
                 "pxmodrim.core.services.steam_cmd_service._extract_archive",
                 side_effect=_fake_extract,
             ),
-            patch(
-                "pxmodrim.core.config.config_file_path",
-                return_value=cfg_path,
-            ),
         ):
             result = asyncio.run(service.ensure_installed(prefix=new_prefix))
         assert result is True
@@ -263,11 +250,7 @@ class TestEnsureInstalled:
         ctx = service._ctx
         assert ctx is not None
         assert ctx.config.paths.steamcmd_prefix == new_prefix
-        cfg = msgspec.json.decode(
-            cfg_path.read_bytes(),
-            type=AppConfig,
-            dec_hook=dec_hook,
-        )
+        cfg = ctx.config_service.load("config.json", AppConfig)
         assert cfg.paths.steamcmd_prefix == new_prefix
 
     def test_installs_when_missing(

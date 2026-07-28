@@ -17,7 +17,6 @@ import httpx
 import msgspec
 from loguru import logger
 
-from pxmodrim.core.config import config_dir, save_config
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
 from pxmodrim.core.events import Event
 from pxmodrim.core.plugin import Plugin
@@ -171,7 +170,9 @@ class SteamCmdService(Plugin):
     def prefix(self) -> str:
         if self._ctx is None:
             raise RuntimeError("SteamCmdService accessed before setup()")
-        return self._ctx.config.paths.steamcmd_prefix or str(config_dir() / "steamcmd")
+        return self._ctx.config.paths.steamcmd_prefix or str(
+            self._ctx.config_service.config_dir / "steamcmd"
+        )
 
     @property
     def install_path(self) -> str:
@@ -273,7 +274,7 @@ class SteamCmdService(Plugin):
         if self.is_installed() and not reinstall:
             logger.debug(f"[steamcmd] already installed at {self.executable}")
             if prefix:
-                save_config(ctx.config)
+                ctx.config_service.save("config.json", ctx.config)
             return True
 
         system = platform.system()
@@ -288,7 +289,7 @@ class SteamCmdService(Plugin):
         if loading_state is not None:
             ok = await self._ensure_with_progress(url, loading_state)
             if ok and prefix:
-                save_config(ctx.config)
+                ctx.config_service.save("config.json", ctx.config)
             return ok
 
         self.status_message_changed.emit(f"Downloading SteamCMD from {url}...")
@@ -306,7 +307,7 @@ class SteamCmdService(Plugin):
         if self.is_installed():
             self.status_message_changed.emit("SteamCMD installed successfully.")
             if prefix:
-                save_config(ctx.config)
+                ctx.config_service.save("config.json", ctx.config)
             return True
         self.status_message_changed.emit(
             "SteamCMD installation completed but executable not found."

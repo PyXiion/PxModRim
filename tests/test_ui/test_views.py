@@ -8,7 +8,7 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import QApplication
 
-from pxmodrim.core.config import AppConfig
+from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.ui.plugins.steam_workshop import SteamWorkshopViewPanel
 from pxmodrim.ui.theme.qml_theme import Theme
 
@@ -36,37 +36,37 @@ def qml_engine(qapp: QApplication) -> Iterator[QQmlEngine]:
     yield engine
 
 
-def _ctx_stub() -> CoreContext:
+def _ctx_stub(cfg_svc: ConfigService) -> CoreContext:
     from pxmodrim.core.context import CoreContext
 
-    return CoreContext.create(_cfg())
+    return CoreContext.create(cfg_svc.load("config.json", AppConfig), cfg_svc)
 
 
-def _app_ctx_stub() -> AppContext:
+def _app_ctx_stub(cfg_svc: ConfigService) -> AppContext:
     from pxmodrim.ui.context import AppContext
 
-    return AppContext(_ctx_stub())
-
-
-def _cfg() -> AppConfig:
-    from pxmodrim.core.config import config_file_path, load_config
-
-    return load_config(config_file_path())
+    return AppContext(_ctx_stub(cfg_svc))
 
 
 class TestSteamWorkshopView:
     def test_preload_runs_without_error(
-        self, qml_engine: QQmlEngine
+        self, qml_engine: QQmlEngine, config_service: ConfigService
     ) -> None:
         view = SteamWorkshopViewPanel(
-            ctx=_ctx_stub(), qml_engine=qml_engine, app_ctx=_app_ctx_stub(),
+            ctx=_ctx_stub(config_service),
+            qml_engine=qml_engine,
+            app_ctx=_app_ctx_stub(config_service),
         )
 
         view.preload()
 
-    def test_web_is_none_before_init(self, qml_engine: QQmlEngine) -> None:
+    def test_web_is_none_before_init(
+        self, qml_engine: QQmlEngine, config_service: ConfigService
+    ) -> None:
         view = SteamWorkshopViewPanel(
-            ctx=_ctx_stub(), qml_engine=qml_engine, app_ctx=_app_ctx_stub(),
+            ctx=_ctx_stub(config_service),
+            qml_engine=qml_engine,
+            app_ctx=_app_ctx_stub(config_service),
         )
 
         assert view._web() is None
