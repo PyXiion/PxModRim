@@ -58,6 +58,7 @@ class DiagnosticsService:
         "_use_this_instead_service",
         "_community_rules",
         "_last_active_uuids",
+        "_last_summary",
         "_checker",
     )
 
@@ -74,6 +75,7 @@ class DiagnosticsService:
         self._use_this_instead_service = UseThisInsteadService(cs)
         self._community_rules: dict[PackageId, CommunityRule] | None = None
         self._last_active_uuids: list[str] = []
+        self._last_summary: dict[str, ModDiagnosticsView] = {}
         self._checker = ModChecker(
             checkers=[
                 DependencyIssueChecker(),
@@ -233,9 +235,13 @@ class DiagnosticsService:
         self, diagnostics: dict[str, ModDiagnostics]
     ) -> None:
         """Callback from checker; emit updated summary, status, and sidebar signals."""
-        self.diagnostics_summary_changed.emit(self._to_view(diagnostics))
+        self._last_summary = self._to_view(diagnostics)
+        self.diagnostics_summary_changed.emit(self._last_summary)
         self.status_message_changed.emit(self._format_status())
         self.sidebar_entries_changed.emit(self._build_sidebar_entries())
+
+    def summary_for(self, uuid: str) -> ModDiagnosticsView | None:
+        return self._last_summary.get(uuid)
 
     # ── Status ──────────────────────────────────────────────────
 
