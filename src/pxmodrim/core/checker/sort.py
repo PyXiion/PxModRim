@@ -93,20 +93,18 @@ def _build_deps_and_rev_deps(
         if pid not in all_pids:
             continue
 
-        for edge in graph.edges_of_type(pid, EdgeType.LOAD_BEFORE):
-            if edge.target in all_pids:
-                deps.setdefault(edge.target, set()).add(pid)
-                rev_deps.setdefault(pid, set()).add(edge.target)
-
-        for edge in graph.edges_of_type(pid, EdgeType.LOAD_AFTER):
-            if edge.target in all_pids:
-                deps.setdefault(pid, set()).add(edge.target)
-                rev_deps.setdefault(edge.target, set()).add(pid)
-
-        for edge in graph.edges_of_type(pid, EdgeType.DEPENDENCY):
-            if edge.target in all_pids:
-                deps.setdefault(pid, set()).add(edge.target)
-                rev_deps.setdefault(edge.target, set()).add(pid)
+        deps_pid = deps[pid]
+        rev_pid = rev_deps[pid]
+        for edge in graph.outgoing(pid):
+            target = edge.target
+            if target not in all_pids:
+                continue
+            if edge.type == EdgeType.LOAD_BEFORE:
+                deps[target].add(pid)
+                rev_pid.add(target)
+            elif edge.type in (EdgeType.LOAD_AFTER, EdgeType.DEPENDENCY):
+                deps_pid.add(target)
+                rev_deps[target].add(pid)
 
     return deps, rev_deps
 
