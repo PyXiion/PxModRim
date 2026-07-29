@@ -13,9 +13,10 @@ from loguru import logger
 
 logger.remove()
 
-from pxmodrim.core.models.metadata.parsing import create_listed_mod_from_path
-from pxmodrim.core.services.mod_discovery import scan_mod_directory
-
+from pxmodrim.core.models.metadata.parsing import (  # noqa: E402
+    create_listed_mod_from_path,
+)
+from pxmodrim.core.services.mod_discovery import scan_mod_directory  # noqa: E402
 
 ABOUT_XML = """\
 <?xml version="1.0" encoding="utf-8"?>
@@ -83,8 +84,14 @@ def bench(count: int) -> None:
     scan_ms = (t1 - t0) / 1e6
     parse_ms = (t3 - t2) / 1e6
     total_ms = (t3 - t0) / 1e6
-    print(f"{count:>5} mods: scan_dir={scan_ms:>6.1f}ms  parse_xml={parse_ms:>6.1f}ms  total={total_ms:>6.1f}ms")
-    print(f"  scan avg: {scan_ms/count*1000:.1f} us/mod  parse avg: {parse_ms/count*1000:.1f} us/mod")
+    print(
+        f"{count:>5} mods: scan_dir={scan_ms:>6.1f}ms"
+        f"  parse_xml={parse_ms:>6.1f}ms  total={total_ms:>6.1f}ms"
+    )
+    print(
+        f"  scan avg: {scan_ms / count * 1000:.1f} us/mod"
+        f"  parse avg: {parse_ms / count * 1000:.1f} us/mod"
+    )
 
 
 if __name__ == "__main__":
