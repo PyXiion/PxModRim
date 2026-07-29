@@ -37,9 +37,11 @@ class CoreModProvider(BaseModProvider):
             if data_dir.exists():
                 with (t or Timer())("scan_dir"):
                     dirs = scan_mod_directory(data_dir)
-                for d in dirs:
+                for d, a in dirs.items():
                     with (t or Timer())("parse_xml"):
-                        _, mod = create_listed_mod_from_path(d, target_version)
+                        _, mod = create_listed_mod_from_path(
+                            d, target_version, about_xml_path=a
+                        )
                     logger.debug(
                         "CoreModProvider found: {} (uuid: {})", mod.name, mod.uuid
                     )

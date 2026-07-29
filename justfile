@@ -40,6 +40,21 @@ linux-copy-desktop:
     sed "s|Icon=pxmodrim|Icon={{justfile_directory()}}/src/pxmodrim/ui/assets/logo.svg|" packaging/linux/pxmodrim.desktop > ~/.local/share/applications/pxmodrim.desktop
     kbuildsycoca6 --noincremental
 
+bench name="":
+    #!/usr/bin/env python3
+    import glob, subprocess, sys
+    from pathlib import Path
+    root = Path("{{justfile_directory()}}") / "tests" / "benchmarks"
+    scripts = sorted(glob.glob(str(root / "bench_*.py")))
+    name = "{{name}}"
+    if name and name != "all":
+        scripts = [s for s in scripts if name in s]
+    if not scripts:
+        print("no benchmark found"); sys.exit(1)
+    for s in scripts:
+        print(f"  === {Path(s).stem} ===")
+        subprocess.run(["uv", "run", "python", s])
+
 build:
     uv run python packaging/build.py
 

@@ -7,6 +7,9 @@ def find_about_xml(mod_path: Path) -> Path | None:
     """Find About.xml in a mod directory (case-insensitive)."""
     if not mod_path.is_dir():
         return None
+    candidate = mod_path / "About" / "About.xml"
+    if candidate.is_file():
+        return candidate
     for entry in mod_path.iterdir():
         if entry.name.lower() == "about" and entry.is_dir():
             for child in entry.iterdir():

@@ -61,3 +61,6 @@ _dummy_pxmodrim.py
 # OpenCode
 .opencode/**
 opencode.json
+
+# Steam workshop plugin
+src/pxmodrim/ui/plugins/steam_workshop/

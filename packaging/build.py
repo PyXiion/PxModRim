@@ -16,6 +16,7 @@ def get_standalone_args(release: bool = False) -> list[str]:
         "nuitka",
         "--standalone",
         "--enable-plugin=pyside6",
+        "--nofollow-import-to=pytest,pygments",
         "--include-package-data=pxmodrim",
         f"--output-dir={project_root / 'dist'}",
         "--assume-yes-for-downloads",

@@ -7,6 +7,15 @@ import lxml.etree as ET
 from loguru import logger
 
 
+def _text(elem: ET._Element, tag: str) -> str | None:
+    """Return stripped text of the first child matching *tag*, or None."""
+    found = elem.find(tag)
+    if found is None or found.text is None:
+        return None
+    text = found.text.strip()
+    return text or None
+
+
 def etree_to_dict(t: Any) -> dict[str, Any]:
     """Recursively convert an lxml Element tree into a plain nested dictionary."""
     d: dict[str, Any] = {str(t.tag): {}}
