@@ -185,7 +185,9 @@ class StartupImpactDb:
         db = await self._connection_for(path)
         async with db.cursor() as cursor:
             await cursor.execute(
-                "WITH " + _WEIGHTED_SESSION_CTE + """
+                "WITH "
+                + _WEIGHTED_SESSION_CTE
+                + """
                 SELECT COALESCE(
                     SUM(e.total_impact_s * w.weight) * 1.0
                         / NULLIF(SUM(w.weight), 0),
@@ -208,9 +210,7 @@ class StartupImpactDb:
 
         Mods absent from the stored history default to (0.0, 0.0).
         """
-        result: dict[str, tuple[float, float]] = dict.fromkeys(
-            package_ids, (0.0, 0.0)
-        )
+        result: dict[str, tuple[float, float]] = dict.fromkeys(package_ids, (0.0, 0.0))
         if not package_ids:
             return result
         if not path.exists():
@@ -219,7 +219,9 @@ class StartupImpactDb:
         db = await self._connection_for(path)
         async with db.cursor() as cursor:
             await cursor.execute(
-                "WITH " + _WEIGHTED_SESSION_CTE + """
+                "WITH "
+                + _WEIGHTED_SESSION_CTE
+                + """
                 SELECT e.package_id,
                        COALESCE(
                            SUM(e.total_impact_s * w.weight)
@@ -233,7 +235,9 @@ class StartupImpactDb:
                        )
                 FROM startup_impact_entries e
                 JOIN w ON w.session_id = e.session_id
-                WHERE e.package_id IN (""" + placeholders + """)
+                WHERE e.package_id IN ("""
+                + placeholders
+                + """)
                 GROUP BY e.package_id
                 """,
                 (*_CTE_PARAMS, *package_ids),
@@ -248,7 +252,9 @@ class StartupImpactDb:
         db = await self._connection_for(path)
         async with db.cursor() as cursor:
             await cursor.execute(
-                "WITH " + _WEIGHTED_SESSION_CTE + """
+                "WITH "
+                + _WEIGHTED_SESSION_CTE
+                + """
                 SELECT e.package_id,
                        COALESCE(
                            SUM(e.total_impact_s * w.weight)
@@ -261,9 +267,7 @@ class StartupImpactDb:
                 """,
                 _CTE_PARAMS,
             )
-            return {
-                str(row[0]): float(row[1]) for row in await cursor.fetchall()
-            }
+            return {str(row[0]): float(row[1]) for row in await cursor.fetchall()}
 
     async def get_latest_with_averages(
         self,
@@ -312,7 +316,9 @@ class StartupImpactDb:
                 )
 
             await cursor.execute(
-                "WITH " + _WEIGHTED_SESSION_CTE + """
+                "WITH "
+                + _WEIGHTED_SESSION_CTE
+                + """
                 SELECT COALESCE(
                     SUM(e.total_impact_s * w.weight) * 1.0
                         / NULLIF(SUM(w.weight), 0),
@@ -333,7 +339,9 @@ class StartupImpactDb:
             if active_pids:
                 placeholders = ",".join("?" for _ in active_pids)
                 await cursor.execute(
-                    "WITH " + _WEIGHTED_SESSION_CTE + """
+                    "WITH "
+                    + _WEIGHTED_SESSION_CTE
+                    + """
                     SELECT e.package_id,
                            COALESCE(
                                SUM(e.total_impact_s * w.weight)
@@ -347,7 +355,9 @@ class StartupImpactDb:
                            )
                     FROM startup_impact_entries e
                     JOIN w ON w.session_id = e.session_id
-                    WHERE e.package_id IN (""" + placeholders + """)
+                    WHERE e.package_id IN ("""
+                    + placeholders
+                    + """)
                     GROUP BY e.package_id
                     """,
                     (*_CTE_PARAMS, *active_pids),
@@ -358,7 +368,9 @@ class StartupImpactDb:
             selected_avg = 0.0
             if selected_pid is not None:
                 await cursor.execute(
-                    "WITH " + _WEIGHTED_SESSION_CTE + """
+                    "WITH "
+                    + _WEIGHTED_SESSION_CTE
+                    + """
                     SELECT COALESCE(
                         SUM(e.total_impact_s * w.weight) * 1.0
                             / NULLIF(SUM(w.weight), 0),

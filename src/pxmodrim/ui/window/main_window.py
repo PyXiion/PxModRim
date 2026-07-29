@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import time
 from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
@@ -27,9 +25,7 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.config import save_config
 from pxmodrim.core.constants import LaunchStrategy
-from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.ui.components import (
@@ -40,10 +36,10 @@ from pxmodrim.ui.components import (
     ViewRailPanel,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.theme.qml_theme import Theme
-from pxmodrim.ui.ui_prefs import UIPrefs
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 if TYPE_CHECKING:
@@ -51,14 +47,15 @@ if TYPE_CHECKING:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, ctx: CoreContext, ui_prefs: UIPrefs) -> None:
+    def __init__(self, app_ctx: AppContext) -> None:
         """Initialize the main application window."""
         super().__init__()
 
         self._app_quit_callback: Callable[[], None] | None = None
         self._is_frameless: bool = False
-        self._ui_prefs = ui_prefs
-        self._ctx = ctx
+        self._app_ctx = app_ctx
+        self._ctx = app_ctx.core
+        self._ui_prefs = app_ctx.ui_prefs
         self._selected_uuid: str | None = None
 
         self._setup_window_basics()
@@ -119,7 +116,7 @@ class MainWindow(QMainWindow):
 
     def _setup_content_and_views(self) -> None:
         logger.debug("main_window: setting up content and views")
-        rail_views = self._ctx.rail_views
+        rail_views = self._app_ctx.rail_views
 
         outer = QWidget()
         outer.setObjectName("outerContainer")
@@ -157,31 +154,17 @@ class MainWindow(QMainWindow):
 
         self._views: list = []
         for view_cls in rail_views:
-            view = view_cls(self._ctx, self._qml_engine, ui_prefs=self._ui_prefs)
+            view = view_cls(self._ctx, self._qml_engine, app_ctx=self._app_ctx)
             self._views.append(view)
             self._stack.addWidget(view)
 
-        self._mods_view = next(
-            (v for v in self._views if v.view_id == "mods"), None
-        )
+        self._mods_view = next((v for v in self._views if v.view_id == "mods"), None)
         if self._mods_view is not None:
             self.sidebar = self._mods_view.sidebar
             self.mod_list = self._mods_view.mod_list
             self.mod_info = self._mods_view.mod_info
             self._mods_view.entry_selected.connect(self._on_entry_selected)
             self._mods_view.mod_selected.connect(self._on_mod_selected)
-            self._mods_view.active_mods_changed.connect(
-                self._on_active_mods_changed, Qt.ConnectionType.QueuedConnection
-            )
-            self._mods_view.order_changed.connect(
-                self._on_order_changed, Qt.ConnectionType.QueuedConnection
-            )
-
-        steam_view = next(
-            (v for v in self._views if v.view_id == "steam_workshop"), None
-        )
-        if steam_view is not None and self._mods_view is not None:
-            self._mods_view.active_mods_changed.connect(steam_view.refresh_badges)
 
         outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
@@ -288,16 +271,11 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _refresh_mods(self) -> None:
         self._toast_manager.info("Refreshing mods...")
-        t0 = time.monotonic()
-        await self._ctx.mod_service.reload()
-        elapsed = time.monotonic() - t0
-        if not self._ctx.all_mods:
-            logger.warning("No mods found after refresh ({:.1f}s)", elapsed)
+        count = await self._app_ctx.refresh_mods()
+        if not count:
             self._toast_manager.warning("No mods found")
             return
-        self._toast_manager.info(
-            f"Reloaded {len(self._ctx.all_mods)} mods in {elapsed:.1f}s", 3000
-        )
+        self._toast_manager.success(f"Reloaded {count} mods")
 
     # ── Private slots ───────────────────────────────────────
 
@@ -312,14 +290,9 @@ class MainWindow(QMainWindow):
         cfg = dialog.get_config()
         if not cfg.paths.game:
             logger.warning("Settings saved without a game path")
-        save_config(cfg)
+        self._ctx.config_service.save("config.json", cfg)
         self._ctx.update_config(cfg)
-        from pxmodrim.core.providers import create_providers
-
-        self._ctx.mod_service.reset_providers(
-            create_providers(cfg.paths, self._ctx._pool)
-        )
-        self._ctx.steam_cmd_service.set_prefix(cfg.paths.steamcmd_prefix)
+        self._ctx.reset_providers(cfg.paths)
         await self._ctx.mod_service.reload()
 
     @asyncSlot()
@@ -328,25 +301,8 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
-        deps_to_enable = self._ctx.sort_service.resolve_missing_dependencies(
-            set(self.mod_list.active_uuids())
-        )
-        if deps_to_enable:
-            logger.info(
-                "auto-sort: enabling {} missing dependencies", len(deps_to_enable)
-            )
-            self.mod_list.enableMods(deps_to_enable)
-            self._ctx.diagnostics_service.rebuild(self.mod_list.active_uuids())
-
-        t0 = time.monotonic()
-        ordered_uuids = await self._ctx.sort_service.sort_active_mods()
-        elapsed = time.monotonic() - t0
-        self.mod_list.model.reorder(ordered_uuids)
-        self._ctx.diagnostics_service.reorder(ordered_uuids)
-        logger.info("auto-sort: {} mods sorted in {:.1f}s", len(ordered_uuids), elapsed)
-        self._toast_manager.success(
-            f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
-        )
+        count, elapsed = await self._ctx.auto_sort()
+        self._toast_manager.success(f"Sorted {count} mods in {elapsed:.0f}ms", 5000)
 
     @asyncSlot()
     async def _save_mods_config(self) -> None:
@@ -387,7 +343,7 @@ class MainWindow(QMainWindow):
             self._ui_prefs.launch_strategy = new_strategy
             from pxmodrim.ui.config import save_ui_prefs
 
-            save_ui_prefs(self._ui_prefs)
+            save_ui_prefs(self._ui_prefs, self._ctx.config_service)
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:
@@ -402,17 +358,6 @@ class MainWindow(QMainWindow):
                 self._resolve_active_pids(),
             )
 
-    @asyncSlot()
-    async def _on_active_mods_changed(self) -> None:
-        if self.mod_list.model.rowCount() == 0:
-            return
-        uuids = self.mod_list.active_uuids()
-        self._ctx.diagnostics_service.rebuild(uuids)
-        await asyncio.sleep(0)
-        self._apply_current_sidebar_filter()
-        if self._selected_uuid:
-            await self._on_mod_selected(self._selected_uuid)
-
     def _resolve_active_pids(self) -> list[str]:
         pids: list[str] = []
         for uuid in self.mod_list.active_uuids():
@@ -420,12 +365,6 @@ class MainWindow(QMainWindow):
             if isinstance(mod, AboutXmlMod):
                 pids.append(str(mod.package_id).lower())
         return pids
-
-    def _on_order_changed(self) -> None:
-        uuids = self.mod_list.active_uuids()
-        self._ctx.diagnostics_service.reorder(
-            uuids if uuids else self._ctx.active_uuids
-        )
 
     def _apply_current_sidebar_filter(self) -> None:
         if self._mods_view is not None:
@@ -472,6 +411,7 @@ class MainWindow(QMainWindow):
     def _on_diagnostics_summary_changed(
         self, diagnostics: dict[str, ModDiagnosticsView]
     ) -> None:
+        self._apply_current_sidebar_filter()
         if self._selected_uuid is not None:
             self.mod_info.set_issues(
                 self._ctx.diagnostics_service.issues_for(self._selected_uuid)

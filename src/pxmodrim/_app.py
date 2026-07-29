@@ -9,9 +9,9 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
-from PySide6.QtWidgets import QApplication, QMessageBox
-from qasync import QEventLoop
+from PySide6.QtWebEngineQuick import QtWebEngineQuick  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
+from qasync import QEventLoop  # noqa: E402
 
 # Qt6 defaults to PassThrough, which causes QtWebEngine to render at
 # integer buffer-scale (e.g. 1×) while the compositor upscales fractionally
@@ -21,21 +21,31 @@ from qasync import QEventLoop
 os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "RoundPreferFloor")
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
-from pxmodrim.core.config import (
+_we_verbose = os.environ.get("PX_WEBENGINE_VERBOSE")
+if _we_verbose is not None:
+    os.environ.setdefault(
+        "QTWEBENGINE_CHROMIUM_FLAGS",
+        f"--enable-logging --v={_we_verbose}",
+    )
+    os.environ.setdefault(
+        "QT_LOGGING_RULES",
+        "qt.webenginecontext.*=true",
+    )
+
+from pxmodrim.core.config import (  # noqa: E402
     AppConfig,
-    config_file_path,
+    ConfigService,
+    config_dir,
     detect_game_paths,
-    load_config,
-    save_config,
 )
-from pxmodrim.core.context import CoreContext
-from pxmodrim.ui.components.dialogs import await_dialog
-from pxmodrim.ui.config import load_ui_prefs
-from pxmodrim.ui.panels.settings_panel import SettingsPanel
-from pxmodrim.ui.plugins import SteamCmdUiPlugin
-from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet
-from pxmodrim.ui.views.mods_view import ModsViewPanel
-from pxmodrim.ui.window.main_window import MainWindow
+from pxmodrim.core.context import CoreContext  # noqa: E402
+from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
+from pxmodrim.ui.config import load_ui_prefs  # noqa: E402
+from pxmodrim.ui.context import AppContext  # noqa: E402
+from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
+from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet  # noqa: E402
+from pxmodrim.ui.views.mods_view import ModsViewPanel  # noqa: E402
+from pxmodrim.ui.window.main_window import MainWindow  # noqa: E402
 
 
 def _exception_hook(
@@ -71,13 +81,25 @@ def _async_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> 
 sys.excepthook = _exception_hook
 
 
+def _parse_disabled_plugins() -> set[str]:
+    disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
+    return {n.strip() for n in disabled_raw.split(",") if n.strip()}
+
+
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
-    __slots__ = ("qt_app", "_ctx", "_ui_prefs", "main_window")
+    __slots__ = (
+        "qt_app",
+        "_ctx",
+        "_app_ctx",
+        "_ui_prefs",
+        "main_window",
+    )
 
     def __init__(self) -> None:
         QtWebEngineQuick.initialize()
+
         self.qt_app = QApplication(sys.argv)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         self.qt_app.setWindowIcon(icon)
@@ -114,23 +136,39 @@ class App:
         except (FileNotFoundError, KeyError) as exc:
             logger.warning("Failed to load theme: {}", exc)
 
-        cfg = load_config(config_file_path())
+        config_svc = ConfigService(config_dir())
+        cfg = config_svc.load("config.json", AppConfig)
         if not cfg.paths.game:
             logger.info("No game path in config, attempting auto-detect")
             detected = detect_game_paths()
             if detected.game:
                 cfg.paths = detected
-                save_config(cfg)
+                config_svc.save("config.json", cfg)
 
-        self._setup(cfg)
+        self._setup(cfg, config_svc)
 
-    def _setup(self, cfg: AppConfig) -> None:
+    def _setup(self, cfg: AppConfig, config_svc: ConfigService) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
-        self._ui_prefs = load_ui_prefs()
-        self._ctx = CoreContext.create(cfg)
-        self._ctx.add_rail_view(ModsViewPanel)
-        self._ctx.register_plugin(SteamCmdUiPlugin())
-        self.main_window = MainWindow(self._ctx, self._ui_prefs)
+
+        self._ui_prefs = load_ui_prefs(config_svc)
+        self._ctx = CoreContext.create(cfg, config_svc)
+        self._app_ctx = AppContext(self._ctx, self._ui_prefs)
+        self._app_ctx.add_rail_view(ModsViewPanel)
+
+        disabled = _parse_disabled_plugins()
+
+        if "steamcmd" not in disabled:
+            from pxmodrim.core.services.steam_cmd_service import SteamCmdService
+
+            self._ctx.register_plugin(SteamCmdService())
+
+        if "steamworkshop" not in disabled:
+            from pxmodrim.ui.plugins import SteamCmdUiPlugin
+
+            self._app_ctx.register_plugin(SteamCmdUiPlugin())
+
+        self._app_ctx.setup_all()
+        self.main_window = MainWindow(self._app_ctx)
 
     async def async_run(self) -> int:
         """Start main window, prompt for game path if needed, then run event loop."""
@@ -144,19 +182,18 @@ class App:
             if result != 1 or not new_cfg.paths.game:
                 logger.warning("No game path configured, exiting")
                 return 1
-            save_config(new_cfg)
+            self._ctx.config_service.save("config.json", new_cfg)
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
-            self._ctx.steam_cmd_service.set_prefix(new_cfg.paths.steamcmd_prefix)
 
-        await self._ctx.plugins.init_all(self._ctx)
-        await self.main_window._refresh_mods()
+        await self._app_ctx.refresh_mods()
+        await self._app_ctx.init_all()
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)
         self.main_window.set_app_quit_callback(app_close_event.set)
         await app_close_event.wait()
-        await self._ctx.plugins.shutdown_all()
+        await self._app_ctx.shutdown_all()
         return 0
 
     def run(self) -> int:

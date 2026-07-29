@@ -67,7 +67,12 @@ class SteamCmdDownloadWorker(QThread):
                 if self._stopped:
                     break
                 self._run_batch(batch, succeeded, failed, total)
-            if not self._stopped and any(self._batches) and not succeeded and not failed:  # noqa: E501
+            if (
+                not self._stopped
+                and any(self._batches)
+                and not succeeded
+                and not failed
+            ):  # noqa: E501
                 self.status.emit(
                     "SteamCMD produced no recognizable output. Check logs for details."
                 )
@@ -116,9 +121,7 @@ class SteamCmdDownloadWorker(QThread):
         with contextlib.suppress(OSError):
             os.remove(script)
 
-    def _parse_line(
-        self, line: str, succeeded: list[str], failed: list[str]
-    ) -> None:
+    def _parse_line(self, line: str, succeeded: list[str], failed: list[str]) -> None:
         text = line.strip()
         m = _DOWNLOADING_RE.search(text)
         if m:

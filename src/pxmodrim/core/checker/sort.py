@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 from typing import TYPE_CHECKING
 
 from pxmodrim.core.checker.graph import ConstraintGraph, EdgeType
@@ -62,17 +63,16 @@ def topological_sort(
             def _key(pid: PackageId, config_priority=config_priority) -> tuple:
                 return (config_priority.get(pid, len(config_priority)), pid.lower())
 
-            queue = [pid for pid, deg in indegree.items() if deg == 0]
-            queue.sort(key=_key)
+            queue = [(_key(pid), pid) for pid, deg in indegree.items() if deg == 0]
+            heapq.heapify(queue)
 
             while queue:
-                pid = queue.pop(0)
+                _, pid = heapq.heappop(queue)
                 order.append(pid)
                 for dependent in rev.get(pid, set()):
                     indegree[dependent] -= 1
                     if indegree[dependent] == 0:
-                        queue.append(dependent)
-                queue.sort(key=_key)
+                        heapq.heappush(queue, (_key(dependent), dependent))
 
             remaining = tier_pids - set(order)
             if remaining:
@@ -93,20 +93,18 @@ def _build_deps_and_rev_deps(
         if pid not in all_pids:
             continue
 
-        for edge in graph.edges_of_type(pid, EdgeType.LOAD_BEFORE):
-            if edge.target in all_pids:
-                deps.setdefault(edge.target, set()).add(pid)
-                rev_deps.setdefault(pid, set()).add(edge.target)
-
-        for edge in graph.edges_of_type(pid, EdgeType.LOAD_AFTER):
-            if edge.target in all_pids:
-                deps.setdefault(pid, set()).add(edge.target)
-                rev_deps.setdefault(edge.target, set()).add(pid)
-
-        for edge in graph.edges_of_type(pid, EdgeType.DEPENDENCY):
-            if edge.target in all_pids:
-                deps.setdefault(pid, set()).add(edge.target)
-                rev_deps.setdefault(edge.target, set()).add(pid)
+        deps_pid = deps[pid]
+        rev_pid = rev_deps[pid]
+        for edge in graph.outgoing(pid):
+            target = edge.target
+            if target not in all_pids:
+                continue
+            if edge.type == EdgeType.LOAD_BEFORE:
+                deps[target].add(pid)
+                rev_pid.add(target)
+            elif edge.type in (EdgeType.LOAD_AFTER, EdgeType.DEPENDENCY):
+                deps_pid.add(target)
+                rev_deps[target].add(pid)
 
     return deps, rev_deps
 

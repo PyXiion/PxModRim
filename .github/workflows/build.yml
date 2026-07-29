@@ -25,6 +25,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - name: Install just
         uses: taiki-e/install-action@v2
         with:
@@ -41,7 +46,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Build with Nuitka
-        run: just build-release
+        run: just build-release-bundled
 
       - name: Package tar.gz
         run: tar -czf PxModRim-Linux.tar.gz -C dist entrypoint.dist/
@@ -76,6 +81,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - name: Install just
         uses: taiki-e/install-action@v2
         with:
@@ -85,7 +95,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Build with Nuitka
-        run: just build-release
+        run: just build-release-bundled
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

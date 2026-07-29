@@ -26,9 +26,7 @@ class ModListPanel(QWidget):
     order_changed = Signal()
     selection_changed = Signal(list)
 
-    def __init__(
-        self, ctx: CoreContext, qml_engine: QQmlEngine | None = None
-    ) -> None:
+    def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
         super().__init__()
         self._ctx = ctx
         layout = QVBoxLayout(self)
@@ -72,9 +70,9 @@ class ModListPanel(QWidget):
         layout.addWidget(search_container)
 
         # Models: source + proxy
-        self._model = ModListModel({})
+        self._model = ModListModel({}, ctx.diagnostics_service)
         self._proxy = ModListProxyModel(self._model)
-        self._model.active_mods_changed.connect(self._on_model_active_changed)
+        self._model.active_mods_changed.connect(self.active_mods_changed)
 
         # QML view
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
@@ -94,11 +92,10 @@ class ModListPanel(QWidget):
         qml_ctx.setContextProperty("searchFocused", False)
         self.search_input.installEventFilter(self)
 
+        ctx.active_state_changed.connect(self._on_core_state_changed)
+
         # Reactive bindings
         ctx.mod_service.mods_changed.connect(self._on_mods_changed)
-        ctx.diagnostics_service.diagnostics_summary_changed.connect(
-            self._model.set_diagnostics
-        )
 
     # ── Public API ────────────────────────────────────────────
 
@@ -170,6 +167,7 @@ class ModListPanel(QWidget):
             else Qt.CheckState.Checked
         )
         self._model.setData(idx, new_state, ModListModel.CheckStateRole)
+        self._ctx.set_active(self._model.active_uuids())
 
     @Slot(list)
     def toggleChecked(self, rows: list[int]) -> None:
@@ -190,6 +188,7 @@ class ModListPanel(QWidget):
         bottom = self._model.index(max(changed), 0)
         self._model.dataChanged.emit(top, bottom, [ModListModel.CheckStateRole])
         self._model.active_mods_changed.emit()
+        self._ctx.set_active(self._model.active_uuids())
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:
@@ -197,20 +196,20 @@ class ModListPanel(QWidget):
         item = self._model.get_item(source_row)
         return item.checked if item else False
 
-    @Slot(list)
-    def enableMods(self, uuids: list[str]) -> None:
-        rows: list[int] = []
-        for uuid in uuids:
-            for i, item in enumerate(self._model._items):
-                if item.uuid == uuid and not item.checked:
-                    rows.append(i)
-                    break
-        if rows:
-            self._model.set_check_states(rows, True)
+    def _on_core_state_changed(self, active_uuids: object) -> None:
+        if not isinstance(active_uuids, tuple):
+            return
+        current = frozenset(self._model.active_uuids())
+        new = frozenset(active_uuids)
+        self._model.set_checkable(new - current, True)
+        self._model.set_checkable(current - new, False)
+        if list(active_uuids) != self._model.active_uuids():
+            self._model.commitOrder(list(active_uuids))
 
     @Slot(list)
     def commitOrder(self, uuids: list[str]) -> None:
         self._model.commitOrder(uuids)
+        self._ctx.set_active(self._model.active_uuids())
         self.order_changed.emit()
 
     @Slot(int, int)
@@ -219,6 +218,7 @@ class ModListPanel(QWidget):
 
     @Slot()
     def dragEnded(self) -> None:
+        self._ctx.set_active(self._model.active_uuids())
         self.order_changed.emit()
 
     @Slot(list)
@@ -230,9 +230,6 @@ class ModListPanel(QWidget):
 
     def _on_search_changed(self, text: str) -> None:
         self._proxy.set_search_filter(text)
-
-    def _on_model_active_changed(self) -> None:
-        self.active_mods_changed.emit()
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj is self.search_input:

@@ -121,9 +121,7 @@ class ModService:
             adopt(timer, d.result())
             adopt(timer, diag.result())
             adopt(timer, si.result())
-            self._ctx.diagnostics_service.rebuild(
-                self._ctx.active_uuids, timer=timer
-            )
+            self._ctx.diagnostics_service.rebuild(self._ctx.active_uuids, timer=timer)
         logger.debug("Profile report:\n{}", timer.render())
         self.mods_changed.emit(None)
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -14,6 +14,9 @@ from PySide6.QtCore import (
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
+if TYPE_CHECKING:
+    from pxmodrim.core.services.diagnostics_service import DiagnosticsService
+
 
 @dataclass(slots=True)
 class ModItem:
@@ -21,10 +24,6 @@ class ModItem:
     uuid: str
     checked: bool = False
     provider_color: str = "#808080"
-    has_error: bool = False
-    has_warning: bool = False
-    error_tooltip: str = ""
-    warning_tooltip: str = ""
     startup_impact_s: float = 0.0
 
 
@@ -42,10 +41,19 @@ class ModListModel(QAbstractListModel):
 
     active_mods_changed = Signal()
 
-    def __init__(self, provider_colors: dict[str, str]) -> None:
+    def __init__(
+        self,
+        provider_colors: dict[str, str],
+        diagnostics: DiagnosticsService | None = None,
+    ) -> None:
         super().__init__()
         self._provider_colors = provider_colors
         self._items: list[ModItem] = []
+        self._diag = diagnostics
+        if diagnostics is not None:
+            diagnostics.diagnostics_summary_changed.connect(
+                self._on_diagnostics_summary_changed
+            )
 
     def rowCount(
         self, parent: QModelIndex | QPersistentModelIndex | None = None
@@ -61,11 +69,7 @@ class ModListModel(QAbstractListModel):
         index: QModelIndex | QPersistentModelIndex,
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if (
-            not index.isValid()
-            or index.row() < 0
-            or index.row() >= len(self._items)
-        ):
+        if not index.isValid() or index.row() < 0 or index.row() >= len(self._items):
             return None
 
         item = self._items[index.row()]
@@ -82,14 +86,21 @@ class ModListModel(QAbstractListModel):
             return item.provider_color
         if role == self.UuidRole:
             return item.uuid
-        if role == self.HasErrorRole:
-            return 1 if item.has_error else 0
-        if role == self.HasWarningRole:
-            return 1 if item.has_warning else 0
-        if role == self.ErrorTooltipRole:
-            return item.error_tooltip
-        if role == self.WarningTooltipRole:
-            return item.warning_tooltip
+        if role in {
+            self.HasErrorRole,
+            self.HasWarningRole,
+            self.ErrorTooltipRole,
+            self.WarningTooltipRole,
+        }:
+            diag = self._diag.summary_for(item.uuid) if self._diag else None
+            if role == self.HasErrorRole:
+                return 1 if diag is not None and diag.has_errors else 0
+            if role == self.HasWarningRole:
+                return 1 if diag is not None and diag.has_warnings else 0
+            if role == self.ErrorTooltipRole:
+                return diag.error_tooltip if diag is not None else ""
+            if role == self.WarningTooltipRole:
+                return diag.warning_tooltip if diag is not None else ""
         if role == self.StartupImpactRole:
             return item.startup_impact_s
         if (
@@ -107,11 +118,7 @@ class ModListModel(QAbstractListModel):
         value: Any,
         role: int = Qt.ItemDataRole.EditRole,
     ) -> bool:
-        if (
-            not index.isValid()
-            or index.row() < 0
-            or index.row() >= len(self._items)
-        ):
+        if not index.isValid() or index.row() < 0 or index.row() >= len(self._items):
             return False
 
         if role == self.CheckStateRole:
@@ -140,29 +147,20 @@ class ModListModel(QAbstractListModel):
         bottom = self.index(len(self._items) - 1, 0)
         self.dataChanged.emit(top, bottom, [self.StartupImpactRole])
 
-    def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
-        changed_rows: list[int] = []
-        for row, item in enumerate(self._items):
-            old_flags = (item.has_error, item.has_warning)
-            got = diagnostics.get(item.uuid)
-            if got is not None:
-                item.has_error = got.has_errors
-                item.has_warning = got.has_warnings
-                item.error_tooltip = got.error_tooltip
-                item.warning_tooltip = got.warning_tooltip
-            else:
-                item.has_error = False
-                item.has_warning = False
-                item.error_tooltip = ""
-                item.warning_tooltip = ""
-            if (item.has_error, item.has_warning) != old_flags:
-                changed_rows.append(row)
-
-        if not changed_rows:
+    def _on_diagnostics_summary_changed(self, diags: dict[str, Any]) -> None:
+        if not self._items:
             return
-
-        top = self.index(min(changed_rows), 0)
-        bottom = self.index(max(changed_rows), 0)
+        old = getattr(self, "_last_diags", {}) or {}
+        self._last_diags = diags
+        changed = [
+            row
+            for row, item in enumerate(self._items)
+            if old.get(item.uuid) != diags.get(item.uuid)
+        ]
+        if not changed:
+            return
+        top = self.index(min(changed), 0)
+        bottom = self.index(max(changed), 0)
         self.dataChanged.emit(
             top,
             bottom,
@@ -305,15 +303,22 @@ class ModListModel(QAbstractListModel):
                 return item
         return None
 
+    def set_checkable(self, uuids: frozenset[str], checked: bool) -> None:
+        if not uuids:
+            return
+        rows = [
+            i
+            for i, it in enumerate(self._items)
+            if it.uuid in uuids and it.checked != checked
+        ]
+        self.set_check_states(rows, checked)
+
     def set_check_states(self, rows: list[int], checked: bool) -> None:
         if not rows:
             return
         changed_rows: list[int] = []
         for row in rows:
-            if (
-                0 <= row < len(self._items)
-                and self._items[row].checked != checked
-            ):
+            if 0 <= row < len(self._items) and self._items[row].checked != checked:
                 self._items[row].checked = checked
                 changed_rows.append(row)
         if not changed_rows:

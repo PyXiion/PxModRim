@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import TypeVar
 
 import msgspec
 from loguru import logger
@@ -10,6 +11,8 @@ from loguru import logger
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
 from pxmodrim.core.msgspec_hooks import dec_hook, enc_hook
 from pxmodrim.core.sort.config import SortSettings, TierConfig
+
+StructT = TypeVar("StructT", bound=msgspec.Struct)
 
 
 def read_game_version(game_path: str | Path) -> str | None:
@@ -42,7 +45,6 @@ class PathConfig(msgspec.Struct):
 
 
 class AppConfig(msgspec.Struct):
-
     """Top-level core config: RimWorld paths and sort settings."""
 
     paths: PathConfig = msgspec.field(default_factory=PathConfig)
@@ -52,19 +54,41 @@ class AppConfig(msgspec.Struct):
 
 
 class ConfigService:
-    __slots__ = ("config", "_path")
+    """Generic file-based config repository backed by a config directory.
 
-    def __init__(self, cfg: AppConfig, path: Path) -> None:
-        """Initialize with the given app config and file path."""
-        self.config = cfg
-        self._path = path
+    Provides typed load/save for msgspec structs. Core and UI layer
+    wrappers live in their respective modules and use this service
+    instead of calling ``config_dir()`` directly.
+    """
 
-    def save(self) -> None:
-        save_config(self.config, self._path)
+    __slots__ = ("_config_dir",)
+
+    def __init__(self, config_dir: Path) -> None:
+        self._config_dir = config_dir
 
     @property
-    def path(self) -> Path:
-        return self._path
+    def config_dir(self) -> Path:
+        return self._config_dir
+
+    def load(self, filename: str, struct_type: type[StructT]) -> StructT:
+        path = self._config_dir / filename
+        if not path.exists():
+            return struct_type()
+        try:
+            return msgspec.json.decode(
+                path.read_bytes(), type=struct_type, dec_hook=dec_hook
+            )
+        except (OSError, msgspec.DecodeError) as e:
+            logger.warning(f"Failed to load {filename}: {e}")
+            return struct_type()
+
+    def save(self, filename: str, data: msgspec.Struct) -> None:
+        path = self._config_dir / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        formatted = msgspec.json.format(
+            msgspec.json.encode(data, enc_hook=enc_hook), indent=2
+        )
+        path.write_bytes(formatted)
 
 
 def config_dir() -> Path:

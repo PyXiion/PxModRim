@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import QVBoxLayout, QWidget
@@ -8,9 +10,11 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.ui_prefs import UIPrefs
 
+if TYPE_CHECKING:
+    from pxmodrim.ui.context import AppContext
+
 
 class BaseViewPanel(QWidget):
-
     """
     UI-side whole-window view contributed to the left icon rail.
 
@@ -27,12 +31,13 @@ class BaseViewPanel(QWidget):
         ctx: CoreContext,
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
-        ui_prefs: UIPrefs | None = None,
+        app_ctx: AppContext | None = None,
     ) -> None:
         super().__init__(parent)
         self._ctx = ctx
+        self._app_ctx = app_ctx
         self._qml_engine = qml_engine
-        self._ui_prefs = ui_prefs or UIPrefs()
+        self._ui_prefs = app_ctx.ui_prefs if app_ctx is not None else UIPrefs()
         self.setAutoFillBackground(True)
         self._root = QVBoxLayout(self)
         self._root.setContentsMargins(0, 0, 0, 0)

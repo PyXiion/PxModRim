@@ -13,14 +13,12 @@ from pxmodrim.core.sort.community import (
     COMMUNITY_RULES_FILENAME,
     COMMUNITY_RULES_URL,
     ExternalRulesSchema,
-    community_rules_path,
-    config_dir,
     dec_hook,
 )
 from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 if TYPE_CHECKING:
-    pass
+    from pxmodrim.core.config import ConfigService
 
 
 class CommunityRulesService:
@@ -28,9 +26,9 @@ class CommunityRulesService:
 
     __slots__ = ("_cache_dir", "_json_path")
 
-    def __init__(self) -> None:
-        self._cache_dir = config_dir()
-        self._json_path = community_rules_path()
+    def __init__(self, config_service: ConfigService) -> None:
+        self._cache_dir = config_service.config_dir
+        self._json_path = self._cache_dir / COMMUNITY_RULES_FILENAME
 
     async def ensure_rules(
         self, loading: LoadingState, force: bool = False

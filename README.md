@@ -46,8 +46,8 @@ first, then growing from there.
 | Experience                      | RimSort                                                              | PxModRim                                          |
 |---------------------------------|----------------------------------------------------------------------|---------------------------------------------------|
 | UI while scanning big mod lists | Can freeze or stutter                                                | Stays responsive                                  |
-| Metadata scan (~200 mods)       | ~900ms                              | ~200ms                                            |
-| Sorting (~200 active mods)      | Sort in ~5ms, then **UI freezes ~500ms** rebuilding all widgets      | Sort + diagnostics in ~35ms, no widget rebuild    |
+| Metadata scan (~200 mods)       | ~900ms                              | ~15ms                                             |
+| Sorting (~200 active mods)      | Sort in ~5ms, then **UI freezes ~500ms** rebuilding all widgets      | Sort + diagnostics in ~10ms, no widget rebuild    |
 | Settings dialog                 | Large 9-tab modal with many options                                  | Smaller (i hope)                                  |
 | How mod sources are shown       | Detected from folder paths                                           | Separated cleanly by source                       |
 | Load-order sorting              | Implemented well, but causes UI lag                                  | No UI lag                                         |
@@ -66,8 +66,8 @@ These are the big pieces planned next, in roughly the order they will be tackled
 - [x] Automatic load-order sorting
 - [x] Save active mod list to `ModsConfig.xml`
 - [x] Game launching (Steam, standalone, with optional wrappers)
-- [ ] Steam Workshop integration (browse, subscribe, update)
-- [ ] SteamCMD support for downloading mods without the Steam client
+- [x] Steam Workshop integration (browse, subscribe, update)
+- [x] SteamCMD support for downloading mods without the Steam client
 - [ ] Launch presets (mods/configs/etc)
 - [ ] Player log viewer with filtering and colorization
 - [ ] File search across all installed mods (maybe?)

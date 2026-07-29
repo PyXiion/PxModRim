@@ -47,9 +47,7 @@ def _mod_with_deps(name: str, pid: str, deps: dict[str, str]) -> AboutXmlMod:
     )
 
 
-def _mod_with_alt_deps(
-    name: str, pid: str, deps: dict[str, set[str]]
-) -> AboutXmlMod:
+def _mod_with_alt_deps(name: str, pid: str, deps: dict[str, set[str]]) -> AboutXmlMod:
     """Create an AboutXmlMod with deps that have alternative package IDs.
 
     ``deps`` maps dependency package-id → set of alternative package IDs.
@@ -64,9 +62,7 @@ def _mod_with_alt_deps(
                 CaseInsensitiveStr(dep_pid): DependencyMod(
                     name=f"Dep of {name}",
                     package_id=CaseInsensitiveStr(dep_pid),
-                    alternative_package_ids={
-                        CaseInsensitiveStr(a) for a in alts
-                    },
+                    alternative_package_ids={CaseInsensitiveStr(a) for a in alts},
                 )
                 for dep_pid, alts in deps.items()
             }
@@ -96,9 +92,7 @@ class TestResolveMissingDependencies:
         result = sort_service.resolve_missing_dependencies({"uuid-a", "uuid-b"})
         assert result == []
 
-    def test_missing_dep_exists_as_inactive(
-        self, sort_service: SortService
-    ) -> None:
+    def test_missing_dep_exists_as_inactive(self, sort_service: SortService) -> None:
         sort_service._ctx.load(
             {
                 "uuid-a": _mod_with_deps("Mod A", "mod.a", {"mod.b": "Mod B"}),
@@ -109,23 +103,17 @@ class TestResolveMissingDependencies:
         result = sort_service.resolve_missing_dependencies({"uuid-a"})
         assert result == ["uuid-b"]
 
-    def test_missing_dep_not_in_all_mods(
-        self, sort_service: SortService
-    ) -> None:
+    def test_missing_dep_not_in_all_mods(self, sort_service: SortService) -> None:
         sort_service._ctx.load(
             {
-                "uuid-a": _mod_with_deps(
-                    "Mod A", "mod.a", {"mod.b": "Mod B"}
-                ),
+                "uuid-a": _mod_with_deps("Mod A", "mod.a", {"mod.b": "Mod B"}),
             },
             active_uuids=["uuid-a"],
         )
         result = sort_service.resolve_missing_dependencies({"uuid-a"})
         assert result == []
 
-    def test_missing_dep_already_active(
-        self, sort_service: SortService
-    ) -> None:
+    def test_missing_dep_already_active(self, sort_service: SortService) -> None:
         sort_service._ctx.load(
             {
                 "uuid-a": _mod_with_deps("Mod A", "mod.a", {"mod.b": "Mod B"}),
@@ -133,14 +121,10 @@ class TestResolveMissingDependencies:
             },
             active_uuids=["uuid-a", "uuid-b"],
         )
-        result = sort_service.resolve_missing_dependencies(
-            {"uuid-a", "uuid-b"}
-        )
+        result = sort_service.resolve_missing_dependencies({"uuid-a", "uuid-b"})
         assert result == []
 
-    def test_dep_satisfied_via_alternative_pid(
-        self, sort_service: SortService
-    ) -> None:
+    def test_dep_satisfied_via_alternative_pid(self, sort_service: SortService) -> None:
         sort_service._ctx.load(
             {
                 "uuid-a": _mod_with_alt_deps(
@@ -152,9 +136,7 @@ class TestResolveMissingDependencies:
             },
             active_uuids=["uuid-a", "uuid-c"],
         )
-        result = sort_service.resolve_missing_dependencies(
-            {"uuid-a", "uuid-c"}
-        )
+        result = sort_service.resolve_missing_dependencies({"uuid-a", "uuid-c"})
         assert result == []
 
     def test_non_about_xml_mod_in_active_set_skipped(
@@ -168,9 +150,7 @@ class TestResolveMissingDependencies:
             },
             active_uuids=["uuid-folder", "uuid-a"],
         )
-        result = sort_service.resolve_missing_dependencies(
-            {"uuid-folder", "uuid-a"}
-        )
+        result = sort_service.resolve_missing_dependencies({"uuid-folder", "uuid-a"})
         assert result == []
 
     def test_no_duplicates_when_two_mods_share_missing_dep(
@@ -184,14 +164,10 @@ class TestResolveMissingDependencies:
             },
             active_uuids=["uuid-a", "uuid-b"],
         )
-        result = sort_service.resolve_missing_dependencies(
-            {"uuid-a", "uuid-b"}
-        )
+        result = sort_service.resolve_missing_dependencies({"uuid-a", "uuid-b"})
         assert result == ["uuid-c"]
 
-    def test_empty_active_set_returns_empty(
-        self, sort_service: SortService
-    ) -> None:
+    def test_empty_active_set_returns_empty(self, sort_service: SortService) -> None:
         sort_service._ctx.load(
             {
                 "uuid-a": _mod_with_deps("Mod A", "mod.a", {"mod.b": "Mod B"}),
@@ -212,7 +188,5 @@ class TestResolveMissingDependencies:
             },
             active_uuids=["uuid-a", "uuid-b"],
         )
-        result = sort_service.resolve_missing_dependencies(
-            {"uuid-a", "uuid-b"}
-        )
+        result = sort_service.resolve_missing_dependencies({"uuid-a", "uuid-b"})
         assert result == []

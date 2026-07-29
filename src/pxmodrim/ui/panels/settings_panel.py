@@ -32,7 +32,7 @@ from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
 
 if TYPE_CHECKING:
-    from pxmodrim.ui.plugins.steam_cmd_plugin import SteamCmdUiPlugin
+    from pxmodrim.core.services.steam_cmd_service import SteamCmdService
 
 
 class SettingsPanel(QDialog):
@@ -125,8 +125,8 @@ class SettingsPanel(QDialog):
 
         self.steamcmd_status = QLineEdit()
         self.steamcmd_status.setReadOnly(True)
-        svc = self._ctx.steam_cmd_service
-        if svc.is_installed():
+        svc = cast("SteamCmdService | None", self._ctx.plugins.get("steamcmd"))
+        if svc is not None and svc.is_installed():
             self.steamcmd_status.setText(f"Installed at {svc.install_path}")
         else:
             self.steamcmd_status.setText("Not installed")
@@ -242,9 +242,7 @@ class SettingsPanel(QDialog):
             self.config_edit.setText(path)
 
     def _browse_steamcmd(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "Select SteamCMD install folder"
-        )
+        path = QFileDialog.getExistingDirectory(self, "Select SteamCMD install folder")
         if path:
             self.steamcmd_edit.setText(path)
 
@@ -254,19 +252,20 @@ class SettingsPanel(QDialog):
         if not prefix:
             self.steamcmd_status.setText("Choose an install path first")
             return
+        svc = cast("SteamCmdService | None", self._ctx.plugins.get("steamcmd"))
+        if svc is None:
+            self.steamcmd_status.setText("SteamCMD plugin not available")
+            return
         self.steamcmd_install_btn.setEnabled(False)
         self.steamcmd_status.setText("Installing SteamCMD\u2026")
         try:
-            plugin = cast("SteamCmdUiPlugin | None", self._ctx.plugins.get("steamcmd"))
-            if plugin is None:
-                self.steamcmd_status.setText("SteamCMD plugin not available")
+            if svc.is_installed():
+                self.steamcmd_status.setText(f"Already installed at {svc.install_path}")
                 return
-            ok = await plugin.ensure_steamcmd(self, prefix=prefix)
+            async with ProgressDialog(LoadingState(), self) as dialog:
+                ok = await svc.ensure_installed(prefix, loading_state=dialog.loading)
             if ok:
-                svc = self._ctx.steam_cmd_service
-                self.steamcmd_status.setText(
-                    f"Installed at {svc.install_path}"
-                )
+                self.steamcmd_status.setText(f"Installed at {svc.install_path}")
             else:
                 self.steamcmd_status.setText("Install failed")
         finally:
@@ -298,7 +297,7 @@ class SettingsPanel(QDialog):
         self.cr_status.setText("Downloading...")
         try:
             async with ProgressDialog(LoadingState(self)) as dialog:
-                service = CommunityRulesService()
+                service = CommunityRulesService(self._ctx.config_service)
                 path = await service.ensure_rules(dialog.loading, force=True)
 
             if path:

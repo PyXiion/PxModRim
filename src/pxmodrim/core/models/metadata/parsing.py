@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import lxml.etree as ET
 from loguru import logger
 
 from pxmodrim.core.constants import (
@@ -22,7 +23,7 @@ from pxmodrim.core.models.metadata.structures import (
     ListedMod,
 )
 from pxmodrim.core.utils import find_about_xml
-from pxmodrim.core.xml import xml_path_to_json
+from pxmodrim.core.xml import _text
 
 
 class MalformedDataException(Exception):
@@ -424,6 +425,264 @@ def create_about_mod(
     return mod.valid, mod
 
 
+def _match_versioned_child(
+    parent: ET._Element, target_version: str
+) -> ET._Element | None:
+    """Find the versioned child element matching target_version (*.*)."""
+    try:
+        major, minor = target_version.split(".")[:2]
+    except ValueError:
+        return None
+    key = f"v{major}.{minor}"
+    found = parent.find(key)
+    if found is None:
+        found = parent.find(f"{major}.{minor}")
+    if found is not None:
+        return found
+    for child in parent:
+        if re.match(key, child.tag):
+            return child
+    return None
+
+
+def _dep_from_li(li: ET._Element) -> DependencyMod:
+    """Parse a <li> element from <modDependencies> into a DependencyMod."""
+    dep = DependencyMod()
+    pid = _text(li, "packageId")
+    if pid:
+        dep.package_id = CaseInsensitiveStr(pid)
+    name = _text(li, "displayName")
+    if name:
+        dep.name = name
+    url = _text(li, "workshopUrl")
+    if url:
+        dep.workshop_url = url
+    alt_el = li.find("alternativePackageIds")
+    if alt_el is not None:
+        for alt_li in alt_el:
+            if alt_li.tag == "li" and alt_li.text and alt_li.text.strip():
+                dep.alternative_package_ids.add(
+                    CaseInsensitiveStr(alt_li.text.strip())
+                )
+    return dep
+
+
+def _element_value(el: ET._Element | None) -> str | list[str] | None:
+    """Extract text or <li> children as a string or list of strings."""
+    if el is None:
+        return None
+    children = [ch for ch in el if ch.tag == "li"]
+    if children:
+        return [
+            c.text.strip()
+            for c in children
+            if c.text and c.text.strip()
+        ]
+    if el.text:
+        text = el.text.strip()
+        return text or None
+    return None
+
+
+def _create_about_mod_from_element(
+    root: ET._Element,
+    target_version: str,
+    prefer_versioned: bool = True,
+) -> AboutXmlMod:
+    """Build AboutXmlMod in a single pass over the <ModMetaData> element children."""
+    mod = AboutXmlMod()
+    rules = BaseRules()
+
+    deps_el: ET._Element | None = None
+    deps_bv: bool = False
+    load_before_li: list[str] = []
+    load_after_li: list[str] = []
+    incompat_li: list[str] = []
+    force_before_li: list[str] = []
+    force_after_li: list[str] = []
+    load_before_bv_el: ET._Element | None = None
+    load_after_bv_el: ET._Element | None = None
+    incompat_bv_el: ET._Element | None = None
+
+    for child in root:
+        tag = child.tag
+        if tag == "packageId":
+            t = _element_value(child)
+            if isinstance(t, str) and t:
+                mod.package_id = CaseInsensitiveStr(t)
+            else:
+                _set_mod_invalid(
+                    mod,
+                    f"packageId missing or invalid: {t}. "
+                    f"Assigned sentinel '{DEFAULT_MISSING_PACKAGEID}'.",
+                )
+                mod.package_id = CaseInsensitiveStr(DEFAULT_MISSING_PACKAGEID)
+
+        elif tag == "steamAppId":
+            t = _element_value(child)
+            if isinstance(t, str) and t.isdigit():
+                mod.steam_app_id = int(t)
+
+        elif tag == "name":
+            t = _element_value(child)
+            if isinstance(t, str):
+                mod.name = t
+
+        elif tag == "description":
+            t = _element_value(child)
+            if isinstance(t, str):
+                mod.description = t
+
+        elif tag == "author":
+            t = _element_value(child)
+            if isinstance(t, str):
+                mod.authors.append(t)
+
+        elif tag == "authors":
+            t = _element_value(child)
+            if isinstance(t, list):
+                mod.authors.extend(t)
+
+        elif tag == "supportedVersions":
+            t = _element_value(child)
+            if isinstance(t, list):
+                mod.supported_versions = set(t)
+
+        elif tag == "modVersion":
+            t = _element_value(child)
+            if isinstance(t, str):
+                mod.mod_version = t
+
+        elif tag == "modIconPath":
+            t = _element_value(child)
+            if isinstance(t, str):
+                mod.mod_icon_path = Path(t)
+
+        elif tag == "url":
+            t = _element_value(child)
+            if isinstance(t, str):
+                mod.url = t
+
+        elif tag == "modDependencies":
+            if not deps_bv:
+                deps_el = child
+        elif tag == "modDependenciesByVersion":
+            if prefer_versioned:
+                matched = _match_versioned_child(child, target_version)
+                if matched is not None:
+                    deps_el = matched
+                    deps_bv = True
+
+        elif tag == "loadBefore":
+            t = _element_value(child)
+            if isinstance(t, list):
+                load_before_li = t
+        elif tag == "loadBeforeByVersion":
+            if prefer_versioned:
+                matched = _match_versioned_child(child, target_version)
+                if matched is not None:
+                    load_before_bv_el = matched
+
+        elif tag == "loadAfter":
+            t = _element_value(child)
+            if isinstance(t, list):
+                load_after_li = t
+        elif tag == "loadAfterByVersion":
+            if prefer_versioned:
+                matched = _match_versioned_child(child, target_version)
+                if matched is not None:
+                    load_after_bv_el = matched
+
+        elif tag == "forceLoadBefore":
+            t = _element_value(child)
+            if isinstance(t, list):
+                force_before_li = t
+        elif tag == "forceLoadAfter":
+            t = _element_value(child)
+            if isinstance(t, list):
+                force_after_li = t
+
+        elif tag == "incompatibleWith":
+            t = _element_value(child)
+            if isinstance(t, list):
+                incompat_li = t
+        elif tag == "incompatibleWithByVersion":
+            if prefer_versioned:
+                matched = _match_versioned_child(child, target_version)
+                if matched is not None:
+                    incompat_bv_el = matched
+
+        elif tag == "descriptionsByVersion":
+            matched = _match_versioned_child(child, target_version)
+            if matched is not None and matched.text and matched.text.strip():
+                mod.description = matched.text.strip()
+
+    # Apply versioned overrides
+    if load_before_bv_el is not None:
+        t = _element_value(load_before_bv_el)
+        if isinstance(t, list):
+            load_before_li = t
+    if load_after_bv_el is not None:
+        t = _element_value(load_after_bv_el)
+        if isinstance(t, list):
+            load_after_li = t
+    if incompat_bv_el is not None:
+        t = _element_value(incompat_bv_el)
+        if isinstance(t, list):
+            incompat_li = t
+
+    # Combine force + regular
+    load_before_li.extend(force_before_li)
+    load_after_li.extend(force_after_li)
+
+    # Build rules
+    rules.load_before = CaseInsensitiveSet(load_before_li)
+    rules.load_after = CaseInsensitiveSet(load_after_li)
+    rules.incompatible_with = CaseInsensitiveSet(incompat_li)
+
+    # Process dependencies
+    if deps_el is not None:
+        for li in deps_el:
+            if li.tag != "li":
+                continue
+            if li.attrib.get("isNull") == "True":
+                continue
+            if not li.attrib and len(li) == 0:
+                continue
+            dep = _dep_from_li(li)
+            if dep.package_id in rules.dependencies:
+                logger.warning(
+                    f"Duplicate dependency found: {dep.package_id}. Skipping."
+                )
+            else:
+                rules.dependencies[dep.package_id] = dep
+
+    mod.about_rules = rules
+
+    # DLC fallback for name/description/steamAppId
+    str_pid = str(mod.package_id)
+    dlc_appid = _get_dlc_packageid_map().get(str_pid)
+    dlc_meta = RIMWORLD_DLC_METADATA.get(dlc_appid, {}) if dlc_appid else {}
+    if dlc_meta:
+        if not mod.name or mod.name == str_pid:
+            mod.name = dlc_meta["name"]
+        if not mod.description:
+            mod.description = dlc_meta["description"]
+
+    # DLC -> RimWorld dependency
+    dlc_map = _get_dlc_packageid_map()
+    if str_pid in dlc_map and dlc_map[str_pid] != RIMWORLD_STEAM_APP_ID:
+        rimworld_pid = CaseInsensitiveStr("ludeon.rimworld")
+        if rimworld_pid not in rules.dependencies:
+            rules.dependencies[rimworld_pid] = DependencyMod(
+                package_id=rimworld_pid,
+                name="RimWorld",
+                workshop_url="https://store.steampowered.com/app/294100/RimWorld",
+            )
+
+    return mod
+
+
 def _create_about_mod_from_xml(
     base_path: Path,
     mod_xml_path: Path,
@@ -432,38 +691,31 @@ def _create_about_mod_from_xml(
 ) -> tuple[bool, AboutXmlMod]:
     """Parse an About.xml file and return a validated AboutXmlMod with its path set."""
     try:
-        mod_data = xml_path_to_json(str(mod_xml_path))
+        tree = ET.parse(str(mod_xml_path))
     except (OSError, TypeError):
         logger.error(f"Unable to parse {mod_xml_path}: {traceback.format_exc()}")
         return False, AboutXmlMod(valid=False)
 
-    mod_data = {k.lower(): v for k, v in mod_data.items()}
-    mod_data = mod_data.get("modmetadata", {})
-
-    if not mod_data:
+    root = tree.getroot()
+    if root is None:
         logger.error(f"Could not parse {mod_xml_path}.")
         return False, AboutXmlMod(valid=False)
 
-    valid, mod = create_about_mod(mod_data, target_version, prefer_versioned)
-
+    mod = _create_about_mod_from_element(root, target_version, prefer_versioned)
     mod.mod_path = base_path
-    return valid, mod
+    return mod.valid, mod
 
 
 def create_listed_mod_from_path(
     path: Path,
     target_version: str,
     prefer_versioned: bool = True,
-    case_insensitive_about_xml: bool = True,
+    about_xml_path: Path | None = None,
 ) -> tuple[bool, ListedMod]:
     """Create a ListedMod from a directory path, parsing About.xml if present."""
     if path.is_dir():
-        about_xml_path: Path | None
-        if case_insensitive_about_xml:
+        if about_xml_path is None:
             about_xml_path = find_about_xml(path)
-        else:
-            candidate = path / "About" / "About.xml"
-            about_xml_path = candidate if candidate.exists() else None
 
         if about_xml_path is not None:
             success, about_mod = _create_about_mod_from_xml(
