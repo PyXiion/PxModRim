@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from loguru import logger
@@ -9,18 +10,21 @@ from pxmodrim.core.mods_config import parse_mods_config
 from pxmodrim.core.utils import find_about_xml
 
 
-def scan_mod_directory(mods_path: Path) -> list[Path]:
-    """Scan a directory for mod subdirectories, returning those containing About.xml."""
+def scan_mod_directory(mods_path: Path) -> dict[Path, Path]:
+    """Scan a directory for mod subdirectories, returning {mod_path: about_xml_path}."""
     if not mods_path.exists() or not mods_path.is_dir():
         logger.warning(f"Mod directory not found: {mods_path}")
-        return []
+        return {}
 
-    results: list[Path] = []
-    for entry in mods_path.iterdir():
-        if not entry.is_dir():
-            continue
-        if find_about_xml(entry):
-            results.append(entry)
+    results: dict[Path, Path] = {}
+    with os.scandir(mods_path) as it:
+        for entry in it:
+            if not entry.is_dir():
+                continue
+            p = Path(entry.path)
+            about = find_about_xml(p)
+            if about:
+                results[p] = about
     return results
 
 

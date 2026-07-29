@@ -38,17 +38,19 @@ class LocalModProvider(BaseModProvider):
             with tm("scan_dir"):
                 dirs = scan_mod_directory(self._path)
 
-            def _keep(d: Path) -> ListedMod | None:
+            def _keep(d: Path, about: Path) -> ListedMod | None:
                 if (d / "About/PublishedFileId.txt").exists():
                     return None
-                _, mod = create_listed_mod_from_path(d, target_version)
+                _, mod = create_listed_mod_from_path(
+                    d, target_version, about_xml_path=about
+                )
                 mod.provider_id = self.provider_id
                 return mod
 
             pool = self._pool
             if pool is not None:
                 with tm("process_mods"):
-                    futures = {pool.submit(_keep, d): d for d in dirs}
+                    futures = {pool.submit(_keep, d, a): d for d, a in dirs.items()}
                     result: dict[str, ListedMod] = {}
                     for f in as_completed(futures):
                         mod = f.result()
@@ -57,8 +59,8 @@ class LocalModProvider(BaseModProvider):
             else:
                 with tm("process_mods"):
                     result = {}
-                    for d in dirs:
-                        mod = _keep(d)
+                    for d, a in dirs.items():
+                        mod = _keep(d, a)
                         if mod is not None:
                             result[mod.uuid] = mod
             return result
@@ -94,17 +96,19 @@ class SteamCmdModProvider(BaseModProvider):
             with tm("scan_dir"):
                 dirs = scan_mod_directory(self._path)
 
-            def _keep(d: Path) -> ListedMod | None:
+            def _keep(d: Path, about: Path) -> ListedMod | None:
                 if not (d / "About/PublishedFileId.txt").exists():
                     return None
-                _, mod = create_listed_mod_from_path(d, target_version)
+                _, mod = create_listed_mod_from_path(
+                    d, target_version, about_xml_path=about
+                )
                 mod.provider_id = self.provider_id
                 return mod
 
             pool = self._pool
             if pool is not None:
                 with tm("process_mods"):
-                    futures = {pool.submit(_keep, d): d for d in dirs}
+                    futures = {pool.submit(_keep, d, a): d for d, a in dirs.items()}
                     result: dict[str, ListedMod] = {}
                     for f in as_completed(futures):
                         mod = f.result()
@@ -113,8 +117,8 @@ class SteamCmdModProvider(BaseModProvider):
             else:
                 with tm("process_mods"):
                     result = {}
-                    for d in dirs:
-                        mod = _keep(d)
+                    for d, a in dirs.items():
+                        mod = _keep(d, a)
                         if mod is not None:
                             result[mod.uuid] = mod
             return result

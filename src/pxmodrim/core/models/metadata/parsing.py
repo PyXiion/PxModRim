@@ -454,16 +454,12 @@ def create_listed_mod_from_path(
     path: Path,
     target_version: str,
     prefer_versioned: bool = True,
-    case_insensitive_about_xml: bool = True,
+    about_xml_path: Path | None = None,
 ) -> tuple[bool, ListedMod]:
     """Create a ListedMod from a directory path, parsing About.xml if present."""
     if path.is_dir():
-        about_xml_path: Path | None
-        if case_insensitive_about_xml:
+        if about_xml_path is None:
             about_xml_path = find_about_xml(path)
-        else:
-            candidate = path / "About" / "About.xml"
-            about_xml_path = candidate if candidate.exists() else None
 
         if about_xml_path is not None:
             success, about_mod = _create_about_mod_from_xml(
