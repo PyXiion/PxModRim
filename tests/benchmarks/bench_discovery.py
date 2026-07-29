@@ -39,7 +39,6 @@ ABOUT_XML = """\
 def make_mod_dir(root: Path, i: int, dep_pid: str) -> Path:
     author = random.choice(string.ascii_lowercase[:5])
     name = f"benchmark_mod_{i:04d}"
-    pid = f"{author}.{name}"
 
     about = ABOUT_XML.format(
         name=name, author=author, sid=i, dep=dep_pid, i=i
