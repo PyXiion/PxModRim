@@ -297,7 +297,7 @@ class SettingsPanel(QDialog):
         self.cr_status.setText("Downloading...")
         try:
             async with ProgressDialog(LoadingState(self)) as dialog:
-                service = CommunityRulesService()
+                service = CommunityRulesService(self._ctx.config_service)
                 path = await service.ensure_rules(dialog.loading, force=True)
 
             if path:
