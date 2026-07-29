@@ -66,8 +66,8 @@ These are the big pieces planned next, in roughly the order they will be tackled
 - [x] Automatic load-order sorting
 - [x] Save active mod list to `ModsConfig.xml`
 - [x] Game launching (Steam, standalone, with optional wrappers)
-- [ ] Steam Workshop integration (browse, subscribe, update)
-- [ ] SteamCMD support for downloading mods without the Steam client
+- [x] Steam Workshop integration (browse, subscribe, update)
+- [x] SteamCMD support for downloading mods without the Steam client
 - [ ] Launch presets (mods/configs/etc)
 - [ ] Player log viewer with filtering and colorization
 - [ ] File search across all installed mods (maybe?)
