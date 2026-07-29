@@ -43,11 +43,14 @@ linux-copy-desktop:
     sed "s|Icon=pxmodrim|Icon={{justfile_directory()}}/src/pxmodrim/ui/assets/logo.svg|" packaging/linux/pxmodrim.desktop > ~/.local/share/applications/pxmodrim.desktop
     kbuildsycoca6 --noincremental
 
-build: build-js
-    uv run python packaging/build.py
+build *args: build-js
+    uv run python packaging/build.py {{args}}
 
-build-release:
-    uv run python packaging/build.py --release
+build-release *args: build-js
+    uv run python packaging/build.py --release {{args}}
+
+build-release-bundled: build-js
+    uv run python packaging/build.py --release --bundle-qt
 
 build-clean:
     rm -rf build/ dist/ *.build/ *.dist/ *.onefile-build/

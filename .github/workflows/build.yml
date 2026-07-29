@@ -41,7 +41,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Build with Nuitka
-        run: just build-release
+        run: just build-release-bundled
 
       - name: Package tar.gz
         run: tar -czf PxModRim-Linux.tar.gz -C dist entrypoint.dist/
@@ -85,7 +85,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Build with Nuitka
-        run: just build-release
+        run: just build-release-bundled
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
