@@ -95,12 +95,12 @@ class CoreContext:
             logger.info("auto-sort: enabling {} missing dependencies", len(deps))
         t0 = time.monotonic()
         self._active_uuids = await self.sort_service.sort_active_mods()
-        elapsed = time.monotonic() - t0
+        elapsed_ms = (time.monotonic() - t0) * 1000
         self.diagnostics_service.reorder(self._active_uuids)
         self._active_state_changed.emit(tuple(self._active_uuids))
         n = len(self._active_uuids)
-        logger.info("auto-sort: {} mods sorted in {:.1f}s", n, elapsed)
-        return len(self._active_uuids), elapsed
+        logger.info("auto-sort: {} mods sorted in {:.0f}ms", n, elapsed_ms)
+        return n, elapsed_ms
 
     def update_config(self, cfg: AppConfig) -> None:
         """Replace the live config and refresh derived values (game version)."""

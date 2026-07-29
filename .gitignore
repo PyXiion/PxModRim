@@ -64,3 +64,6 @@ src/pxmodrim/ui/plugins/steam_workshop/inject.js
 # OpenCode
 .opencode/**
 opencode.json
+
+# Steam workshop plugin
+src/pxmodrim/ui/plugins/steam_workshop/

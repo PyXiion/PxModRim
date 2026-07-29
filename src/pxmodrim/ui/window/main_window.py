@@ -302,7 +302,7 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _auto_sort(self) -> None:
         count, elapsed = await self._ctx.auto_sort()
-        self._toast_manager.success(f"Sorted {count} mods in {elapsed:.1f}s", 5000)
+        self._toast_manager.success(f"Sorted {count} mods in {elapsed:.0f}ms", 5000)
 
     @asyncSlot()
     async def _save_mods_config(self) -> None:

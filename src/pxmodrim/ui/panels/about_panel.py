@@ -139,8 +139,6 @@ class AboutPanel(QDialog):
             ("loguru", "MIT"),
             ("lxml", "BSD-3-Clause"),
             ("msgspec", "BSD-3-Clause"),
-            ("natsort", "MIT"),
-            ("networkx", "BSD-3-Clause"),
             ("pyside6", "LGPL-3.0 / GPL-2.0 / GPL-3.0"),
             ("qasync", "BSD-2-Clause"),
             ("toposort", "Apache-2.0"),
