@@ -46,8 +46,8 @@ first, then growing from there.
 | Experience                      | RimSort                                                              | PxModRim                                          |
 |---------------------------------|----------------------------------------------------------------------|---------------------------------------------------|
 | UI while scanning big mod lists | Can freeze or stutter                                                | Stays responsive                                  |
-| Metadata scan (~200 mods)       | ~900ms                              | ~200ms                                            |
-| Sorting (~200 active mods)      | Sort in ~5ms, then **UI freezes ~500ms** rebuilding all widgets      | Sort + diagnostics in ~35ms, no widget rebuild    |
+| Metadata scan (~200 mods)       | ~900ms                              | ~15ms                                             |
+| Sorting (~200 active mods)      | Sort in ~5ms, then **UI freezes ~500ms** rebuilding all widgets      | Sort + diagnostics in ~10ms, no widget rebuild    |
 | Settings dialog                 | Large 9-tab modal with many options                                  | Smaller (i hope)                                  |
 | How mod sources are shown       | Detected from folder paths                                           | Separated cleanly by source                       |
 | Load-order sorting              | Implemented well, but causes UI lag                                  | No UI lag                                         |
