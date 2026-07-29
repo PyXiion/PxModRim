@@ -343,9 +343,14 @@ class MainWindow(QMainWindow):
         elapsed = time.monotonic() - t0
         self.mod_list.model.reorder(ordered_uuids)
         self._ctx.diagnostics_service.reorder(ordered_uuids)
-        logger.info("auto-sort: {} mods sorted in {:.1f}s", len(ordered_uuids), elapsed)
+        elapsed_ms = elapsed * 1000
+        logger.info(
+            "auto-sort: {} mods sorted in {:.0f}ms",
+            len(ordered_uuids),
+            elapsed_ms,
+        )
         self._toast_manager.success(
-            f"Sorted {len(ordered_uuids)} mods in {elapsed:.1f}s", 5000
+            f"Sorted {len(ordered_uuids)} mods in {elapsed_ms:.0f}ms", 5000
         )
 
     @asyncSlot()
