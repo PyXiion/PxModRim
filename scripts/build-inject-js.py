@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -37,10 +38,15 @@ def main() -> int:
         print(f"{OUT_FILE} is up to date")
         return 0
 
+    npx = shutil.which("npx")
+    if npx is None:
+        print("npx not found — install Node.js or pre-build inject.js")
+        return 1
+
     print(f"Building {OUT_FILE} from {len(sources)} source files...")
     result = subprocess.run(
         [
-            "npx",
+            npx,
             "--yes",
             "esbuild",
             str(TS_DIR / "main.ts"),
