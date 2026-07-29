@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Qt, Signal
 
 if TYPE_CHECKING:
-    from pxmodrim.ui.ui_prefs import UIPrefs
+    from pxmodrim.ui.context import AppContext
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
@@ -34,10 +34,10 @@ class ModsViewPanel(BaseViewPanel):
         ctx: CoreContext,
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
-        ui_prefs: UIPrefs | None = None,
+        app_ctx: AppContext | None = None,
     ) -> None:
         """Initialize mods view with sidebar, mod list, and mod info panels."""
-        super().__init__(ctx, qml_engine, parent, ui_prefs)
+        super().__init__(ctx, qml_engine, parent, app_ctx=app_ctx)
 
         content = QWidget()
         content.setObjectName("contentArea")

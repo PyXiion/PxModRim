@@ -21,9 +21,7 @@ def _provider_colors() -> dict[str, str]:
 
 def _mod(name: str, pid: str = "") -> AboutXmlMod:
     package_id = CaseInsensitiveStr(pid or name.lower())
-    return AboutXmlMod(
-        name=name, package_id=package_id, provider_id="stub", valid=True
-    )
+    return AboutXmlMod(name=name, package_id=package_id, provider_id="stub", valid=True)
 
 
 @pytest.fixture(scope="module")
@@ -40,8 +38,7 @@ def source(qapp: QApplication) -> ModListModel:
     colors = _provider_colors()
     m = ModListModel(colors)
     mods: dict[str, ListedMod] = {
-        f"uuid-{i}": _mod(f"Mod {i}", f"mod.{i}")
-        for i in range(5)
+        f"uuid-{i}": _mod(f"Mod {i}", f"mod.{i}") for i in range(5)
     }
     active = ["uuid-0", "uuid-2"]
     m.load_mods(mods, active)
@@ -62,8 +59,7 @@ class TestSidebarFilter:
         assert proxy.rowCount() == 3
 
         rows = [
-            proxy.mapToSource(proxy.index(i, 0)).row()
-            for i in range(proxy.rowCount())
+            proxy.mapToSource(proxy.index(i, 0)).row() for i in range(proxy.rowCount())
         ]
         # source _items = [uuid-0, uuid-2, uuid-1, uuid-3, uuid-4]
         assert rows == [0, 1, 4]

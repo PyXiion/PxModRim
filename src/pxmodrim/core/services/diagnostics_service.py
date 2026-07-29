@@ -39,6 +39,7 @@ from pxmodrim.core.sort.models import CommunityRule, PackageId
 
 if TYPE_CHECKING:
     from pxmodrim.core.checker.graph import ConstraintGraph
+    from pxmodrim.core.config import ConfigService
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.models.metadata.structures import AboutXmlMod
 
@@ -57,19 +58,24 @@ class DiagnosticsService:
         "_use_this_instead_service",
         "_community_rules",
         "_last_active_uuids",
+        "_last_summary",
         "_checker",
     )
 
-    def __init__(self, ctx: CoreContext) -> None:
+    def __init__(
+        self, ctx: CoreContext, config_service: ConfigService | None = None
+    ) -> None:
         """Initialise diagnostics with checkers, databases, and community rules."""
         self.diagnostics_summary_changed = Event()
         self.status_message_changed = Event()
         self.sidebar_entries_changed = Event()
         self._ctx = ctx
-        self._no_version_warning_service = NoVersionWarningService()
-        self._use_this_instead_service = UseThisInsteadService()
+        cs = config_service or ctx.config_service
+        self._no_version_warning_service = NoVersionWarningService(cs)
+        self._use_this_instead_service = UseThisInsteadService(cs)
         self._community_rules: dict[PackageId, CommunityRule] | None = None
         self._last_active_uuids: list[str] = []
+        self._last_summary: dict[str, ModDiagnosticsView] = {}
         self._checker = ModChecker(
             checkers=[
                 DependencyIssueChecker(),
@@ -124,14 +130,11 @@ class DiagnosticsService:
         """Load community sorting rules from disk, if enabled."""
         if not self._ctx.config.sort.use_community_rules:
             return None
-        from pxmodrim.core.sort.community import (
-            community_rules_path,
-            load_community_rules,
-        )
+        from pxmodrim.core.sort.community import load_community_rules
 
         path = self._ctx.config.paths.community_rules_file
         if not path:
-            path = str(community_rules_path())
+            path = str(self._ctx.config_service.config_dir / "communityRules.json")
         if not path or not Path(path).exists():
             return None
         return load_community_rules(Path(path))
@@ -232,9 +235,13 @@ class DiagnosticsService:
         self, diagnostics: dict[str, ModDiagnostics]
     ) -> None:
         """Callback from checker; emit updated summary, status, and sidebar signals."""
-        self.diagnostics_summary_changed.emit(self._to_view(diagnostics))
+        self._last_summary = self._to_view(diagnostics)
+        self.diagnostics_summary_changed.emit(self._last_summary)
         self.status_message_changed.emit(self._format_status())
         self.sidebar_entries_changed.emit(self._build_sidebar_entries())
+
+    def summary_for(self, uuid: str) -> ModDiagnosticsView | None:
+        return self._last_summary.get(uuid)
 
     # ── Status ──────────────────────────────────────────────────
 

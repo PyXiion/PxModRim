@@ -4,10 +4,13 @@ pytest_opts := "--doctest-modules --no-qt-log"
 @default:
     just --list
 
-run: dev-setup
+build-js:
+    uv run python scripts/build-inject-js.py
+
+run: build-js dev-setup
     LOGURU_LEVEL=DEBUG uv run python -m pxmodrim
 
-test: dev-setup
+test: build-js dev-setup
     uv run pytest {{pytest_opts}} -s
 
 test-verbose: dev-setup
@@ -24,7 +27,7 @@ ruff-format-fix:
 
 fix: ruff-fix ruff-format-fix
 
-check: ruff-fix pyright check-deps
+check: ruff-fix build-js pyright check-deps
 
 check-deps:
     uv run python scripts/check-deps.py
@@ -55,11 +58,14 @@ bench name="":
         print(f"  === {Path(s).stem} ===")
         subprocess.run(["uv", "run", "python", s])
 
-build:
-    uv run python packaging/build.py
+build *args: build-js
+    uv run python packaging/build.py {{args}}
 
-build-release:
-    uv run python packaging/build.py --release
+build-release *args: build-js
+    uv run python packaging/build.py --release {{args}}
+
+build-release-bundled: build-js
+    uv run python packaging/build.py --release --bundle-qt
 
 build-clean:
     rm -rf build/ dist/ *.build/ *.dist/ *.onefile-build/

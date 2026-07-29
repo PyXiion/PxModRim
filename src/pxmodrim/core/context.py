@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
+from pxmodrim.core.events import Event
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.plugin import PluginRegistry
 from pxmodrim.core.structures import CollectionStats
@@ -16,7 +20,6 @@ if TYPE_CHECKING:
     from pxmodrim.core.services.diagnostics_service import DiagnosticsService
     from pxmodrim.core.services.game_launcher import GameLauncher
     from pxmodrim.core.services.sort_service import SortService
-    from pxmodrim.core.services.steam_cmd_service import SteamCmdService
 
 # Minimum valid version string shape: "X.Y" — reject anything shorter
 _VERSION_MIN_PARTS = 2
@@ -33,6 +36,7 @@ class CoreContext:
 
     __slots__ = (
         "_cfg",
+        "_config_service",
         "_mods",
         "_active_uuids",
         "_game_version",
@@ -42,14 +46,15 @@ class CoreContext:
         "_game_launcher",
         "_providers",
         "_pool",
-        "_steam_cmd_service",
-        "_config_service",
         "_plugins",
-        "_rail_views",
+        "_active_state_changed",
     )
 
-    def __init__(self, cfg: AppConfig) -> None:
+    def __init__(
+        self, cfg: AppConfig, config_service: ConfigService | None = None
+    ) -> None:
         self._cfg = cfg
+        self._config_service = config_service
         self._mods: dict[str, ListedMod] = {}
         self._active_uuids: list[str] = []
         self._game_version: str = "Unknown"
@@ -60,15 +65,42 @@ class CoreContext:
         self._game_launcher: GameLauncher | None = None
         self._providers: list[BaseModProvider] | None = None
         self._pool: ThreadPoolExecutor | None = None
-        self._steam_cmd_service: SteamCmdService | None = None
-        self._config_service: ConfigService | None = None
         self._plugins = PluginRegistry()
-        self._rail_views: list[type] = []
+        self._active_state_changed = Event[tuple[str, ...]]()
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         """Replace all mods and active UUIDs, taking ownership of the data."""
         self._mods = dict(mods)
         self._active_uuids = list(active_uuids)
+
+    def set_active(self, uuids: list[str]) -> None:
+        old_set = frozenset(self._active_uuids)
+        new_set = frozenset(uuids)
+        if old_set == new_set and self._active_uuids == uuids:
+            return
+        set_changed = old_set != new_set
+        self._active_uuids = list(uuids)
+        if set_changed:
+            self.diagnostics_service.rebuild(self._active_uuids)
+        else:
+            self.diagnostics_service.reorder(self._active_uuids)
+        self._active_state_changed.emit(tuple(self._active_uuids))
+
+    async def auto_sort(self) -> tuple[int, float]:
+        deps = self.sort_service.resolve_missing_dependencies(set(self._active_uuids))
+        if deps:
+            self._active_uuids.extend(deps)
+            self.diagnostics_service.rebuild(self._active_uuids)
+            self._active_state_changed.emit(tuple(self._active_uuids))
+            logger.info("auto-sort: enabling {} missing dependencies", len(deps))
+        t0 = time.monotonic()
+        self._active_uuids = await self.sort_service.sort_active_mods()
+        elapsed_ms = (time.monotonic() - t0) * 1000
+        self.diagnostics_service.reorder(self._active_uuids)
+        self._active_state_changed.emit(tuple(self._active_uuids))
+        n = len(self._active_uuids)
+        logger.info("auto-sort: {} mods sorted in {:.0f}ms", n, elapsed_ms)
+        return n, elapsed_ms
 
     def update_config(self, cfg: AppConfig) -> None:
         """Replace the live config and refresh derived values (game version)."""
@@ -110,8 +142,17 @@ class CoreContext:
         return list(self._active_uuids)
 
     @property
+    def active_state_changed(self) -> Event[tuple[str, ...]]:
+        return self._active_state_changed
+
+    @property
     def config(self) -> AppConfig:
         return self._cfg
+
+    @property
+    def config_service(self) -> ConfigService:
+        assert self._config_service is not None
+        return self._config_service
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         """Return total/active/inactive/error counts for the current mod set."""
@@ -128,9 +169,10 @@ class CoreContext:
     # ── Factory ────────────────────────────────────────────────────────────────
 
     @classmethod
-    def create(cls, cfg: AppConfig) -> CoreContext:
+    def create(
+        cls, cfg: AppConfig, config_service: ConfigService | None = None
+    ) -> CoreContext:
         """Create a fully-initialised context with all core services."""
-        from pxmodrim.core.config import ConfigService, config_file_path
         from pxmodrim.core.mod_service import ModService
         from pxmodrim.core.profiler import profile
         from pxmodrim.core.providers import create_providers
@@ -140,9 +182,7 @@ class CoreContext:
         from pxmodrim.core.services.game_launcher import GameLauncher
         from pxmodrim.core.services.sort_service import SortService
 
-
-        ctx = cls(cfg)
-        ctx._config_service = ConfigService(cfg, config_file_path())
+        ctx = cls(cfg, config_service)
         ctx._pool = ThreadPoolExecutor(max_workers=os.cpu_count())
         with profile("services.create") as t:
             with t("create_providers"):
@@ -155,14 +195,6 @@ class CoreContext:
                 ctx._sort_service = SortService(ctx, ctx._diagnostics_service)
             with t("game_launcher"):
                 ctx._game_launcher = GameLauncher(ctx)
-            with t("steam_cmd_service"):
-                from pxmodrim.core.services.steam_cmd_service import (
-                    SteamCmdService,
-                )
-
-                ctx._steam_cmd_service = SteamCmdService(
-                    ctx, ctx._config_service
-                )
         return ctx
 
     # ── Service accessors ──────────────────────────────────────────────────────
@@ -182,10 +214,6 @@ class CoreContext:
     @property
     def game_launcher(self) -> GameLauncher:
         return _require_not_none(self._game_launcher, "game_launcher")
-
-    @property
-    def steam_cmd_service(self) -> SteamCmdService:
-        return _require_not_none(self._steam_cmd_service, "steam_cmd_service")
 
     async def initialize(self) -> None:
         svc = _require_not_none(self._mod_service, "mod_service")
@@ -219,13 +247,6 @@ class CoreContext:
     def register_plugin(self, plugin: Plugin) -> None:
         self._plugins.register(plugin, self)
 
-    def add_rail_view(self, view_cls: type) -> None:
-        self._rail_views.append(view_cls)
-
     @property
     def plugins(self) -> PluginRegistry:
         return self._plugins
-
-    @property
-    def rail_views(self) -> tuple[type, ...]:
-        return tuple(self._rail_views)

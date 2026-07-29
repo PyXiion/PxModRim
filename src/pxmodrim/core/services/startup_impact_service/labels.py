@@ -54,10 +54,10 @@ _PREFIX = "LoadingProgress.StartupImpact."
 
 def metric_label(key: str) -> str:
     if key.startswith(_PREFIX):
-        key = key[len(_PREFIX):]
+        key = key[len(_PREFIX) :]
     if key in METRIC_LABELS:
         return METRIC_LABELS[key]
-    tail = key.split('.')[-1]
+    tail = key.split(".")[-1]
     if tail in METRIC_LABELS:
         return METRIC_LABELS[tail]
     return key

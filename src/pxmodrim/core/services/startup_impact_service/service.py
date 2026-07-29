@@ -4,7 +4,6 @@ from pathlib import Path
 
 from loguru import logger
 
-from pxmodrim.core.config import config_dir
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.services.startup_impact_service import db
 from pxmodrim.core.services.startup_impact_service.db import StartupImpactDb
@@ -36,7 +35,7 @@ class StartupImpactService:
         if not cfg.paths.config_folder:
             return None
 
-        dbp = db.db_path(config_dir())
+        dbp = db.db_path(self._ctx.config_service.config_dir)
         json_path = get_startup_impact_path(Path(cfg.paths.config_folder))
         logger.debug("Loading startup impact from {}", json_path)
 
@@ -63,27 +62,31 @@ class StartupImpactService:
         return report
 
     async def get_latest_report(self) -> StartupImpactReport | None:
-        return await self._db.get_latest_report(db.db_path(config_dir()))
+        return await self._db.get_latest_report(
+            db.db_path(self._ctx.config_service.config_dir)
+        )
 
     async def estimated_impact_for(self, package_id: str) -> float:
         return await self._db.get_average(
-            db.db_path(config_dir()),
+            db.db_path(self._ctx.config_service.config_dir),
             normalize_package_id(package_id),
         )
 
     async def estimated_total(self, active_pids: list[str]) -> float:
-        dbp = db.db_path(config_dir())
+        dbp = db.db_path(self._ctx.config_service.config_dir)
         bg = await self._db.get_average(dbp, _BASE_GAME_PID)
         totals = await self._db.get_totals_for(dbp, active_pids)
         mod_sum = sum(on + off for on, off in totals.values())
         return bg + mod_sum
 
     async def get_all_averages(self) -> dict[str, float]:
-        return await self._db.get_all_averages(db.db_path(config_dir()))
+        return await self._db.get_all_averages(
+            db.db_path(self._ctx.config_service.config_dir)
+        )
 
     async def base_game_average(self) -> float:
         return await self._db.get_average(
-            db.db_path(config_dir()), _BASE_GAME_PID
+            db.db_path(self._ctx.config_service.config_dir), _BASE_GAME_PID
         )
 
     async def snapshot(
@@ -99,17 +102,16 @@ class StartupImpactService:
         the four sequential queries previously issued on every mod toggle.
         """
         return await self._db.get_latest_with_averages(
-            db.db_path(config_dir()),
+            db.db_path(self._ctx.config_service.config_dir),
             active_pids,
             normalize_package_id(selected_pid) if selected_pid else None,
         )
 
     async def clear(self) -> None:
-        await self._db.clear(db.db_path(config_dir()))
+        await self._db.clear(db.db_path(self._ctx.config_service.config_dir))
 
     async def close_connection(self) -> None:
         await self._db.close()
 
     def close_connection_sync(self) -> None:
         self._db.close_sync()
-

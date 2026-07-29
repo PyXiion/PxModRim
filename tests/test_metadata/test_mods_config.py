@@ -138,6 +138,7 @@ class TestModsConfigRoundTrip:
         assert loaded.activeMods == original.activeMods
         assert loaded.knownExpansions == original.knownExpansions
 
+
 class TestModsConfigProperties:
     def test_active_mods_getter_returns_copy(self) -> None:
         config = ModsConfig(

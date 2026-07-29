@@ -54,7 +54,7 @@ class _TabButton(QPushButton):
             self.setFixedHeight(30)
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background: {PALETTE['ELEVATE_1']};
+                    background: {PALETTE["ELEVATE_1"]};
                     border: none;
                     color: #949ba4;
                     font-size: 11px;
@@ -63,14 +63,14 @@ class _TabButton(QPushButton):
                     text-align: left;
                 }}
                 QPushButton:hover {{
-                    background: {PALETTE['ELEVATE_4']};
+                    background: {PALETTE["ELEVATE_4"]};
                 }}
                 QPushButton:checked {{
-                    background: {PALETTE['ELEVATE_2']};
-                    color: {PALETTE['TEXT_MAIN']};
-                    border-top: 2px solid {PALETTE['PRIMARY']};
-                    border-left: 1px solid {PALETTE['BORDER']};
-                    border-right: 1px solid {PALETTE['BORDER']};
+                    background: {PALETTE["ELEVATE_2"]};
+                    color: {PALETTE["TEXT_MAIN"]};
+                    border-top: 2px solid {PALETTE["PRIMARY"]};
+                    border-left: 1px solid {PALETTE["BORDER"]};
+                    border-right: 1px solid {PALETTE["BORDER"]};
                     border-bottom: none;
                     border-top-left-radius: 4px;
                     border-top-right-radius: 4px;
@@ -91,12 +91,12 @@ class _TabButton(QPushButton):
                     margin: 0px;
                 }}
                 QPushButton:hover {{
-                    background: {PALETTE['ELEVATE_4']};
+                    background: {PALETTE["ELEVATE_4"]};
                     border-radius: 4px;
                 }}
                 QPushButton:checked {{
-                    background: {PALETTE['ELEVATE_4']};
-                    border-left: 2px solid {PALETTE['PRIMARY']};
+                    background: {PALETTE["ELEVATE_4"]};
+                    border-left: 2px solid {PALETTE["PRIMARY"]};
                     border-radius: 0px;
                 }}
             """)
@@ -114,12 +114,12 @@ class _TabButton(QPushButton):
                     text-align: left;
                 }}
                 QPushButton:hover {{
-                    background: {PALETTE['ELEVATE_4']};
+                    background: {PALETTE["ELEVATE_4"]};
                 }}
                 QPushButton:checked {{
-                    background: {PALETTE['ELEVATE_4']};
-                    color: {PALETTE['TEXT_MAIN']};
-                    border-left: 2px solid {PALETTE['PRIMARY']};
+                    background: {PALETTE["ELEVATE_4"]};
+                    color: {PALETTE["TEXT_MAIN"]};
+                    border-left: 2px solid {PALETTE["PRIMARY"]};
                 }}
             """)
 
@@ -200,9 +200,7 @@ class IconTabWidget(QWidget):
             self._root.addWidget(self._tab_bar, 1)
             self._root.addWidget(self._stack, 0)
 
-    def addTab(
-        self, widget: QWidget, icon_name: str, label: str
-    ) -> int:
+    def addTab(self, widget: QWidget, icon_name: str, label: str) -> int:
         index = self._stack.count()
         self._stack.addWidget(widget)
 

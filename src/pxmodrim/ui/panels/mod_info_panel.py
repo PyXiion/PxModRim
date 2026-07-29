@@ -246,7 +246,9 @@ class ModInfoPanel(QWidget):
 
         issues_scroll = QScrollArea()
         issues_scroll.setWidgetResizable(True)
-        issues_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        issues_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         issues_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         issues_scroll.viewport().setAutoFillBackground(False)
 
@@ -425,11 +427,11 @@ class ModInfoPanel(QWidget):
         self._ui_prefs.deps_expanded = expanded
         from pxmodrim.ui.config import save_ui_prefs
 
-        await asyncio.to_thread(save_ui_prefs, self._ui_prefs)
+        await asyncio.to_thread(save_ui_prefs, self._ui_prefs, self._ctx.config_service)
 
     @asyncSlot(bool)
     async def _on_desc_toggled(self, expanded: bool) -> None:
         self._ui_prefs.desc_expanded = expanded
         from pxmodrim.ui.config import save_ui_prefs
 
-        await asyncio.to_thread(save_ui_prefs, self._ui_prefs)
+        await asyncio.to_thread(save_ui_prefs, self._ui_prefs, self._ctx.config_service)

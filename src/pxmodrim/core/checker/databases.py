@@ -4,13 +4,16 @@ import json
 import zipfile
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
 from loguru import logger
 
 from pxmodrim.core.checker.models import PackageId, ReplacementInfo
-from pxmodrim.core.sort.community import config_dir as checker_config_dir
 from pxmodrim.core.xml import xml_path_to_json
+
+if TYPE_CHECKING:
+    from pxmodrim.core.config import ConfigService
 
 NO_VERSION_WARNING_URL = (
     "https://github.com/emipa606/NoVersionWarning/archive/refs/heads/main.zip"
@@ -20,22 +23,14 @@ USE_THIS_INSTEAD_URL = (
 )
 
 
-def no_version_warning_path() -> Path:
-    return checker_config_dir() / "ModIdsToFix.xml"
-
-
-def use_this_instead_path() -> Path:
-    return checker_config_dir() / "replacements.json.gz"
-
-
 class NoVersionWarningService:
     """Service to download and cache the NoVersionWarning package-ID list."""
 
     __slots__ = ("_cache_dir", "_xml_path", "_pids")
 
-    def __init__(self) -> None:
-        self._cache_dir = checker_config_dir()
-        self._xml_path = no_version_warning_path()
+    def __init__(self, config_service: ConfigService) -> None:
+        self._cache_dir = config_service.config_dir
+        self._xml_path = self._cache_dir / "ModIdsToFix.xml"
         self._pids: set[PackageId] = set()
 
     async def ensure(self, force: bool = False) -> set[PackageId]:
@@ -108,9 +103,9 @@ class UseThisInsteadService:
 
     __slots__ = ("_cache_dir", "_json_path", "_entries")
 
-    def __init__(self) -> None:
-        self._cache_dir = checker_config_dir()
-        self._json_path = use_this_instead_path()
+    def __init__(self, config_service: ConfigService) -> None:
+        self._cache_dir = config_service.config_dir
+        self._json_path = self._cache_dir / "replacements.json.gz"
         self._entries: dict[str, ReplacementInfo] = {}
 
     async def ensure(self, force: bool = False) -> Mapping[str, ReplacementInfo]:

@@ -55,9 +55,7 @@ def parse_startup_impact(path: str | Path) -> StartupImpactReport | None:
                 package_id=package_id,
                 total_impact_s=_as_seconds(entry.get("totalImpact")),
                 metrics=_as_string_float_dict(entry.get("metrics")),
-                off_thread_metrics=_as_string_float_dict(
-                    entry.get("offThreadMetrics")
-                ),
+                off_thread_metrics=_as_string_float_dict(entry.get("offThreadMetrics")),
                 off_thread_total_impact_s=_as_seconds(
                     entry.get("offThreadTotalImpact")
                 ),

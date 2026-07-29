@@ -40,11 +40,28 @@ def _impact_color(seconds: float) -> str:
 
 
 _COLOR_PRESETS = [
-    "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
-    "#911eb4", "#42d4f4", "#f032e6", "#bfef45", "#fabed4",
-    "#469990", "#dcbeff", "#9a6324", "#800000", "#aaffc3",
-    "#808000", "#ffd8b1", "#000075", "#a9a9a9", "#e6beff",
+    "#e6194b",
+    "#3cb44b",
+    "#ffe119",
+    "#4363d8",
+    "#f58231",
+    "#911eb4",
+    "#42d4f4",
+    "#f032e6",
+    "#bfef45",
+    "#fabed4",
+    "#469990",
+    "#dcbeff",
+    "#9a6324",
+    "#800000",
+    "#aaffc3",
+    "#808000",
+    "#ffd8b1",
+    "#000075",
+    "#a9a9a9",
+    "#e6beff",
 ]
+
 
 def _metric_color(index: int) -> str:
     return _COLOR_PRESETS[index % len(_COLOR_PRESETS)]
@@ -135,9 +152,7 @@ class TimeAnalyticsPanel(QWidget):
         }
         root_obj.setProperty("sourceData", data)
 
-    def _build_segments(
-        self, mod: StartupImpactMod | None, own: float
-    ) -> list[dict]:
+    def _build_segments(self, mod: StartupImpactMod | None, own: float) -> list[dict]:
         if not mod:
             return []
         denom = max(own, 0.001)
@@ -155,9 +170,7 @@ class TimeAnalyticsPanel(QWidget):
     def _build_top5(
         self, report: StartupImpactReport, mod: StartupImpactMod | None, own: float
     ) -> list[dict]:
-        sorted_mods = sorted(
-            report.mods, key=lambda m: m.total_impact_s, reverse=True
-        )
+        sorted_mods = sorted(report.mods, key=lambda m: m.total_impact_s, reverse=True)
         top5: list[tuple[StartupImpactMod, bool]] = []
         current_pid = mod.package_id if mod else None
         for m in sorted_mods:
@@ -178,24 +191,20 @@ class TimeAnalyticsPanel(QWidget):
         max_impact = max((val for _, _, val in entries), default=1)
         result = []
         for entry, is_cur, val in entries:
-            bar_color = _COLOR_ACCENT if is_cur else _impact_color(
-                entry.total_impact_s
+            bar_color = _COLOR_ACCENT if is_cur else _impact_color(entry.total_impact_s)
+            result.append(
+                {
+                    "label": entry.mod_name,
+                    "value": _fmt(val),
+                    "fraction": val / max_impact if max_impact > 0 else 0,
+                    "is_current": is_cur,
+                    "color": bar_color,
+                }
             )
-            result.append({
-                "label": entry.mod_name,
-                "value": _fmt(val),
-                "fraction": val / max_impact if max_impact > 0 else 0,
-                "is_current": is_cur,
-                "color": bar_color,
-            })
         return result
 
-    def _build_base_metrics(
-        self, report: StartupImpactReport
-    ) -> list[dict]:
-        sorted_m = sorted(
-            report.metrics.items(), key=lambda x: x[1], reverse=True
-        )
+    def _build_base_metrics(self, report: StartupImpactReport) -> list[dict]:
+        sorted_m = sorted(report.metrics.items(), key=lambda x: x[1], reverse=True)
         return [
             {
                 "label": metric_label(name),
@@ -242,23 +251,29 @@ class TimeAnalyticsPanel(QWidget):
     ) -> list[dict]:
         legend = []
         if own > 0.001:
-            legend.append({
-                "label": mod.mod_name if mod else "This mod",
-                "value": _fmt(own),
-                "color": _impact_color(own),
-            })
+            legend.append(
+                {
+                    "label": mod.mod_name if mod else "This mod",
+                    "value": _fmt(own),
+                    "color": _impact_color(own),
+                }
+            )
         if other > 0.001:
-            legend.append({
-                "label": f"Other mods ({mod_count})",
-                "value": _fmt(other),
-                "color": _COLOR_BASE,
-            })
+            legend.append(
+                {
+                    "label": f"Other mods ({mod_count})",
+                    "value": _fmt(other),
+                    "color": _COLOR_BASE,
+                }
+            )
         if base > 0.001:
-            legend.append({
-                "label": "Base game",
-                "value": _fmt(base),
-                "color": _COLOR_BASE_GAME,
-            })
+            legend.append(
+                {
+                    "label": "Base game",
+                    "value": _fmt(base),
+                    "color": _COLOR_BASE_GAME,
+                }
+            )
         return legend
 
     def clear(self) -> None:

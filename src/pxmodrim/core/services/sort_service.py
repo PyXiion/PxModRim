@@ -71,8 +71,7 @@ class SortService:
                 if dep_str in active_pids:
                     continue
                 satisfied = any(
-                    str(alt) in active_pids
-                    for alt in dep_info.alternative_package_ids
+                    str(alt) in active_pids for alt in dep_info.alternative_package_ids
                 )
                 if satisfied:
                     continue
