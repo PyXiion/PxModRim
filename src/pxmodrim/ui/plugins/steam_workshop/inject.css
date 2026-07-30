@@ -69,7 +69,7 @@ header,
     font-size: 16px;
     box-shadow: 0 0 4px black;
     user-select: none;
-    transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease, visibility 0.2s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease, visibility 0.2s ease, background-color 0.2s ease;
     z-index: 10;
     opacity: 0;
     visibility: hidden;
@@ -79,9 +79,16 @@ header,
     transform: scale(0.9);
 }
 
-.rimsort-mod-installed {
+.rimsort-mod-active {
     background-color: #4CAF50;
-    cursor: default;
+    cursor: pointer;
+    opacity: 1;
+    visibility: visible;
+}
+
+.rimsort-mod-inactive {
+    background-color: #666;
+    cursor: pointer;
     opacity: 1;
     visibility: visible;
 }
@@ -106,7 +113,12 @@ header,
     pointer-events: none;
 }
 
-.rimsort-tile:hover .rimsort-modstatus-badge {
+.collectionItem {
+    position: relative;
+}
+
+.rimsort-tile:hover .rimsort-modstatus-badge,
+.collectionItem:hover .rimsort-modstatus-badge {
     opacity: 1;
     visibility: visible;
 }
@@ -130,12 +142,17 @@ header,
     border: none;
     text-decoration: none;
     box-shadow: 0 0 4px rgb(0 0 0 / 30%);
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease;
 }
 
-.rimsort-detail-btn.rimsort-mod-installed {
+.rimsort-detail-btn.rimsort-mod-active {
     background-color: #4CAF50;
-    cursor: default;
+    cursor: pointer;
+}
+
+.rimsort-detail-btn.rimsort-mod-inactive {
+    background-color: #666;
+    cursor: pointer;
 }
 
 .rimsort-detail-btn.rimsort-mod-checked {
@@ -210,7 +227,7 @@ header,
     color: white;
     user-select: none;
     cursor: pointer;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease;
     flex-shrink: 0;
 }
 
@@ -333,4 +350,44 @@ header,
     background: rgb(255 255 255 / 10%);
     color: #fff;
     border-color: rgb(255 255 255 / 20%);
+}
+
+/* Hide native Steam collection buttons — replaced by RimSort badges */
+
+.subscribeCollection {
+    display: none !important;
+}
+
+.collectionItem .subscriptionControls {
+    display: none !important;
+}
+
+/* Collection page batch bar */
+
+.rimsort-collection-bar {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.rimsort-only-btn {
+    padding: 6px 14px;
+    border: 1px solid #FFA500;
+    border-radius: 4px;
+    background: transparent;
+    color: #FFA500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.rimsort-only-btn:hover {
+    background: rgb(255 165 0 / 10%);
+}
+
+.rimsort-only-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }

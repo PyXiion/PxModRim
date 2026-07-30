@@ -1,84 +1,15 @@
-import { BadgeState, Config } from "./types";
-import type { BadgeStatus } from "./types";
-import { log, warn, getModId, getModTitle, findItemCard } from "./utils";
-import { setBadgeVisuals, getDepBadgeState } from "./visuals";
-import { getDepsFor, flattenDepTree } from "./deps";
-import { batchToggleChecked } from "./detail";
-import { PxModRimAPI } from "./api";
+import { ModState } from "./types";
+import { log, getModId, getModTitle, findItemCard } from "./utils";
+import { getModState, applyModState, handleClick } from "./controls";
 import { isBridgeDataReady } from "./bridge";
-import { _activeRoute } from "./lifecycle";
+import { isPageKind } from "./lifecycle";
 
-let _badgeRaf: number | null = null;
+let _badgeTimer: ReturnType<typeof setTimeout> | null = null;
+const BADGE_DEBOUNCE_MS = 300;
 
-export function makeBadgeClickHandler(
-  badge: HTMLElement,
-  modId: string,
-  getTitle: () => string,
-): (e: MouseEvent) => Promise<void> {
-  return async (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (badge.classList.contains("rimsort-mod-installed")) return;
-    if (badge.classList.contains("rimsort-mod-resolving")) return;
-    badge.classList.add("pressed");
-    requestAnimationFrame(() => badge.classList.remove("pressed"));
-    if (badge.classList.contains("rimsort-mod-default")) {
-      setBadgeVisuals(badge, BadgeState.RESOLVING);
-
-      const title = getTitle();
-      const tree = await getDepsFor(modId);
-
-      const toggles: { id: string; title: string }[] = [
-        { id: modId, title },
-      ];
-      window.__pxmodrim.checkedIds.add(modId);
-
-      if (tree) {
-        const allDeps = flattenDepTree(tree, new Set([modId]));
-        for (const dep of allDeps) {
-          window.__pxmodrim.checkedIds.add(dep.id);
-          toggles.push(dep);
-        }
-      } else {
-        warn(`Failed to resolve deps for badge ${modId}`);
-      }
-
-      batchToggleChecked(toggles, true);
-
-      setBadgeVisuals(badge, BadgeState.CHECKED);
-      refreshAllDepsBadges();
-      updateAllModBadges();
-    } else if (badge.classList.contains("rimsort-mod-checked")) {
-      window.__pxmodrim.checkedIds.delete(modId);
-      setBadgeVisuals(badge, BadgeState.DEFAULT);
-      PxModRimAPI.toggleDownloadChecked(modId, "", false);
-      refreshAllDepsBadges();
-      updateAllModBadges();
-    }
-  };
-}
-
-export function refreshAllDepsBadges(): void {
-  document.querySelectorAll(".rimsort-dep-badge").forEach((badge) => {
-    const el = badge as HTMLElement;
-    const modId = el.dataset.modid;
-    if (!modId) return;
-    setBadgeVisuals(el, getDepBadgeState(modId));
-  });
-}
-
-export function scheduleBadgeUpdate(): void {
-  if (_badgeRaf !== null) return;
-  if (_activeRoute?.name !== "grid") return;
-  _badgeRaf = requestAnimationFrame(() => {
-    _badgeRaf = null;
-    if (isBridgeDataReady()) updateAllModBadges();
-  });
-}
-
-export function updateModBadge(modId: string, status: BadgeStatus): void {
-  if (_activeRoute?.name !== "grid") return;
-  log("updateModBadge modId=" + modId + " status=" + status);
+export function updateModBadge(modId: string): void {
+  if (!isPageKind("grid")) return;
+  const state = getModState(modId);
 
   const link = document.querySelector<HTMLAnchorElement>(
     `a[href*="sharedfiles/filedetails/?id=${modId}"]`,
@@ -98,12 +29,15 @@ export function updateModBadge(modId: string, status: BadgeStatus): void {
     tile.classList.add("rimsort-tile");
     tile.appendChild(badge);
 
-    badge.addEventListener(
-      "click",
-      makeBadgeClickHandler(badge, modId, () => getModTitle(tile)),
-    );
+    badge.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      await handleClick(badge!, modId, () => getModTitle(tile));
+      updateAllModBadges();
+    });
   }
-  setBadgeVisuals(badge, status);
+
+  applyModState(badge, state);
 }
 
 export function updateAllModBadges(): void {
@@ -115,17 +49,26 @@ export function updateAllModBadges(): void {
   links.forEach((link) => {
     const modId = getModId(link);
     if (!modId) return;
-
-    if (window.__pxmodrim.installedIds.has(modId)) {
-      updateModBadge(modId, BadgeState.INSTALLED);
-      badged++;
-    } else if (window.__pxmodrim.checkedIds.has(modId)) {
-      updateModBadge(modId, BadgeState.CHECKED);
-    } else {
-      updateModBadge(modId, BadgeState.DEFAULT);
-    }
+    updateModBadge(modId);
+    badged++;
   });
-  log(
-    `Badges updated: links=${links.length} installed=${badged}`,
-  );
+  log(`Badges updated: ${badged}`);
+}
+
+export function scheduleBadgeUpdate(): void {
+  if (_badgeTimer !== null) return;
+  if (!isPageKind("grid")) return;
+  _badgeTimer = setTimeout(() => {
+    _badgeTimer = null;
+    if (isBridgeDataReady()) updateAllModBadges();
+  }, BADGE_DEBOUNCE_MS);
+}
+
+export function refreshAllDepsBadges(): void {
+  document.querySelectorAll(".rimsort-dep-badge").forEach((badge) => {
+    const el = badge as HTMLElement;
+    const modId = el.dataset.modid;
+    if (!modId) return;
+    applyModState(el, getModState(modId));
+  });
 }

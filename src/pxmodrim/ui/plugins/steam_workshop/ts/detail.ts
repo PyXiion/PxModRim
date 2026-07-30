@@ -1,12 +1,8 @@
-import { BadgeState, Config } from "./types";
+import { ModState, Config } from "./types";
 import { log, warn } from "./utils";
-import {
-  setDetailBtnVisuals,
-  getDetailButtonState,
-} from "./visuals";
-import { getDepsFor, flattenDepTree } from "./deps";
-import { refreshAllDepsBadges, updateAllModBadges } from "./badges";
-import { PxModRimAPI } from "./api";
+import { getModState, applyModState, handleClick, performModAction } from "./controls";
+import { getDepsFor } from "./deps";
+import { refreshAllDepsBadges } from "./badges";
 import {
   waitForBridgeData,
   isBridgeDataReady,
@@ -15,15 +11,111 @@ import { buildDepSection } from "./rendering";
 
 export const DetailState: {
   injectedUrl: string | null;
-  resolvingDeps: boolean;
   depsInjected: boolean;
 } = {
   injectedUrl: null,
-  resolvingDeps: false,
   depsInjected: false,
 };
 
 let _depsLoading = false;
+
+function updateSoloLinkVisibility(): void {
+  const soloLink = document.getElementById(Config.DEP_SOLO_LINK_ID);
+  const requiredContainer = document.getElementById("RequiredItems");
+  const btn = document.getElementById("pxmodrim-subscribe-btn");
+  if (!soloLink) return;
+  const isInstalled = btn?.classList.contains("rimsort-mod-active") || btn?.classList.contains("rimsort-mod-inactive");
+  const isChecked = btn?.classList.contains("rimsort-mod-checked");
+  if (requiredContainer && !isInstalled && !isChecked) {
+    soloLink.classList.remove("hidden");
+  } else {
+    soloLink.classList.add("hidden");
+  }
+}
+
+function finalizeButton(
+  btn: HTMLElement,
+  container: HTMLElement,
+  modId: string,
+  title: string,
+  hasDeps: boolean,
+): void {
+  btn.id = "pxmodrim-subscribe-btn";
+  btn.className = "rimsort-detail-btn";
+  btn.style.textAlign = "center";
+
+  btn.dataset.rimsortVariant = "detail";
+  btn.dataset.rimsortLabel = hasDeps ? "Add to Queue (with deps)" : "Add to Queue";
+  btn.dataset.rimsortTitle = "Add to download queue";
+
+  function updateButtonVisuals(): void {
+    applyModState(btn, getModState(modId));
+  }
+
+  btn.addEventListener("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    (async () => {
+      await handleClick(btn, modId, () => title);
+      updateButtonVisuals();
+      updateSoloLinkVisibility();
+    })();
+  });
+
+  updateButtonVisuals();
+
+  if (hasDeps) {
+    const soloLink = document.createElement("a");
+    soloLink.id = Config.DEP_SOLO_LINK_ID;
+    soloLink.className = "rimsort-solo-link";
+    soloLink.textContent = "Queue only this mod";
+    soloLink.href = "#";
+    soloLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      (async () => {
+        await performModAction(modId, () => title, { skipDeps: true });
+        updateButtonVisuals();
+        updateSoloLinkVisibility();
+      })();
+    });
+    container.appendChild(soloLink);
+    updateSoloLinkVisibility();
+  }
+}
+
+function createLoadingPlaceholder(
+  loadingFactory: () => HTMLElement,
+  afterLoadedFactory: (
+    loadingEl: HTMLElement,
+    container: HTMLElement,
+  ) => void,
+  event: () => Promise<void>,
+): HTMLElement {
+  const loadingEl = loadingFactory();
+  const container = document.createElement("div");
+  container.id = "pxmodrim-loading-container";
+  container.style.display = "flex";
+  container.style.flexDirection = "column";
+  container.style.gap = "8px";
+  container.appendChild(loadingEl);
+
+  event().then(
+    () => {
+      if (!document.contains(container)) return;
+      afterLoadedFactory(loadingEl, container);
+    },
+    () => {
+      if (!document.contains(container)) return;
+      warn("Bridge data timeout \u2014 showing error state");
+      loadingEl.className = "rimsort-error-btn";
+      loadingEl.textContent = "ERROR";
+    },
+  );
+
+  return container;
+}
 
 export async function createDetailButton(): Promise<void> {
   if ((createDetailButton as Record<string, unknown>)._running) return;
@@ -48,7 +140,9 @@ export async function createDetailButton(): Promise<void> {
       const modId = (
         window.location.href.match(/[?&]id=(\d+)/) || []
       )[1];
-      if (modId) setDetailBtnVisuals(btn, getDetailButtonState(modId));
+      if (modId) {
+        applyModState(btn, getModState(modId));
+      }
       updateSoloLinkVisibility();
       container =
         btn.closest("div[style*='flex']") || btn.parentElement;
@@ -140,172 +234,4 @@ export async function createDetailButton(): Promise<void> {
   }
 }
 
-async function queueModWithDeps(
-  modId: string,
-  title: string,
-): Promise<void> {
-  if (DetailState.resolvingDeps) return;
-  DetailState.resolvingDeps = true;
 
-  const btn = document.getElementById(
-    "pxmodrim-subscribe-btn",
-  ) as HTMLElement | null;
-  if (btn) {
-    btn.classList.add("rimsort-deps-resolving");
-    btn.textContent = "Resolving deps...";
-  }
-
-  window.__pxmodrim.checkedIds.add(modId);
-
-  const toggles: { id: string; title: string }[] = [
-    { id: modId, title },
-  ];
-  const tree = await getDepsFor(modId);
-  if (tree) {
-    const allDeps = flattenDepTree(tree, new Set([modId]));
-    for (const dep of allDeps) {
-      window.__pxmodrim.checkedIds.add(dep.id);
-      toggles.push(dep);
-    }
-  } else {
-    warn("Failed to resolve deps for", modId);
-  }
-
-  batchToggleChecked(toggles, true);
-
-  if (btn) {
-    btn.classList.remove("rimsort-deps-resolving");
-    setDetailBtnVisuals(btn, getDetailButtonState(modId));
-  }
-  refreshAllDepsBadges();
-  updateSoloLinkVisibility();
-  DetailState.resolvingDeps = false;
-}
-
-function queueModSolo(modId: string, title: string): void {
-  window.__pxmodrim.checkedIds.add(modId);
-  PxModRimAPI.toggleDownloadChecked(modId, title, true);
-  const btn = document.getElementById(
-    "pxmodrim-subscribe-btn",
-  ) as HTMLElement | null;
-  if (btn) setDetailBtnVisuals(btn, getDetailButtonState(modId));
-  refreshAllDepsBadges();
-  updateSoloLinkVisibility();
-}
-
-export function batchToggleChecked(
-  mods: { id: string; title: string }[],
-  checked: boolean,
-): void {
-  if (!mods.length) return;
-  PxModRimAPI.batchToggleDownloadChecked(
-    mods.map((m) => m.id),
-    mods.map((m) => m.title),
-    checked,
-  );
-}
-
-function updateSoloLinkVisibility(): void {
-  const soloLink = document.getElementById(Config.DEP_SOLO_LINK_ID);
-  const requiredContainer = document.getElementById("RequiredItems");
-  const btn = document.getElementById("pxmodrim-subscribe-btn");
-  if (!soloLink) return;
-  const isInstalled = btn?.classList.contains("rimsort-mod-installed");
-  const isChecked = btn?.classList.contains("rimsort-mod-checked");
-  if (requiredContainer && !isInstalled && !isChecked) {
-    soloLink.classList.remove("hidden");
-  } else {
-    soloLink.classList.add("hidden");
-  }
-}
-
-function createLoadingPlaceholder(
-  loadingFactory: () => HTMLElement,
-  afterLoadedFactory: (
-    loadingEl: HTMLElement,
-    container: HTMLElement,
-  ) => void,
-  event: () => Promise<void>,
-): HTMLElement {
-  const loadingEl = loadingFactory();
-  const container = document.createElement("div");
-  container.id = "pxmodrim-loading-container";
-  container.style.display = "flex";
-  container.style.flexDirection = "column";
-  container.style.gap = "8px";
-  container.appendChild(loadingEl);
-
-  event().then(
-    () => {
-      if (!document.contains(container)) return;
-      afterLoadedFactory(loadingEl, container);
-    },
-    () => {
-      if (!document.contains(container)) return;
-      warn("Bridge data timeout \u2014 showing error state");
-      loadingEl.className = "rimsort-error-btn";
-      loadingEl.textContent = "ERROR";
-    },
-  );
-
-  return container;
-}
-
-function finalizeButton(
-  btn: HTMLElement,
-  container: HTMLElement,
-  modId: string,
-  title: string,
-  hasDeps: boolean,
-): void {
-  btn.id = "pxmodrim-subscribe-btn";
-  btn.className = "rimsort-detail-btn";
-  btn.style.textAlign = "center";
-
-  function updateButtonVisuals(): void {
-    setDetailBtnVisuals(
-      btn,
-      getDetailButtonState(modId),
-      hasDeps ? "Add to Queue (with deps)" : "Add to Queue",
-    );
-  }
-
-  btn.addEventListener("click", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (btn.classList.contains("rimsort-mod-installed")) return;
-    if (DetailState.resolvingDeps) return;
-
-    btn.classList.add("pressed");
-    requestAnimationFrame(() => btn.classList.remove("pressed"));
-
-    const state = getDetailButtonState(modId);
-    if (state === "checked") {
-      window.__pxmodrim.checkedIds.delete(modId);
-      updateButtonVisuals();
-      PxModRimAPI.toggleDownloadChecked(modId, "", false);
-      updateSoloLinkVisibility();
-    } else {
-      queueModWithDeps(modId, title);
-    }
-  });
-
-  updateButtonVisuals();
-
-  if (hasDeps) {
-    const soloLink = document.createElement("a");
-    soloLink.id = Config.DEP_SOLO_LINK_ID;
-    soloLink.className = "rimsort-solo-link";
-    soloLink.textContent = "Queue only this mod";
-    soloLink.href = "#";
-    soloLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (btn.classList.contains("rimsort-mod-installed")) return;
-      if (DetailState.resolvingDeps) return;
-      queueModSolo(modId, title);
-    });
-    container.appendChild(soloLink);
-    updateSoloLinkVisibility();
-  }
-}

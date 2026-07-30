@@ -53,6 +53,7 @@ class SteamCmdUiPlugin(Plugin):
     download_busy_changed: Event[bool]
     uncheck_mod_requested: Event[str]
     clear_checked_requested: Event[None]
+    active_refresh_requested: Event[list[str]]
 
     _svc: SteamCmdService
 
@@ -64,11 +65,13 @@ class SteamCmdUiPlugin(Plugin):
         self.download_busy_changed = Event()
         self.uncheck_mod_requested = Event()
         self.clear_checked_requested = Event()
+        self.active_refresh_requested = Event()
 
         self._core: CoreContext | None = None
         self._app_ctx: AppContext | None = None
 
         self._installed_ids: set[str] = set()
+        self._active_ids: set[str] = set()
         self._checked_ids: dict[str, str] = {}
         self._download_statuses: dict[str, str] = {}
         self._current_downloading_id: str = ""
@@ -84,6 +87,7 @@ class SteamCmdUiPlugin(Plugin):
         ctx.add_rail_view(SteamWorkshopViewPanel)
 
         ctx.core.mod_service.mods_changed.connect(self._on_mods_changed)
+        ctx.core.active_state_changed.connect(self._on_active_state_changed)
         self._svc.download_progress.connect(self._on_steam_progress)
         self._svc.download_item_status_changed.connect(self._on_steam_item_status)
         self._svc.download_finished.connect(self._on_steam_finished)
@@ -101,6 +105,9 @@ class SteamCmdUiPlugin(Plugin):
             )
             self._svc.download_finished.disconnect(self._on_steam_finished)
             self._core.mod_service.mods_changed.disconnect(self._on_mods_changed)
+            self._core.active_state_changed.disconnect(
+                self._on_active_state_changed
+            )
 
     # ── JS action handlers (called by action_handler) ────
 
@@ -125,6 +132,45 @@ class SteamCmdUiPlugin(Plugin):
             self.sidebar_sync_requested.emit(
                 SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
             )
+
+    def toggle_active(self, mod_id: str, active: bool) -> None:
+        if self._core is None:
+            return
+        uuid = next(
+            (
+                u
+                for u, m in self._core.all_mods.items()
+                if m.published_file_id == mod_id
+            ),
+            None,
+        )
+        if uuid is None:
+            return
+        current = set(self._core.active_uuids)
+        if active:
+            current.add(uuid)
+        else:
+            current.discard(uuid)
+        self._core.set_active(list(current))
+
+    def batch_toggle_active(self, mod_ids: list[str], active: bool) -> None:
+        if self._core is None:
+            return
+        pub_to_uuid = {
+            m.published_file_id: u
+            for u, m in self._core.all_mods.items()
+            if m.published_file_id
+        }
+        current = set(self._core.active_uuids)
+        for mid in mod_ids:
+            uuid = pub_to_uuid.get(mid)
+            if uuid is None:
+                continue
+            if active:
+                current.add(uuid)
+            else:
+                current.discard(uuid)
+        self._core.set_active(list(current))
 
     # ── Sidebar callbacks (called by view) ───────────────
 
@@ -229,15 +275,22 @@ class SteamCmdUiPlugin(Plugin):
     def sync_all(self) -> None:
         self._refresh_cached_ids()
         self.badges_refresh_requested.emit(list(self._installed_ids))
+        self.active_refresh_requested.emit(list(self._active_ids))
         self.sidebar_sync_requested.emit(
             SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
         )
 
     # ── Service event handlers ───────────────────────────
 
+    def _on_active_state_changed(self, _: tuple[str, ...]) -> None:
+        self._refresh_cached_ids()
+        self.badges_refresh_requested.emit(list(self._installed_ids))
+        self.active_refresh_requested.emit(list(self._active_ids))
+
     def _on_mods_changed(self, _: None) -> None:
         self._refresh_cached_ids()
         self.badges_refresh_requested.emit(list(self._installed_ids))
+        self.active_refresh_requested.emit(list(self._active_ids))
 
     def _on_steam_progress(self, progress: SteamCmdProgress) -> None:
         self.progress_updated.emit(
@@ -280,6 +333,12 @@ class SteamCmdUiPlugin(Plugin):
             m.published_file_id
             for m in self._core.all_mods.values()
             if m.published_file_id
+        }
+        active_uuids = set(self._core.active_uuids)
+        self._active_ids = {
+            m.published_file_id
+            for m in self._core.all_mods.values()
+            if m.published_file_id and m.uuid in active_uuids
         }
 
     async def fetch_mod_deps(self, mod_id: str) -> str | None:

@@ -1,6 +1,7 @@
 import { startScript, waitForRoot } from "./lifecycle";
 import {
   __pxmSetInstalled,
+  __pxmSetActive,
   __pxmUncheckMod,
   __pxmClearChecked,
   initRPC,
@@ -12,6 +13,7 @@ if (!window.__pxmodrimInited) {
   window.__pxmodrimInited = true;
 
   window.__pxmSetInstalled = __pxmSetInstalled;
+  window.__pxmSetActive = __pxmSetActive;
   window.__pxmUncheckMod = __pxmUncheckMod;
   window.__pxmClearChecked = __pxmClearChecked;
   window.updateAllModBadges = updateAllModBadges;

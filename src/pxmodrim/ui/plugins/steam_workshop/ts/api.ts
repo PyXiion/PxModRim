@@ -36,6 +36,26 @@ export namespace PxModRimAPI {
         });
     }
 
+    export async function toggleActive(
+        modId: string,
+        active: boolean,
+    ): Promise<void> {
+        await _rpc!.call("toggle_active", {
+            mod_id: modId,
+            active,
+        });
+    }
+
+    export async function batchToggleActive(
+        modIds: string[],
+        active: boolean,
+    ): Promise<void> {
+        await _rpc!.call("batch_toggle_active", {
+            mod_ids: modIds,
+            active,
+        });
+    }
+
     export async function fetchModDeps(
         modId: string,
     ): Promise<DepItemsResult | null> {

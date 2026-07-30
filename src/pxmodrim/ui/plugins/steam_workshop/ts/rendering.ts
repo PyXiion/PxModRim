@@ -1,8 +1,7 @@
-import { BadgeState, Config } from "./types";
+import { Config } from "./types";
 import type { DepNode } from "./types";
 import { scrapeDepsFromContainer } from "./utils";
-import { setBadgeVisuals, getDepBadgeState } from "./visuals";
-import { makeBadgeClickHandler } from "./badges";
+import { getModState, applyModState, handleClick } from "./controls";
 
 export function buildDepSection(
   tree: DepNode | null,
@@ -100,12 +99,13 @@ function createDepNode(dep: DepNode, depth: number): HTMLDivElement {
   badge.className = "rimsort-dep-badge";
   badge.dataset.modid = dep.id;
   badge.title = dep.id;
-  setBadgeVisuals(badge, getDepBadgeState(dep.id));
+  applyModState(badge, getModState(dep.id));
 
-  badge.addEventListener(
-    "click",
-    makeBadgeClickHandler(badge, dep.id, () => dep.title),
-  );
+  badge.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    await handleClick(badge, dep.id, () => dep.title);
+  });
 
   const titleLink = document.createElement("a");
   titleLink.className = "rimsort-dep-title";

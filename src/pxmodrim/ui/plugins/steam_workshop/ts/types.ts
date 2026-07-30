@@ -1,11 +1,12 @@
-export const BadgeState = {
-  INSTALLED: "installed",
+export const ModState = {
+  ACTIVE: "active",
+  INACTIVE: "inactive",
   CHECKED: "checked",
   DEFAULT: "default",
   RESOLVING: "resolving",
 } as const;
 
-export type BadgeStatus = (typeof BadgeState)[keyof typeof BadgeState];
+export type ModStatus = (typeof ModState)[keyof typeof ModState];
 
 export const Config = {
   DEPTH_MAX: 3,

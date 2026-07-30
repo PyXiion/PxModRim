@@ -1,16 +1,14 @@
 import "./qwebchannel.js";
-import type { BadgeStatus } from "./types";
-import {
-  setDetailBtnVisuals,
-  getDetailButtonState,
-} from "./visuals";
+import { getModState, applyModState } from "./controls";
 import { refreshAllDepsBadges, updateAllModBadges } from "./badges";
+import { log } from "./utils";
 
 // Ensure __pxmodrim exists (modules may initialize before main.ts guard)
 if (!window.__pxmodrim) {
   window.__pxmodrim = {
     installedIds: new Set(),
     checkedIds: new Set(),
+    activeIds: new Set(),
     onStateChange: null,
   };
 }
@@ -107,11 +105,7 @@ export function __pxmSetInstalled(modIds: string[]): void {
 
 export function __pxmUncheckMod(modId: string): void {
   window.__pxmodrim.checkedIds.delete(modId);
-  if (window.__pxmodrim.installedIds.has(modId)) {
-    window.updateModBadge(modId, "installed");
-  } else {
-    window.updateModBadge(modId, "default");
-  }
+  window.updateModBadge(modId);
   refreshAllDepsBadges();
   window.__pxmodrim.onStateChange?.();
 }
@@ -123,12 +117,22 @@ export function __pxmClearChecked(): void {
   window.__pxmodrim.onStateChange?.();
 }
 
+export function __pxmSetActive(modIds: string[]): void {
+  window.__pxmodrim.activeIds.clear();
+  (modIds || []).forEach((id) => window.__pxmodrim.activeIds.add(id));
+  if (_bridgeDataReady) {
+    updateAllModBadges();
+    refreshAllDepsBadges();
+    window.__pxmodrim.onStateChange?.();
+  }
+}
+
 // Render detail page button on state changes from Python
 window.__pxmodrim.onStateChange = function () {
   const modId = (window.location.href.match(/[?&]id=(\d+)/) || [])[1];
   const btn = document.getElementById("pxmodrim-subscribe-btn");
   if (btn && modId) {
-    setDetailBtnVisuals(btn, getDetailButtonState(modId));
+    applyModState(btn, getModState(modId));
   }
   refreshAllDepsBadges();
 };

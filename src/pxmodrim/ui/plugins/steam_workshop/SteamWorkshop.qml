@@ -172,7 +172,7 @@ Rectangle {
                 profile: WebEngineProfile {
                     storageName: "pxmodrim-steam"
                     httpCacheType: WebEngineProfile.DiskHttpCache
-                    httpCacheMaximumSize: 536870912
+                    httpCacheMaximumSize: 52428800
                     offTheRecord: false
                 }
 
