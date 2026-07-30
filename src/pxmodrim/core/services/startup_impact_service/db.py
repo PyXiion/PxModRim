@@ -95,6 +95,7 @@ class StartupImpactDb:
                 await conn.execute("PRAGMA journal_mode=WAL")
                 await conn.execute("PRAGMA busy_timeout=5000")
                 await conn.execute("PRAGMA foreign_keys=ON")
+                await conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
                 await conn.executescript(_SCHEMA)
                 self._connection = conn
                 self._connection_path = db_str
@@ -150,6 +151,15 @@ class StartupImpactDb:
                 (HISTORY_DEPTH,),
             )
         await db.commit()
+
+        # Compact the database: checkpoint WAL, reclaim freelist, and VACUUM
+        # if the file has grown bloated (freelist pages accumulate because SQLite
+        # never shrinks the physical file by default).
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        await db.execute("PRAGMA incremental_vacuum")
+        db_size = path.stat().st_size
+        if db_size > 10 * 1024 * 1024:
+            await db.execute("VACUUM")
 
     async def get_latest_report(self, path: Path) -> StartupImpactReport | None:
         if not path.exists():
@@ -395,6 +405,8 @@ class StartupImpactDb:
             await cursor.execute("DELETE FROM startup_impact_entries")
             await cursor.execute("DELETE FROM startup_impact_sessions")
         await db.commit()
+        await db.execute("VACUUM")
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
 def _row_to_mod(row: aiosqlite.Row) -> StartupImpactMod:
