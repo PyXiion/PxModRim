@@ -113,6 +113,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             self._download_sidebar.clear_requested.connect(self._plugin.clear_queue)
 
             self._plugin.badges_refresh_requested.connect(self._push_badges_to_js)
+            self._plugin.active_refresh_requested.connect(self._push_active_to_js)
             self._plugin.sidebar_sync_requested.connect(self._on_sidebar_sync)
             self._plugin.progress_updated.connect(self._on_progress_updated)
             self._plugin.item_status_changed.connect(self._on_item_status_changed)
@@ -166,6 +167,10 @@ class SteamWorkshopViewPanel(BaseViewPanel):
     def _push_badges_to_js(self, ids: list[str]) -> None:
         js = json.dumps(ids)
         self._run_js(f"if (window.__pxmSetInstalled) window.__pxmSetInstalled({js})")
+
+    def _push_active_to_js(self, ids: list[str]) -> None:
+        js = json.dumps(ids)
+        self._run_js(f"if (window.__pxmSetActive) window.__pxmSetActive({js})")
 
     def _push_uncheck_to_js(self, mod_id: str) -> None:
         self._run_js(f"window.__pxmUncheckMod({json.dumps(mod_id)});")

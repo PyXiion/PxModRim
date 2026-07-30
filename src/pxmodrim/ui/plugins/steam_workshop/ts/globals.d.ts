@@ -7,6 +7,7 @@ declare class QWebChannel {
 interface PxmodrimState {
   installedIds: Set<string>;
   checkedIds: Set<string>;
+  activeIds: Set<string>;
   onStateChange: (() => void) | null;
 }
 
@@ -14,9 +15,10 @@ interface Window {
   __pxmodrim: PxmodrimState;
   __pxmodrimInited?: boolean;
   QWebChannel: typeof QWebChannel;
-  updateModBadge(modId: string, status: string): void;
+  updateModBadge(modId: string): void;
   updateAllModBadges(): void;
   __pxmSetInstalled(modIds: string[]): void;
+  __pxmSetActive(modIds: string[]): void;
   __pxmUncheckMod(modId: string): void;
   __pxmClearChecked(): void;
 }

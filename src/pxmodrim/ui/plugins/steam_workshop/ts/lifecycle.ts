@@ -1,112 +1,131 @@
-import { BadgeState, Config } from "./types";
-import { log } from "./utils";
+import { Config } from "./types";
+import { log, findItemCard } from "./utils";
 import {
   refreshAllDepsBadges,
   scheduleBadgeUpdate,
   updateAllModBadges,
 } from "./badges";
 import { createDetailButton, DetailState } from "./detail";
+import { initCollectionPage, updateCollectionBadges } from "./collection";
 import { setBridgeDataReady } from "./bridge";
 import { PxModRimAPI } from "./api";
 
-export let _activeRoute: {
-  name: string;
-  match: (url: string) => boolean;
-  init: () => void;
-  onMutation: (mutations: MutationRecord[]) => void;
-} | null = null;
+type PageKindKey = "collection" | "mod-details" | "grid";
 
-const ROUTES = [
-  {
-    name: "details",
-    match: (url: string) =>
-      url.startsWith(
-        "https://steamcommunity.com/sharedfiles/filedetails/?id=",
-      ),
-    init() {
-      createDetailButton();
-    },
-    onMutation(mutations: MutationRecord[]) {
-      const RELEVANT_IDS = new Set([
-        "SubscribeItemBtn",
-        "RequiredItems",
-        "pxmodrim-subscribe-btn",
-        Config.DEP_SECTION_ID,
-        "pxmodrim-loading-container",
-        "pxmodrim-solo-link",
-      ]);
-      const hasRelevant = mutations.some((m) => {
-        if (m.type === "childList") {
-          for (const list of [m.addedNodes, m.removedNodes]) {
-            for (const node of list) {
-              if (node.nodeType !== Node.ELEMENT_NODE) continue;
-              const el = node as Element;
-              if (RELEVANT_IDS.has(el.id)) return true;
-              if (el.querySelector?.("[id]")) {
-                const nested = el.querySelector(
-                  "#SubscribeItemBtn,#RequiredItems,#pxmodrim-subscribe-btn,#" +
-                    CSS.escape(Config.DEP_SECTION_ID),
-                );
-                if (nested) return true;
-              }
-            }
-          }
-        }
-        if (
-          m.type === "attributes" &&
-          RELEVANT_IDS.has((m.target as Element).id)
-        )
-          return true;
-        return false;
-      });
-      if (!hasRelevant) return;
+interface PageKind {
+  init(): void;
+  onMutation(mutations: MutationRecord[]): void;
+}
 
-      const currentUrl = window.location.href;
-      if (
-        document.getElementById("SubscribeItemBtn") &&
-        !document.getElementById("pxmodrim-subscribe-btn")
-      ) {
-        createDetailButton();
+let _pageKind: PageKindKey | null = null;
+
+function handleGridMutations(mutations: MutationRecord[]): void {
+  for (const m of mutations) {
+    for (const node of m.addedNodes) {
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      const el = node as Element;
+      const link = el.querySelector<HTMLAnchorElement>('a[href*="sharedfiles/filedetails/?id="]');
+      if (!link || !el.querySelector("img")) continue;
+      if (!findItemCard(link)) continue;
+      scheduleBadgeUpdate();
+      return;
+    }
+  }
+}
+
+function handleCollectionMutations(mutations: MutationRecord[]): void {
+  for (const m of mutations) {
+    for (const node of m.addedNodes) {
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      const el = node as Element;
+      if (el.matches?.(".collectionItem") || el.querySelector?.(".collectionItem")) {
+        updateCollectionBadges();
         return;
       }
-      if (DetailState.injectedUrl !== currentUrl) {
-        return;
-      }
-      if (
-        document.getElementById("RequiredItems") &&
-        !document.getElementById(Config.DEP_SECTION_ID) &&
-        !DetailState.depsInjected
-      ) {
-        createDetailButton();
-      }
-    },
-  },
-  {
-    name: "grid",
-    match: () => true,
-    init() {
-      updateAllModBadges();
-    },
-    onMutation(mutations: MutationRecord[]) {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
+    }
+  }
+}
+
+function handleModDetailMutations(mutations: MutationRecord[]): void {
+  const RELEVANT_IDS = new Set([
+    "SubscribeItemBtn",
+    "RequiredItems",
+    "pxmodrim-subscribe-btn",
+    Config.DEP_SECTION_ID,
+    "pxmodrim-loading-container",
+    "pxmodrim-solo-link",
+  ]);
+  const hasRelevant = mutations.some((m) => {
+    if (m.type === "childList") {
+      for (const list of [m.addedNodes, m.removedNodes]) {
+        for (const node of list) {
           if (node.nodeType !== Node.ELEMENT_NODE) continue;
           const el = node as Element;
-          if (
-            el.querySelector('a[href*="sharedfiles/filedetails/?id="]') &&
-            el.querySelector("img")
-          ) {
-            scheduleBadgeUpdate();
-            return;
+          if (RELEVANT_IDS.has(el.id)) return true;
+          if (el.querySelector?.("[id]")) {
+            const nested = el.querySelector(
+              "#SubscribeItemBtn,#RequiredItems,#pxmodrim-subscribe-btn,#" +
+                CSS.escape(Config.DEP_SECTION_ID),
+            );
+            if (nested) return true;
           }
         }
       }
-    },
-  },
-];
+    }
+    if (m.type === "attributes" && RELEVANT_IDS.has((m.target as Element).id)) return true;
+    return false;
+  });
+  if (!hasRelevant) return;
 
-function getActiveRoute() {
-  return ROUTES.find((r) => r.match(window.location.href)) ?? null;
+  const currentUrl = window.location.href;
+  if (document.getElementById("SubscribeItemBtn") && !document.getElementById("pxmodrim-subscribe-btn")) {
+    createDetailButton();
+    return;
+  }
+  if (DetailState.injectedUrl !== currentUrl) return;
+  if (
+    document.getElementById("RequiredItems") &&
+    !document.getElementById(Config.DEP_SECTION_ID) &&
+    !DetailState.depsInjected
+  ) {
+    createDetailButton();
+  }
+}
+
+const PAGE_KINDS: Record<PageKindKey, PageKind> = {
+  collection: {
+    init: initCollectionPage,
+    onMutation: handleCollectionMutations,
+  },
+  "mod-details": {
+    init: createDetailButton,
+    onMutation: handleModDetailMutations,
+  },
+  grid: {
+    init: updateAllModBadges,
+    onMutation: handleGridMutations,
+  },
+};
+
+function resolveKind(mutations: MutationRecord[]): PageKindKey | null {
+  for (const m of mutations) {
+    for (const node of m.addedNodes) {
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      const el = node as Element;
+      if (el.matches?.(".collectionChildren") || el.querySelector?.(".collectionChildren")) {
+        return "collection";
+      }
+      if (el.matches?.("#SubscribeItemBtn") || el.querySelector?.("#SubscribeItemBtn")) {
+        return "mod-details";
+      }
+    }
+  }
+  return null;
+}
+
+function activateKind(kind: PageKindKey): void {
+  _pageKind = kind;
+  PAGE_KINDS[kind].init();
 }
 
 function runDomCleanup() {
@@ -128,15 +147,23 @@ function injectStyles() {
 
 function initObservers() {
   log("initObservers START");
-  _activeRoute = getActiveRoute();
-  log(
-    "Active route:",
-    _activeRoute?.name,
-    _activeRoute?.match(window.location.href),
+  const isSharedFile = window.location.href.startsWith(
+    "https://steamcommunity.com/sharedfiles/filedetails/?id=",
   );
+  if (!isSharedFile) {
+    activateKind("grid");
+    log("initObservers grid page");
+  }
 
   const mainObserver = new MutationObserver((mutations) => {
-    _activeRoute?.onMutation(mutations);
+    if (!_pageKind) {
+      const kind = resolveKind(mutations);
+      if (kind) {
+        activateKind(kind);
+        log("initObservers resolved pageKind=%s", kind);
+      }
+    }
+    if (_pageKind) PAGE_KINDS[_pageKind].onMutation(mutations);
     runDomCleanup();
   });
 
@@ -147,9 +174,18 @@ function initObservers() {
   log("initObservers OBSERVER ATTACHED");
 
   runDomCleanup();
-  log("initObservers CALLING _activeRoute.init()");
-  _activeRoute?.init();
-  log("initObservers DONE");
+
+  if (!_pageKind) {
+    if (document.querySelector(".collectionChildren")) {
+      activateKind("collection");
+      log("initObservers immediate: collection");
+    } else if (document.querySelector("#SubscribeItemBtn")) {
+      activateKind("mod-details");
+      log("initObservers immediate: mod-details");
+    }
+  }
+
+  log("initObservers DONE pageKind=%s", _pageKind);
 }
 
 function initState() {
@@ -162,7 +198,7 @@ function initState() {
   );
 
   setBridgeDataReady();
-  _activeRoute?.init();
+  if (_pageKind) PAGE_KINDS[_pageKind].init();
   refreshAllDepsBadges();
   PxModRimAPI.initReady();
   log("initState DONE");
@@ -185,6 +221,10 @@ function startScript() {
   initObservers();
   initState();
   log("startScript DONE");
+}
+
+export function isPageKind(kind: PageKindKey): boolean {
+  return _pageKind === kind;
 }
 
 export { startScript, waitForRoot };

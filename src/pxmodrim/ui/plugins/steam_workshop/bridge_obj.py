@@ -42,6 +42,18 @@ class PxModRimBridge(QObject):
                     params.get("checked", False),
                 )
                 result = None
+            elif method == "toggle_active":
+                self._plugin.toggle_active(
+                    params["mod_id"],
+                    params.get("active", False),
+                )
+                result = None
+            elif method == "batch_toggle_active":
+                self._plugin.batch_toggle_active(
+                    params["mod_ids"],
+                    params.get("active", False),
+                )
+                result = None
             elif method == "fetch_mod_deps":
                 raw = await asyncio.wait_for(
                     self._plugin.fetch_mod_deps(params["mod_id"]),
