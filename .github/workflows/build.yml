@@ -31,7 +31,7 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2.85.3
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: just@1.40.0
 
@@ -87,7 +87,7 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2.85.3
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: just@1.40.0
 
