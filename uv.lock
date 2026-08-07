@@ -26,8 +26,8 @@ name = "anyio"
 version = "4.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "typing-extensions", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "idna" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3b/72/5562aabb8dd7181e8e860622a38bea08d17842b99ecd4c91f84ac95251b0/anyio-4.14.1.tar.gz", hash = "sha256:8d648a3544c1a700e3ff78615cd679e4c5c3f149904287e73687b2596963629e", size = 254831, upload-time = "2026-06-24T20:56:06.017Z" }
 wheels = [
@@ -75,8 +75,8 @@ name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "h11", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "certifi" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
 wheels = [
@@ -88,10 +88,10 @@ name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "certifi", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "httpcore", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "idna", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
 wheels = [
@@ -209,27 +209,27 @@ name = "pxmodrim"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "aiosqlite", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "httpx", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "loguru", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "lxml", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "msgspec", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pyside6", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "qasync", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "toposort", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "ttimer", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "aiosqlite" },
+    { name = "httpx" },
+    { name = "loguru" },
+    { name = "lxml" },
+    { name = "msgspec" },
+    { name = "pyside6" },
+    { name = "qasync" },
+    { name = "toposort" },
+    { name = "ttimer" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "nuitka", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pydeps", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pyright", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pytest", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pytest-asyncio", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pytest-qt", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pytest-xvfb", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "ruff", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "nuitka" },
+    { name = "pydeps" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-qt" },
+    { name = "pytest-xvfb" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -248,7 +248,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "nuitka", specifier = ">=2.6.7" },
-    { name = "pydeps", specifier = ">=3.0.6" },
+    { name = "pydeps", specifier = ">=3.0.7" },
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
@@ -259,14 +259,14 @@ dev = [
 
 [[package]]
 name = "pydeps"
-version = "3.0.6"
+version = "3.0.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "stdlib-list", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "stdlib-list" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/1b/b5dfc2ed2d5fc4e281b319562bae323c4dbb83dedc91f952e15a565a41c4/pydeps-3.0.6.tar.gz", hash = "sha256:7f8b12c9db90f5a2e009fe0ef75f2945bf698d6cc5fb064423a525823d423085", size = 54777, upload-time = "2026-04-23T10:34:50.012Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/5e/1e4dc6069a2768a73b33f0dc2d5c1b5e1d264b0016ee931c23628324b052/pydeps-3.0.7.tar.gz", hash = "sha256:69903a434bb0b9d8ba179545159d067ac6281a63229191b3fd1327e3e6c145da", size = 55664, upload-time = "2026-08-03T11:56:24.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/93/f152a9d5c669efdce1c4e4328256eb2a61486134a2ff4dce8cb93bcd8e9d/pydeps-3.0.6-py3-none-any.whl", hash = "sha256:fc102c0ee2ad25a1596714c7175d8060fa138aaa87eafb308e820e88a709e5fc", size = 48106, upload-time = "2026-04-23T10:34:48.622Z" },
+    { url = "https://files.pythonhosted.org/packages/63/31/9a72d5de5042c8ca740a00a350c8780f307a40168aa3baf94521e11da0e7/pydeps-3.0.7-py3-none-any.whl", hash = "sha256:39e8a484788a054defaefba7f127f975389de0c609dbfb66014203a65ba86d16", size = 48467, upload-time = "2026-08-03T11:56:22.765Z" },
 ]
 
 [[package]]
@@ -283,8 +283,8 @@ name = "pyright"
 version = "1.1.411"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nodeenv", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "typing-extensions", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "nodeenv" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7e/ab/265f7dc69d28113ebba19092e57b075f41543b2ed048429c5f56e2b88eac/pyright-1.1.411.tar.gz", hash = "sha256:d885a0551f2e763b089a02702174e7f4ba77548cddabc972ab86d1f7f1b0f998", size = 4112861, upload-time = "2026-06-25T02:14:06.37Z" }
 wheels = [
@@ -296,9 +296,9 @@ name = "pyside6"
 version = "6.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyside6-addons", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pyside6-essentials", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "shiboken6", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pyside6-addons" },
+    { name = "pyside6-essentials" },
+    { name = "shiboken6" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/a6/27ba5947ed48918f7b74b7c43a1e280aac069e36f25adeb4c9adfac835c4/pyside6-6.11.1-cp310-abi3-macosx_13_0_universal2.whl", hash = "sha256:537682c3b7530817203e667c1f5a2f00486b37bf52c52eeab438544c7a0917f6", size = 571921, upload-time = "2026-05-13T09:47:36.402Z" },
@@ -313,8 +313,8 @@ name = "pyside6-addons"
 version = "6.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyside6-essentials", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "shiboken6", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pyside6-essentials" },
+    { name = "shiboken6" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3f/6b/8bc94aff48b63f788f2d84e5467c12362d68906ba742c0942f46cb04c879/pyside6_addons-6.11.1-cp310-abi3-macosx_13_0_universal2.whl", hash = "sha256:54733c77f789bef5f03c6aff4ad3bec8b2eff021f0cfcbc53d5e6c250ded24f9", size = 331714589, upload-time = "2026-05-13T09:39:12.36Z" },
@@ -329,7 +329,7 @@ name = "pyside6-essentials"
 version = "6.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "shiboken6", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "shiboken6" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/da/10d9197e7370eb4fed8df5fc547b7548dec88e5c5949e2d450db4ae96feb/pyside6_essentials-6.11.1-cp310-abi3-macosx_13_0_universal2.whl", hash = "sha256:228de53c2bc26b07e5021fbe3614fc44ca08e4dab9999af08c2b389d2c239957", size = 110352945, upload-time = "2026-05-13T09:43:08.006Z" },
@@ -345,10 +345,10 @@ version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "iniconfig", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "packaging", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pluggy", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pygments", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
@@ -360,8 +360,8 @@ name = "pytest-asyncio"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pytest", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "typing-extensions", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pytest" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/43/7c/d36d04db312ecf4298932ef77e6e4a9e8ad017906e24e34f0b0c361a2473/pytest_asyncio-1.4.0.tar.gz", hash = "sha256:c6c0d2259945122819f171a32ecea2c349ead889ee28176caaf492143424be42", size = 58514, upload-time = "2026-05-26T09:56:04.083Z" }
 wheels = [
@@ -373,9 +373,9 @@ name = "pytest-qt"
 version = "4.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pluggy", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pytest", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "typing-extensions", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pluggy" },
+    { name = "pytest" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d3/61/8bdec02663c18bf5016709b909411dce04a868710477dc9b9844ffcf8dd2/pytest_qt-4.5.0.tar.gz", hash = "sha256:51620e01c488f065d2036425cbc1cbcf8a6972295105fd285321eb47e66a319f", size = 128702, upload-time = "2025-07-01T17:24:39.889Z" }
 wheels = [
@@ -387,8 +387,8 @@ name = "pytest-xvfb"
 version = "3.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pytest", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pyvirtualdisplay", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pytest" },
+    { name = "pyvirtualdisplay" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b6/ce/b3444c98eab123b7348d55d4705c2f1095a6bdf8dae85bc6a34ab5222845/pytest_xvfb-3.1.1.tar.gz", hash = "sha256:90593634427d974b272e845793e4533f5b827c9d84c051879013624504175e44", size = 9022, upload-time = "2025-03-12T12:35:07.533Z" }
 wheels = [
@@ -482,8 +482,8 @@ name = "ttimer"
 version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anytree", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "tabulate", marker = "sys_platform == 'darwin' or sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "anytree" },
+    { name = "tabulate" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/39/5ddf98e1fe3ceb46a6c252c1372e137464623ef6515b5a98161a87d5690b/ttimer-0.0.2.tar.gz", hash = "sha256:eb2b68279b7b616b513cdf1dde8c9949c8dc7c322b105262133fdff45410adca", size = 9584, upload-time = "2022-03-22T11:54:56.562Z" }
 wheels = [
