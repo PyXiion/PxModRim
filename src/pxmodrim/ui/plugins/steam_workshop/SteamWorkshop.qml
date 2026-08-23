@@ -11,6 +11,18 @@ Rectangle {
     property bool _firstLoad: true
     property string _placeholderText: "Initializing Steam Workshop browser\u2026"
     property bool _showError: false
+    property bool _loadedOnce: false
+    property bool _pendingReload: false
+
+    function _navigate() {
+        if (!root._loadedOnce) {
+            root._loadedOnce = true
+            webView.url = "https://steamcommunity.com/workshop/browse/?appid=294100"
+        } else if (root._pendingReload) {
+            root._pendingReload = false
+            webView.reload()
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -99,6 +111,32 @@ Rectangle {
                 }
 
                 Rectangle {
+                    id: clearCacheBtn
+                    width: 28; height: 28
+                    radius: Theme.radiusSm
+                    color: clearCacheMouse.containsMouse ? Theme.elevate3 : "transparent"
+
+                    Image {
+                        anchors.centerIn: parent
+                        source: "image://icons/trash?color=" + encodeURIComponent(Theme.textDim)
+                        sourceSize.width: 14; sourceSize.height: 14
+                    }
+
+                    MouseArea {
+                        id: clearCacheMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        // Stale Steam SSR JS in the disk cache fails SRI and gets
+                        // blocked; drop it and reload once the clear completes.
+                        onClicked: {
+                            root._pendingReload = true
+                            webView.profile.clearHttpCache()
+                        }
+                    }
+                }
+
+                Rectangle {
                     id: reloadBtn
                     width: 28; height: 28
                     radius: Theme.radiusSm
@@ -170,14 +208,17 @@ Rectangle {
                 anchors.fill: parent
 
                 profile: WebEngineProfile {
+                    id: steamProfile
                     storageName: "pxmodrim-steam"
                     httpCacheType: WebEngineProfile.DiskHttpCache
                     httpCacheMaximumSize: 52428800
                     offTheRecord: false
                 }
 
-                // url is set in Component.onCompleted after user script injection
-                // to ensure the script runs on the initial page load
+                // Steam redeploys its SSR JS with new SRI hashes, so the persistent
+                // disk cache can hold stale bytes that fail the integrity check and
+                // get blocked. Clear it before the first navigation; url is set only
+                // after clearHttpCacheCompleted to avoid navigating mid-clear.
 
                 settings {
                     pluginsEnabled: false
@@ -197,7 +238,15 @@ Rectangle {
                     inj.runsOnSubFrames = false
                     webView.userScripts.insert(inj)
 
-                    webView.url = "https://steamcommunity.com/workshop/browse/?appid=294100"
+                    webView.profile.clearHttpCache()
+                }
+
+                Connections {
+                    target: steamProfile
+
+                    function onClearHttpCacheCompleted() {
+                        root._navigate()
+                    }
                 }
 
                 onLoadingChanged: function(loadRequest) {
