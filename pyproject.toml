@@ -64,6 +64,7 @@ addopts = [
     "--import-mode=importlib",
     "--no-qt-log",
 ]
+asyncio_mode = "auto"
 pythonpath = 'src'
 testpaths = ['tests']
 

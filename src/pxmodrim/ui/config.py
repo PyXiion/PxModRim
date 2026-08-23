@@ -7,7 +7,7 @@ from pxmodrim.ui.ui_prefs import UIPrefs
 if TYPE_CHECKING:
     from pxmodrim.core.config import ConfigService
 
-__all__ = ["UIPrefs", "load_ui_prefs", "save_ui_prefs"]
+__all__ = ["UIPrefs", "UIPrefsService", "load_ui_prefs", "save_ui_prefs"]
 
 
 def load_ui_prefs(config_service: ConfigService) -> UIPrefs:
@@ -18,3 +18,27 @@ def load_ui_prefs(config_service: ConfigService) -> UIPrefs:
 def save_ui_prefs(prefs: UIPrefs, config_service: ConfigService) -> None:
     """Save UI prefs to ``ui_prefs.json`` via config service."""
     config_service.save("ui_prefs.json", prefs)
+
+
+class UIPrefsService:
+    """Owns UIPrefs lifecycle: load and save.
+
+    Follows the Service protocol (setup).
+    """
+
+    __slots__ = ("_svc", "_prefs")
+
+    def __init__(self, svc: ConfigService) -> None:
+        self._svc = svc
+        self._prefs: UIPrefs | None = None
+
+    async def setup(self) -> None:
+        self._prefs = self._svc.load("ui_prefs.json", UIPrefs)
+
+    def prefs(self) -> UIPrefs:
+        assert self._prefs is not None
+        return self._prefs
+
+    def save_prefs(self) -> None:
+        if self._prefs is not None:
+            self._svc.save("ui_prefs.json", self._prefs)

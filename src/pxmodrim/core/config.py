@@ -88,7 +88,9 @@ class ConfigService:
         formatted = msgspec.json.format(
             msgspec.json.encode(data, enc_hook=enc_hook), indent=2
         )
-        path.write_bytes(formatted)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_bytes(formatted)
+        os.replace(tmp, path)
 
 
 def config_dir() -> Path:
@@ -355,3 +357,27 @@ def _detect_windows_paths(steam_id: str) -> PathConfig:
             fallback / "steamapps" / "workshop" / "content" / steam_id
         )
     return result
+
+
+class AppConfigService:
+    """Owns AppConfig lifecycle: load and save.
+
+    Follows the Service protocol (setup).
+    """
+
+    __slots__ = ("_svc", "_cfg")
+
+    def __init__(self, svc: ConfigService) -> None:
+        self._svc = svc
+        self._cfg: AppConfig | None = None
+
+    async def setup(self) -> None:
+        self._cfg = self._svc.load("config.json", AppConfig)
+
+    def cfg(self) -> AppConfig:
+        assert self._cfg is not None
+        return self._cfg
+
+    def save_cfg(self) -> None:
+        if self._cfg is not None:
+            self._svc.save("config.json", self._cfg)

@@ -7,6 +7,7 @@ from time import time
 
 import aiosqlite
 
+from pxmodrim.core.migrator import ensure_schema
 from pxmodrim.core.services.startup_impact_service.models import (
     StartupImpactMod,
     StartupImpactReport,
@@ -44,6 +45,8 @@ _SCHEMA = """
     CREATE INDEX IF NOT EXISTS idx_sie_pid
         ON startup_impact_entries(package_id);
 """
+
+_SCHEMA_VERSION = 1
 
 _BASE_GAME_PID = "__base_game__"
 
@@ -96,10 +99,23 @@ class StartupImpactDb:
                 await conn.execute("PRAGMA busy_timeout=5000")
                 await conn.execute("PRAGMA foreign_keys=ON")
                 await conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
-                await conn.executescript(_SCHEMA)
+                await self._ensure_schema(conn, path)
                 self._connection = conn
                 self._connection_path = db_str
             return self._connection
+
+    async def _ensure_schema(self, conn: aiosqlite.Connection, path: Path) -> None:
+        await ensure_schema(
+            conn,
+            schema_sql=_SCHEMA,
+            schema_version=_SCHEMA_VERSION,
+            steps={
+                # Add future migration steps here:
+                # 2: _v2_add_column,
+            },
+            backup_path=path,
+            label="DB schema",
+        )
 
     async def close(self) -> None:
         async with self._lock:

@@ -34,16 +34,18 @@ if _we_verbose is not None:
 
 from pxmodrim.core.config import (  # noqa: E402
     AppConfig,
+    AppConfigService,
     ConfigService,
     config_dir,
     detect_game_paths,
 )
 from pxmodrim.core.context import CoreContext  # noqa: E402
 from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
-from pxmodrim.ui.config import load_ui_prefs  # noqa: E402
+from pxmodrim.ui.config import UIPrefsService  # noqa: E402
 from pxmodrim.ui.context import AppContext  # noqa: E402
 from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
 from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet  # noqa: E402
+from pxmodrim.ui.ui_prefs import UIPrefs  # noqa: E402
 from pxmodrim.ui.views.mods_view import ModsViewPanel  # noqa: E402
 from pxmodrim.ui.window.main_window import MainWindow  # noqa: E402
 
@@ -93,7 +95,6 @@ class App:
         "qt_app",
         "_ctx",
         "_app_ctx",
-        "_ui_prefs",
         "main_window",
     )
 
@@ -111,7 +112,7 @@ class App:
         self._apply_theme()
 
     def _apply_theme(self) -> None:
-        """Set Fusion style, dark palette, stylesheet; detect game paths if missing."""
+        """Set Fusion style, dark palette, and stylesheet."""
         self.qt_app.setStyle("Fusion")
 
         palette = QPalette()
@@ -136,23 +137,16 @@ class App:
         except (FileNotFoundError, KeyError) as exc:
             logger.warning("Failed to load theme: {}", exc)
 
-        config_svc = ConfigService(config_dir())
-        cfg = config_svc.load("config.json", AppConfig)
-        if not cfg.paths.game:
-            logger.info("No game path in config, attempting auto-detect")
-            detected = detect_game_paths()
-            if detected.game:
-                cfg.paths = detected
-                config_svc.save("config.json", cfg)
-
-        self._setup(cfg, config_svc)
-
-    def _setup(self, cfg: AppConfig, config_svc: ConfigService) -> None:
+    def _setup(
+        self,
+        cfg: AppConfig,
+        config_svc: ConfigService,
+        ui_prefs: UIPrefs | None = None,
+    ) -> None:
         """Initialize CoreContext, services, and the main window via constructor DI."""
 
-        self._ui_prefs = load_ui_prefs(config_svc)
         self._ctx = CoreContext.create(cfg, config_svc)
-        self._app_ctx = AppContext(self._ctx, self._ui_prefs)
+        self._app_ctx = AppContext(self._ctx, ui_prefs)
         self._app_ctx.add_rail_view(ModsViewPanel)
 
         disabled = _parse_disabled_plugins()
@@ -171,8 +165,42 @@ class App:
         self.main_window = MainWindow(self._app_ctx)
 
     async def async_run(self) -> int:
-        """Start main window, prompt for game path if needed, then run event loop."""
+        """Run the app: migrate config, create services, open window, run event loop."""
+
         logger.info("Starting PxModRim")
+
+        # Phase 1: config migration
+        config_svc = ConfigService(config_dir())
+        app_cfg_svc = AppConfigService(config_svc)
+        ui_prefs_svc = UIPrefsService(config_svc)
+
+        try:
+            await app_cfg_svc.setup()
+            await ui_prefs_svc.setup()
+        except Exception:
+            logger.exception("Failed to initialize configuration")
+            QMessageBox.critical(
+                None,
+                "PxModRim - Configuration Error",
+                "Failed to initialize configuration.\n"
+                "Check the logs for details.\n",
+            )
+            return 1
+
+        cfg = app_cfg_svc.cfg()
+        ui_prefs = ui_prefs_svc.prefs()
+
+        if not cfg.paths.game:
+            logger.info("No game path in config, attempting auto-detect")
+            detected = detect_game_paths()
+            if detected.game:
+                cfg.paths = detected
+                app_cfg_svc.save_cfg()
+
+        # Phase 2: service initialization
+        self._setup(cfg, config_svc, ui_prefs)
+
+        # Phase 3: runtime
         self.main_window.show()
 
         if not self._ctx.config.paths.game:
