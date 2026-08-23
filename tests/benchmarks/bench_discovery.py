@@ -41,9 +41,7 @@ def make_mod_dir(root: Path, i: int, dep_pid: str) -> Path:
     author = random.choice(string.ascii_lowercase[:5])
     name = f"benchmark_mod_{i:04d}"
 
-    about = ABOUT_XML.format(
-        name=name, author=author, sid=i, dep=dep_pid, i=i
-    )
+    about = ABOUT_XML.format(name=name, author=author, sid=i, dep=dep_pid, i=i)
 
     mod_dir = root / name
     about_dir = mod_dir / "About"
@@ -75,9 +73,7 @@ def bench(count: int) -> None:
         mods = {}
         t2 = time.perf_counter_ns()
         for d, about in scanned.items():
-            _, mod = create_listed_mod_from_path(
-                d, "1.5", about_xml_path=about
-            )
+            _, mod = create_listed_mod_from_path(d, "1.5", about_xml_path=about)
             mods[mod.uuid] = mod
         t3 = time.perf_counter_ns()
 

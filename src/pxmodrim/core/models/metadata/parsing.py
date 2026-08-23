@@ -461,9 +461,7 @@ def _dep_from_li(li: ET._Element) -> DependencyMod:
     if alt_el is not None:
         for alt_li in alt_el:
             if alt_li.tag == "li" and alt_li.text and alt_li.text.strip():
-                dep.alternative_package_ids.add(
-                    CaseInsensitiveStr(alt_li.text.strip())
-                )
+                dep.alternative_package_ids.add(CaseInsensitiveStr(alt_li.text.strip()))
     return dep
 
 
@@ -473,11 +471,7 @@ def _element_value(el: ET._Element | None) -> str | list[str] | None:
         return None
     children = [ch for ch in el if ch.tag == "li"]
     if children:
-        return [
-            c.text.strip()
-            for c in children
-            if c.text and c.text.strip()
-        ]
+        return [c.text.strip() for c in children if c.text and c.text.strip()]
     if el.text:
         text = el.text.strip()
         return text or None

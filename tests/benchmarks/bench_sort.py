@@ -121,9 +121,9 @@ def bench(count: int, edges_per_mod: int) -> None:
     )
     print(
         f"  avg per mod: "
-        f"graph={build_ms/count*1000:>5.1f}us  "
-        f"sort={sort_ms/count*1000:>5.1f}us  "
-        f"total={total_ms/count*1000:>5.1f}us"
+        f"graph={build_ms / count * 1000:>5.1f}us  "
+        f"sort={sort_ms / count * 1000:>5.1f}us  "
+        f"total={total_ms / count * 1000:>5.1f}us"
     )
 
 
