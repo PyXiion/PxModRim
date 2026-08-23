@@ -6,7 +6,7 @@ Rectangle {
     id: root
     height: 80
     color: Theme.elevate1
-    property var controller: null
+    property var controller: headerController
 
     RowLayout {
         anchors.fill: parent
