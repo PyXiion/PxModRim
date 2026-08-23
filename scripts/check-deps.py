@@ -22,7 +22,7 @@ ENTRYPOINTS = {"__main__", "_app"}
 
 GROUPS: dict[str, set[str]] = {
     "core.foundation": {"core.constants", "core.events", "core.structures", "core.utils", "core.xml", "core.loading",
-                        "core.profiler", "core.plugin"},
+                        "core.profiler", "core.plugin", "core.migrator"},
     "core.models": {"core.models"},
     "core.msgspec_hooks": {"core.msgspec_hooks"},
     "core.sort": {"core.sort"},
@@ -40,6 +40,7 @@ GROUPS: dict[str, set[str]] = {
     "ui.models": {"ui.models"},
     "ui.ui_prefs": {"ui.ui_prefs"},
     "ui.config": {"ui.config"},
+    "ui.mod_selection": {"ui.mod_selection"},
     "ui.panels": {"ui.panels"},
     "ui.plugins": {"ui.plugins"},
     "ui.views": {"ui.views"},
@@ -67,7 +68,8 @@ ALLOWED: dict[str, set[str]] = {
     "ui.models": {"ui.theme"},
     "ui.ui_prefs": set(),
     "ui.config": {"core", "ui.ui_prefs"},
-    "ui.plugins": {"core", "ui.theme", "ui.context", "ui.components", "ui.views"},
+    "ui.mod_selection": {"ui.panels"},
+    "ui.plugins": {"core", "ui.theme", "ui.context", "ui.components", "ui.views", "ui.panels", "ui.mod_selection"},
     "ui.panels": {"ui.theme", "ui.components", "ui.models", "ui.config", "ui.ui_prefs", "ui.plugins"},
     "ui.views": {"ui.theme", "ui.context", "ui.components", "ui.models", "ui.panels", "ui.config", "ui.ui_prefs", "ui.plugins"},
     "ui.window": {
@@ -79,6 +81,7 @@ ALLOWED: dict[str, set[str]] = {
         "ui.views",
         "ui.config",
         "ui.ui_prefs",
+        "ui.mod_selection",
     },
 }
 
