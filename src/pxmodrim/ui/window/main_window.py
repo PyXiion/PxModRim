@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
 from qasync import asyncSlot
 
 from pxmodrim.core.constants import LaunchStrategy
-from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.ui.components import (
     HeaderController,
@@ -37,6 +36,7 @@ from pxmodrim.ui.components import (
 )
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.context import AppContext
+from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.theme.qml_theme import Theme
@@ -165,6 +165,7 @@ class MainWindow(QMainWindow):
             self.mod_info = self._mods_view.mod_info
             self._mods_view.entry_selected.connect(self._on_entry_selected)
             self._mods_view.mod_selected.connect(self._on_mod_selected)
+        self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
 
         outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
@@ -348,23 +349,7 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:
         self._selected_uuid = uuid
-        item = self.mod_list.model.get_item_by_uuid(uuid)
-        if item and item.mod:
-            self.mod_info.show_mod(item.mod)
-            self.mod_info.set_issues(self._ctx.diagnostics_service.issues_for(uuid))
-            pid = getattr(item.mod, "package_id", None)
-            await self.mod_info.set_time_analytics(
-                str(pid) if pid else None,
-                self._resolve_active_pids(),
-            )
-
-    def _resolve_active_pids(self) -> list[str]:
-        pids: list[str] = []
-        for uuid in self.mod_list.active_uuids():
-            mod = self._ctx.all_mods.get(uuid)
-            if isinstance(mod, AboutXmlMod):
-                pids.append(str(mod.package_id).lower())
-        return pids
+        await self._selection.show(uuid)
 
     def _apply_current_sidebar_filter(self) -> None:
         if self._mods_view is not None:
