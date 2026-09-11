@@ -259,14 +259,14 @@ dev = [
 
 [[package]]
 name = "pydeps"
-version = "3.0.7"
+version = "3.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "stdlib-list" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/5e/1e4dc6069a2768a73b33f0dc2d5c1b5e1d264b0016ee931c23628324b052/pydeps-3.0.7.tar.gz", hash = "sha256:69903a434bb0b9d8ba179545159d067ac6281a63229191b3fd1327e3e6c145da", size = 55664, upload-time = "2026-08-03T11:56:24.027Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/7b/4c40de7ca4c27395adc772bec625674d874f6983657fd8763fb36bee9444/pydeps-3.0.8.tar.gz", hash = "sha256:e54b19d22c8f94b4787bc0bbb3bbe4afc074e32ff9e7868d7750340faec9f8ec", size = 59676, upload-time = "2026-09-07T13:58:56.692Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/31/9a72d5de5042c8ca740a00a350c8780f307a40168aa3baf94521e11da0e7/pydeps-3.0.7-py3-none-any.whl", hash = "sha256:39e8a484788a054defaefba7f127f975389de0c609dbfb66014203a65ba86d16", size = 48467, upload-time = "2026-08-03T11:56:22.765Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/5b/84b74df24b6c958dce0b8d99dc3f5b510f04828ade387ef4ae4a846f2b0a/pydeps-3.0.8-py3-none-any.whl", hash = "sha256:e7d8479292d427c87f7a05e96601c1495ca4147f5e160c48254197f4fc68601f", size = 50215, upload-time = "2026-09-07T13:58:55.576Z" },
 ]
 
 [[package]]
