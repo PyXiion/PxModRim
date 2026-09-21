@@ -23,9 +23,8 @@ async def ensure_schema(
 ) -> None:
     """Stamp, init, or migrate a ``PRAGMA user_version`` schema to ``schema_version``.
 
-    ``steps`` maps target version to a migration coroutine; may be empty when no
-    migrations exist yet. A file copy backup of ``backup_path`` is made before any
-    migration that is not a fresh init.
+    ``steps`` maps every target version to a migration coroutine. A file copy
+    backup of ``backup_path`` is made before a non-fresh migration.
     """
     row = await conn.execute("PRAGMA user_version")
     fetched = await row.fetchone()
@@ -48,11 +47,12 @@ async def ensure_schema(
         backup = backup_path.with_suffix(f".db.bak.{int(time())}")
         shutil.copy2(backup_path, backup)
 
-    if not steps:
-        await stamp(schema_version)
-        return
+    targets = range(current + 1, schema_version + 1)
+    for target in targets:
+        if target not in steps:
+            raise KeyError(f"Missing migration step for target version {target}")
 
-    migrator = Migrator(steps)
+    migrator = Migrator({target: steps[target] for target in targets})
     await migrator.migrate(current, on_step=stamp)
     await stamp(schema_version)
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
+from time import time
+from typing import Any, TypeVar
 
 import msgspec
 from loguru import logger
@@ -13,6 +16,17 @@ from pxmodrim.core.msgspec_hooks import dec_hook, enc_hook
 from pxmodrim.core.sort.config import SortSettings, TierConfig
 
 StructT = TypeVar("StructT", bound=msgspec.Struct)
+_JSON_SCHEMA_MARKER = "schema_version"
+CURRENT_CONFIG_SCHEMA_VERSION = 1
+_VERSIONED_CONFIG_FILES = frozenset({"config.json", "ui_prefs.json"})
+_JsonMigration = Callable[[dict[str, Any]], None]
+
+
+def _v1_json_migration(data: dict[str, Any]) -> None:
+    return None
+
+
+_JSON_MIGRATIONS: dict[int, _JsonMigration] = {1: _v1_json_migration}
 
 
 def read_game_version(game_path: str | Path) -> str | None:
@@ -53,6 +67,19 @@ class AppConfig(msgspec.Struct):
     )
 
 
+def _migrate_json(data: dict[str, Any], current: int) -> None:
+    if current > CURRENT_CONFIG_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported JSON schema version {current}; "
+            f"latest is {CURRENT_CONFIG_SCHEMA_VERSION}"
+        )
+    for target in range(current + 1, CURRENT_CONFIG_SCHEMA_VERSION + 1):
+        migration = _JSON_MIGRATIONS.get(target)
+        if migration is None:
+            raise KeyError(f"Missing JSON migration step for target version {target}")
+        migration(data)
+
+
 class ConfigService:
     """Generic file-based config repository backed by a config directory.
 
@@ -75,8 +102,31 @@ class ConfigService:
         if not path.exists():
             return struct_type()
         try:
+            if filename not in _VERSIONED_CONFIG_FILES:
+                return msgspec.json.decode(
+                    path.read_bytes(), type=struct_type, dec_hook=dec_hook
+                )
+
+            raw = msgspec.json.decode(path.read_bytes(), type=dict[str, Any])
+            marker = raw.pop(_JSON_SCHEMA_MARKER, None)
+            if marker is None:
+                version = 0
+            elif type(marker) is int and marker >= 0:
+                version = marker
+            else:
+                raise msgspec.DecodeError("Invalid JSON schema version")
+
+            if version < CURRENT_CONFIG_SCHEMA_VERSION:
+                _migrate_json(raw, version)
+                backup = path.with_suffix(f"{path.suffix}.bak.{int(time())}")
+                shutil.copy2(path, backup)
+                raw[_JSON_SCHEMA_MARKER] = CURRENT_CONFIG_SCHEMA_VERSION
+                self._write(path, raw)
+            elif version > CURRENT_CONFIG_SCHEMA_VERSION:
+                _migrate_json(raw, version)
+
             return msgspec.json.decode(
-                path.read_bytes(), type=struct_type, dec_hook=dec_hook
+                msgspec.json.encode(raw), type=struct_type, dec_hook=dec_hook
             )
         except (OSError, msgspec.DecodeError) as e:
             logger.warning(f"Failed to load {filename}: {e}")
@@ -85,9 +135,17 @@ class ConfigService:
     def save(self, filename: str, data: msgspec.Struct) -> None:
         path = self._config_dir / filename
         path.parent.mkdir(parents=True, exist_ok=True)
-        formatted = msgspec.json.format(
-            msgspec.json.encode(data, enc_hook=enc_hook), indent=2
-        )
+        encoded = msgspec.json.encode(data, enc_hook=enc_hook)
+        if filename in _VERSIONED_CONFIG_FILES:
+            raw = msgspec.json.decode(encoded, type=dict[str, Any])
+            raw[_JSON_SCHEMA_MARKER] = CURRENT_CONFIG_SCHEMA_VERSION
+            encoded = msgspec.json.encode(raw)
+        self._write(path, encoded)
+
+    @staticmethod
+    def _write(path: Path, data: bytes | dict[str, Any]) -> None:
+        encoded = msgspec.json.encode(data) if isinstance(data, dict) else data
+        formatted = msgspec.json.format(encoded, indent=2)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_bytes(formatted)
         os.replace(tmp, path)
@@ -109,24 +167,13 @@ def community_rules_file() -> Path:
 def load_config(path: Path | None = None) -> AppConfig:
     """Load config from a JSON file. Returns defaults if missing or corrupt."""
     path = path or config_file_path()
-    if not path.exists():
-        return AppConfig()
-    try:
-        raw = path.read_bytes()
-        return msgspec.json.decode(raw, type=AppConfig, dec_hook=dec_hook)
-    except (OSError, msgspec.DecodeError) as e:
-        logger.warning(f"Failed to load config from {path}: {e}")
-        return AppConfig()
+    return ConfigService(path.parent).load(path.name, AppConfig)
 
 
 def save_config(cfg: AppConfig, path: Path | None = None) -> None:
     """Serialize and write the core config (paths + sort) to a JSON file."""
     path = path or config_file_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    formatted = msgspec.json.format(
-        msgspec.json.encode(cfg, enc_hook=enc_hook), indent=2
-    )
-    path.write_bytes(formatted)
+    ConfigService(path.parent).save(path.name, cfg)
     logger.info(f"Config saved to {path}")
 
 
