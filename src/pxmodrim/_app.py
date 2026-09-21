@@ -83,6 +83,19 @@ def _async_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> 
 sys.excepthook = _exception_hook
 
 
+def _configure_file_logging() -> int:
+    logs_dir = config_dir() / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    return logger.add(
+        logs_dir / "pxmodrim.log",
+        level=os.environ.get("LOGURU_LEVEL", "INFO"),
+        rotation="10 MB",
+        retention=5,
+        serialize=True,
+        format="{time} | {level} | pid={process.id} | {module}:{line} | {message}",
+    )
+
+
 def _parse_disabled_plugins() -> set[str]:
     disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
     return {n.strip() for n in disabled_raw.split(",") if n.strip()}
@@ -99,6 +112,7 @@ class App:
     )
 
     def __init__(self) -> None:
+        _configure_file_logging()
         QtWebEngineQuick.initialize()
 
         self.qt_app = QApplication(sys.argv)
@@ -189,6 +203,12 @@ class App:
 
         cfg = app_cfg_svc.cfg()
         ui_prefs = ui_prefs_svc.prefs()
+        logger.info(
+            "Configuration loaded: game={}, local={}, workshop={}",
+            cfg.paths.game or "<unset>",
+            cfg.paths.local or "<unset>",
+            cfg.paths.workshop or "<unset>",
+        )
 
         if not cfg.paths.game:
             logger.info("No game path in config, attempting auto-detect")
@@ -199,6 +219,7 @@ class App:
 
         # Phase 2: service initialization
         self._setup(cfg, config_svc, ui_prefs)
+        logger.info("Services initialized for game version {}", self._ctx.game_version)
 
         # Phase 3: runtime
         self.main_window.show()
@@ -214,7 +235,8 @@ class App:
             self._ctx.update_config(new_cfg)
             self._ctx.reset_providers(new_cfg.paths)
 
-        await self._app_ctx.refresh_mods()
+        mod_count = await self._app_ctx.refresh_mods()
+        logger.info("Initial mod load complete: {} mods", mod_count)
         await self._app_ctx.init_all()
 
         app_close_event = asyncio.Event()

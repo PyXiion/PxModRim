@@ -4,6 +4,8 @@ from PySide6.QtCore import QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import QMenuBar
 
+from pxmodrim.core.config import config_dir
+
 
 class MenuBar(QMenuBar):
     settings_requested = Signal()
@@ -30,6 +32,10 @@ class MenuBar(QMenuBar):
         report_action.triggered.connect(self._open_report)
         help_menu.addAction(report_action)
 
+        logs_action = QAction("Open &Logs Folder", self)
+        logs_action.triggered.connect(self._open_logs_folder)
+        help_menu.addAction(logs_action)
+
         help_menu.addSeparator()
 
         about_action = QAction("&About PxModRim", self)
@@ -45,3 +51,7 @@ class MenuBar(QMenuBar):
     @staticmethod
     def _open_report() -> None:
         QDesktopServices.openUrl(QUrl("https://github.com/PyXiion/PxModRim/issues"))
+
+    @staticmethod
+    def _open_logs_folder() -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(config_dir() / "logs")))
