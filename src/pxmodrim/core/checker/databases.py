@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import zipfile
 from collections.abc import Mapping
@@ -26,7 +27,7 @@ USE_THIS_INSTEAD_URL = (
 class NoVersionWarningService:
     """Service to download and cache the NoVersionWarning package-ID list."""
 
-    __slots__ = ("_cache_dir", "_xml_path", "_pids")
+    __slots__ = ("_cache_dir", "_pids", "_xml_path")
 
     def __init__(self, config_service: ConfigService) -> None:
         self._cache_dir = config_service.config_dir
@@ -73,10 +74,12 @@ class NoVersionWarningService:
                     "GET", NO_VERSION_WARNING_URL, follow_redirects=True, timeout=30.0
                 ) as resp,
             ):
-                resp.raise_for_status()
-                with open(zip_path, "wb") as fh:
+                fh = await asyncio.to_thread(zip_path.open, "wb")
+                try:
                     async for chunk in resp.aiter_bytes(8192):
-                        fh.write(chunk)
+                        await asyncio.to_thread(fh.write, chunk)
+                finally:
+                    await asyncio.to_thread(fh.close)
 
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(extract_dir)
@@ -91,7 +94,7 @@ class NoVersionWarningService:
                         _rmtree(zip_path, extract_dir)
                         return self._pids
 
-        except Exception as e:
+        except (OSError, zipfile.BadZipFile, httpx.HTTPError) as e:
             logger.warning(f"Failed to download No Version Warning DB: {e}")
 
         _rmtree(zip_path, extract_dir)
@@ -101,7 +104,7 @@ class NoVersionWarningService:
 class UseThisInsteadService:
     """Service to download and cache the UseThisInstead replacement database."""
 
-    __slots__ = ("_cache_dir", "_json_path", "_entries")
+    __slots__ = ("_cache_dir", "_entries", "_json_path")
 
     def __init__(self, config_service: ConfigService) -> None:
         self._cache_dir = config_service.config_dir
@@ -148,7 +151,7 @@ class UseThisInsteadService:
                     )
             logger.info(f"Loaded {len(result)} Use This Instead entries")
             return result
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - malformed cache falls back empty
             logger.error(f"Failed to load Use This Instead DB: {e}")
             return {}
 
@@ -165,10 +168,12 @@ class UseThisInsteadService:
                     "GET", USE_THIS_INSTEAD_URL, follow_redirects=True, timeout=30.0
                 ) as resp,
             ):
-                resp.raise_for_status()
-                with open(zip_path, "wb") as fh:
+                fh = await asyncio.to_thread(zip_path.open, "wb")
+                try:
                     async for chunk in resp.aiter_bytes(8192):
-                        fh.write(chunk)
+                        await asyncio.to_thread(fh.write, chunk)
+                finally:
+                    await asyncio.to_thread(fh.close)
 
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(extract_dir)
@@ -182,7 +187,7 @@ class UseThisInsteadService:
                         _rmtree(zip_path, extract_dir)
                         return self._entries
 
-        except Exception as e:
+        except (OSError, zipfile.BadZipFile, httpx.HTTPError) as e:
             logger.warning(f"Failed to download Use This Instead DB: {e}")
 
         _rmtree(zip_path, extract_dir)
