@@ -201,8 +201,10 @@ class TestConfigDerivedPaths:
         self, service: SteamCmdService, tmp_path: Path
     ) -> None:
         prefix = str(tmp_path / "prefix_for_install")
-        Path(service.executable).parent.mkdir(parents=True, exist_ok=True)
-        Path(service.executable).write_text("#!/bin/sh\n")
+        exe_name = "steamcmd.exe" if sys.platform == "win32" else "steamcmd.sh"
+        executable = Path(prefix) / "steamcmd" / exe_name
+        executable.parent.mkdir(parents=True, exist_ok=True)
+        executable.write_text("#!/bin/sh\n")
         assert asyncio.run(service.ensure_installed(prefix=prefix)) is True
         assert service.prefix == prefix
 
