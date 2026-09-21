@@ -26,31 +26,38 @@ def get_standalone_args(release: bool = False, bundle_qt: bool = True) -> list[s
     args.append("--include-qt-plugins=qml")
 
     if release:
-        args.extend([
-            "--lto=yes",
-            "--python-flag=no_asserts",
-            "--python-flag=no_docstrings",
-        ])
+        args.extend(
+            [
+                "--lto=yes",
+                "--python-flag=no_asserts",
+                "--python-flag=no_docstrings",
+            ]
+        )
 
-    args.extend([
-        "--noinclude-setuptools-mode=nofollow",
-        "--noinclude-pytest-mode=nofollow",
-        "--noinclude-unittest-mode=nofollow",
-        "--noinclude-default-mode=nofollow",
-        "--nowarn-mnemonic=unwanted-module",
-    ])
+    args.extend(
+        [
+            "--noinclude-setuptools-mode=nofollow",
+            "--noinclude-pytest-mode=nofollow",
+            "--noinclude-unittest-mode=nofollow",
+            "--noinclude-default-mode=nofollow",
+            "--nowarn-mnemonic=unwanted-module",
+        ]
+    )
 
     system = platform.system()
     if system == "Windows":
         import tomllib
+
         pyproject = project_root / "pyproject.toml"
         version = tomllib.loads(pyproject.read_text("utf-8"))["project"]["version"]
-        args.extend([
-            "--windows-icon-from-ico=packaging/logo.ico",
-            "--windows-company-name=PxModRim",
-            "--windows-product-name=PxModRim",
-            f"--windows-product-version={version}",
-        ])
+        args.extend(
+            [
+                "--windows-icon-from-ico=packaging/logo.ico",
+                "--windows-company-name=PxModRim",
+                "--windows-product-name=PxModRim",
+                f"--windows-product-version={version}",
+            ]
+        )
 
     return args
 
@@ -195,7 +202,9 @@ def strip_qt_devtools(dist_dir: Path) -> None:
     if pak.exists():
         sz = pak.stat().st_size
         pak.unlink()
-        print(f"  Removed qtwebengine_devtools_resources.pak ({sz // (1024 * 1024)} MB)")
+        print(
+            f"  Removed qtwebengine_devtools_resources.pak ({sz // (1024 * 1024)} MB)"
+        )
 
 
 def strip_qt_locales(dist_dir: Path) -> None:

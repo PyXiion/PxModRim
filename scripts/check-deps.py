@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import sys
 
-from pydeps import target, py2depgraph
+from pydeps import py2depgraph, target
 from pydeps.configs import Config
 
 SRC = "src/pxmodrim"
@@ -21,8 +21,17 @@ SRC = "src/pxmodrim"
 ENTRYPOINTS = {"__main__", "_app"}
 
 GROUPS: dict[str, set[str]] = {
-    "core.foundation": {"core.constants", "core.events", "core.structures", "core.utils", "core.xml", "core.loading",
-                        "core.profiler", "core.plugin", "core.migrator"},
+    "core.foundation": {
+        "core.constants",
+        "core.events",
+        "core.structures",
+        "core.utils",
+        "core.xml",
+        "core.loading",
+        "core.profiler",
+        "core.plugin",
+        "core.migrator",
+    },
     "core.models": {"core.models"},
     "core.msgspec_hooks": {"core.msgspec_hooks"},
     "core.sort": {"core.sort"},
@@ -53,14 +62,39 @@ ALLOWED: dict[str, set[str]] = {
     "core.foundation": set(),
     "core.models": {"core.foundation"},
     "core.msgspec_hooks": {"core.foundation", "core.models"},
-    "core.sort": {"core.foundation", "core.models", "core.msgspec_hooks", "core.config"},
+    "core.sort": {
+        "core.foundation",
+        "core.models",
+        "core.msgspec_hooks",
+        "core.config",
+    },
     "core.checker": {"core.foundation", "core.models", "core.sort", "core.config"},
     "core.config": {"core.foundation", "core.msgspec_hooks", "core.sort"},
     "core.context": {"core"},
     "core.mods_config": {"core.foundation", "core.models"},
-    "core.providers": {"core.foundation", "core.models", "core.config", "core.services"},
-    "core.services": {"core.foundation", "core.models", "core.checker", "core.sort", "core.context", "core.config", "core.mods_config"},
-    "core.mod_service": {"core.foundation", "core.models", "core.context", "core.providers", "core.services", "core.mods_config"},
+    "core.providers": {
+        "core.foundation",
+        "core.models",
+        "core.config",
+        "core.services",
+    },
+    "core.services": {
+        "core.foundation",
+        "core.models",
+        "core.checker",
+        "core.sort",
+        "core.context",
+        "core.config",
+        "core.mods_config",
+    },
+    "core.mod_service": {
+        "core.foundation",
+        "core.models",
+        "core.context",
+        "core.providers",
+        "core.services",
+        "core.mods_config",
+    },
     "ui.progress": set(),
     "ui.context": {"ui.ui_prefs"},
     "ui.theme": {"ui.components"},
@@ -69,9 +103,33 @@ ALLOWED: dict[str, set[str]] = {
     "ui.ui_prefs": set(),
     "ui.config": {"core", "ui.ui_prefs"},
     "ui.mod_selection": {"ui.panels"},
-    "ui.plugins": {"core", "ui.theme", "ui.context", "ui.components", "ui.views", "ui.panels", "ui.mod_selection"},
-    "ui.panels": {"ui.theme", "ui.components", "ui.models", "ui.config", "ui.ui_prefs", "ui.plugins"},
-    "ui.views": {"ui.theme", "ui.context", "ui.components", "ui.models", "ui.panels", "ui.config", "ui.ui_prefs", "ui.plugins"},
+    "ui.plugins": {
+        "core",
+        "ui.theme",
+        "ui.context",
+        "ui.components",
+        "ui.views",
+        "ui.panels",
+        "ui.mod_selection",
+    },
+    "ui.panels": {
+        "ui.theme",
+        "ui.components",
+        "ui.models",
+        "ui.config",
+        "ui.ui_prefs",
+        "ui.plugins",
+    },
+    "ui.views": {
+        "ui.theme",
+        "ui.context",
+        "ui.components",
+        "ui.models",
+        "ui.panels",
+        "ui.config",
+        "ui.ui_prefs",
+        "ui.plugins",
+    },
     "ui.window": {
         "ui.theme",
         "ui.context",
@@ -149,7 +207,11 @@ def main() -> int:
             if _is_allowed(src_group, tgt_group):
                 continue
             violations.append(
-                (modname.removeprefix("pxmodrim."), imp.removeprefix("pxmodrim."), tgt_group)
+                (
+                    modname.removeprefix("pxmodrim."),
+                    imp.removeprefix("pxmodrim."),
+                    tgt_group,
+                )
             )
 
     if violations:

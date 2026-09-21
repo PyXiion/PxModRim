@@ -6,15 +6,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-TS_DIR = (
-    PROJECT_ROOT
-    / "src"
-    / "pxmodrim"
-    / "ui"
-    / "plugins"
-    / "steam_workshop"
-    / "ts"
-)
+TS_DIR = PROJECT_ROOT / "src" / "pxmodrim" / "ui" / "plugins" / "steam_workshop" / "ts"
 OUT_FILE = (
     PROJECT_ROOT
     / "src"

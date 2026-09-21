@@ -20,14 +20,20 @@ pyright:
     uv run python -m pyright -p pyproject.toml src/ tests/
 
 ruff-fix:
-    uv run ruff check {{ruff_config}} src/ tests/ --fix
+    uv run ruff check {{ruff_config}} src/ tests/ scripts/ packaging/ --fix
 
 ruff-format-fix:
-    uv run ruff format {{ruff_config}} src/ tests/
+    uv run ruff format {{ruff_config}} src/ tests/ scripts/ packaging/
+
+ruff-check:
+    uv run ruff check {{ruff_config}} src/ tests/ scripts/ packaging/
+
+ruff-format-check:
+    uv run ruff format --check {{ruff_config}} src/ tests/ scripts/ packaging/
 
 fix: ruff-fix ruff-format-fix
 
-check: ruff-fix build-js pyright check-deps
+check: ruff-check ruff-format-check build-js pyright check-deps
 
 check-deps:
     uv run python scripts/check-deps.py
