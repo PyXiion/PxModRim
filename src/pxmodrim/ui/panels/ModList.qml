@@ -40,9 +40,6 @@ Rectangle {
             active: true
         }
 
-        move: Transition {
-            NumberAnimation { properties: "y"; duration: 120; easing.type: Easing.InOutQuad }
-        }
         moveDisplaced: Transition {
             NumberAnimation { properties: "y"; duration: 120; easing.type: Easing.InOutQuad }
         }
