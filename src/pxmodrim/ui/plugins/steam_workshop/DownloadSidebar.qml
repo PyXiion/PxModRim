@@ -7,6 +7,14 @@ Rectangle {
     color: Theme.elevate2
     property bool downloadEnabled: true
 
+    // downloadQueueModel is a context property; it can transiently be null
+    // while the underlying model is being torn down. Every read of it below
+    // goes through these guarded aliases instead of scattering `?.`/ternary
+    // checks at each call site.
+    readonly property int queueTotal: downloadQueueModel ? downloadQueueModel.progress_total : 0
+    readonly property int queueCompleted: downloadQueueModel ? downloadQueueModel.progress_completed : 0
+    readonly property string queueDownloadingId: downloadQueueModel ? downloadQueueModel.downloading_id : ""
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
@@ -22,13 +30,12 @@ Rectangle {
         }
 
         ColumnLayout {
-            visible: downloadQueueModel.progress_total > 0
+            visible: root.queueTotal > 0
             Layout.bottomMargin: 8
             spacing: 4
 
             Text {
-                text: "Downloading " + downloadQueueModel.progress_completed
-                    + "/" + downloadQueueModel.progress_total
+                text: "Downloading " + root.queueCompleted + "/" + root.queueTotal
                 color: Theme.textDim
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -36,8 +43,8 @@ Rectangle {
             ProgressBar {
                 id: progressBar
                 from: 0
-                to: Math.max(downloadQueueModel.progress_total, 1)
-                value: downloadQueueModel.progress_completed
+                to: Math.max(root.queueTotal, 1)
+                value: root.queueCompleted
                 Layout.fillWidth: true
                 height: 6
                 contentItem: Rectangle {
@@ -86,7 +93,7 @@ Rectangle {
                     width: listView.width
                     height: 28
                     radius: Theme.radiusMd
-                    color: model.id === downloadQueueModel.downloading_id
+                    color: model.id === root.queueDownloadingId
                         ? Theme.elevate3 : removeArea.containsMouse
                         ? Theme.elevate3 : "transparent"
 
@@ -131,7 +138,7 @@ Rectangle {
                         height: 2
                         radius: 1
                         color: Theme.primary
-                        visible: model.id === downloadQueueModel.downloading_id
+                        visible: model.id === root.queueDownloadingId
                         opacity: 0.5
                     }
 

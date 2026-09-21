@@ -14,7 +14,6 @@ from PySide6.QtGui import (
     QResizeEvent,
     QShortcut,
 )
-from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -30,9 +29,9 @@ from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.ui.components import (
     HeaderController,
     HeaderPanel,
-    SvgIconProvider,
     ToastManager,
     ViewRailPanel,
+    create_qml_engine,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.context import AppContext
@@ -81,10 +80,9 @@ class MainWindow(QMainWindow):
 
     def _setup_qml(self) -> None:
         logger.debug("main_window: setting up QML engine and theme")
-        self._qml_engine = QQmlEngine(self)
+        self._qml_engine = create_qml_engine(self)
         self._theme = Theme(self)
         self._qml_engine.rootContext().setContextProperty("Theme", self._theme)
-        self._qml_engine.addImageProvider("icons", SvgIconProvider())
 
     def _setup_header_and_shortcuts(self) -> None:
         logger.debug("main_window: setting up header and shortcuts")
@@ -154,7 +152,9 @@ class MainWindow(QMainWindow):
 
         self._views: list = []
         for view_cls in rail_views:
-            view = view_cls(self._ctx, self._qml_engine, app_ctx=self._app_ctx)
+            view = view_cls(
+                self._ctx, self._qml_engine, parent=self._stack, app_ctx=self._app_ctx
+            )
             self._views.append(view)
             self._stack.addWidget(view)
 
@@ -348,8 +348,11 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:
-        self._selected_uuid = uuid
-        await self._selection.show(uuid)
+        self._selected_uuid = uuid or None
+        if uuid:
+            await self._selection.show(uuid)
+        else:
+            self._selection.clear()
 
     def _apply_current_sidebar_filter(self) -> None:
         if self._mods_view is not None:

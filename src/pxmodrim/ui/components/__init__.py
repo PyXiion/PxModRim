@@ -13,7 +13,7 @@ from .icons import icon, pixmap, qml_source, svg_str
 from .procedural_preview import generate_preview
 from .progress_dialog import ProgressDialog
 from .responsive_meta_grid import ResponsiveMetaGrid
-from .svg_provider import SvgIconProvider
+from .svg_provider import SvgIconProvider, create_qml_engine
 from .toast import Toast, ToastManager
 from .view_rail_panel import ViewRailPanel
 
@@ -34,6 +34,7 @@ __all__ = [
     "Toast",
     "ToastManager",
     "ViewRailPanel",
+    "create_qml_engine",
     "generate_preview",
     "icon",
     "pixmap",
