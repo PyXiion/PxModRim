@@ -68,14 +68,14 @@ _PROVIDER_ICONS: dict[str, str] = {
 
 class SidebarItem:
     __slots__ = (
-        "label",
-        "count",
         "badge_bg",
         "badge_fg",
-        "icon_name",
-        "icon_color",
-        "section_name",
+        "count",
         "entry",
+        "icon_color",
+        "icon_name",
+        "label",
+        "section_name",
     )
 
     def __init__(

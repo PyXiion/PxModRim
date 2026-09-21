@@ -32,7 +32,7 @@ class EdgeOrigin(IntEnum):
 
 
 class ConstraintEdge:
-    __slots__ = ("source", "target", "type", "origin")
+    __slots__ = ("origin", "source", "target", "type")
 
     def __init__(
         self,
@@ -69,7 +69,7 @@ class ConstraintEdge:
 class ConstraintGraph:
     """Directed graph modelling mod dependencies, load order, incompatibilities."""
 
-    __slots__ = ("_outgoing", "_incoming", "_pid_to_index", "_ordered_pids")
+    __slots__ = ("_incoming", "_ordered_pids", "_outgoing", "_pid_to_index")
 
     def __init__(self) -> None:
         self._outgoing: dict[PackageId, set[ConstraintEdge]] = {}

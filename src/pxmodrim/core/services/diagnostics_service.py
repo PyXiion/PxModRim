@@ -50,16 +50,16 @@ class DiagnosticsService:
     sidebar_entries_changed: Event[list[SidebarEntry]]
 
     __slots__ = (
-        "diagnostics_summary_changed",
-        "status_message_changed",
-        "sidebar_entries_changed",
-        "_ctx",
-        "_no_version_warning_service",
-        "_use_this_instead_service",
+        "_checker",
         "_community_rules",
+        "_ctx",
         "_last_active_uuids",
         "_last_summary",
-        "_checker",
+        "_no_version_warning_service",
+        "_use_this_instead_service",
+        "diagnostics_summary_changed",
+        "sidebar_entries_changed",
+        "status_message_changed",
     )
 
     def __init__(

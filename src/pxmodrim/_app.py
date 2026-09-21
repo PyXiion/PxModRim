@@ -9,9 +9,9 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWebEngineQuick import QtWebEngineQuick  # noqa: E402
-from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
-from qasync import QEventLoop  # noqa: E402
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
+from PySide6.QtWidgets import QApplication, QMessageBox
+from qasync import QEventLoop
 
 # Qt6 defaults to PassThrough, which causes QtWebEngine to render at
 # integer buffer-scale (e.g. 1×) while the compositor upscales fractionally
@@ -105,10 +105,10 @@ class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
     __slots__ = (
-        "qt_app",
-        "_ctx",
         "_app_ctx",
+        "_ctx",
         "main_window",
+        "qt_app",
     )
 
     def __init__(self) -> None:
@@ -191,13 +191,12 @@ class App:
         try:
             await app_cfg_svc.setup()
             await ui_prefs_svc.setup()
-        except Exception:
+        except Exception:  # noqa: BLE001 - configuration migration boundary
             logger.exception("Failed to initialize configuration")
             QMessageBox.critical(
                 None,
                 "PxModRim - Configuration Error",
-                "Failed to initialize configuration.\n"
-                "Check the logs for details.\n",
+                "Failed to initialize configuration.\nCheck the logs for details.\n",
             )
             return 1
 

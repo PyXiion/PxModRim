@@ -26,7 +26,7 @@ class UIPrefsService:
     Follows the Service protocol (setup).
     """
 
-    __slots__ = ("_svc", "_prefs")
+    __slots__ = ("_prefs", "_svc")
 
     def __init__(self, svc: ConfigService) -> None:
         self._svc = svc

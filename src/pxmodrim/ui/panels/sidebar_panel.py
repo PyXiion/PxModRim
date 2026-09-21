@@ -58,6 +58,6 @@ class SidebarPanel(QWidget):
     # ── Slots called from QML ─────────────────────────────────
 
     @Slot(int)
-    def entrySelected(self, row: int) -> None:  # noqa: N802
+    def entrySelected(self, row: int) -> None:
         if 0 <= row < len(self._entries):
             self.entry_selected.emit(self._entries[row])

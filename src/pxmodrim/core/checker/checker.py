@@ -25,20 +25,20 @@ class ModChecker:
     """Orchestrates diagnostic checks across active mods."""
 
     __slots__ = (
+        "_active_mods",
+        "_all_mods",
+        "_cached_cycles",
         "_checkers",
+        "_community_rules",
+        "_diagnostics",
+        "_graph",
+        "_no_version_warning",
+        "_on_diagnostics_changed",
+        "_ordered_pids",
         "_settings",
         "_target_version",
-        "_on_diagnostics_changed",
-        "_graph",
-        "_all_mods",
-        "_diagnostics",
-        "_active_mods",
-        "_uuid_to_pid",
-        "_ordered_pids",
-        "_no_version_warning",
         "_use_this_instead",
-        "_community_rules",
-        "_cached_cycles",
+        "_uuid_to_pid",
     )
 
     def __init__(
@@ -277,7 +277,7 @@ class ModChecker:
                 continue
             try:
                 issues = checker.check(mod, ctx)
-            except Exception:
+            except Exception:  # noqa: BLE001 - one checker must not abort diagnostics
                 logger.exception(
                     f"Checker {type(checker).__name__} failed on {mod.package_id}"
                 )

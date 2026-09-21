@@ -35,19 +35,19 @@ class CoreContext:
     """Centralised application state for mods, config, and game version."""
 
     __slots__ = (
+        "_active_state_changed",
+        "_active_uuids",
         "_cfg",
         "_config_service",
-        "_mods",
-        "_active_uuids",
+        "_diagnostics_service",
+        "_game_launcher",
         "_game_version",
         "_mod_service",
-        "_diagnostics_service",
-        "_sort_service",
-        "_game_launcher",
-        "_providers",
-        "_pool",
+        "_mods",
         "_plugins",
-        "_active_state_changed",
+        "_pool",
+        "_providers",
+        "_sort_service",
     )
 
     def __init__(

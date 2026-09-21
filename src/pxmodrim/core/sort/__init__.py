@@ -32,10 +32,10 @@ __all__ = [
     "Tier",
     "TierConfig",
     "assign_tiers",
+    "community_rules_path",
     "find_cycle",
     "get_deps_recursive",
     "get_reverse_deps_recursive",
     "load_community_rules",
     "merge_community_rules",
-    "community_rules_path",
 ]

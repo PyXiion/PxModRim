@@ -72,11 +72,11 @@ class SteamCmdDownloadWorker(QThread):
                 and any(self._batches)
                 and not succeeded
                 and not failed
-            ):  # noqa: E501
+            ):
                 self.status.emit(
                     "SteamCMD produced no recognizable output. Check logs for details."
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - worker boundary reports all failures
             self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
         logger.info(
             f"[steamcmd] worker done: {len(succeeded)} ok, {len(failed)} failed"

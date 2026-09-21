@@ -393,8 +393,8 @@ def _detect_windows_paths(steam_id: str) -> PathConfig:
                         _workshop_path_from_game(game, steam_root, steam_id)
                     )
                     return result
-        except Exception:
-            continue
+        except OSError:
+            logger.debug("Unable to inspect Windows Steam registry key {}", reg_key)
     fallback = Path("C:/Program Files (x86)/Steam")
     game = fallback / "steamapps" / "common" / "RimWorld"
     if game.is_dir():
@@ -412,7 +412,7 @@ class AppConfigService:
     Follows the Service protocol (setup).
     """
 
-    __slots__ = ("_svc", "_cfg")
+    __slots__ = ("_cfg", "_svc")
 
     def __init__(self, svc: ConfigService) -> None:
         self._svc = svc

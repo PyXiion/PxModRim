@@ -132,13 +132,13 @@ class SteamCmdService(Plugin):
     download_finished: Event[SteamCmdResult]
 
     __slots__ = (
-        "status_message_changed",
-        "download_progress",
-        "download_item_status_changed",
-        "download_finished",
         "_ctx",
-        "_worker",
         "_runner_factory",
+        "_worker",
+        "download_finished",
+        "download_item_status_changed",
+        "download_progress",
+        "status_message_changed",
     )
 
     def __init__(
