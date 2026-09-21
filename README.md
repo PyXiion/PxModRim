@@ -58,7 +58,9 @@ first, then growing from there.
 
 ## Roadmap / TODO
 
-These are the big pieces planned next, in roughly the order they will be tackled. Checked items are already in place.
+The checklist below tracks major feature areas at a glance. For the detailed, prioritised
+engineering plan — release blockers, quality gates, milestone scope, and acceptance criteria —
+see [`ROADMAP.md`](./ROADMAP.md).
 
 - [x] Core mod discovery (Steam, local, core)
 - [x] Responsive three-panel UI with sidebar filters
