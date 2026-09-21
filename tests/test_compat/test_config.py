@@ -14,6 +14,7 @@ from pxmodrim.core.config import (
     PathConfig,
     read_game_version,
 )
+from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.ui.config import UIPrefsService
 from pxmodrim.ui.ui_prefs import UIPrefs
 
@@ -49,41 +50,62 @@ class TestReadGameVersion:
             ver_file.chmod(0o644)
 
 
-async def test_legacy_app_config_migrates_with_backup(tmp_path: Path) -> None:
+async def test_legacy_app_config_migrates_with_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     service = ConfigService(tmp_path)
-    service.save(
-        "config.json",
-        AppConfig(paths=PathConfig(game="/legacy/game", local="/legacy/mods")),
+    expected = AppConfig(
+        paths=PathConfig(
+            game="/legacy/game",
+            local="/legacy/mods",
+            workshop="/legacy/workshop",
+            config_folder="/legacy/config",
+            community_rules_file="/legacy/rules",
+            no_version_warning_file="/legacy/no-warning",
+            use_this_instead_file="/legacy/use-instead",
+            steamcmd_prefix="/legacy/steamcmd",
+        )
     )
+    service.save("config.json", expected)
     path = tmp_path / "config.json"
     legacy = json.loads(path.read_text())
     legacy.pop("schema_version")
     path.write_text(json.dumps(legacy), encoding="utf-8")
+    before = path.read_bytes()
+    monkeypatch.setattr(config_module, "time", lambda: 1_700_000_000)
 
     app_service = AppConfigService(service)
     await app_service.setup()
 
-    assert app_service.cfg().paths.game == "/legacy/game"
-    migrated = json.loads(path.read_text())
-    assert migrated["schema_version"] == 1
-    assert json.loads(next(tmp_path.glob("config.json.bak.*")).read_text()) == legacy
+    assert app_service.cfg() == expected
+    assert json.loads(path.read_text())["schema_version"] == 1
+    assert (tmp_path / "config.json.bak.1700000000").read_bytes() == before
 
 
-async def test_legacy_ui_prefs_migrates_with_backup(tmp_path: Path) -> None:
+async def test_legacy_ui_prefs_migrates_with_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     service = ConfigService(tmp_path)
-    service.save("ui_prefs.json", UIPrefs(desc_expanded=True, validate_downloads=True))
+    expected = UIPrefs(
+        deps_expanded=False,
+        desc_expanded=True,
+        launch_strategy=LaunchStrategy.STEAM,
+        validate_downloads=True,
+    )
+    service.save("ui_prefs.json", expected)
     path = tmp_path / "ui_prefs.json"
     legacy = json.loads(path.read_text())
     legacy.pop("schema_version")
     path.write_text(json.dumps(legacy), encoding="utf-8")
+    before = path.read_bytes()
+    monkeypatch.setattr(config_module, "time", lambda: 1_700_000_000)
 
     prefs_service = UIPrefsService(service)
     await prefs_service.setup()
 
-    assert prefs_service.prefs().desc_expanded is True
-    assert prefs_service.prefs().validate_downloads is True
+    assert prefs_service.prefs() == expected
     assert json.loads(path.read_text())["schema_version"] == 1
-    assert json.loads(next(tmp_path.glob("ui_prefs.json.bak.*")).read_text()) == legacy
+    assert (tmp_path / "ui_prefs.json.bak.1700000000").read_bytes() == before
 
 
 async def test_fresh_services_return_defaults_without_creating_files(
@@ -101,13 +123,19 @@ async def test_fresh_services_return_defaults_without_creating_files(
     assert not (tmp_path / "ui_prefs.json").exists()
 
 
-def test_managed_saves_stamp_schema_version(tmp_path: Path) -> None:
+def test_managed_saves_stamp_schema_version_and_round_trips_values(
+    tmp_path: Path,
+) -> None:
     service = ConfigService(tmp_path)
-    service.save("config.json", AppConfig())
-    service.save("ui_prefs.json", UIPrefs())
+    expected_config = AppConfig(paths=PathConfig(game="/game", local="/mods"))
+    expected_prefs = UIPrefs(desc_expanded=True, validate_downloads=True)
+    service.save("config.json", expected_config)
+    service.save("ui_prefs.json", expected_prefs)
 
     assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 1
     assert json.loads((tmp_path / "ui_prefs.json").read_text())["schema_version"] == 1
+    assert service.load("config.json", AppConfig) == expected_config
+    assert service.load("ui_prefs.json", UIPrefs) == expected_prefs
 
 
 def test_current_config_load_does_not_rewrite(tmp_path: Path) -> None:
