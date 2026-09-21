@@ -101,6 +101,28 @@ class TestSearchFilter:
         proxy.set_search_filter("MOD 2")
         assert proxy.rowCount() == 1
 
+    def test_search_whitespace_only_shows_all(self, proxy: ModListProxyModel) -> None:
+        proxy.set_search_filter("   \t \n ")
+        assert proxy.rowCount() == 5
+
+    def test_search_normalized_unicode_and_whitespace(self, qapp: QApplication) -> None:
+        colors = _provider_colors()
+        source = ModListModel(colors)
+        mods: dict[str, ListedMod] = {
+            "uuid-u": _mod("Große Mod", "grosse.mod"),
+            "uuid-p": _mod("  Padded Mod  ", "  padded.pkg  "),
+        }
+        source.load_mods(mods, ["uuid-u", "uuid-p"])
+        proxy = ModListProxyModel(source)
+
+        proxy.set_search_filter("  GROßE  ")
+        assert proxy.rowCount() == 1
+        assert proxy.mapToSource(proxy.index(0, 0)).row() == 0
+
+        proxy.set_search_filter("  padded.pkg  ")
+        assert proxy.rowCount() == 1
+        assert proxy.mapToSource(proxy.index(0, 0)).row() == 1
+
 
 class TestCombinedFilter:
     def test_sidebar_and_search(self, proxy: ModListProxyModel) -> None:
@@ -134,3 +156,46 @@ class TestMapToSource:
             src_row = src_index.row()
             mapped_back = proxy.mapFromSource(src_index)
             assert mapped_back == proxy_index
+
+    def test_mapping_after_move_row(self, proxy: ModListProxyModel) -> None:
+        assert proxy.move_row(0, 2)
+        for r in range(proxy.rowCount()):
+            src_idx = proxy.mapToSource(proxy.index(r, 0))
+            assert src_idx.isValid()
+            assert proxy.mapFromSource(src_idx).row() == r
+
+    def test_mapping_after_filter_rebuild(
+        self, proxy: ModListProxyModel, source: ModListModel
+    ) -> None:
+        proxy.set_sidebar_filter({"uuid-1", "uuid-3"})
+        assert proxy.rowCount() == 2
+        assert proxy.mapToSource(proxy.index(0, 0)).row() == 2
+        assert proxy.mapToSource(proxy.index(1, 0)).row() == 3
+        assert proxy.mapFromSource(source.index(2, 0)).row() == 0
+        assert proxy.mapFromSource(source.index(3, 0)).row() == 1
+        assert not proxy.mapFromSource(source.index(0, 0)).isValid()
+
+        proxy.set_sidebar_filter(None)
+        proxy.set_search_filter("Mod 4")
+        assert proxy.rowCount() == 1
+        assert proxy.mapToSource(proxy.index(0, 0)).row() == 4
+        assert proxy.mapFromSource(source.index(4, 0)).row() == 0
+        assert not proxy.mapFromSource(source.index(2, 0)).isValid()
+
+        proxy.set_search_filter("")
+        assert proxy.rowCount() == 5
+        for r in range(proxy.rowCount()):
+            src_idx = proxy.mapToSource(proxy.index(r, 0))
+            assert proxy.mapFromSource(src_idx).row() == r
+
+    def test_mapping_after_move_with_active_filter(
+        self, proxy: ModListProxyModel, source: ModListModel
+    ) -> None:
+        proxy.set_sidebar_filter({"uuid-0", "uuid-1", "uuid-4"})
+        assert proxy.rowCount() == 3
+        assert proxy.move_row(0, 1)
+        for r in range(proxy.rowCount()):
+            src_idx = proxy.mapToSource(proxy.index(r, 0))
+            assert src_idx.isValid()
+            assert proxy.mapFromSource(src_idx).row() == r
+        assert not proxy.mapFromSource(source.index(0, 0)).isValid()

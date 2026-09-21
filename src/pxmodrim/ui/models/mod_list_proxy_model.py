@@ -22,6 +22,7 @@ class ModListProxyModel(QAbstractListModel):
         self._sidebar_uuids: set[str] | None = None
         self._visible_uuids: list[str] = []
         self._source_row_for_uuid: dict[str, int] = {}
+        self._proxy_row_by_uuid: dict[str, int] = {}
         self._in_proxy_move = False
 
         self._source.dataChanged.connect(self._on_source_data_changed)
@@ -40,6 +41,9 @@ class ModListProxyModel(QAbstractListModel):
             for uuid, row in self._source_row_for_uuid.items()
             if self._accept_item(self._source.get_item(row))
         ]
+        self._proxy_row_by_uuid = {
+            uuid: row for row, uuid in enumerate(self._visible_uuids)
+        }
 
     def _rebuild_source_mapping(self) -> None:
         self._source_row_for_uuid = {
@@ -53,24 +57,21 @@ class ModListProxyModel(QAbstractListModel):
             return False
 
         if self._search_text:
-            name_match = self._search_text in item.mod.name.lower()
+            name_match = self._search_text in item.mod.name.strip().casefold()
             pid_match = (
                 isinstance(item.mod, AboutXmlMod)
-                and self._search_text in str(item.mod.package_id).lower()
+                and self._search_text in str(item.mod.package_id).strip().casefold()
             )
             if not (name_match or pid_match):
                 return False
 
         return True
 
-    def _proxy_row_for_uuid(self, uuid: str) -> int | None:
-        try:
-            return self._visible_uuids.index(uuid)
-        except ValueError:
-            return None
+    def proxy_row_for_uuid(self, uuid: str) -> int | None:
+        return self._proxy_row_by_uuid.get(uuid)
 
     def set_search_filter(self, search_text: str) -> None:
-        text = search_text.lower()
+        text = search_text.strip().casefold()
         if self._search_text == text:
             return
         self._search_text = text
@@ -160,7 +161,7 @@ class ModListProxyModel(QAbstractListModel):
         item = self._source.get_item(source_index.row())
         if item is None:
             return QModelIndex()
-        proxy_row = self._proxy_row_for_uuid(item.uuid)
+        proxy_row = self.proxy_row_for_uuid(item.uuid)
         if proxy_row is None:
             return QModelIndex()
         return self.index(proxy_row, 0)
@@ -195,6 +196,9 @@ class ModListProxyModel(QAbstractListModel):
             )
             self._visible_uuids.pop(proxy_source)
             self._visible_uuids.insert(proxy_target, source_uuid)
+            self._proxy_row_by_uuid = {
+                uuid: row for row, uuid in enumerate(self._visible_uuids)
+            }
             self._source.move_row(source_source_row, source_target_row)
             self._rebuild_source_mapping()
             self.endMoveRows()
@@ -212,7 +216,7 @@ class ModListProxyModel(QAbstractListModel):
             item = self._source.get_item(source_row)
             if item is None:
                 continue
-            proxy_row = self._proxy_row_for_uuid(item.uuid)
+            proxy_row = self.proxy_row_for_uuid(item.uuid)
             if proxy_row is not None:
                 proxy_rows.append(proxy_row)
         if not proxy_rows:

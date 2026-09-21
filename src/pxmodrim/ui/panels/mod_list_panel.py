@@ -118,13 +118,13 @@ class ModListPanel(QWidget):
         qml_ctx = self._qml.rootContext()
         qml_ctx.setContextProperty("modListPanel", self)
         qml_ctx.setContextProperty("modListModel", self._proxy)
+        qml_ctx.setContextProperty("modListHasFocus", False)
         self._qml.setSource(str(_MOD_LIST_QML))
 
         layout.addWidget(self._qml)
 
-        # Expose search-focus state to QML for keyboard navigation gating
-        qml_ctx.setContextProperty("searchFocused", False)
-        self.search_input.installEventFilter(self)
+        self._qml.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._qml.installEventFilter(self)
 
         ctx.active_state_changed.connect(self._on_core_state_changed)
 
@@ -177,7 +177,13 @@ class ModListPanel(QWidget):
             list_view = root.findChild(QObject, "listView")
             if list_view is not None:
                 list_view.setProperty("currentIndex", -1)
+                list_view.setProperty("anchorIndex", -1)
                 list_view.setProperty("selectedIndices", [])
+                list_view.setProperty("currentUuid", "")
+                list_view.setProperty("anchorUuid", "")
+                list_view.setProperty("selectedUuids", [])
+        self.selection_changed.emit([])
+        self.mod_selected.emit("")
 
     def _proxy_to_source_row(self, proxy_row: int) -> int:
         proxy_index = self._proxy.index(proxy_row, 0)
@@ -189,6 +195,11 @@ class ModListPanel(QWidget):
         source_row = self._proxy_to_source_row(row)
         item = self._model.get_item(source_row)
         return item.uuid if item else ""
+
+    @Slot(str, result=int)
+    def rowForUuid(self, uuid: str) -> int:
+        row = self._proxy.proxy_row_for_uuid(uuid)
+        return row if row is not None else -1
 
     @asyncSlot(int)
     async def toggleCheck(self, row: int) -> None:
@@ -322,9 +333,8 @@ class ModListPanel(QWidget):
         self.order_changed.emit()
 
     @Slot(list)
-    def selectionChanged(self, rows: list[int]) -> None:
-        uuids = [self.uuidAt(r) for r in rows]
-        self.selection_changed.emit(uuids)
+    def selectionChanged(self, uuids: list[str]) -> None:
+        self.selection_changed.emit([uuid for uuid in uuids if uuid])
 
     # ── Private slots ─────────────────────────────────────────
 
@@ -332,10 +342,9 @@ class ModListPanel(QWidget):
         self._proxy.set_search_filter(text)
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if obj is self.search_input:
-            root_ctx = self._qml.rootContext()
+        if obj is self._qml:
             if event.type() == QEvent.Type.FocusIn:
-                root_ctx.setContextProperty("searchFocused", True)
+                self._qml.rootContext().setContextProperty("modListHasFocus", True)
             elif event.type() == QEvent.Type.FocusOut:
-                root_ctx.setContextProperty("searchFocused", False)
+                self._qml.rootContext().setContextProperty("modListHasFocus", False)
         return super().eventFilter(obj, event)

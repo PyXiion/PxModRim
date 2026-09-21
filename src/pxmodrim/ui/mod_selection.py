@@ -17,8 +17,13 @@ class ModSelectionPresenter:
         generation = self._generation + 1
         self._generation = generation
 
+        if not uuid:
+            self._panel.clear()
+            return
+
         mod = self._ctx.all_mods.get(uuid)
         if mod is None:
+            self._panel.clear()
             return
 
         self._panel.show_mod(mod)
@@ -32,6 +37,10 @@ class ModSelectionPresenter:
             str(pid) if pid is not None else None,
             active_pids,
         )
+
+    def clear(self) -> None:
+        self._generation += 1
+        self._panel.clear()
 
     def _resolve_active_pids(self) -> list[str]:
         active = set(self._ctx.active_uuids)
