@@ -66,7 +66,7 @@ class GameLauncher:
         try:
             await asyncio.to_thread(webbrowser.open, url)
             return True, "Launching via Steam..."
-        except Exception as e:
+        except webbrowser.Error as e:
             logger.warning("Steam launch failed: {}", e)
             return False, f"Steam launch failed: {e}"
 
@@ -97,5 +97,5 @@ class GameLauncher:
             try:
                 app_id_path.write_text(RIMWORLD_STEAM_APP_ID)
                 logger.debug("Created {}", app_id_path)
-            except Exception as e:
+            except OSError as e:
                 logger.warning("Failed to create steam_appid.txt: {}", e)

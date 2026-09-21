@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 import toposort
 from loguru import logger
@@ -15,8 +15,8 @@ class Plugin:
     async and runs immediately after ``setup()`` — use it for I/O or async init.
     """
 
-    name: str = ""
-    dependencies: list[str] = []
+    name: ClassVar[str] = ""
+    dependencies: ClassVar[list[str]] = []
 
     def setup(self, ctx: Any) -> None: ...
 

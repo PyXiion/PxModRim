@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
 
 from pxmodrim.core.checker.graph import EdgeType
 from pxmodrim.core.checker.models import CheckContext, ModIssue, PackageId
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
-
-if TYPE_CHECKING:
-    pass
 
 
 class ModIssueChecker(ABC):

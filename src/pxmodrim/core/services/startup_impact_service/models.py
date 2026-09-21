@@ -60,10 +60,7 @@ class StartupImpactReport:
 
 
 def normalize_package_id(package_id: str) -> str:
-    normalized = package_id.lower()
-    if normalized.endswith("_steam"):
-        normalized = normalized[: -len("_steam")]
-    return normalized
+    return package_id.lower().removesuffix("_steam")
 
 
 def format_impact(seconds: float) -> str:

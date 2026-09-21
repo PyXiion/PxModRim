@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from loguru import logger
+from ttimer import Timer
 
 from pxmodrim.core.models.metadata.parsing import create_listed_mod_from_path
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.services.mod_discovery import scan_mod_directory
-
-if TYPE_CHECKING:
-    from ttimer import Timer
 
 
 class CoreModProvider(BaseModProvider):

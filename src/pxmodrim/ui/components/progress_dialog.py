@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Self
+
 from PySide6.QtCore import QPropertyAnimation, Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog,
@@ -57,7 +59,7 @@ class ProgressDialog(QDialog):
     def loading(self) -> LoadingState:
         return self._loading
 
-    async def __aenter__(self) -> ProgressDialog:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(

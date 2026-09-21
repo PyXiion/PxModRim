@@ -3,10 +3,11 @@ from __future__ import annotations
 import contextlib
 import functools
 import os
-from collections.abc import Iterable, Iterator, MutableSet, Set
+from collections.abc import Iterable, Iterator, MutableSet
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 from uuid import uuid4
 
 import msgspec
@@ -29,7 +30,7 @@ class ReplacementInfo:
 class CaseInsensitiveStr(str):
     """Case-insensitive string that stores the lowered version."""
 
-    def __new__(cls, pid: str) -> CaseInsensitiveStr:
+    def __new__(cls, pid: str) -> Self:
         return super().__new__(cls, pid.lower())
 
 
@@ -63,19 +64,19 @@ class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
     def __len__(self) -> int:
         return len(self._data)
 
-    def __or__(self, other: Set[Any]) -> CaseInsensitiveSet:
+    def __or__(self, other: AbstractSet[Any]) -> CaseInsensitiveSet:
         return CaseInsensitiveSet(self._data | {CaseInsensitiveStr(i) for i in other})
 
-    def __ror__(self, other: Set[Any]) -> CaseInsensitiveSet:
+    def __ror__(self, other: AbstractSet[Any]) -> CaseInsensitiveSet:
         return self.__or__(other)
 
     def __hash__(self) -> int:
         return hash(self._data)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, CaseInsensitiveSet):
             return self._data == other._data
-        if isinstance(other, Set):
+        if isinstance(other, AbstractSet):
             return self._data == {CaseInsensitiveStr(i) for i in other}
         return False
 
@@ -89,14 +90,14 @@ class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
             value = CaseInsensitiveStr(value)
         return self._data.add(value)
 
-    def __and__(self, other: Set[Any]) -> Set[CaseInsensitiveStr]:
+    def __and__(self, other: AbstractSet[Any]) -> AbstractSet[CaseInsensitiveStr]:
         return super().__and__(other)
 
 
 class ModsConfig:
     """Parsed ModsConfig.xml data with active mods and known expansions."""
 
-    __slots__ = ("version", "_activeMods", "_knownExpansions")
+    __slots__ = ("_activeMods", "_knownExpansions", "version")
 
     def __init__(
         self,
@@ -173,7 +174,9 @@ class BaseMod:
 class PackageIdMod:
     """Mixin dataclass adding a case-insensitive package ID."""
 
-    package_id: CaseInsensitiveStr = CaseInsensitiveStr("invalid.mod")
+    package_id: CaseInsensitiveStr = field(
+        default_factory=lambda: CaseInsensitiveStr("invalid.mod")
+    )
 
 
 @dataclass(slots=True)
@@ -357,7 +360,7 @@ class AboutXmlMod(ListedMod, PackageIdMod):
 
     def get_dlc_name(self) -> str | None:
         """Return the DLC name if this mod matches a known RimWorld DLC."""
-        for _appid, meta in RIMWORLD_DLC_METADATA.items():
+        for meta in RIMWORLD_DLC_METADATA.values():
             if meta["packageid"] == str(self.package_id):
                 return meta["name"]
         return None

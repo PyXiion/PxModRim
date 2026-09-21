@@ -12,8 +12,8 @@ from pxmodrim.core.plugin import Plugin, PluginRegistry
 
 class _RecorderPlugin(Plugin):
     def __init__(self, name: str, dependencies: list[str] | None = None) -> None:
-        self.name = name
-        self.dependencies = dependencies or []
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "dependencies", dependencies or [])
 
     def setup(self, ctx: list[str]) -> None:
         ctx.append(self.name)
