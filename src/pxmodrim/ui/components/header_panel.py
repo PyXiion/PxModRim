@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -27,7 +27,7 @@ class HeaderPanel(QQuickWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)
         self.setClearColor(QColor(PALETTE["ELEVATE_1"]))
         self.rootContext().setContextProperty("headerController", controller)
-        self.setSource(str(_HEADER_QML))
+        self.setSource(QUrl.fromLocalFile(str(_HEADER_QML)))
         root_obj = self.rootObject()
         if root_obj is None:
             raise RuntimeError("Header.qml failed to load: rootObject is None")

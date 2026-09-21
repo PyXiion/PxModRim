@@ -46,4 +46,4 @@ def test_open_logs_folder_uses_config_logs_path(
     MenuBar._open_logs_folder()
 
     assert len(opened_urls) == 1
-    assert opened_urls[0].toLocalFile() == str(tmp_path / "pxmodrim" / "logs")
+    assert Path(opened_urls[0].toLocalFile()) == tmp_path / "pxmodrim" / "logs"

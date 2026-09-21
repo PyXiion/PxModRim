@@ -62,7 +62,10 @@ jobs:
           with open('results.sarif') as f:
               sarif = json.load(f)
           os.makedirs('results-split', exist_ok=True)
-          for i, run in enumerate(sarif['runs']):
+          runs = sarif.get('runs', [])
+          runs_with_results = [r for r in runs if r.get('results')]
+          selected_runs = (runs_with_results if runs_with_results else runs)[:20]
+          for i, run in enumerate(selected_runs):
               tool = run['tool']['driver']['name']
               safe = re.sub(r'[^a-zA-Z0-9_-]', '_', tool)
               out = {'\$schema': sarif['\$schema'], 'version': sarif['version'], 'runs': [run]}

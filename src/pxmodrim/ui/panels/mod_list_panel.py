@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal, Slot
+from PySide6.QtCore import QEvent, QObject, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -119,7 +119,7 @@ class ModListPanel(QWidget):
         qml_ctx.setContextProperty("modListPanel", self)
         qml_ctx.setContextProperty("modListModel", self._proxy)
         qml_ctx.setContextProperty("modListHasFocus", False)
-        self._qml.setSource(str(_MOD_LIST_QML))
+        self._qml.setSource(QUrl.fromLocalFile(str(_MOD_LIST_QML)))
 
         layout.addWidget(self._qml)
 

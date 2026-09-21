@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -90,7 +90,7 @@ class TimeAnalyticsPanel(QWidget):
         self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self._qml.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)
         self._qml.setClearColor(QColor(PALETTE["ELEVATE_2"]))
-        self._qml.setSource(str(_TIMING_QML))
+        self._qml.setSource(QUrl.fromLocalFile(str(_TIMING_QML)))
         layout.addWidget(self._qml)
 
     async def set_data(self, pid: str | None, active_pids: list[str]) -> None:

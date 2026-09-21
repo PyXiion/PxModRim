@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -43,7 +43,7 @@ class SidebarPanel(QWidget):
         qml_ctx = self._qml.rootContext()
         qml_ctx.setContextProperty("sidebarPanel", self)
         qml_ctx.setContextProperty("sidebarModel", self._model)
-        self._qml.setSource(str(_SIDEBAR_QML))
+        self._qml.setSource(QUrl.fromLocalFile(str(_SIDEBAR_QML)))
 
         layout.addWidget(self._qml)
 
