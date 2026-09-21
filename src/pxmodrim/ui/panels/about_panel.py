@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import platform
+import sys
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
 
-from loguru import logger
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QUrl, qVersion
+from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
-    QTabWidget,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
@@ -19,146 +23,266 @@ from pxmodrim.ui.components import AppButton
 
 
 class AboutPanel(QDialog):
+    _REPOSITORY_URL = "https://github.com/PyXiion/PxModRim"
+    _ISSUES_URL = f"{_REPOSITORY_URL}/issues"
+    _DEPENDENCIES = (
+        ("aiosqlite", "MIT"),
+        ("httpx", "BSD-3-Clause"),
+        ("loguru", "MIT"),
+        ("lxml", "BSD-3-Clause"),
+        ("msgspec", "BSD-3-Clause"),
+        ("PySide6", "LGPL-3.0 / GPL-2.0 / GPL-3.0"),
+        ("qasync", "BSD-2-Clause"),
+        ("toposort", "Apache-2.0"),
+        ("ttimer", "MIT"),
+    )
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("aboutPanel")
         self.setWindowTitle("About PxModRim")
         self.setModal(True)
-        self.resize(600, 450)
+        self.resize(700, 620)
+        self.setMinimumSize(640, 560)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 20)
+        layout.setSpacing(18)
+        layout.addWidget(self._create_hero())
+        layout.addWidget(self._create_project_story())
+        layout.addWidget(self._create_details())
+        self._credits_dialog = self._create_credits_dialog()
+        layout.addLayout(self._create_actions())
 
-        tabs = QTabWidget()
-        tabs.addTab(self._create_about_tab(), "About")
-        tabs.addTab(self._create_credits_tab(), "Credits")
-        layout.addWidget(tabs)
+        disclaimer = QLabel(
+            "PxModRim is an unofficial fan-made tool. RimWorld is a trademark "
+            "of Ludeon Studios."
+        )
+        disclaimer.setObjectName("aboutDisclaimer")
+        disclaimer.setWordWrap(True)
+        layout.addWidget(disclaimer)
 
-        close_btn = AppButton("Close")
-        close_btn.clicked.connect(self.reject)
-        layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignRight)
+        footer = QHBoxLayout()
+        footer.addStretch()
+        close_button = AppButton("Close")
+        close_button.clicked.connect(self.reject)
+        footer.addWidget(close_button)
+        layout.addLayout(footer)
 
-    def _create_about_tab(self) -> QWidget:
-        tab = QWidget()
-        header = QHBoxLayout(tab)
-        header.setSpacing(20)
+    def _create_hero(self) -> QFrame:
+        hero = QFrame()
+        hero.setObjectName("aboutHero")
+        layout = QHBoxLayout(hero)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
 
-        left_vbox = QVBoxLayout()
-        left_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-        logo_label = QLabel()
-        logo_pixmap = QPixmap(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
-        logo_label.setPixmap(
-            logo_pixmap.scaled(
-                80,
-                80,
+        logo = QLabel()
+        pixmap = QPixmap(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
+        logo.setPixmap(
+            pixmap.scaled(
+                96,
+                96,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
-        left_vbox.addWidget(logo_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignTop)
 
-        name_label = QLabel("PxModRim")
-        name_label.setObjectName("aboutTitle")
-        name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        left_vbox.addWidget(name_label)
+        identity = QVBoxLayout()
+        identity.setSpacing(6)
 
-        version_label = QLabel(f"v{self._get_version()}")
-        version_label.setObjectName("aboutVersion")
-        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        left_vbox.addWidget(version_label)
+        title_row = QHBoxLayout()
+        title = QLabel("PxModRim")
+        title.setObjectName("aboutTitle")
+        title_row.addWidget(title)
+        title_row.addStretch()
 
-        header.addLayout(left_vbox)
+        version_badge = QLabel(f"v{self._get_version()}")
+        version_badge.setObjectName("aboutVersionBadge")
+        title_row.addWidget(version_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
+        identity.addLayout(title_row)
 
-        right_vbox = QVBoxLayout()
-        right_vbox.setSpacing(12)
+        tagline = QLabel("A friendly, modern mod manager for RimWorld.")
+        tagline.setObjectName("aboutTagline")
+        identity.addWidget(tagline)
 
-        desc_label = QLabel("A mod manager for RimWorld.")
-        desc_label.setObjectName("aboutDescription")
-        desc_label.setWordWrap(True)
-        right_vbox.addWidget(desc_label)
-
-        author_label = QLabel("Author: PyXiion")
-        author_label.setObjectName("aboutMeta")
-        right_vbox.addWidget(author_label)
-
-        github_link = QLabel(
-            '<a href="https://github.com/PyXiion/PxModRim" '
-            'style="color: #66c0f4;">GitHub</a>'
+        description = QLabel(
+            "Scan, sort, resolve dependencies, and manage large mod lists easily."
         )
-        github_link.setOpenExternalLinks(True)
-        github_link.setObjectName("aboutMeta")
-        right_vbox.addWidget(github_link)
+        description.setObjectName("aboutDescription")
+        description.setWordWrap(True)
+        identity.addWidget(description)
+        identity.addStretch()
 
-        license_label = QLabel("License: LGPL-3.0")
-        license_label.setObjectName("aboutMeta")
-        right_vbox.addWidget(license_label)
+        layout.addLayout(identity, stretch=1)
+        return hero
 
-        disclaimer = QLabel(
-            '<i style="color: #949ba4;">This is an unofficial fan-made tool. '
-            "RimWorld is a trademark of Ludeon Studios.</i>"
+    def _create_project_story(self) -> QWidget:
+        section = QWidget()
+        layout = QVBoxLayout(section)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        heading = QLabel("THE PROJECT")
+        heading.setObjectName("aboutSectionTitle")
+        layout.addWidget(heading)
+
+        story = QLabel(
+            "I used RimPy and RimSort for a long time myself, but with recent "
+            "updates it kept getting slower and worse — some features even broke "
+            "my game 🙁<br><br>"
+            "I initially started working on a PR to fix most of the parallelism "
+            "issues in RimSort, but realized it didn't make much sense. So I decided "
+            "to try creating my own alternative with the help of AI. The result "
+            "is what you see on your screen.<br><br>"
+            "This is all just my personal opinion based on my experience with "
+            "RimSort at the time, and things may have changed for the better since "
+            "then (I hope so!).<br><br>"
+            "<b>— PyXiion</b>"
         )
-        disclaimer.setWordWrap(True)
-        right_vbox.addWidget(disclaimer)
+        story.setObjectName("aboutStory")
+        story.setWordWrap(True)
+        layout.addWidget(story)
+        return section
 
-        right_vbox.addStretch()
+    def _create_details(self) -> QFrame:
+        details = QFrame()
+        details.setObjectName("aboutDetails")
+        layout = QGridLayout(details)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setHorizontalSpacing(14)
+        layout.setVerticalSpacing(8)
 
-        header.addLayout(right_vbox, stretch=1)
-
-        return tab
-
-    def _create_credits_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(8)
-
-        based_on = QLabel("Based on")
-        based_on.setObjectName("creditSection")
-        layout.addWidget(based_on)
-
-        rimsort_label = QLabel(
-            "Clean rewrite inspired by "
-            + '<a href="https://github.com/RimSort/RimSort" '
-            + 'style="color: #66c0f4;">RimSort</a> '
-            + "(MIT licensed)."
+        rows = (
+            ("CREATED BY", "PyXiion"),
+            ("LICENSE", "LGPL-3.0"),
+            ("INSPIRED BY", "RimSort"),
+            (
+                "ENVIRONMENT",
+                (
+                    f"Python {sys.version_info.major}.{sys.version_info.minor}"
+                    f"  •  Qt {qVersion()}  •  {platform.system()}"
+                ),
+            ),
         )
-        rimsort_label.setOpenExternalLinks(True)
-        rimsort_label.setWordWrap(True)
-        rimsort_label.setObjectName("creditItem")
-        layout.addWidget(rimsort_label)
+        for row, (label_text, value_text) in enumerate(rows):
+            label = QLabel(label_text)
+            label.setObjectName("aboutMetaLabel")
+            layout.addWidget(label, row, 0)
 
-        spacer = QLabel()
-        spacer.setFixedHeight(8)
-        layout.addWidget(spacer)
+            value = QLabel(value_text)
+            value.setObjectName("aboutMetaValue")
+            layout.addWidget(value, row, 1)
 
-        deps_header = QLabel("Dependencies")
-        deps_header.setObjectName("creditSection")
-        layout.addWidget(deps_header)
+        layout.setColumnStretch(1, 1)
+        return details
 
-        deps = [
-            ("httpx", "BSD-3-Clause"),
-            ("loguru", "MIT"),
-            ("lxml", "BSD-3-Clause"),
-            ("msgspec", "BSD-3-Clause"),
-            ("pyside6", "LGPL-3.0 / GPL-2.0 / GPL-3.0"),
-            ("qasync", "BSD-2-Clause"),
-            ("toposort", "Apache-2.0"),
-        ]
+    def _create_actions(self) -> QHBoxLayout:
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
 
-        for dep, lic in deps:
-            try:
-                ver = version(dep)
-                label = QLabel(f"{dep} {ver}  —  {lic}")
-                label.setObjectName("creditItem")
-                layout.addWidget(label)
-            except PackageNotFoundError:
-                logger.debug("Package not found: {}", dep)
+        github_button = AppButton("GitHub")
+        github_button.setObjectName("primaryAction")
+        github_button.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(self._REPOSITORY_URL))
+        )
+        actions.addWidget(github_button)
 
-        layout.addStretch()
-        return tab
+        issues_button = AppButton("Report issue")
+        issues_button.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(self._ISSUES_URL))
+        )
+        actions.addWidget(issues_button)
+
+        self._copy_button = AppButton("Copy system info")
+        self._copy_button.clicked.connect(self._copy_system_information)
+        actions.addWidget(self._copy_button)
+
+        credits_button = AppButton("Open-source credits…")
+        credits_button.clicked.connect(self._credits_dialog.open)
+        actions.addWidget(credits_button)
+        actions.addStretch()
+        return actions
+
+    def _create_credits_dialog(self) -> QDialog:
+        dialog = QDialog(self)
+        dialog.setObjectName("creditsDialog")
+        dialog.setWindowTitle("Open-source credits")
+        dialog.setModal(True)
+        dialog.resize(560, 500)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(20, 20, 20, 16)
+        layout.setSpacing(14)
+
+        title = QLabel("Open-source credits")
+        title.setObjectName("creditsTitle")
+        layout.addWidget(title)
+
+        credits = QTextBrowser()
+        credits.setObjectName("creditsBrowser")
+        credits.setOpenExternalLinks(True)
+        credits.setHtml(self._credits_html())
+        layout.addWidget(credits)
+
+        footer = QHBoxLayout()
+        footer.addStretch()
+        close_button = AppButton("Close")
+        close_button.clicked.connect(dialog.reject)
+        footer.addWidget(close_button)
+        layout.addLayout(footer)
+        return dialog
+
+    def _credits_html(self) -> str:
+        dependencies = "".join(
+            "<tr>"
+            f'<td><a href="https://pypi.org/project/{name}/">{name}</a></td>'
+            f"<td>{version(name)}</td>"
+            f"<td>{license_name}</td>"
+            "</tr>"
+            for name, license_name in self._DEPENDENCIES
+        )
+        return f"""
+            <h2>PxModRim</h2>
+            <p>Created and maintained by <b>PyXiion</b>.</p>
+            <h2>RimSort</h2>
+            <p>
+                Portions are derived from
+                <a href="https://github.com/RimSort/RimSort">RimSort</a>
+                and used under the MIT license.
+            </p>
+            <h2>Runtime dependencies</h2>
+            <table width="100%" cellspacing="0" cellpadding="5">
+                <tr>
+                    <th align="left">Package</th>
+                    <th align="left">Version</th>
+                    <th align="left">License</th>
+                </tr>
+                {dependencies}
+            </table>
+        """
+
+    def _copy_system_information(self) -> None:
+        QApplication.clipboard().setText(self._system_information())
+        self._copy_button.setText("Copied")
+
+    def _system_information(self) -> str:
+        return "\n".join(
+            (
+                f"PxModRim {self._get_version()}",
+                f"Python {platform.python_version()}",
+                f"PySide6 {version('PySide6')}",
+                f"Qt {qVersion()}",
+                (
+                    f"Operating system: {platform.system()} {platform.release()} "
+                    f"({platform.machine()})"
+                ),
+            )
+        )
 
     @staticmethod
     def _get_version() -> str:
         try:
             return version("pxmodrim")
-        except Exception:
+        except PackageNotFoundError:
             return "0.1.0"

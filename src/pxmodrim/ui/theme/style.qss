@@ -466,37 +466,63 @@ QProgressBar::chunk {
 }
 
 /* ── About Dialog ── */
-QWidget#aboutPanel {
+QDialog#aboutPanel,
+QDialog#creditsDialog {
     background-color: $ELEVATE_1;
 }
-QLabel#aboutTitle {
-    font-size: 20px;
+QFrame#aboutHero {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 10px;
+}
+QLabel#aboutTitle,
+QLabel#creditsTitle {
+    font-size: 24px;
     font-weight: 700;
     color: $TEXT_MAIN;
 }
-QLabel#aboutVersion {
-    font-size: 12px;
-    color: $TEXT_MUTED;
+QLabel#aboutVersionBadge {
+    background-color: $PRIMARY;
+    border-radius: 8px;
+    color: $ELEVATE_0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
 }
-QLabel#aboutDescription {
-    font-size: 14px;
+QLabel#aboutTagline {
     color: $TEXT_MAIN;
-    line-height: 1.4;
+    font-size: 15px;
+    font-weight: 600;
 }
-QLabel#aboutMeta {
-    font-size: 12px;
+QLabel#aboutDescription,
+QLabel#aboutStory {
     color: $TEXT_MUTED;
+    font-size: 13px;
 }
-QLabel#creditItem {
-    font-size: 12px;
-    color: $TEXT_MUTED;
-    padding: 4px 0;
-}
-QLabel#creditSection {
+QLabel#aboutSectionTitle,
+QLabel#aboutMetaLabel {
+    color: $TEXT_DIM;
     font-size: 10px;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+}
+QFrame#aboutDetails {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 8px;
+}
+QLabel#aboutMetaValue {
+    color: $TEXT_MAIN;
+    font-size: 12px;
+}
+QLabel#aboutDisclaimer {
     color: $TEXT_DIM;
-    padding: 8px 0 2px;
+    font-size: 11px;
+    font-style: italic;
+}
+QTextBrowser#creditsBrowser {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 8px;
+    color: $TEXT_MAIN;
+    padding: 12px;
 }
