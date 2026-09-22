@@ -7,9 +7,9 @@ from dataclasses import field
 
 from pxmodrim.core.models.metadata.structures import ListedMod
 
-    "steam": "Steam Workshop",
 PROVIDER_LABELS: dict[str, str] = {
     "local": "Local",
+    "steam": "Steam Workshop",
     "steam_cmd": "Steam Workshop",
     "core": "System / Core",
 }
