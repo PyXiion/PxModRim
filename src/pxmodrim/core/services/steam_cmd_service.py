@@ -427,8 +427,11 @@ class SteamCmdService(Plugin):
         worker.start()
         try:
             await done.wait()
+        except asyncio.CancelledError:
+            worker.cancel()
+            raise
         finally:
-            worker.wait()
+            await asyncio.to_thread(worker.wait)
             worker.quit()
             self._worker = None
 

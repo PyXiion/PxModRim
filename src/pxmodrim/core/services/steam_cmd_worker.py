@@ -4,6 +4,7 @@ import contextlib
 import os
 import re
 import subprocess
+import threading
 from typing import Any
 
 from loguru import logger
@@ -50,10 +51,16 @@ class SteamCmdDownloadWorker(QThread):
         self._batches = batches
         self._script_builder = script_builder
         self._stopped = False
+        self._process_lock = threading.Lock()
+        self._process: subprocess.Popen[str] | None = None
 
     def cancel(self) -> None:
         logger.debug("[steamcmd] worker cancel requested")
-        self._stopped = True
+        with self._process_lock:
+            self._stopped = True
+            process = self._process
+        if process is not None:
+            _kill(process)
 
     def run(self) -> None:
         succeeded: list[str] = []
@@ -77,7 +84,8 @@ class SteamCmdDownloadWorker(QThread):
                     "SteamCMD produced no recognizable output. Check logs for details."
                 )
         except Exception as e:  # noqa: BLE001 - worker boundary reports all failures
-            self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
+            if not self._stopped:
+                self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
         logger.info(
             f"[steamcmd] worker done: {len(succeeded)} ok, {len(failed)} failed"
         )
@@ -92,34 +100,46 @@ class SteamCmdDownloadWorker(QThread):
     ) -> None:
         os.makedirs(self._steam_path, exist_ok=True)
         script = self._script_builder(batch)
-        logger.debug(f"[steamcmd] spawning: {self._steamcmd} batch={batch}")
-        proc = subprocess.Popen(
-            [self._steamcmd, f'+runscript "{script}"'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            cwd=self._steam_path,
-            start_new_session=True,
-        )
-        assert proc.stdout is not None
         try:
-            for line in proc.stdout:
+            logger.debug(f"[steamcmd] spawning: {self._steamcmd} batch={batch}")
+            with self._process_lock:
                 if self._stopped:
-                    _kill(proc)
-                    break
-                self._parse_line(line, succeeded, failed)
-                completed = len(succeeded) + len(failed)
-                self.progress.emit(total, completed, "", "")
-            proc.wait()
-            if proc.returncode != 0:
-                msg = f"SteamCMD exited with code {proc.returncode}"
-                logger.warning("[steamcmd] {}", msg)
-                self.status.emit(msg)
-        finally:
-            if proc.poll() is None:
+                    return
+            proc = subprocess.Popen(
+                [self._steamcmd, "+runscript", script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=self._steam_path,
+                start_new_session=True,
+            )
+            with self._process_lock:
+                self._process = proc
+                stopped = self._stopped
+            if stopped:
                 _kill(proc)
-        with contextlib.suppress(OSError):
-            os.remove(script)
+            assert proc.stdout is not None
+            try:
+                for line in proc.stdout:
+                    if self._stopped:
+                        break
+                    self._parse_line(line, succeeded, failed)
+                    completed = len(succeeded) + len(failed)
+                    self.progress.emit(total, completed, "", "")
+                proc.wait()
+                if not self._stopped and proc.returncode != 0:
+                    msg = f"SteamCMD exited with code {proc.returncode}"
+                    logger.warning("[steamcmd] {}", msg)
+                    self.status.emit(msg)
+            finally:
+                if proc.poll() is None:
+                    _kill(proc)
+                with self._process_lock:
+                    if self._process is proc:
+                        self._process = None
+        finally:
+            with contextlib.suppress(OSError):
+                os.remove(script)
 
     def _parse_line(self, line: str, succeeded: list[str], failed: list[str]) -> None:
         text = line.strip()
