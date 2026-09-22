@@ -23,10 +23,10 @@ def _make_mod(package_id: str) -> AboutXmlMod:
     return m
 
 
-def _settings() -> SortSettings:
+def _settings(*, use_alternative_package_ids: bool = False) -> SortSettings:
     return SortSettings(
         use_community_rules=False,
-        use_alternative_package_ids=False,
+        use_alternative_package_ids=use_alternative_package_ids,
     )
 
 
@@ -64,6 +64,46 @@ class TestConstraintGraph:
         assert edge.target == PackageId("mod.b")
         assert edge.type == EdgeType.DEPENDENCY
         assert edge.origin == EdgeOrigin.ABOUT_XML
+
+    def test_dependency_alternative_resolution_respects_setting(self):
+        g = ConstraintGraph()
+        consumer = _make_mod("mod.consumer")
+        alternative = _make_mod("mod.alternative")
+        dependency = DependencyMod()
+        dependency.package_id = CaseInsensitiveStr("mod.dependency")
+        dependency.alternative_package_ids = {CaseInsensitiveStr("mod.alternative")}
+        consumer.about_rules.dependencies = {PackageId("mod.dependency"): dependency}
+        mods = {
+            PackageId("mod.consumer"): consumer,
+            PackageId("mod.alternative"): alternative,
+        }
+        ordered_pids = list(mods)
+
+        g.build(
+            mods,
+            ordered_pids,
+            _settings(use_alternative_package_ids=True),
+        )
+        enabled_targets = {
+            edge.target
+            for edge in g.edges_of_type(
+                PackageId("mod.consumer"), EdgeType.DEPENDENCY
+            )
+        }
+        assert enabled_targets == {PackageId("mod.alternative")}
+
+        g.build(
+            mods,
+            ordered_pids,
+            _settings(use_alternative_package_ids=False),
+        )
+        disabled_targets = {
+            edge.target
+            for edge in g.edges_of_type(
+                PackageId("mod.consumer"), EdgeType.DEPENDENCY
+            )
+        }
+        assert disabled_targets == {PackageId("mod.dependency")}
 
     def test_incompatibility_edge(self):
         g = ConstraintGraph()
@@ -137,8 +177,8 @@ class TestConstraintGraph:
 
         g.remove_mod(PackageId("mod.b"))
         assert PackageId("mod.b") not in g.nodes
-        # Incoming edge from 'a' should be gone too
-        assert len(g.incoming(PackageId("mod.a"))) == 0
+        # The edge from 'a' to the removed node should be gone too
+        assert not g.outgoing(PackageId("mod.a"))
 
     def test_update_order(self):
         g = ConstraintGraph()

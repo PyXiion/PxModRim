@@ -123,6 +123,23 @@ class TestIncompatibilityIssueChecker:
         assert issues[0].category == "incompatibility"
         assert issues[0].severity == "error"
 
+    def test_reverse_declared(self):
+        declarer = _make_mod("mod.declarer")
+        target = _make_mod("mod.target")
+        declarer.about_rules.incompatible_with = CaseInsensitiveSet(["mod.target"])
+        mods = {
+            PackageId("mod.declarer"): declarer,
+            PackageId("mod.target"): target,
+        }
+        ctx = _ctx(mods)
+        checker = IncompatibilityIssueChecker()
+
+        issues = checker.check(target, ctx)
+
+        assert len(issues) == 1
+        assert issues[0].category == "incompatibility"
+        assert issues[0].related_package_ids == (PackageId("mod.declarer"),)
+
 
 class TestLoadOrderIssueChecker:
     def test_no_violations(self):

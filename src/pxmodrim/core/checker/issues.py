@@ -105,34 +105,26 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                     )
                 )
 
-        # Reverse incompatibilities (other mods declaring this mod incompatible)
-        self_declared = set(mod.about_rules.incompatible_with)
+        self_declared = set(mod.overall_rules.incompatible_with)
         for edge in ctx.graph.incoming_of_type(pid, EdgeType.INCOMPATIBILITY):
-            if edge.source in ctx.active_mods and edge.source != pid:
-                # Check if this is already counted (mutual declaration)
-                if edge.source in self_declared:
-                    continue
-                other = ctx.active_mods.get(edge.source)
-                name = other.name if other else str(edge.source)
-                # Only add if this edge originates from community rules or from
-                # about_xml that we already didn't count (non-mutual)
-                source_mod = ctx.active_mods.get(edge.source)
-                if (
-                    source_mod
-                    and PackageId(str(pid))
-                    not in source_mod.about_rules.incompatible_with
-                ):
-                    issues.append(
-                        ModIssue(
-                            category="incompatibility",
-                            category_display_name=self.category_display_name,
-                            severity="error",
-                            short_message="Incompatibilities detected",
-                            detail_message=f"Declared incompatible by: "
-                            f"{name} ({edge.source})",
-                            related_package_ids=(PackageId(edge.source),),
-                        )
-                    )
+            if (
+                edge.source not in ctx.active_mods
+                or edge.source == pid
+                or edge.source in self_declared
+            ):
+                continue
+            other = ctx.active_mods[edge.source]
+            issues.append(
+                ModIssue(
+                    category="incompatibility",
+                    category_display_name=self.category_display_name,
+                    severity="error",
+                    short_message="Incompatibilities detected",
+                    detail_message=f"Declared incompatible by: "
+                    f"{other.name} ({edge.source})",
+                    related_package_ids=(PackageId(edge.source),),
+                )
+            )
 
         return issues
 

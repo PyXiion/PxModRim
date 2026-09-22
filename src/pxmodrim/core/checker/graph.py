@@ -143,7 +143,11 @@ class ConstraintGraph:
         for pid in ordered_pids:
             self._ensure_node(pid)
 
-        alt_map = _build_alt_map(active_mods)
+        alt_map = (
+            _build_alt_map(active_mods)
+            if settings.use_alternative_package_ids
+            else {}
+        )
 
         for pid, mod in active_mods.items():
             self._add_rules(pid, mod.about_rules, EdgeOrigin.ABOUT_XML, alt_map)
@@ -176,9 +180,12 @@ class ConstraintGraph:
         self._ordered_pids.insert(index, pid)
         self._rebuild_index()
 
-        self._add_rules(
-            pid, mod.about_rules, EdgeOrigin.ABOUT_XML, _build_alt_map({pid: mod})
+        alt_map = (
+            _build_alt_map({pid: mod})
+            if settings.use_alternative_package_ids
+            else {}
         )
+        self._add_rules(pid, mod.about_rules, EdgeOrigin.ABOUT_XML, alt_map)
 
         if settings.use_community_rules and community_rules and pid in community_rules:
             cr = community_rules[pid]
@@ -311,10 +318,14 @@ class ConstraintGraph:
 def _build_alt_map(
     active_mods: dict[PackageId, AboutXmlMod],
 ) -> dict[PackageId, PackageId]:
-    """Build a mapping from alternative package IDs to their canonical active PID."""
+    """Map canonical package IDs to active alternatives that satisfy them."""
     alt_map: dict[PackageId, PackageId] = {}
-    for pid, mod in active_mods.items():
-        for dep in mod.about_rules.dependencies.values():
-            for alt in dep.alternative_package_ids:
-                alt_map[alt] = pid
+    for mod in active_mods.values():
+        for dep_id, dep in mod.about_rules.dependencies.items():
+            if dep_id in active_mods:
+                continue
+            for alternative_pid in dep.alternative_package_ids:
+                if alternative_pid in active_mods:
+                    alt_map[dep_id] = alternative_pid
+                    break
     return alt_map

@@ -121,40 +121,12 @@ class ModChecker:
         active: bool,
         ordered_uuids: list[str],
     ) -> None:
-        """Add/remove a mod from active set, update diagnostics for affected mods."""
+        """Rebuild constraints and diagnostics after toggling a mod."""
         if not isinstance(mod, AboutXmlMod):
             self._emit()
             return
 
-        pid = PackageId(mod.package_id)
-        self._collect_active(
-            dict(self._all_mods),
-            ordered_uuids,
-        )
-
-        if active:
-            idx = self._ordered_pids.index(pid) if pid in self._ordered_pids else -1
-            if idx >= 0:
-                self._graph.add_mod(
-                    pid, mod, idx, self._settings, self._community_rules
-                )
-        else:
-            self._graph.remove_mod(pid)
-
-        self._cached_cycles = self._graph.find_cycles()
-        ctx = self._build_context(self._cached_cycles)
-
-        affected = {pid}
-        affected.update(self._graph.neighbors(pid))
-        for current_pid in affected:
-            if current_pid in self._active_mods:
-                current_mod = self._active_mods[current_pid]
-                diag = self._check_mod(current_mod, ctx)
-                self._diagnostics[current_pid] = diag
-            else:
-                self._diagnostics.pop(current_pid, None)
-
-        self._emit()
+        self.rebuild(self._all_mods, ordered_uuids)
 
     def move_mod(self, uuid: str, old_index: int, new_index: int) -> None:
         """Move a mod to new position and recheck diagnostics for neighbors."""

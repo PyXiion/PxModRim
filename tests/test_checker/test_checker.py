@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pxmodrim.core.checker.checker import ModChecker
+from pxmodrim.core.checker.graph import EdgeType
 from pxmodrim.core.checker.issues import (
     CycleIssueChecker,
     DependencyIssueChecker,
@@ -8,7 +9,7 @@ from pxmodrim.core.checker.issues import (
     LoadOrderIssueChecker,
     ModIssueChecker,
 )
-from pxmodrim.core.checker.models import ModDiagnostics
+from pxmodrim.core.checker.models import ModDiagnostics, PackageId
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
@@ -85,7 +86,7 @@ class TestModChecker:
         assert not diag_b.has_errors
         assert not diag_b.has_warnings
 
-    def test_toggle_mod(self):
+    def test_toggle_mod_rebuilds_diagnostics_and_constraints(self):
         checkers = [
             DependencyIssueChecker(),
             IncompatibilityIssueChecker(),
@@ -95,26 +96,38 @@ class TestModChecker:
         dep = DependencyMod()
         dep.package_id = CaseInsensitiveStr("mod.b")
         a.about_rules.dependencies = {CaseInsensitiveStr("mod.b"): dep}
+        b.about_rules.load_after = CaseInsensitiveSet(["mod.a"])
         mods = _as_listed([a, b])
-        active_uuids = [u for u, m in mods.items() if m.name == "mod.a"]
-
-        checker = ModChecker(checkers, _settings())
-        checker.rebuild(mods, active_uuids)
-
         a_uuid = _uuid_for(mods, "mod.a")
         b_uuid = _uuid_for(mods, "mod.b")
 
-        # 'a' should have missing dependency error (b is not active)
+        checker = ModChecker(checkers, _settings())
+        checker.rebuild(mods, [a_uuid, b_uuid])
+
+        checker.toggle_mod(mods[b_uuid], False, [a_uuid])
+
         diag = checker.diagnostics_for(a_uuid)
         assert diag is not None and diag.has_errors
+        assert diag.errors[0].category == "missing_dependency"
 
-        # Toggle b on
-        all_uuids = [a_uuid, b_uuid]
-        checker.toggle_mod(mods[b_uuid], True, all_uuids)
+        checker.toggle_mod(mods[b_uuid], True, [a_uuid, b_uuid])
 
-        # Now dep should be satisfied
         diag = checker.diagnostics_for(a_uuid)
-        assert diag is None or not diag.has_errors
+        assert diag is not None and not diag.has_errors
+        dependency_sources = {
+            edge.source
+            for edge in checker.graph.incoming_of_type(
+                PackageId("mod.b"), EdgeType.DEPENDENCY
+            )
+        }
+        assert dependency_sources == {PackageId("mod.a")}
+        load_after_targets = {
+            edge.target
+            for edge in checker.graph.edges_of_type(
+                PackageId("mod.b"), EdgeType.LOAD_AFTER
+            )
+        }
+        assert load_after_targets == {PackageId("mod.a")}
 
     def test_move_mod_updates_load_order(self):
         checkers: list[ModIssueChecker] = [
