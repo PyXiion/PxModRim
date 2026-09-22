@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pxmodrim.core.models.metadata.structures import ListedMod
-
 
 @dataclass(frozen=True, slots=True)
 class ModDiagnosticsView:
@@ -21,10 +19,3 @@ class ModIssueView:
     category_display_name: str
     detail: str | None
     is_error: bool
-
-
-@dataclass(frozen=True, slots=True)
-class ModItemState:
-    uuid: str
-    mod: ListedMod
-    checked: bool

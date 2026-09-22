@@ -6,7 +6,6 @@ from typing import Any
 
 import msgspec
 
-from pxmodrim.core.models.metadata.structures import BaseRules
 from pxmodrim.core.msgspec_hooks import dec_hook
 from pxmodrim.core.sort.models import CommunityRule, PackageId
 
@@ -71,21 +70,3 @@ def load_community_rules(json_path: Path) -> dict[PackageId, CommunityRule]:
         json_path.read_bytes(), type=ExternalRulesSchema, dec_hook=dec_hook
     )
     return data.to_community_rules()
-
-
-def merge_community_rules(
-    mod_rules: BaseRules,
-    community_rules: dict[PackageId, CommunityRule],
-    mod_pid: PackageId,
-) -> BaseRules:
-    """Merge community-sourced ordering rules into a mod's own BaseRules."""
-    if mod_pid not in community_rules:
-        return mod_rules
-
-    cr = community_rules[mod_pid]
-    return BaseRules(
-        load_after=mod_rules.load_after | cr.load_after,
-        load_before=mod_rules.load_before | cr.load_before,
-        incompatible_with=mod_rules.incompatible_with,
-        dependencies=dict(mod_rules.dependencies),
-    )

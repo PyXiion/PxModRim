@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -15,8 +14,6 @@ from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.panels.mod_list_panel import ModListPanel
 from pxmodrim.ui.panels.sidebar_panel import SidebarPanel
 from pxmodrim.ui.views.base import BaseViewPanel
-
-_QML_DIR = Path(__file__).parent
 
 
 class ModsViewPanel(BaseViewPanel):

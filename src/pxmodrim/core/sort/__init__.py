@@ -3,7 +3,6 @@ from __future__ import annotations
 from pxmodrim.core.sort.community import (
     community_rules_path,
     load_community_rules,
-    merge_community_rules,
 )
 from pxmodrim.core.sort.community_service import CommunityRulesService
 from pxmodrim.core.sort.config import (
@@ -37,5 +36,4 @@ __all__ = [
     "get_deps_recursive",
     "get_reverse_deps_recursive",
     "load_community_rules",
-    "merge_community_rules",
 ]

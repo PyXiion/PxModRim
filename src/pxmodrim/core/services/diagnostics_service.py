@@ -23,7 +23,6 @@ from pxmodrim.core.events import Event
 from pxmodrim.core.models.view.diagnostics import (
     ModDiagnosticsView,
     ModIssueView,
-    ModItemState,
 )
 from pxmodrim.core.models.view.sidebar import (
     PROVIDER_LABELS,
@@ -153,12 +152,6 @@ class DiagnosticsService:
             return
         with timer("diagnostics.rebuild"):
             self._checker.rebuild(self._ctx.all_mods, active_uuids, timer=timer)
-
-    def apply_active_mods_change(self, states: list[ModItemState]) -> None:
-        """Apply a new active set from toggle states and rebuild diagnostics."""
-        active_uuids = [s.uuid for s in states if s.checked]
-        self._last_active_uuids = active_uuids
-        self._checker.rebuild(self._ctx.all_mods, active_uuids)
 
     def reorder(self, active_uuids: list[str]) -> None:
         """Notify the checker of a new active mod order."""
