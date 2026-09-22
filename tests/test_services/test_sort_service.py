@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -13,6 +14,7 @@ from pxmodrim.core.models.metadata.structures import (
     DependencyMod,
     ListedMod,
 )
+from pxmodrim.core.sort.models import PackageId
 from pxmodrim.core.services.sort_service import SortService
 
 
@@ -78,6 +80,32 @@ def ctx() -> CoreContext:
 @pytest.fixture
 def sort_service(ctx: CoreContext) -> SortService:
     return SortService(ctx, MagicMock())
+
+
+class TestSortActiveMods:
+    def test_duplicate_inactive_copy_does_not_replace_active_uuid(
+        self, ctx: CoreContext
+    ) -> None:
+        active_mod = _mod("Active Copy", "shared.package")
+        inactive_mod = _mod("Inactive Copy", "shared.package")
+        ctx.load(
+            {
+                "uuid-active": active_mod,
+                "uuid-inactive": inactive_mod,
+            },
+            active_uuids=["uuid-active"],
+        )
+        diagnostics = MagicMock()
+        diagnostics.active_mods_by_pid = {PackageId("shared.package"): active_mod}
+        service = SortService(ctx, diagnostics)
+
+        with patch(
+            "pxmodrim.core.services.sort_service.topological_sort",
+            return_value=[PackageId("shared.package")],
+        ):
+            result = asyncio.run(service.sort_active_mods())
+
+        assert result == ["uuid-active"]
 
 
 class TestResolveMissingDependencies:
