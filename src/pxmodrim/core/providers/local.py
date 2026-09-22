@@ -98,6 +98,12 @@ class SteamCmdModProvider(BaseModProvider):
 
             def _keep(d: Path, about: Path) -> ListedMod | None:
                 if not (d / "About/PublishedFileId.txt").exists():
+
+
+class SteamWorkshopModProvider(SteamCmdModProvider):
+    """Provider for mods installed by the Steam client."""
+
+    provider_id = "steam"
                     return None
                 _, mod = create_listed_mod_from_path(
                     d, target_version, about_xml_path=about

@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING
 
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.providers.core import CoreModProvider
-from pxmodrim.core.providers.local import LocalModProvider, SteamCmdModProvider
+from pxmodrim.core.providers.local import (
+    LocalModProvider,
+    SteamCmdModProvider,
+    SteamWorkshopModProvider,
+)
 
 if TYPE_CHECKING:
     from pxmodrim.core.config import PathConfig
@@ -22,6 +26,10 @@ def create_providers(
     if paths.local:
         providers.append(LocalModProvider(Path(paths.local), pool=pool))
         providers.append(SteamCmdModProvider(Path(paths.local), pool=pool))
+    if paths.workshop:
+        providers.append(
+            SteamWorkshopModProvider(Path(paths.workshop), pool=pool)
+        )
     return providers
 
 
@@ -30,5 +38,6 @@ __all__ = [
     "CoreModProvider",
     "LocalModProvider",
     "SteamCmdModProvider",
+    "SteamWorkshopModProvider",
     "create_providers",
 ]
