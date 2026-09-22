@@ -239,15 +239,15 @@ class ModListModel(QAbstractListModel):
             old_uuid_to_row[item.uuid]: i for i, item in enumerate(new_items)
         }
 
+        self.layoutAboutToBeChanged.emit()
         persistent_indexes = self.persistentIndexList()
-        new_persistent: list[QModelIndex] = []
-        for pid in persistent_indexes:
-            new_row = new_row_for_old.get(pid.row(), -1)
-            new_persistent.append(self.index(new_row, 0))
+        self._items = new_items
+        new_persistent = [
+            self.index(new_row_for_old.get(index.row(), -1), 0)
+            for index in persistent_indexes
+        ]
         if persistent_indexes:
             self.changePersistentIndexList(persistent_indexes, new_persistent)
-
-        self._items = new_items
         self.layoutChanged.emit()
 
     def reorder(self, ordered_uuids: list[str]) -> None:

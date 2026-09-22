@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QPersistentModelIndex, Qt
 from PySide6.QtWidgets import QApplication
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
@@ -88,6 +88,31 @@ class TestCommitOrder:
         model.layoutChanged.connect(lambda *_: layout_changes.append(None))
         model.commitOrder([it.uuid for it in model._items])
         assert layout_changes == []
+
+    def test_layout_signals_wrap_reorder_and_preserve_persistent_index(
+        self, model: ModListModel
+    ) -> None:
+        before = [item.uuid for item in model._items]
+        target = list(reversed(before))
+        persistent_index = QPersistentModelIndex(model.index(0, 0))
+        uuid = persistent_index.data(ModListModel.UuidRole)
+        events: list[tuple[str, list[str]]] = []
+
+        model.layoutAboutToBeChanged.connect(
+            lambda *_: events.append(
+                ("about-to-change", [item.uuid for item in model._items])
+            )
+        )
+        model.layoutChanged.connect(
+            lambda *_: events.append(
+                ("changed", [item.uuid for item in model._items])
+            )
+        )
+
+        model.commitOrder(target)
+
+        assert events == [("about-to-change", before), ("changed", target)]
+        assert persistent_index.data(ModListModel.UuidRole) == uuid
 
 
 class TestActiveUuids:
