@@ -21,6 +21,7 @@ class LRUMap {
     this._map.set(key, value);
   }
   has(key) { return this._map.has(key); }
+  delete(key) { return this._map.delete(key); }
   get size() { return this._map.size; }
 }
 
@@ -650,10 +651,13 @@ export default {
 
         const id = url.searchParams.get('id');
         if (id && /^\d+$/.test(id.trim())) {
-          const purgeUrl = new URL(`/deps?id=${id.trim()}`, url.origin);
+          const targetId = id.trim();
+          const purgeUrl = new URL(`/deps?id=${targetId}`, url.origin);
           await caches.default.delete(new Request(purgeUrl));
-          console.log(`[PURGE] Cleared cache for mod ${id.trim()}`);
-          return new Response(`Purged ${id.trim()}`, { status: 200 });
+          GLOBAL_RAM_CACHE.delete(targetId);
+          await env.DB.prepare('DELETE FROM items WHERE id = ?').bind(targetId).run();
+          console.log(`[PURGE] Cleared cache for mod ${targetId}`);
+          return new Response(`Purged ${targetId}`, { status: 200 });
         }
         return new Response('Provide ?id=<steamid> to purge a specific mod', { status: 400 });
       }
