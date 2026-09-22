@@ -44,6 +44,7 @@ async def ensure_schema(
 
     logger.info("Migrating {} {} -> {}", label, current, schema_version)
     if backup_path is not None:
+        await conn.execute("PRAGMA wal_checkpoint(FULL)")
         backup = backup_path.with_suffix(f".db.bak.{int(time())}")
         shutil.copy2(backup_path, backup)
 
@@ -54,7 +55,6 @@ async def ensure_schema(
 
     migrator = Migrator({target: steps[target] for target in targets})
     await migrator.migrate(current, on_step=stamp)
-    await stamp(schema_version)
 
 
 class Migrator:

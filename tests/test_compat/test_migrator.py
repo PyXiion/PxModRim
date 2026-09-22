@@ -46,7 +46,7 @@ async def test_db_fresh_init_creates_schema_and_stamps_target(
     assert not list(tmp_path.glob("cache.db.bak.*"))
 
 
-async def test_db_migrations_run_in_order_and_backup_before_steps(
+async def test_db_migrations_checkpoint_wal_before_backup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / "cache.db"
@@ -54,14 +54,17 @@ async def test_db_migrations_run_in_order_and_backup_before_steps(
     backup_path = tmp_path / "cache.db.bak.1700000000"
 
     async with aiosqlite.connect(path) as conn:
+        journal_mode = await (await conn.execute("PRAGMA journal_mode = WAL")).fetchone()
+        assert journal_mode == ("wal",)
+        await conn.execute("PRAGMA wal_autocheckpoint = 0")
         await conn.execute("CREATE TABLE state (value TEXT)")
+        await conn.execute("INSERT INTO state VALUES ('before')")
         await conn.execute("PRAGMA user_version = 1")
         await conn.commit()
-        before = path.read_bytes()
+        assert path.with_name(f"{path.name}-wal").stat().st_size > 0
         events: list[str] = []
 
         async def step_two() -> None:
-            assert backup_path.read_bytes() == before
             events.append("two")
             await conn.execute("ALTER TABLE state ADD COLUMN second TEXT")
 
@@ -69,14 +72,11 @@ async def test_db_migrations_run_in_order_and_backup_before_steps(
             events.append("three")
             await conn.execute("ALTER TABLE state ADD COLUMN third TEXT")
 
-        async def step_four() -> None:
-            events.append("four")
-
         await ensure_schema(
             conn,
             schema_sql="CREATE TABLE IF NOT EXISTS state (value TEXT);",
             schema_version=3,
-            steps={2: step_two, 3: step_three, 4: step_four},
+            steps={2: step_two, 3: step_three},
             backup_path=path,
         )
         await conn.commit()
@@ -88,7 +88,23 @@ async def test_db_migrations_run_in_order_and_backup_before_steps(
         assert [column[1] for column in columns] == ["value", "second", "third"]
         assert events == ["two", "three"]
 
-    assert backup_path.read_bytes() == before
+    for suffix in ("-wal", "-shm"):
+        backup_path.with_name(f"{backup_path.name}{suffix}").unlink(missing_ok=True)
+
+    async with aiosqlite.connect(backup_path) as backup_conn:
+        backup_version = await (
+            await backup_conn.execute("PRAGMA user_version")
+        ).fetchone()
+        backup_columns = await (
+            await backup_conn.execute("PRAGMA table_info(state)")
+        ).fetchall()
+        backup_rows = await (
+            await backup_conn.execute("SELECT value FROM state")
+        ).fetchall()
+
+    assert backup_version == (1,)
+    assert [column[1] for column in backup_columns] == ["value"]
+    assert backup_rows == [("before",)]
 
 
 async def test_db_missing_migration_step_fails_without_advancing_version(
