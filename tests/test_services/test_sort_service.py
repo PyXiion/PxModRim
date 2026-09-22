@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,8 +13,8 @@ from pxmodrim.core.models.metadata.structures import (
     DependencyMod,
     ListedMod,
 )
-from pxmodrim.core.sort.models import PackageId
 from pxmodrim.core.services.sort_service import SortService
+from pxmodrim.core.sort.models import PackageId
 
 
 def _mod(name: str, pid: str = "") -> AboutXmlMod:
@@ -83,7 +82,7 @@ def sort_service(ctx: CoreContext) -> SortService:
 
 
 class TestSortActiveMods:
-    def test_duplicate_inactive_copy_does_not_replace_active_uuid(
+    async def test_duplicate_inactive_copy_does_not_replace_active_uuid(
         self, ctx: CoreContext
     ) -> None:
         active_mod = _mod("Active Copy", "shared.package")
@@ -103,7 +102,7 @@ class TestSortActiveMods:
             "pxmodrim.core.services.sort_service.topological_sort",
             return_value=[PackageId("shared.package")],
         ):
-            result = asyncio.run(service.sort_active_mods())
+            result = await service.sort_active_mods()
 
         assert result == ["uuid-active"]
 

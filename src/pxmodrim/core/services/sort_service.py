@@ -37,11 +37,11 @@ class SortService:
             sorted_pids = await asyncio.to_thread(_sort)
 
             all_mods = self._ctx.all_mods
-            pid_to_uuid = {
-                PackageId(mod.package_id): uuid
-                for uuid in self._ctx.active_uuids
-                if isinstance((mod := all_mods.get(uuid)), AboutXmlMod)
-            }
+            pid_to_uuid: dict[PackageId, str] = {}
+            for uuid in self._ctx.active_uuids:
+                mod = all_mods.get(uuid)
+                if isinstance(mod, AboutXmlMod):
+                    pid_to_uuid[PackageId(mod.package_id)] = uuid
 
             return [pid_to_uuid[pid] for pid in sorted_pids if pid in pid_to_uuid]
 
