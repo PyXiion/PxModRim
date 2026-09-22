@@ -84,7 +84,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
         )
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
-        """Report errors for active incompatible mods, avoid duplicate mutual decls."""
+        """Report errors for active incompatible mods without duplicate sources."""
         issues: list[ModIssue] = []
         pid = PackageId(mod.package_id)
 
@@ -105,14 +105,15 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                     )
                 )
 
-        self_declared = set(mod.overall_rules.incompatible_with)
+        reported_sources = set(mod.overall_rules.incompatible_with)
         for edge in ctx.graph.incoming_of_type(pid, EdgeType.INCOMPATIBILITY):
             if (
                 edge.source not in ctx.active_mods
                 or edge.source == pid
-                or edge.source in self_declared
+                or edge.source in reported_sources
             ):
                 continue
+            reported_sources.add(edge.source)
             other = ctx.active_mods[edge.source]
             issues.append(
                 ModIssue(

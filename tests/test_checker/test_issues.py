@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pxmodrim.core.checker.graph import ConstraintGraph
+from pxmodrim.core.checker.graph import ConstraintGraph, EdgeOrigin, EdgeType
 from pxmodrim.core.checker.issues import (
     CycleIssueChecker,
     DependencyIssueChecker,
@@ -19,6 +19,7 @@ from pxmodrim.core.models.metadata.structures import (
     DependencyMod,
 )
 from pxmodrim.core.sort.config import SortSettings
+from pxmodrim.core.sort.models import CommunityRule
 
 
 def _make_mod(package_id: str) -> AboutXmlMod:
@@ -139,6 +140,44 @@ class TestIncompatibilityIssueChecker:
         assert len(issues) == 1
         assert issues[0].category == "incompatibility"
         assert issues[0].related_package_ids == (PackageId("mod.declarer"),)
+
+    def test_reverse_declared_is_deduplicated_across_origins(self):
+        declarer = _make_mod("mod.declarer")
+        target = _make_mod("mod.target")
+        declarer_pid = PackageId("mod.declarer")
+        target_pid = PackageId("mod.target")
+        declarer.about_rules.incompatible_with = CaseInsensitiveSet([target_pid])
+        mods = {declarer_pid: declarer, target_pid: target}
+        settings = SortSettings(
+            use_community_rules=True,
+            use_alternative_package_ids=True,
+            check_missing_dependencies=True,
+        )
+        community_rules = {
+            declarer_pid: CommunityRule(
+                package_id=declarer_pid,
+                load_after=set(),
+                load_before=set(),
+                load_first=False,
+                load_last=False,
+                incompatible_with={target_pid},
+            )
+        }
+        graph = ConstraintGraph()
+        graph.build(mods, list(mods), settings, community_rules)
+        origins = {
+            edge.origin
+            for edge in graph.incoming_of_type(
+                target_pid, EdgeType.INCOMPATIBILITY
+            )
+        }
+        assert origins == {EdgeOrigin.ABOUT_XML, EdgeOrigin.COMMUNITY_RULES}
+        ctx = _ctx(mods, graph=graph, settings=settings)
+
+        issues = IncompatibilityIssueChecker().check(target, ctx)
+
+        assert len(issues) == 1
+        assert issues[0].related_package_ids == (declarer_pid,)
 
 
 class TestLoadOrderIssueChecker:
