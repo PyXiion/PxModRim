@@ -81,7 +81,8 @@ QPushButton {
     font-size: 12px;
     font-weight: 500;
 }
-QPushButton#appBtn {
+QPushButton#appBtn,
+QPushButton#primaryAction {
     padding: 6px 14px;
     min-height: 18px;
 }

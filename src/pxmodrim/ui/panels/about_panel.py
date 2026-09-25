@@ -56,7 +56,8 @@ class AboutPanel(QDialog):
 
         disclaimer = QLabel(
             "PxModRim is an unofficial fan-made tool. RimWorld is a trademark "
-            "of Ludeon Studios."
+            "of Ludeon Studios.",
+            self,
         )
         disclaimer.setObjectName("aboutDisclaimer")
         disclaimer.setWordWrap(True)
@@ -64,19 +65,19 @@ class AboutPanel(QDialog):
 
         footer = QHBoxLayout()
         footer.addStretch()
-        close_button = AppButton("Close")
+        close_button = AppButton("Close", self)
         close_button.clicked.connect(self.reject)
         footer.addWidget(close_button)
         layout.addLayout(footer)
 
     def _create_hero(self) -> QFrame:
-        hero = QFrame()
+        hero = QFrame(self)
         hero.setObjectName("aboutHero")
         layout = QHBoxLayout(hero)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
-        logo = QLabel()
+        logo = QLabel(hero)
         pixmap = QPixmap(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         logo.setPixmap(
             pixmap.scaled(
@@ -92,22 +93,23 @@ class AboutPanel(QDialog):
         identity.setSpacing(6)
 
         title_row = QHBoxLayout()
-        title = QLabel("PxModRim")
+        title = QLabel("PxModRim", hero)
         title.setObjectName("aboutTitle")
         title_row.addWidget(title)
         title_row.addStretch()
 
-        version_badge = QLabel(f"v{self._get_version()}")
+        version_badge = QLabel(f"v{self._get_version()}", hero)
         version_badge.setObjectName("aboutVersionBadge")
         title_row.addWidget(version_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
         identity.addLayout(title_row)
 
-        tagline = QLabel("A friendly, modern mod manager for RimWorld.")
+        tagline = QLabel("A friendly, modern mod manager for RimWorld.", hero)
         tagline.setObjectName("aboutTagline")
         identity.addWidget(tagline)
 
         description = QLabel(
-            "Scan, sort, resolve dependencies, and manage large mod lists easily."
+            "Scan, sort, resolve dependencies, and manage large mod lists easily.",
+            hero,
         )
         description.setObjectName("aboutDescription")
         description.setWordWrap(True)
@@ -118,12 +120,12 @@ class AboutPanel(QDialog):
         return hero
 
     def _create_project_story(self) -> QWidget:
-        section = QWidget()
+        section = QWidget(self)
         layout = QVBoxLayout(section)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        heading = QLabel("THE PROJECT")
+        heading = QLabel("THE PROJECT", section)
         heading.setObjectName("aboutSectionTitle")
         layout.addWidget(heading)
 
@@ -138,7 +140,8 @@ class AboutPanel(QDialog):
             "This is all just my personal opinion based on my experience with "
             "RimSort at the time, and things may have changed for the better since "
             "then (I hope so!).<br><br>"
-            "<b>— PyXiion</b>"
+            "<b>— PyXiion</b>",
+            section,
         )
         story.setObjectName("aboutStory")
         story.setWordWrap(True)
@@ -146,31 +149,29 @@ class AboutPanel(QDialog):
         return section
 
     def _create_details(self) -> QFrame:
-        details = QFrame()
+        details = QFrame(self)
         details.setObjectName("aboutDetails")
         layout = QGridLayout(details)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setHorizontalSpacing(14)
         layout.setVerticalSpacing(8)
 
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+        environment = (
+            f"Python {python_version}  •  Qt {qVersion()}  •  {platform.system()}"
+        )
         rows = (
             ("CREATED BY", "PyXiion"),
             ("LICENSE", "LGPL-3.0"),
             ("INSPIRED BY", "RimSort"),
-            (
-                "ENVIRONMENT",
-                (
-                    f"Python {sys.version_info.major}.{sys.version_info.minor}"
-                    f"  •  Qt {qVersion()}  •  {platform.system()}"
-                ),
-            ),
+            ("ENVIRONMENT", environment),
         )
         for row, (label_text, value_text) in enumerate(rows):
-            label = QLabel(label_text)
+            label = QLabel(label_text, details)
             label.setObjectName("aboutMetaLabel")
             layout.addWidget(label, row, 0)
 
-            value = QLabel(value_text)
+            value = QLabel(value_text, details)
             value.setObjectName("aboutMetaValue")
             layout.addWidget(value, row, 1)
 
@@ -181,24 +182,24 @@ class AboutPanel(QDialog):
         actions = QHBoxLayout()
         actions.setSpacing(8)
 
-        github_button = AppButton("GitHub")
+        github_button = AppButton("GitHub", self)
         github_button.setObjectName("primaryAction")
         github_button.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl(self._REPOSITORY_URL))
         )
         actions.addWidget(github_button)
 
-        issues_button = AppButton("Report issue")
+        issues_button = AppButton("Report issue", self)
         issues_button.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl(self._ISSUES_URL))
         )
         actions.addWidget(issues_button)
 
-        self._copy_button = AppButton("Copy system info")
+        self._copy_button = AppButton("Copy system info", self)
         self._copy_button.clicked.connect(self._copy_system_information)
         actions.addWidget(self._copy_button)
 
-        credits_button = AppButton("Open-source credits…")
+        credits_button = AppButton("Open-source credits…", self)
         credits_button.clicked.connect(self._credits_dialog.open)
         actions.addWidget(credits_button)
         actions.addStretch()
@@ -215,11 +216,11 @@ class AboutPanel(QDialog):
         layout.setContentsMargins(20, 20, 20, 16)
         layout.setSpacing(14)
 
-        title = QLabel("Open-source credits")
+        title = QLabel("Open-source credits", dialog)
         title.setObjectName("creditsTitle")
         layout.addWidget(title)
 
-        credits = QTextBrowser()
+        credits = QTextBrowser(dialog)
         credits.setObjectName("creditsBrowser")
         credits.setOpenExternalLinks(True)
         credits.setHtml(self._credits_html())
@@ -227,7 +228,7 @@ class AboutPanel(QDialog):
 
         footer = QHBoxLayout()
         footer.addStretch()
-        close_button = AppButton("Close")
+        close_button = AppButton("Close", dialog)
         close_button.clicked.connect(dialog.reject)
         footer.addWidget(close_button)
         layout.addLayout(footer)
