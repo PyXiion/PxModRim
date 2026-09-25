@@ -17,6 +17,16 @@ def get_version(project_root: Path) -> str:
     return tomllib.loads(pyproject.read_text("utf-8"))["project"]["version"]
 
 
+def debian_architecture(machine: str | None = None) -> str:
+    if machine is None:
+        machine = platform.machine()
+    architectures = {"x86_64": "amd64", "aarch64": "arm64"}
+    try:
+        return architectures[machine.lower()]
+    except KeyError:
+        raise RuntimeError(f"Unsupported Debian package architecture: {machine}") from None
+
+
 def get_standalone_args(release: bool = False) -> list[str]:
     project_root = Path(__file__).parent.parent
 
@@ -165,7 +175,7 @@ def normalize_executable(dist_dir: Path, system: str | None = None) -> Path:
     )
 
 
-def create_appimage(project_root: Path) -> None:
+def create_appimage(project_root: Path, release: bool = False) -> None:
     dist_dir = project_root / "dist" / "entrypoint.dist"
     app_dir = project_root / "dist" / "PxModRim.AppDir"
 
@@ -200,7 +210,10 @@ exec "$HERE/PxModRim" "$@"
     run_file.chmod(0o755)
 
     appimagetool = shutil.which("appimagetool")
+
     if not appimagetool:
+        if release:
+            raise RuntimeError("appimagetool is required to create the AppImage")
         print("Warning: appimagetool not found, skipping AppImage creation")
         print("Install from: https://github.com/AppImage/AppImageKit/releases")
         return
@@ -221,7 +234,8 @@ def create_deb(project_root: Path) -> Path | None:
         raise RuntimeError("dpkg-deb is required to create the Debian package")
 
     version = get_version(project_root)
-    output = project_root / "dist" / f"pxmodrim_{version}_amd64.deb"
+    architecture = debian_architecture()
+    output = project_root / "dist" / f"pxmodrim_{version}_{architecture}.deb"
     staging_dir = project_root / "dist" / "deb_staging"
     if staging_dir.exists():
         shutil.rmtree(staging_dir)
@@ -261,7 +275,7 @@ def create_deb(project_root: Path) -> Path | None:
 Version: {version}
 Section: games
 Priority: optional
-Architecture: amd64
+Architecture: {architecture}
 Installed-Size: {installed_size}
 Maintainer: PyXiion
 Homepage: https://github.com/PyXiion/PxModRim
@@ -279,9 +293,11 @@ Description: Mod manager for RimWorld
     return output
 
 
-def create_rpm(project_root: Path) -> Path | None:
+def create_rpm(project_root: Path, release: bool = False) -> Path | None:
     rpmbuild = shutil.which("rpmbuild")
     if not rpmbuild:
+        if release:
+            raise RuntimeError("rpmbuild is required to create the RPM")
         print("Warning: rpmbuild not found, skipping RPM creation")
         return None
 
@@ -313,7 +329,7 @@ def create_rpm(project_root: Path) -> Path | None:
         print("Warning: No RPM file was generated")
         return None
 
-    output = project_root / "dist" / f"pxmodrim-{version}-1.x86_64.rpm"
+    output = project_root / "dist" / rpm_files[0].name
     shutil.copy2(rpm_files[0], output)
     shutil.rmtree(top_dir)
     print(f"Created {output}")
@@ -353,7 +369,7 @@ def create_nsis_installer(project_root: Path) -> Path | None:
     return output
 
 
-def create_macos_bundle(project_root: Path) -> Path | None:
+def create_macos_bundle(project_root: Path, release: bool = False) -> Path | None:
     version = get_version(project_root)
     dist_path = project_root / "dist"
 
@@ -390,6 +406,11 @@ def create_macos_bundle(project_root: Path) -> Path | None:
             plistlib.dump(pl, f)
         print(f"Updated Info.plist bundle metadata (executable={final_binary.name})")
 
+    subprocess.run(
+        ["codesign", "--force", "--deep", "--sign", "-", str(app_dir)],
+        check=True,
+    )
+
     zip_output = dist_path / "PxModRim-macOS"
     shutil.make_archive(
         str(zip_output), "zip", root_dir=str(dist_path), base_dir="PxModRim.app"
@@ -397,26 +418,31 @@ def create_macos_bundle(project_root: Path) -> Path | None:
     print(f"Created {zip_output}.zip")
 
     hdiutil = shutil.which("hdiutil")
-    if hdiutil:
-        dmg_output = dist_path / "PxModRim-macOS.dmg"
-        if dmg_output.exists():
-            dmg_output.unlink()
-        subprocess.run(
-            [
-                hdiutil,
-                "create",
-                "-volname",
-                "PxModRim",
-                "-srcfolder",
-                str(app_dir),
-                "-ov",
-                "-format",
-                "UDZO",
-                str(dmg_output),
-            ],
-            check=True,
-        )
-        print(f"Created {dmg_output}")
+    if not hdiutil:
+        if release:
+            raise RuntimeError("hdiutil is required to create the macOS DMG")
+        print("Warning: hdiutil not found, skipping DMG creation")
+        return app_dir
+
+    dmg_output = dist_path / "PxModRim-macOS.dmg"
+    if dmg_output.exists():
+        dmg_output.unlink()
+    subprocess.run(
+        [
+            hdiutil,
+            "create",
+            "-volname",
+            "PxModRim",
+            "-srcfolder",
+            str(app_dir),
+            "-ov",
+            "-format",
+            "UDZO",
+            str(dmg_output),
+        ],
+        check=True,
+    )
+    print(f"Created {dmg_output}")
 
     return app_dir
 
@@ -562,9 +588,9 @@ def main() -> None:
     if system == "Linux":
         if bundle_qt:
             print("\nStep 3: Creating Linux packages (AppImage, deb, rpm)...")
-            create_appimage(project_root)
+            create_appimage(project_root, release=release)
             create_deb(project_root)
-            create_rpm(project_root)
+            create_rpm(project_root, release=release)
         else:
             print(
                 "\nStep 3: Skipping Linux packages (system Qt mode, not self-contained)"
@@ -574,7 +600,7 @@ def main() -> None:
         create_nsis_installer(project_root)
     elif system == "Darwin":
         print("\nStep 3: Packaging macOS .app bundle...")
-        create_macos_bundle(project_root)
+        create_macos_bundle(project_root, release=release)
 
     print(f"\nBuild complete! Output: {dist_dir}")
     print(f"Run with: {final_binary}")

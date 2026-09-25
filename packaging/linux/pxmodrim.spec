@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        Mod manager for RimWorld
 License:        LGPL-3.0
 URL:            https://github.com/PyXiion/PxModRim
-BuildArch:      x86_64
+BuildArch:      %{_arch}
 AutoReqProv:    no
 
 %description

@@ -5,6 +5,7 @@ import importlib.util
 import plistlib
 import struct
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,49 @@ def test_get_version_from_git_tag(tmp_path: Path, monkeypatch) -> None:
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[project]\nversion = "1.0.0"\n', encoding="utf-8")
     assert pkg_build.get_version(tmp_path) == "2.0.1"
+
+
+@pytest.mark.parametrize(
+    ("machine", "architecture"),
+    [("x86_64", "amd64"), ("aarch64", "arm64")],
+)
+def test_debian_architecture_mapping(machine: str, architecture: str) -> None:
+    assert pkg_build.debian_architecture(machine) == architecture
+
+
+def test_deb_creation_uses_native_architecture(tmp_path: Path, monkeypatch) -> None:
+    dist_dir = tmp_path / "dist" / "entrypoint.dist"
+    dist_dir.mkdir(parents=True)
+    (dist_dir / "PxModRim").write_bytes(b"application")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nversion = "0.5.0"\n', encoding="utf-8"
+    )
+    desktop_dir = tmp_path / "packaging" / "linux"
+    desktop_dir.mkdir(parents=True)
+    (desktop_dir / "pxmodrim.desktop").write_text(
+        "[Desktop Entry]\n", encoding="utf-8"
+    )
+    icon = tmp_path / "src" / "pxmodrim" / "ui" / "assets" / "logo.svg"
+    icon.parent.mkdir(parents=True)
+    icon.write_text("<svg />", encoding="utf-8")
+
+    control: dict[str, str] = {}
+    monkeypatch.setattr(pkg_build.platform, "machine", lambda: "aarch64")
+    monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: "dpkg-deb")
+
+    def build_package(args: list[str], check: bool) -> None:
+        control["metadata"] = (
+            Path(args[-2]) / "DEBIAN" / "control"
+        ).read_text(encoding="utf-8")
+        Path(args[-1]).touch()
+
+    monkeypatch.setattr(pkg_build.subprocess, "run", build_package)
+
+    output = pkg_build.create_deb(tmp_path)
+
+    assert output is not None
+    assert output.name == "pxmodrim_0.5.0_arm64.deb"
+    assert "Architecture: arm64" in control["metadata"]
 
 
 def test_get_standalone_platform_args(monkeypatch) -> None:
@@ -82,6 +126,30 @@ def test_deb_creation_requires_dpkg_deb(tmp_path: Path, monkeypatch) -> None:
         pkg_build.create_deb(tmp_path)
 
 
+def test_appimage_creation_requires_appimagetool_for_release(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dist_dir = tmp_path / "dist" / "entrypoint.dist"
+    dist_dir.mkdir(parents=True)
+    (dist_dir / "PxModRim").write_bytes(b"application")
+    icon = tmp_path / "src" / "pxmodrim" / "ui" / "assets" / "logo.svg"
+    icon.parent.mkdir(parents=True)
+    icon.write_text("<svg />", encoding="utf-8")
+    monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: None)
+
+    with pytest.raises(RuntimeError, match="appimagetool"):
+        pkg_build.create_appimage(tmp_path, release=True)
+
+
+def test_rpm_creation_requires_rpmbuild_for_release(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: None)
+
+    with pytest.raises(RuntimeError, match="rpmbuild"):
+        pkg_build.create_rpm(tmp_path, release=True)
+
+
 def test_flatpak_metadata_contract() -> None:
     metadata = ET.parse(
         "packaging/flatpak/com.github.PyXiion.PxModRim.metainfo.xml"
@@ -126,7 +194,13 @@ def test_macos_bundle_plist_update(tmp_path: Path, monkeypatch) -> None:
     with open(plist_file, "wb") as f:
         plistlib.dump({}, f)
 
-    # Mock hdiutil not present to only test plist update and zip creation
+    # Mock the platform tools while exercising app metadata and archive creation.
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        pkg_build.subprocess,
+        "run",
+        lambda command, check: commands.append(command),
+    )
     monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: None)
 
     res = pkg_build.create_macos_bundle(project_root)
@@ -142,3 +216,23 @@ def test_macos_bundle_plist_update(tmp_path: Path, monkeypatch) -> None:
     assert pl["CFBundleVersion"] == "0.9.0"
     assert pl["CFBundleExecutable"] == "PxModRim"
     assert pl["CFBundlePackageType"] == "APPL"
+
+    assert any(command[0] == "codesign" and "-" in command for command in commands)
+    with zipfile.ZipFile(project_root / "dist" / "PxModRim-macOS.zip") as archive:
+        assert "PxModRim.app/Contents/MacOS/PxModRim" in archive.namelist()
+
+
+def test_macos_bundle_requires_hdiutil_for_release(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text('[project]\nversion = "0.9.0"\n', encoding="utf-8")
+    app_dir = tmp_path / "dist" / "PxModRim.app"
+    macos_dir = app_dir / "Contents" / "MacOS"
+    macos_dir.mkdir(parents=True)
+    (macos_dir / "PxModRim").write_bytes(b"macOS executable")
+    monkeypatch.setattr(pkg_build.subprocess, "run", lambda command, check: None)
+    monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: None)
+
+    with pytest.raises(RuntimeError, match="hdiutil"):
+        pkg_build.create_macos_bundle(tmp_path, release=True)
