@@ -153,6 +153,7 @@ class ConfirmRestoreDialog(QMessageBox):
 
     def __init__(self, snapshot_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setOption(QMessageBox.Option.DontUseNativeDialog, True)
         self.setIcon(QMessageBox.Icon.Question)
         self.setWindowTitle("Restore Mod List")
         self.setText(f"Restore the mod list saved in {snapshot_name}?")
