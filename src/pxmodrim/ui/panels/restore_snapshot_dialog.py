@@ -153,9 +153,9 @@ class ConfirmRestoreDialog(QMessageBox):
 
     def __init__(self, snapshot_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setOption(QMessageBox.Option.DontUseNativeDialog, True)
         self.setIcon(QMessageBox.Icon.Question)
-        self.setWindowTitle("Restore Mod List")
+        # QMessageBox's setter is a no-op on macOS.
+        QDialog.setWindowTitle(self, "Restore Mod List")
         self.setText(f"Restore the mod list saved in {snapshot_name}?")
         self.setInformativeText(
             "This replaces your current active mod list. PxModRim will save a "
