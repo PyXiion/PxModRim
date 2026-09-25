@@ -81,12 +81,13 @@ def db_path(config_dir: Path) -> Path:
 class StartupImpactDb:
     """Owns a single aiosqlite connection guarded by an asyncio lock."""
 
-    __slots__ = ("_connection", "_connection_path", "_lock")
+    __slots__ = ("_connection", "_connection_path", "_lock", "_operation_lock")
 
     def __init__(self) -> None:
         self._connection: aiosqlite.Connection | None = None
         self._connection_path: str = ""
         self._lock = asyncio.Lock()
+        self._operation_lock = asyncio.Lock()
 
     async def _connection_for(self, path: Path) -> aiosqlite.Connection:
         db_str = str(path)
@@ -118,7 +119,7 @@ class StartupImpactDb:
         )
 
     async def close(self) -> None:
-        async with self._lock:
+        async with self._operation_lock, self._lock:
             if self._connection is not None:
                 await self._connection.close()
                 self._connection = None
@@ -131,6 +132,10 @@ class StartupImpactDb:
             self._connection_path = ""
 
     async def store_report(self, path: Path, report: StartupImpactReport) -> None:
+        async with self._operation_lock:
+            await self._store_report(path, report)
+
+    async def _store_report(self, path: Path, report: StartupImpactReport) -> None:
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
         db = await self._connection_for(path)
@@ -414,15 +419,16 @@ class StartupImpactDb:
         return report, base_avg, totals, selected_avg
 
     async def clear(self, path: Path) -> None:
-        if not path.exists():
-            return
-        db = await self._connection_for(path)
-        async with db.cursor() as cursor:
-            await cursor.execute("DELETE FROM startup_impact_entries")
-            await cursor.execute("DELETE FROM startup_impact_sessions")
-        await db.commit()
-        await db.execute("VACUUM")
-        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        async with self._operation_lock:
+            if not path.exists():
+                return
+            db = await self._connection_for(path)
+            async with db.cursor() as cursor:
+                await cursor.execute("DELETE FROM startup_impact_entries")
+                await cursor.execute("DELETE FROM startup_impact_sessions")
+            await db.commit()
+            await db.execute("VACUUM")
+            await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
 def _row_to_mod(row: aiosqlite.Row) -> StartupImpactMod:
