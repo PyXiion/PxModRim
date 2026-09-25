@@ -24,3 +24,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - SteamCMD worker rewritten on asyncio subprocesses (no `QThread`); cancellation terminates and reaps the process
 - Dependency cycle detection reports all overlapping cycles (SCC-based); sorting/cycle checks no longer hit recursion limits on long chains; tier sort no longer quadratic
 - Unused per-mod `community_rules`/`user_rules` and `overall_rules` merge
+- `About.xml` version keys match exactly (`v1.5` no longer matches `v1.50`); mods without `packageId` are invalid

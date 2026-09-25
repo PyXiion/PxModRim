@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import traceback
 from collections.abc import Sequence
 from pathlib import Path
@@ -62,18 +61,18 @@ def match_version(
     """Match a versioned dict entry by major.minor, return value(s) on success."""
     try:
         major, minor = target_version.split(".")[:2]
-        version_regex = f"v{major}.{minor}"
     except ValueError:
         return False, None
+    version_key = f"v{major}.{minor}"
 
     if stop_at_first:
-        result = input.get(version_regex) or input.get(f"{major}.{minor}")
+        result = input.get(version_key) or input.get(f"{major}.{minor}")
         if result is not None:
             return True, result
 
     results = []
     for key, value in input.items():
-        if re.match(version_regex, key):
+        if key == version_key:
             if stop_at_first:
                 return True, value
             if isinstance(value, list):
@@ -212,16 +211,12 @@ def _match_byversion_raw(
     except ValueError:
         return False, None
 
-    version_regex = f"v{major}.{minor}"
+    version_key = f"v{major}.{minor}"
 
-    if version_regex in byversion_data:
-        return True, byversion_data[version_regex]
+    if version_key in byversion_data:
+        return True, byversion_data[version_key]
     if f"{major}.{minor}" in byversion_data:
         return True, byversion_data[f"{major}.{minor}"]
-
-    for key, value in byversion_data.items():
-        if re.match(version_regex, key):
-            return True, value
 
     return False, None
 
@@ -414,6 +409,8 @@ def create_about_mod(
 ) -> tuple[bool, AboutXmlMod]:
     """Create an AboutXmlMod from parsed XML data. Returns (valid, mod)."""
     mod = _parse_basic(mod_data, AboutXmlMod())
+    if str(mod.package_id) == DEFAULT_MISSING_PACKAGEID:
+        _set_mod_invalid(mod, "packageId missing or invalid.")
 
     if not isinstance(mod, AboutXmlMod):
         ruled_mod = AboutXmlMod()
@@ -433,15 +430,10 @@ def _match_versioned_child(
         major, minor = target_version.split(".")[:2]
     except ValueError:
         return None
-    key = f"v{major}.{minor}"
-    found = parent.find(key)
-    if found is None:
-        found = parent.find(f"{major}.{minor}")
-    if found is not None:
-        return found
-    for child in parent:
-        if re.match(key, child.tag):
-            return child
+    for key in (f"v{major}.{minor}", f"{major}.{minor}"):
+        found = parent.find(key)
+        if found is not None:
+            return found
     return None
 
 
@@ -486,6 +478,7 @@ def _create_about_mod_from_element(
     """Build AboutXmlMod in a single pass over the <ModMetaData> element children."""
     mod = AboutXmlMod()
     rules = BaseRules()
+    has_package_id = False
 
     deps_el: ET._Element | None = None
     deps_bv: bool = False
@@ -501,6 +494,7 @@ def _create_about_mod_from_element(
     for child in root:
         tag = child.tag
         if tag == "packageId":
+            has_package_id = True
             t = _element_value(child)
             if isinstance(t, str) and t:
                 mod.package_id = CaseInsensitiveStr(t)
@@ -611,6 +605,14 @@ def _create_about_mod_from_element(
             if matched is not None and matched.text and matched.text.strip():
                 mod.description = matched.text.strip()
 
+    if not has_package_id:
+        _set_mod_invalid(
+            mod,
+            "packageId missing or invalid. "
+            f"Assigned sentinel '{DEFAULT_MISSING_PACKAGEID}'.",
+        )
+        mod.package_id = CaseInsensitiveStr(DEFAULT_MISSING_PACKAGEID)
+
     # Apply versioned overrides
     if load_before_bv_el is not None:
         t = _element_value(load_before_bv_el)
@@ -686,9 +688,9 @@ def _create_about_mod_from_xml(
     """Parse an About.xml file and return a validated AboutXmlMod with its path set."""
     try:
         tree = ET.parse(str(mod_xml_path))
-    except (OSError, TypeError):
+    except (OSError, TypeError, ET.XMLSyntaxError):
         logger.error(f"Unable to parse {mod_xml_path}: {traceback.format_exc()}")
-        return False, AboutXmlMod(valid=False)
+        return False, AboutXmlMod(valid=False, _mod_path=base_path)
 
     root = tree.getroot()
     if root is None:
@@ -697,6 +699,10 @@ def _create_about_mod_from_xml(
 
     mod = _create_about_mod_from_element(root, target_version, prefer_versioned)
     mod.mod_path = base_path
+    try:
+        mod.mtime = mod_xml_path.stat().st_mtime
+    except OSError:
+        mod.mtime = 0.0
     return mod.valid, mod
 
 
