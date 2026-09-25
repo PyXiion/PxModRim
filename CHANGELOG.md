@@ -26,3 +26,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Unused per-mod `community_rules`/`user_rules` and `overall_rules` merge
 - `About.xml` version keys match exactly (`v1.5` no longer matches `v1.50`); mods without `packageId` are invalid
 - Mod description links restricted to HTTP(S); oversized `<size>`/`<indent>` values no longer crash rendering
+- Stale time-analytics results no longer overwrite the selected mod; sidebar icons update with entries; proxy model keeps persistent indexes valid across filtering

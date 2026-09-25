@@ -9,6 +9,7 @@ from PySide6.QtCore import QCoreApplication, QObject, QPoint, Qt, Signal
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
+from pytestqt.qtbot import QtBot
 
 from pxmodrim.core.checker.graph import ConstraintGraph, PackageId
 from pxmodrim.core.context import CoreContext
@@ -189,11 +190,12 @@ async def test_cancel_keeps_selected_mod_and_dependents_active(
 
 def test_hovering_drag_handle_does_not_show_drag_proxy(
     qml_engine: QQmlEngine,
+    qtbot: QtBot,
 ) -> None:
     panel = _widget_panel(qml_engine)
     panel.resize(420, 320)
     panel.show()
-    QTest.qWait(20)
+    qtbot.waitUntil(lambda: panel._qml.isVisible())
     root = panel._qml.rootObject()
     assert root is not None
     drag_proxy = root.findChild(QObject, "dragProxy")
@@ -254,11 +256,12 @@ def test_qml_selection_follows_uuid_when_selected_row_moves(
 
 def test_search_focus_disables_list_keyboard_actions(
     qml_engine: QQmlEngine,
+    qtbot: QtBot,
 ) -> None:
     panel = _widget_panel(qml_engine)
     panel.resize(420, 320)
     panel.show()
-    QTest.qWait(20)
+    qtbot.waitUntil(lambda: panel._qml.isVisible())
     root = panel._qml.rootObject()
     assert root is not None
 
@@ -268,10 +271,10 @@ def test_search_focus_disables_list_keyboard_actions(
         Qt.KeyboardModifier.NoModifier,
         QPoint(100, 26),
     )
-    QTest.qWait(20)
+    qtbot.waitUntil(lambda: root.property("keyboardActive") is True)
     assert root.property("keyboardActive") is True
     panel.search_input.setFocus()
-    QTest.qWait(10)
+    qtbot.waitUntil(lambda: root.property("keyboardActive") is False)
     assert root.property("keyboardActive") is False
     QTest.keyClick(panel.search_input, Qt.Key.Key_Return)
     assert panel.active_uuids() == []

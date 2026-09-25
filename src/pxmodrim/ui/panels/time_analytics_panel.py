@@ -83,6 +83,7 @@ class TimeAnalyticsPanel(QWidget):
     ) -> None:
         super().__init__()
         self._sis = sis
+        self._request_token = 0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -94,6 +95,8 @@ class TimeAnalyticsPanel(QWidget):
         layout.addWidget(self._qml)
 
     async def set_data(self, pid: str | None, active_pids: list[str]) -> None:
+        self._request_token += 1
+        request_token = self._request_token
         root_obj = self._qml.rootObject()
         if not root_obj:
             return
@@ -104,6 +107,8 @@ class TimeAnalyticsPanel(QWidget):
             return
 
         report, base, totals, own = await sis.snapshot(active_pids, pid)
+        if request_token != self._request_token:
+            return
         if not report:
             root_obj.setProperty("sourceData", None)
             return
@@ -277,6 +282,7 @@ class TimeAnalyticsPanel(QWidget):
         return legend
 
     def clear(self) -> None:
+        self._request_token += 1
         root_obj = self._qml.rootObject()
         if root_obj:
             root_obj.setProperty("sourceData", None)

@@ -84,8 +84,25 @@ class ModListProxyModel(QAbstractListModel):
         self._apply_filter_change()
 
     def _apply_filter_change(self) -> None:
+        self._layout_rebuild()
+
+    def _layout_rebuild(self) -> None:
+        persistent_indexes = self.persistentIndexList()
+        persistent_uuids = [
+            self._visible_uuids[index.row()]
+            if index.isValid() and 0 <= index.row() < len(self._visible_uuids)
+            else None
+            for index in persistent_indexes
+        ]
         self.layoutAboutToBeChanged.emit()
         self._rebuild()
+        new_indexes = [
+            self.index(self._proxy_row_by_uuid[uuid], 0)
+            if uuid is not None and uuid in self._proxy_row_by_uuid
+            else QModelIndex()
+            for uuid in persistent_uuids
+        ]
+        self.changePersistentIndexList(persistent_indexes, new_indexes)
         self.layoutChanged.emit()
 
     def rowCount(
@@ -228,9 +245,7 @@ class ModListProxyModel(QAbstractListModel):
     def _on_source_layout_changed(self) -> None:
         if self._in_proxy_move:
             return
-        self.layoutAboutToBeChanged.emit()
-        self._rebuild()
-        self.layoutChanged.emit()
+        self._layout_rebuild()
 
     def _on_source_model_reset(self) -> None:
         self.beginResetModel()

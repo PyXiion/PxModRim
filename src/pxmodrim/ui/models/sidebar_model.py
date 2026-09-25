@@ -233,9 +233,11 @@ class SidebarModel(QAbstractListModel):
         for i, entry in enumerate(entries):
             item = self._items[i]
             entry_type = _detect_entry_type(entry)
-            bg, fg, _, icon_color = _ENTRY_TYPES.get(
+            bg, fg, icon_name, icon_color = _ENTRY_TYPES.get(
                 entry_type, _ENTRY_TYPES["provider"]
             )
+            if entry_type == "provider":
+                icon_name = _icon_for_provider(entry)
             if entry_type == "provider":
                 label_lower = getattr(entry, "label", "").lower()
                 if "steam" in label_lower:
@@ -258,6 +260,12 @@ class SidebarModel(QAbstractListModel):
             if item.badge_fg != fg:
                 item.badge_fg = fg
                 changed_roles.add(self.BadgeFgRole)
+            if item.icon_name != icon_name:
+                item.icon_name = icon_name
+                changed_roles.add(self.IconRole)
+            if item.icon_color != icon_color:
+                item.icon_color = icon_color
+                changed_roles.add(self.IconColorRole)
 
             item.entry = entry
 

@@ -134,6 +134,8 @@ class ModListModel(QAbstractListModel):
         return False
 
     def set_startup_impact(self, impacts: dict[str, float] | None = None) -> None:
+        if not self._items:
+            return
         if impacts is None:
             impacts = {}
         for item in self._items:

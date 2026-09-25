@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import field
-
-from pxmodrim.core.models.metadata.structures import ListedMod
 
 PROVIDER_LABELS: dict[str, str] = {
     "local": "Local",
@@ -18,8 +15,12 @@ PROVIDER_LABELS: dict[str, str] = {
 class SidebarEntry(ABC):
     """A filter entry in the sidebar. Knows which mods it represents."""
 
-    visible_uuids: set[str] = field(default_factory=set)
-    count: int = 0
+    visible_uuids: set[str]
+    count: int
+
+    def __init__(self) -> None:
+        self.visible_uuids = set()
+        self.count = 0
 
     @property
     @abstractmethod
@@ -28,22 +29,11 @@ class SidebarEntry(ABC):
     def refresh_count(self) -> None:
         self.count = len(self.visible_uuids)
 
-    @abstractmethod
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        """Override for entries needing re-computation on toggles (Active/Inactive)."""
-
 
 class AllModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return "All"
-
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        self.visible_uuids = set(all_mods)
 
 
 class ActiveModsEntry(SidebarEntry):
@@ -51,23 +41,11 @@ class ActiveModsEntry(SidebarEntry):
     def label(self) -> str:
         return "Active"
 
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        self.visible_uuids = set(active_uuids)
-        self.refresh_count()
-
 
 class InactiveModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return "Inactive"
-
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        self.visible_uuids = set(all_mods) - set(active_uuids)
-        self.refresh_count()
 
 
 class ErrorModsEntry(SidebarEntry):
@@ -75,21 +53,11 @@ class ErrorModsEntry(SidebarEntry):
     def label(self) -> str:
         return "With errors"
 
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        pass
-
 
 class WarningModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return "With warnings"
-
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        pass
 
 
 class ProviderModsEntry(SidebarEntry):
@@ -103,8 +71,3 @@ class ProviderModsEntry(SidebarEntry):
     @property
     def label(self) -> str:
         return self._label
-
-    def update_uuids(
-        self, all_mods: dict[str, ListedMod], active_uuids: set[str]
-    ) -> None:
-        pass

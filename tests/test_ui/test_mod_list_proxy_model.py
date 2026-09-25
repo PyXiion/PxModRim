@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, QPersistentModelIndex
 from PySide6.QtWidgets import QApplication
 
 from pxmodrim.core.models.metadata.structures import (
@@ -199,3 +199,17 @@ class TestMapToSource:
             assert src_idx.isValid()
             assert proxy.mapFromSource(src_idx).row() == r
         assert not proxy.mapFromSource(source.index(0, 0)).isValid()
+
+    def test_persistent_indexes_follow_uuid_across_filter_rebuild(
+        self, proxy: ModListProxyModel
+    ) -> None:
+        kept = QPersistentModelIndex(proxy.index(2, 0))
+        filtered = QPersistentModelIndex(proxy.index(1, 0))
+        assert kept.data(ModListModel.UuidRole) == "uuid-1"
+
+        proxy.set_sidebar_filter({"uuid-1", "uuid-3"})
+
+        assert kept.isValid()
+        assert kept.row() == 0
+        assert kept.data(ModListModel.UuidRole) == "uuid-1"
+        assert not filtered.isValid()

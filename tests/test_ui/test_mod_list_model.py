@@ -104,9 +104,7 @@ class TestCommitOrder:
             )
         )
         model.layoutChanged.connect(
-            lambda *_: events.append(
-                ("changed", [item.uuid for item in model._items])
-            )
+            lambda *_: events.append(("changed", [item.uuid for item in model._items]))
         )
 
         model.commitOrder(target)
@@ -120,3 +118,15 @@ class TestActiveUuids:
         active = model.active_uuids()
         assert set(active) == {"uuid-0", "uuid-2"}
         assert active == ["uuid-0", "uuid-2"]
+
+
+def test_setting_startup_impact_on_empty_model_emits_no_data_changed(
+    qapp: QApplication,
+) -> None:
+    model = ModListModel(_provider_colors())
+    changes: list[None] = []
+    model.dataChanged.connect(lambda *_: changes.append(None))
+
+    model.set_startup_impact({"example.mod": 1.0})
+
+    assert changes == []
