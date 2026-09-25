@@ -70,6 +70,6 @@ class PluginRegistry:
 
     async def shutdown_all(self) -> None:
         logger.info("shutting down {} plugins...", len(self._plugins))
-        for p in reversed(list(self._plugins.values())):
+        for p in reversed(self._toposort()):
             await p.shutdown()
         logger.info("all plugins shut down")

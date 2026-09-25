@@ -71,11 +71,6 @@ class Toast(QWidget):
         self._opacity_anim.setDirection(QPropertyAnimation.Direction.Forward)
         self._opacity_anim.start()
 
-    def hide_with_animation(self) -> None:
-        self._opacity_anim.setDirection(QPropertyAnimation.Direction.Backward)
-        self._opacity_anim.finished.connect(self.hide)
-        self._opacity_anim.start()
-
 
 class ToastManager(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -114,7 +109,7 @@ class ToastManager(QWidget):
                 if toast in self._active_toasts:
                     self._active_toasts.remove(toast)
 
-            QTimer.singleShot(duration_ms, _dismiss)
+            QTimer.singleShot(duration_ms, toast, _dismiss)
 
     def info(self, message: str, duration: int = 3000) -> None:
         self.show_toast(message, "info", duration)

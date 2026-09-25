@@ -82,6 +82,21 @@ class TestPluginRegistryToposort:
         asyncio.run(reg.init_all(order))
         assert order == ["a", "b", "c"]
 
+    def test_shutdown_all_reverse_dependency_order(self) -> None:
+        reg = PluginRegistry()
+        shutdown_order: list[str] = []
+
+        class ShutdownRecorder(_RecorderPlugin):
+            async def shutdown(self) -> None:
+                shutdown_order.append(self.name)
+
+        reg.register(ShutdownRecorder("dependent", ["dependency"]))
+        reg.register(ShutdownRecorder("dependency"))
+
+        asyncio.run(reg.shutdown_all())
+
+        assert shutdown_order == ["dependent", "dependency"]
+
 
 class TestParseDisabledPlugins:
     def test_empty(self) -> None:

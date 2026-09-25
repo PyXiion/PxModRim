@@ -115,6 +115,7 @@ class App:
         _configure_file_logging()
         QtWebEngineQuick.initialize()
 
+        self._ctx: CoreContext | None = None
         self.qt_app = QApplication(sys.argv)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         self.qt_app.setWindowIcon(icon)
@@ -156,11 +157,12 @@ class App:
         cfg: AppConfig,
         config_svc: ConfigService,
         ui_prefs: UIPrefs | None = None,
-    ) -> None:
+    ) -> CoreContext:
         """Initialize CoreContext, services, and the main window via constructor DI."""
 
-        self._ctx = CoreContext.create(cfg, config_svc)
-        self._app_ctx = AppContext(self._ctx, ui_prefs)
+        ctx = CoreContext.create(cfg, config_svc)
+        self._ctx = ctx
+        self._app_ctx = AppContext(ctx, ui_prefs)
         self._app_ctx.add_rail_view(ModsViewPanel)
 
         disabled = _parse_disabled_plugins()
@@ -177,6 +179,7 @@ class App:
 
         self._app_ctx.setup_all()
         self.main_window = MainWindow(self._app_ctx)
+        return ctx
 
     async def async_run(self) -> int:
         """Run the app: migrate config, create services, open window, run event loop."""
@@ -217,30 +220,32 @@ class App:
                 app_cfg_svc.save_cfg()
 
         # Phase 2: service initialization
-        self._setup(cfg, config_svc, ui_prefs)
-        logger.info("Services initialized for game version {}", self._ctx.game_version)
-
-        # Phase 3: runtime
-        self.main_window.show()
-
-        if not self._ctx.config.paths.game:
-            logger.info("No game path found, showing settings dialog")
-            result, dialog = await await_dialog(SettingsPanel, self._ctx)
-            new_cfg = dialog.get_config()
-            if result != 1 or not new_cfg.paths.game:
-                logger.warning("No game path configured, exiting")
-                return 1
-            self._ctx.config_service.save("config.json", new_cfg)
-            self._ctx.update_config(new_cfg)
-            self._ctx.reset_providers(new_cfg.paths)
-
-        mod_count = await self._app_ctx.refresh_mods()
-        logger.info("Initial mod load complete: {} mods", mod_count)
-        await self._app_ctx.init_all()
+        ctx = self._setup(cfg, config_svc, ui_prefs)
+        logger.info("Services initialized for game version {}", ctx.game_version)
 
         app_close_event = asyncio.Event()
         self.qt_app.aboutToQuit.connect(app_close_event.set)
         self.main_window.set_app_quit_callback(app_close_event.set)
+        self.main_window.show()
+
+        if not ctx.config.paths.game:
+            logger.info("No game path found, showing settings dialog")
+            result, dialog = await await_dialog(SettingsPanel, ctx)
+            if app_close_event.is_set():
+                await self._app_ctx.shutdown_all()
+                return 0
+            new_cfg = dialog.get_config()
+            if result != 1 or not new_cfg.paths.game:
+                logger.warning("No game path configured, exiting")
+                return 1
+            ctx.config_service.save("config.json", new_cfg)
+            ctx.update_config(new_cfg)
+            ctx.reset_providers(new_cfg.paths)
+
+        mod_count = await self._app_ctx.refresh_mods()
+        if not app_close_event.is_set():
+            logger.info("Initial mod load complete: {} mods", mod_count)
+            await self._app_ctx.init_all()
         await app_close_event.wait()
         await self._app_ctx.shutdown_all()
         return 0
@@ -252,4 +257,5 @@ class App:
         try:
             return asyncio.run(self.async_run(), loop_factory=lambda: loop)
         finally:
-            self._ctx.close_sync()
+            if self._ctx is not None:
+                self._ctx.close_sync()

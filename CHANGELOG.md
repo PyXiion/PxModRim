@@ -27,3 +27,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `About.xml` version keys match exactly (`v1.5` no longer matches `v1.50`); mods without `packageId` are invalid
 - Mod description links restricted to HTTP(S); oversized `<size>`/`<indent>` values no longer crash rendering
 - Stale time-analytics results no longer overwrite the selected mod; sidebar icons update with entries; proxy model keeps persistent indexes valid across filtering
+- Startup no longer crashes on config failure cleanup, and closing the window during startup shuts down cleanly
+- Plugins shut down in reverse dependency order
