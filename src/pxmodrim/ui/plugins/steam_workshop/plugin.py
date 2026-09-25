@@ -182,18 +182,34 @@ class SteamCmdUiPlugin(Plugin):
         logger.debug("[steam] download requested: %s", ids)
 
         self.download_busy_changed.emit(True)
+        queued_ids: list[str] = []
         try:
             if not await self._ensure_steamcmd(parent_widget):
                 return
             if not await self._ensure_symlink(parent_widget):
                 return
 
+            for mod_id in ids:
+                self._download_statuses[mod_id] = "queued"
+                queued_ids.append(mod_id)
+            self.sidebar_sync_requested.emit(
+                SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
+            )
             await self._svc.download_mods(
                 ids,
                 validate=validate,
                 titles=dict(self._checked_ids),
             )
         finally:
+            statuses_changed = False
+            for mod_id in queued_ids:
+                if self._download_statuses.get(mod_id) == "queued":
+                    self._download_statuses.pop(mod_id, None)
+                    statuses_changed = True
+            if statuses_changed:
+                self.sidebar_sync_requested.emit(
+                    SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
+                )
             self.download_busy_changed.emit(False)
 
     def stop_download(self) -> None:
@@ -316,6 +332,9 @@ class SteamCmdUiPlugin(Plugin):
         for mid in result.succeeded:
             self._checked_ids.pop(mid, None)
             self._download_statuses.pop(mid, None)
+        for mod_id, status in tuple(self._download_statuses.items()):
+            if status in {"queued", "downloading"}:
+                self._download_statuses.pop(mod_id)
         self._current_downloading_id = ""
         self.progress_updated.emit(ProgressInfo(0, 0, ""))
         self.sidebar_sync_requested.emit(

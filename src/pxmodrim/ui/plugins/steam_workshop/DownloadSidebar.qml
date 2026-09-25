@@ -145,6 +145,7 @@ Rectangle {
                     MouseArea {
                         id: removeArea
                         anchors.fill: parent
+                        enabled: model.status !== "queued" && model.status !== "downloading"
                         hoverEnabled: true
                         onClicked: downloadSidebar.removeItem(model.id)
                     }

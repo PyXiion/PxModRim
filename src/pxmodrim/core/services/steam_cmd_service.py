@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
+import re
 import shutil
 import sys
 import tarfile
@@ -20,13 +21,23 @@ from loguru import logger
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
 from pxmodrim.core.events import Event
 from pxmodrim.core.plugin import Plugin
+from pxmodrim.core.services.steam_cmd_worker import SteamCmdDownloadWorker
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.loading import LoadingState
-    from pxmodrim.core.services.download_proto import DownloadRunner
 
 STEAMCMD_BATCH_SIZE = 25
+
+_PUBLISHED_FILE_ID_RE = re.compile(r"[0-9]+")
+
+
+def _validate_published_file_ids(publishedfileids: list[str]) -> None:
+    if any(
+        not isinstance(pfid, str) or _PUBLISHED_FILE_ID_RE.fullmatch(pfid) is None
+        for pfid in publishedfileids
+    ):
+        raise ValueError("Published file IDs must contain only ASCII decimal digits.")
 
 
 class SymlinkConflictError(ValueError):
@@ -143,7 +154,7 @@ class SteamCmdService(Plugin):
 
     def __init__(
         self,
-        runner_factory: Callable[..., DownloadRunner] | None = None,
+        runner_factory: Callable[..., SteamCmdDownloadWorker] | None = None,
     ) -> None:
         self.status_message_changed = Event()
         self.download_progress = Event()
@@ -151,7 +162,7 @@ class SteamCmdService(Plugin):
         self.download_finished = Event()
 
         self._ctx: CoreContext | None = None
-        self._worker = None
+        self._worker: SteamCmdDownloadWorker | None = None
         self._runner_factory = runner_factory
 
     # ── Plugin interface ──────────────────────────────────
@@ -213,7 +224,9 @@ class SteamCmdService(Plugin):
     def _build_download_script(
         self, publishedfileids: list[str], validate: bool = False
     ) -> str:
+        _validate_published_file_ids(publishedfileids)
         download_cmd = f"workshop_download_item {RIMWORLD_STEAM_APP_ID}"
+
         script_lines = [
             f'force_install_dir "{self.steam_path}"',
             "login anonymous",
@@ -367,6 +380,7 @@ class SteamCmdService(Plugin):
     ) -> None:
         if not publishedfileids:
             raise ValueError("No mods selected for download.")
+        _validate_published_file_ids(publishedfileids)
         if not self.is_installed():
             raise ValueError("SteamCMD is not installed; cannot download mods.")
 
@@ -376,24 +390,9 @@ class SteamCmdService(Plugin):
             f"[steamcmd] download_mods: {len(publishedfileids)} items"
             f" in {len(batches)} batches"
         )
-        from pxmodrim.core.services.steam_cmd_worker import (
-            SteamCmdDownloadWorker,
-        )
 
         def _script_builder(batch: list[str]) -> str:
             return self._build_download_script(batch, validate=validate)
-
-        factory = self._runner_factory or SteamCmdDownloadWorker
-        worker = factory(
-            self.executable,
-            self.steam_path,
-            batches,
-            _script_builder,
-            None,
-        )
-        self._worker = worker
-
-        done = asyncio.Event()
 
         def _on_status(msg: str) -> None:
             self.status_message_changed.emit(msg)
@@ -413,27 +412,30 @@ class SteamCmdService(Plugin):
                 SteamCmdItemStatus(mod_id=pid, status=status)
             )
 
-        def _on_finished(succeeded: list[str], failed: list[str]) -> None:
-            self.download_finished.emit(
-                SteamCmdResult(succeeded=succeeded, failed=failed)
-            )
-            done.set()
-
-        worker.status.connect(_on_status)
-        worker.progress.connect(_on_progress)
-        worker.item_status.connect(_on_item)
-        worker.finished.connect(_on_finished)
-
-        worker.start()
+        factory = self._runner_factory or SteamCmdDownloadWorker
+        worker = factory(
+            self.executable,
+            self.steam_path,
+            batches,
+            _script_builder,
+            _on_status,
+            _on_progress,
+            _on_item,
+        )
+        self._worker = worker
         try:
-            await done.wait()
+            await worker.run()
         except asyncio.CancelledError:
             worker.cancel()
             raise
         finally:
-            await asyncio.to_thread(worker.wait)
-            worker.quit()
             self._worker = None
+            self.download_finished.emit(
+                SteamCmdResult(
+                    succeeded=worker.succeeded,
+                    failed=worker.failed,
+                )
+            )
 
     def cancel(self) -> None:
         logger.debug("[steamcmd] cancel requested")

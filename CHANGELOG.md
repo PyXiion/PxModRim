@@ -20,3 +20,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Initial release
+- SteamCMD downloads accept only numeric Workshop IDs (prevents runscript command injection); queued/downloading rows can no longer be removed mid-batch
+- SteamCMD worker rewritten on asyncio subprocesses (no `QThread`); cancellation terminates and reaps the process

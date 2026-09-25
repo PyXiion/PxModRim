@@ -3,10 +3,9 @@ from __future__ import annotations
 import asyncio
 import shutil
 import sys
-import threading
 from contextlib import nullcontext
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -22,7 +21,6 @@ from pxmodrim.core.services.steam_cmd_service import (
     SteamCmdService,
     SymlinkConflictError,
 )
-from pxmodrim.core.services.steam_cmd_worker import SteamCmdDownloadWorker
 
 
 def run_async(coro, app: QApplication):
@@ -313,173 +311,6 @@ class TestEnsureInstalled:
         assert result is False
 
 
-class TestDownloadWorker:
-    def test_runscript_uses_separate_argv_entries(self, tmp_path: Path) -> None:
-        script = tmp_path / "download.txt"
-        script.write_text("quit\n")
-        process = MagicMock()
-        process.stdout = []
-        process.returncode = 0
-        process.poll.return_value = 0
-        worker = SteamCmdDownloadWorker(
-            "steamcmd",
-            str(tmp_path),
-            [["111"]],
-            lambda _batch: str(script),
-        )
-
-        with patch(
-            "pxmodrim.core.services.steam_cmd_worker.subprocess.Popen",
-            return_value=process,
-        ) as popen:
-            worker._run_batch(["111"], [], [], 1)
-
-        assert popen.call_args.args[0] == ["steamcmd", "+runscript", str(script)]
-        assert not script.exists()
-
-    def test_cancel_terminates_silent_process(self, tmp_path: Path) -> None:
-        script = tmp_path / "download.txt"
-        script.write_text("quit\n")
-        spawned = threading.Event()
-        terminated = threading.Event()
-        process = MagicMock()
-        process.returncode = None
-        process.poll.side_effect = lambda: process.returncode
-        process.wait.side_effect = lambda: terminated.wait(1)
-
-        class SilentOutput:
-            def __iter__(self):
-                return self
-
-            def __next__(self) -> str:
-                terminated.wait()
-                raise StopIteration
-
-        process.stdout = SilentOutput()
-        worker = SteamCmdDownloadWorker(
-            "steamcmd",
-            str(tmp_path),
-            [["111"]],
-            lambda _batch: str(script),
-        )
-        errors: list[Exception] = []
-
-        def spawn(*_args, **_kwargs):
-            spawned.set()
-            return process
-
-        def terminate(child) -> None:
-            child.returncode = -15
-            terminated.set()
-
-        def run_batch() -> None:
-            try:
-                worker._run_batch(["111"], [], [], 1)
-            except Exception as error:
-                errors.append(error)
-
-        with (
-            patch(
-                "pxmodrim.core.services.steam_cmd_worker.subprocess.Popen",
-                side_effect=spawn,
-            ),
-            patch(
-                "pxmodrim.core.services.steam_cmd_worker._kill",
-                side_effect=terminate,
-            ) as kill,
-        ):
-            thread = threading.Thread(target=run_batch)
-            thread.start()
-            assert spawned.wait(1)
-            worker.cancel()
-            assert terminated.wait(1)
-            thread.join(1)
-
-        assert not thread.is_alive()
-        assert errors == []
-        kill.assert_called_once_with(process)
-        assert not script.exists()
-
-    def test_cancelled_process_exit_is_not_reported_as_failure(
-        self, tmp_path: Path
-    ) -> None:
-        script = tmp_path / "download.txt"
-        script.write_text("quit\n")
-        process = MagicMock()
-        process.returncode = -15
-        process.poll.return_value = -15
-        worker = SteamCmdDownloadWorker(
-            "steamcmd",
-            str(tmp_path),
-            [["111"]],
-            lambda _batch: str(script),
-        )
-
-        class CancelledOutput:
-            def __iter__(self):
-                return self
-
-            def __next__(self) -> str:
-                worker.cancel()
-                raise StopIteration
-
-        process.stdout = CancelledOutput()
-        statuses: list[str] = []
-        worker.status.connect(statuses.append)
-
-        with (
-            patch(
-                "pxmodrim.core.services.steam_cmd_worker.subprocess.Popen",
-                return_value=process,
-            ),
-            patch("pxmodrim.core.services.steam_cmd_worker._kill"),
-        ):
-            worker._run_batch(["111"], [], [], 1)
-
-        assert statuses == []
-
-    def test_task_cancellation_cancels_worker_before_async_wait(
-        self, service: SteamCmdService
-    ) -> None:
-        worker = MagicMock()
-        calls: list[str] = []
-        wait_started = threading.Event()
-        release_wait = threading.Event()
-        worker.start.side_effect = lambda: calls.append("start")
-        worker.cancel.side_effect = lambda: calls.append("cancel")
-        worker.quit.side_effect = lambda: calls.append("quit")
-
-        def wait() -> bool:
-            calls.append("wait")
-            wait_started.set()
-            return release_wait.wait(1)
-
-        worker.wait.side_effect = wait
-        service._runner_factory = lambda *_args: worker
-
-        async def cancel_download() -> None:
-            task = asyncio.create_task(
-                service.download_mods(["111"], validate=False)
-            )
-            await asyncio.sleep(0)
-            task.cancel()
-            for _ in range(100):
-                if wait_started.is_set():
-                    break
-                await asyncio.sleep(0.01)
-            assert wait_started.is_set()
-            assert calls[:3] == ["start", "cancel", "wait"]
-            release_wait.set()
-            with pytest.raises(asyncio.CancelledError):
-                await task
-
-        with patch.object(service, "is_installed", return_value=True):
-            asyncio.run(cancel_download())
-
-        assert calls == ["start", "cancel", "wait", "quit"]
-        assert service._worker is None
-
-
 @pytest.fixture
 def fake_steamcmd(tmp_path: Path) -> Path:
     """A fake 'steamcmd' that prints RimSort-style output for ids 111/222/333."""
@@ -526,6 +357,12 @@ class TestDownloadMods:
         with assert_raises(ValueError, match="not installed"):
             asyncio.run(service.download_mods(["111"], validate=False))
 
+    def test_rejects_non_decimal_published_file_id(
+        self, service: SteamCmdService
+    ) -> None:
+        with pytest.raises(ValueError, match="Published file IDs"):
+            asyncio.run(service.download_mods(["123\nquit"], validate=False))
+
     def test_parses_output(
         self,
         service: SteamCmdService,
@@ -565,12 +402,14 @@ class TestDownloadMods:
         assert any(s.mod_id == "111" and s.status == "success" for s in statuses)
         assert any(s.mod_id == "333" and s.status == "error" for s in statuses)
 
+    @pytest.mark.parametrize("cancel_task", [False, True])
     def test_cancel_stops_early(
         self,
         service: SteamCmdService,
         fake_steamcmd: Path,
         qapp: QApplication,
         tmp_path: Path,
+        cancel_task: bool,
     ) -> None:
         assert service._ctx is not None
         service._ctx.config.paths.steamcmd_prefix = str(tmp_path)
@@ -592,17 +431,21 @@ class TestDownloadMods:
         result: list[SteamCmdResult] = []
         service.download_finished.connect(result.append)
 
-        def _cancel_soon() -> None:
-            service.cancel()
-
-        timer = threading.Timer(0.1, _cancel_soon)
-        timer.start()
-        with _exe_mock:
-            run_async(
-                service.download_mods(["111", "222"], validate=False),
-                qapp,
+        async def _download_then_cancel() -> None:
+            task = asyncio.create_task(
+                service.download_mods(["111", "222"], validate=False)
             )
-        timer.cancel()
+            await asyncio.sleep(0.1)
+            if cancel_task:
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            else:
+                service.cancel()
+                await task
+
+        with _exe_mock:
+            run_async(_download_then_cancel(), qapp)
 
         assert result
         assert "111" not in result[0].succeeded

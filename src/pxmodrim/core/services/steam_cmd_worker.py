@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import re
-import subprocess
-import threading
-from typing import Any
+import signal
+from collections.abc import Callable
 
 from loguru import logger
-from PySide6.QtCore import QThread, Signal
 
 _DOWNLOADING_RE = re.compile(r"Downloading item (\d+)\s*[.…]{3,}")
 _SUCCESS_RE = re.compile(r"Success[.…]*\s*Downloaded item (\d+)")
@@ -16,161 +15,170 @@ _ERROR_RE = re.compile(r"ERROR! Download item (\d+)")
 _LOGON_RE = re.compile(r"ERROR! Not logged on\.")
 
 
-def _kill(proc: subprocess.Popen[str]) -> None:
-    try:
-        if proc.poll() is None:
-            if hasattr(os, "killpg"):
-                with contextlib.suppress(ProcessLookupError):
-                    os.killpg(os.getpgid(proc.pid), 15)
-            else:
-                proc.terminate()
-    except OSError as e:
-        logger.debug("[steamcmd] kill error (expected if already dead): {}", e)
-        with contextlib.suppress(OSError):
-            proc.kill()
-
-
-class SteamCmdDownloadWorker(QThread):
-    status = Signal(str)
-    progress = Signal(int, int, str, str)
-    item_status = Signal(str, str)
-    finished = Signal(list, list)
-
+class SteamCmdDownloadWorker:
     def __init__(
         self,
         steamcmd: str,
         steam_path: str,
         batches: list[list[str]],
-        script_builder,
-        parent: Any = None,
+        script_builder: Callable[[list[str]], str],
+        on_status: Callable[[str], None],
+        on_progress: Callable[[int, int, str, str], None],
+        on_item_status: Callable[[str, str], None],
     ) -> None:
-        """Initialize the SteamCMD download worker thread."""
-        super().__init__(parent)
         self._steamcmd = steamcmd
         self._steam_path = steam_path
         self._batches = batches
         self._script_builder = script_builder
+        self._on_status = on_status
+        self._on_progress = on_progress
+        self._on_item_status = on_item_status
         self._stopped = False
-        self._process_lock = threading.Lock()
-        self._process: subprocess.Popen[str] | None = None
+        self._process: asyncio.subprocess.Process | None = None
+        self.succeeded: list[str] = []
+        self.failed: list[str] = []
 
     def cancel(self) -> None:
         logger.debug("[steamcmd] worker cancel requested")
-        with self._process_lock:
-            self._stopped = True
-            process = self._process
-        if process is not None:
-            _kill(process)
+        self._stopped = True
+        if self._process is not None:
+            self._signal_process(self._process)
 
-    def run(self) -> None:
-        succeeded: list[str] = []
-        failed: list[str] = []
-        total = sum(len(b) for b in self._batches)
+    async def run(self) -> None:
+        total = sum(len(batch) for batch in self._batches)
         logger.info(
-            f"[steamcmd] worker started: {total} items in {len(self._batches)} batches"
+            "[steamcmd] worker started: {} items in {} batches",
+            total,
+            len(self._batches),
         )
         try:
             for batch in self._batches:
                 if self._stopped:
                     break
-                self._run_batch(batch, succeeded, failed, total)
+                await self._run_batch(batch, total)
+            stopped = self._stopped
             if (
-                not self._stopped
+                not stopped
                 and any(self._batches)
-                and not succeeded
-                and not failed
+                and not self.succeeded
+                and not self.failed
             ):
-                self.status.emit(
+                self._on_status(
                     "SteamCMD produced no recognizable output. Check logs for details."
                 )
-        except Exception as e:  # noqa: BLE001 - worker boundary reports all failures
+        except Exception as exc:  # noqa: BLE001 - runner boundary reports failures
             if not self._stopped:
-                self.status.emit(f"SteamCMD worker error: {type(e).__name__}: {e}")
+                self._on_status(f"SteamCMD worker error: {type(exc).__name__}: {exc}")
         logger.info(
-            f"[steamcmd] worker done: {len(succeeded)} ok, {len(failed)} failed"
+            "[steamcmd] worker done: {} ok, {} failed",
+            len(self.succeeded),
+            len(self.failed),
         )
-        self.finished.emit(succeeded, failed)
 
-    def _run_batch(
-        self,
-        batch: list[str],
-        succeeded: list[str],
-        failed: list[str],
-        total: int,
-    ) -> None:
+    async def _run_batch(self, batch: list[str], total: int) -> None:
         os.makedirs(self._steam_path, exist_ok=True)
         script = self._script_builder(batch)
+        process: asyncio.subprocess.Process | None = None
         try:
-            logger.debug(f"[steamcmd] spawning: {self._steamcmd} batch={batch}")
-            with self._process_lock:
-                if self._stopped:
-                    return
-            proc = subprocess.Popen(
-                [self._steamcmd, "+runscript", script],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
+            logger.debug("[steamcmd] spawning: {} batch={}", self._steamcmd, batch)
+            process = await asyncio.create_subprocess_exec(
+                self._steamcmd,
+                "+runscript",
+                script,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
                 cwd=self._steam_path,
-                start_new_session=True,
+                start_new_session=os.name != "nt",
             )
-            with self._process_lock:
-                self._process = proc
-                stopped = self._stopped
-            if stopped:
-                _kill(proc)
-            assert proc.stdout is not None
-            try:
-                for line in proc.stdout:
-                    if self._stopped:
-                        break
-                    self._parse_line(line, succeeded, failed)
-                    completed = len(succeeded) + len(failed)
-                    self.progress.emit(total, completed, "", "")
-                proc.wait()
-                if not self._stopped and proc.returncode != 0:
-                    msg = f"SteamCMD exited with code {proc.returncode}"
-                    logger.warning("[steamcmd] {}", msg)
-                    self.status.emit(msg)
-            finally:
-                if proc.poll() is None:
-                    _kill(proc)
-                with self._process_lock:
-                    if self._process is proc:
-                        self._process = None
-        finally:
-            with contextlib.suppress(OSError):
-                os.remove(script)
+            self._process = process
+            if self._stopped:
+                self._signal_process(process)
 
-    def _parse_line(self, line: str, succeeded: list[str], failed: list[str]) -> None:
+            assert process.stdout is not None
+            async for line in process.stdout:
+                if self._stopped:
+                    break
+                self._parse_line(line.decode("utf-8", errors="replace"))
+                completed = len(self.succeeded) + len(self.failed)
+                self._on_progress(total, completed, "", "")
+
+            returncode = await process.wait()
+            if not self._stopped and returncode != 0:
+                msg = f"SteamCMD exited with code {returncode}"
+                logger.warning("[steamcmd] {}", msg)
+                self._on_status(msg)
+        finally:
+            try:
+                if process is not None:
+                    if process.returncode is None:
+                        self._signal_process(process)
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=5)
+                        except TimeoutError:
+                            self._signal_process(process, force=True)
+                            await process.wait()
+                    if self._process is process:
+                        self._process = None
+            finally:
+                with contextlib.suppress(OSError):
+                    os.remove(script)
+
+    def _signal_process(
+        self, process: asyncio.subprocess.Process, *, force: bool = False
+    ) -> None:
+        if process.returncode is not None:
+            return
+        try:
+            if os.name == "nt":
+                if force:
+                    process.kill()
+                else:
+                    process.terminate()
+            else:
+                os.killpg(
+                    process.pid,
+                    signal.SIGKILL if force else signal.SIGTERM,
+                )
+        except ProcessLookupError:
+            pass
+        except OSError as exc:
+            logger.debug("[steamcmd] kill error (expected if already dead): {}", exc)
+            with contextlib.suppress(OSError):
+                if force:
+                    process.kill()
+                else:
+                    process.terminate()
+
+    def _parse_line(self, line: str) -> None:
         text = line.strip()
-        m = _DOWNLOADING_RE.search(text)
-        if m:
-            pid = m.group(1)
-            logger.debug("[steamcmd] download start: {}", pid)
-            self.item_status.emit(pid, "downloading")
+        match = _DOWNLOADING_RE.search(text)
+        if match:
+            mod_id = match.group(1)
+            logger.debug("[steamcmd] download start: {}", mod_id)
+            self._on_item_status(mod_id, "downloading")
             return
-        m = _SUCCESS_RE.search(text)
-        if m:
-            pid = m.group(1)
-            logger.debug("[steamcmd] download success: {}", pid)
-            if pid not in succeeded:
-                succeeded.append(pid)
-            self.item_status.emit(pid, "success")
+        match = _SUCCESS_RE.search(text)
+        if match:
+            mod_id = match.group(1)
+            logger.debug("[steamcmd] download success: {}", mod_id)
+            if mod_id not in self.succeeded:
+                self.succeeded.append(mod_id)
+            self._on_item_status(mod_id, "success")
             return
-        m = _ERROR_RE.search(text)
-        if m:
-            pid = m.group(1)
-            logger.debug("[steamcmd] download error: {} (raw: {})", pid, text)
-            if pid not in failed:
-                failed.append(pid)
-            self.item_status.emit(pid, "error")
+        match = _ERROR_RE.search(text)
+        if match:
+            mod_id = match.group(1)
+            logger.debug("[steamcmd] download error: {} (raw: {})", mod_id, text)
+            if mod_id not in self.failed:
+                self.failed.append(mod_id)
+            self._on_item_status(mod_id, "error")
             return
         if _LOGON_RE.search(text):
             logger.warning("[steamcmd] logon failed")
-            self.status.emit("SteamCMD failed to log in anonymously.")
+            self._on_status("SteamCMD failed to log in anonymously.")
             return
         if re.search(r"(?i)(error|fail|denied|timeout|unable|cannot|not found)", text):
             logger.warning("[steamcmd] {}", text)
-            self.status.emit(f"SteamCMD: {text}")
+            self._on_status(f"SteamCMD: {text}")
         else:
             logger.debug("[steamcmd] {}", text)
