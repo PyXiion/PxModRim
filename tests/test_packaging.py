@@ -48,9 +48,7 @@ def test_deb_creation_uses_native_architecture(tmp_path: Path, monkeypatch) -> N
     )
     desktop_dir = tmp_path / "packaging" / "linux"
     desktop_dir.mkdir(parents=True)
-    (desktop_dir / "pxmodrim.desktop").write_text(
-        "[Desktop Entry]\n", encoding="utf-8"
-    )
+    (desktop_dir / "pxmodrim.desktop").write_text("[Desktop Entry]\n", encoding="utf-8")
     icon = tmp_path / "src" / "pxmodrim" / "ui" / "assets" / "logo.svg"
     icon.parent.mkdir(parents=True)
     icon.write_text("<svg />", encoding="utf-8")
@@ -60,9 +58,9 @@ def test_deb_creation_uses_native_architecture(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: "dpkg-deb")
 
     def build_package(args: list[str], check: bool) -> None:
-        control["metadata"] = (
-            Path(args[-2]) / "DEBIAN" / "control"
-        ).read_text(encoding="utf-8")
+        control["metadata"] = (Path(args[-2]) / "DEBIAN" / "control").read_text(
+            encoding="utf-8"
+        )
         Path(args[-1]).touch()
 
     monkeypatch.setattr(pkg_build.subprocess, "run", build_package)
@@ -222,9 +220,7 @@ def test_macos_bundle_plist_update(tmp_path: Path, monkeypatch) -> None:
         assert "PxModRim.app/Contents/MacOS/PxModRim" in archive.namelist()
 
 
-def test_macos_bundle_requires_hdiutil_for_release(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_macos_bundle_requires_hdiutil_for_release(tmp_path: Path, monkeypatch) -> None:
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[project]\nversion = "0.9.0"\n', encoding="utf-8")
     app_dir = tmp_path / "dist" / "PxModRim.app"

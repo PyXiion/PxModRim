@@ -24,7 +24,9 @@ def debian_architecture(machine: str | None = None) -> str:
     try:
         return architectures[machine.lower()]
     except KeyError:
-        raise RuntimeError(f"Unsupported Debian package architecture: {machine}") from None
+        raise RuntimeError(
+            f"Unsupported Debian package architecture: {machine}"
+        ) from None
 
 
 def get_standalone_args(release: bool = False) -> list[str]:
