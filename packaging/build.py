@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
-def get_standalone_args(release: bool = False, bundle_qt: bool = True) -> list[str]:
+def get_version(project_root: Path) -> str:
+    tag = os.environ.get("GITHUB_REF_NAME", "")
+    if tag.startswith("v") and len(tag) > 1 and tag[1].isdigit():
+        return tag[1:]
+    pyproject = project_root / "pyproject.toml"
+    return tomllib.loads(pyproject.read_text("utf-8"))["project"]["version"]
+
+
+def get_standalone_args(release: bool = False) -> list[str]:
     project_root = Path(__file__).parent.parent
 
     args = [
@@ -45,17 +55,25 @@ def get_standalone_args(release: bool = False, bundle_qt: bool = True) -> list[s
     )
 
     system = platform.system()
+    version = get_version(project_root)
     if system == "Windows":
-        import tomllib
-
-        pyproject = project_root / "pyproject.toml"
-        version = tomllib.loads(pyproject.read_text("utf-8"))["project"]["version"]
         args.extend(
             [
                 "--windows-icon-from-ico=packaging/logo.ico",
                 "--windows-company-name=PxModRim",
                 "--windows-product-name=PxModRim",
                 f"--windows-product-version={version}",
+            ]
+        )
+    elif system == "Darwin":
+        logo_icns = project_root / "packaging" / "logo.icns"
+        args.extend(
+            [
+                "--macos-create-app-bundle",
+                "--macos-app-name=PxModRim",
+                f"--macos-app-version={version}",
+                "--macos-signed-app-name=com.github.PyXiion.PxModRim",
+                f"--macos-app-icon={logo_icns}",
             ]
         )
 
@@ -112,6 +130,41 @@ def copy_missing_libs(project_root: Path) -> None:
             print(f"Copied {lib_name}")
 
 
+def normalize_executable(dist_dir: Path, system: str | None = None) -> Path:
+    """Normalize the Nuitka entrypoint binary to PxModRim (or PxModRim.exe on Windows).
+
+    Searches platform-appropriate candidate names, renames the first matching
+    source executable to the final target name, and fails clearly if neither
+    the final executable nor any source candidate exists.
+    """
+    if system is None:
+        system = platform.system()
+
+    output_name = "PxModRim.exe" if system == "Windows" else "PxModRim"
+    final_binary = dist_dir / output_name
+
+    if final_binary.is_file():
+        return final_binary
+
+    candidates = (
+        ["entrypoint.exe", "entrypoint.bin", "entrypoint"]
+        if system == "Windows"
+        else ["entrypoint", "entrypoint.bin", "entrypoint.exe"]
+    )
+
+    for candidate_name in candidates:
+        candidate_path = dist_dir / candidate_name
+        if candidate_path.is_file():
+            candidate_path.rename(final_binary)
+            print(f"Renamed {candidate_path.name} to {final_binary.name}")
+            return final_binary
+
+    raise FileNotFoundError(
+        f"Executable not found in {dist_dir}; looked for '{output_name}' "
+        f"and candidates {candidates}"
+    )
+
+
 def create_appimage(project_root: Path) -> None:
     dist_dir = project_root / "dist" / "entrypoint.dist"
     app_dir = project_root / "dist" / "PxModRim.AppDir"
@@ -121,11 +174,7 @@ def create_appimage(project_root: Path) -> None:
 
     shutil.copytree(dist_dir, app_dir)
 
-    binary = app_dir / "PxModRim"
-    if not binary.exists():
-        old_binary = app_dir / "entrypoint.bin"
-        if old_binary.exists():
-            old_binary.rename(binary)
+    normalize_executable(app_dir, system="Linux")
 
     desktop_content = """[Desktop Entry]
 Type=Application
@@ -161,6 +210,217 @@ exec "$HERE/PxModRim" "$@"
     print(f"Created {output}")
 
 
+def create_deb(project_root: Path) -> Path | None:
+    dist_dir = project_root / "dist" / "entrypoint.dist"
+    if not dist_dir.exists():
+        print("Warning: entrypoint.dist not found, skipping .deb creation")
+        return None
+
+    dpkg_deb = shutil.which("dpkg-deb")
+    if not dpkg_deb:
+        raise RuntimeError("dpkg-deb is required to create the Debian package")
+
+    version = get_version(project_root)
+    output = project_root / "dist" / f"pxmodrim_{version}_amd64.deb"
+    staging_dir = project_root / "dist" / "deb_staging"
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
+
+    debian_dir = staging_dir / "DEBIAN"
+    opt_dir = staging_dir / "opt" / "pxmodrim"
+    bin_dir = staging_dir / "usr" / "bin"
+    apps_dir = staging_dir / "usr" / "share" / "applications"
+    icons_dir = (
+        staging_dir / "usr" / "share" / "icons" / "hicolor" / "scalable" / "apps"
+    )
+
+    debian_dir.mkdir(parents=True, exist_ok=True)
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    apps_dir.mkdir(parents=True, exist_ok=True)
+    icons_dir.mkdir(parents=True, exist_ok=True)
+
+    shutil.copytree(dist_dir, opt_dir)
+    (bin_dir / "pxmodrim").symlink_to("/opt/pxmodrim/PxModRim")
+    shutil.copy2(
+        project_root / "packaging" / "linux" / "pxmodrim.desktop",
+        apps_dir / "pxmodrim.desktop",
+    )
+    shutil.copy2(
+        project_root / "src" / "pxmodrim" / "ui" / "assets" / "logo.svg",
+        icons_dir / "pxmodrim.svg",
+    )
+
+    exe_file = opt_dir / "PxModRim"
+    if exe_file.exists():
+        exe_file.chmod(0o755)
+
+    installed_size = (
+        sum(f.stat().st_size for f in staging_dir.rglob("*") if f.is_file()) // 1024
+    )
+    control_content = f"""Package: pxmodrim
+Version: {version}
+Section: games
+Priority: optional
+Architecture: amd64
+Installed-Size: {installed_size}
+Maintainer: PyXiion
+Homepage: https://github.com/PyXiion/PxModRim
+Description: Mod manager for RimWorld
+ PxModRim is a fast and modern mod manager for RimWorld.
+"""
+    (debian_dir / "control").write_text(control_content, encoding="utf-8")
+
+    subprocess.run(
+        [dpkg_deb, "--build", "--root-owner-group", str(staging_dir), str(output)],
+        check=True,
+    )
+    shutil.rmtree(staging_dir)
+    print(f"Created {output}")
+    return output
+
+
+def create_rpm(project_root: Path) -> Path | None:
+    rpmbuild = shutil.which("rpmbuild")
+    if not rpmbuild:
+        print("Warning: rpmbuild not found, skipping RPM creation")
+        return None
+
+    version = get_version(project_root)
+    dist_dir = project_root / "dist" / "entrypoint.dist"
+    if not dist_dir.exists():
+        print("Warning: entrypoint.dist not found, skipping RPM creation")
+        return None
+
+    top_dir = project_root / "dist" / "rpmbuild"
+    if top_dir.exists():
+        shutil.rmtree(top_dir)
+    for sub in ("BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"):
+        (top_dir / sub).mkdir(parents=True, exist_ok=True)
+
+    spec_file = project_root / "packaging" / "linux" / "pxmodrim.spec"
+    cmd = [
+        rpmbuild,
+        "-bb",
+        f"--define=_topdir {top_dir.resolve()}",
+        f"--define=project_root {project_root.resolve()}",
+        f"--define=version {version}",
+        str(spec_file.resolve()),
+    ]
+    subprocess.run(cmd, check=True)
+
+    rpm_files = list((top_dir / "RPMS").rglob("*.rpm"))
+    if not rpm_files:
+        print("Warning: No RPM file was generated")
+        return None
+
+    output = project_root / "dist" / f"pxmodrim-{version}-1.x86_64.rpm"
+    shutil.copy2(rpm_files[0], output)
+    shutil.rmtree(top_dir)
+    print(f"Created {output}")
+    return output
+
+
+def create_nsis_installer(project_root: Path) -> Path | None:
+    makensis = shutil.which("makensis")
+    nsis_dir = os.environ.get("NSIS_DIR")
+    if nsis_dir:
+        configured_nsis = Path(nsis_dir) / "makensis.exe"
+        if configured_nsis.exists():
+            makensis = str(configured_nsis)
+    if not makensis and platform.system() == "Windows":
+        default_nsis = Path("C:/Program Files (x86)/NSIS/makensis.exe")
+        if default_nsis.exists():
+            makensis = str(default_nsis)
+
+    if not makensis:
+        print("Warning: makensis not found, skipping NSIS installer creation")
+        return None
+
+    version = get_version(project_root)
+    dist_dir = project_root / "dist" / "entrypoint.dist"
+    output = project_root / "dist" / "PxModRim-Setup.exe"
+    nsi_file = project_root / "packaging" / "windows" / "installer.nsi"
+
+    cmd = [
+        makensis,
+        f"/DVERSION={version}",
+        f"/DDIST_DIR={dist_dir.resolve()}",
+        f"/DOUTPUT_FILE={output.resolve()}",
+        str(nsi_file.resolve()),
+    ]
+    subprocess.run(cmd, check=True)
+    print(f"Created {output}")
+    return output
+
+
+def create_macos_bundle(project_root: Path) -> Path | None:
+    version = get_version(project_root)
+    dist_path = project_root / "dist"
+
+    app_dir = dist_path / "PxModRim.app"
+    entry_app = dist_path / "entrypoint.app"
+    if not app_dir.exists() and entry_app.exists():
+        entry_app.rename(app_dir)
+
+    if not app_dir.exists():
+        print("Warning: PxModRim.app not found, skipping macOS bundle packaging")
+        return None
+    macos_dir = app_dir / "Contents" / "MacOS"
+    if not macos_dir.exists():
+        raise FileNotFoundError(f"Missing Contents/MacOS directory in {app_dir}")
+
+    final_binary = normalize_executable(macos_dir, system="Darwin")
+
+    plist_file = app_dir / "Contents" / "Info.plist"
+    if plist_file.exists():
+        import plistlib
+
+        with open(plist_file, "rb") as f:
+            pl = plistlib.load(f)
+        pl["CFBundleIdentifier"] = "com.github.PyXiion.PxModRim"
+        pl["CFBundleName"] = "PxModRim"
+        pl["CFBundleDisplayName"] = "PxModRim"
+        pl["CFBundleVersion"] = version
+        pl["CFBundleShortVersionString"] = version
+        pl["CFBundleExecutable"] = final_binary.name
+        pl["CFBundlePackageType"] = "APPL"
+        pl["NSHighResolutionCapable"] = True
+        pl["LSMinimumSystemVersion"] = "11.0"
+        with open(plist_file, "wb") as f:
+            plistlib.dump(pl, f)
+        print(f"Updated Info.plist bundle metadata (executable={final_binary.name})")
+
+    zip_output = dist_path / "PxModRim-macOS"
+    shutil.make_archive(
+        str(zip_output), "zip", root_dir=str(dist_path), base_dir="PxModRim.app"
+    )
+    print(f"Created {zip_output}.zip")
+
+    hdiutil = shutil.which("hdiutil")
+    if hdiutil:
+        dmg_output = dist_path / "PxModRim-macOS.dmg"
+        if dmg_output.exists():
+            dmg_output.unlink()
+        subprocess.run(
+            [
+                hdiutil,
+                "create",
+                "-volname",
+                "PxModRim",
+                "-srcfolder",
+                str(app_dir),
+                "-ov",
+                "-format",
+                "UDZO",
+                str(dmg_output),
+            ],
+            check=True,
+        )
+        print(f"Created {dmg_output}")
+
+    return app_dir
+
+
 def strip_unused_qml_modules(dist_dir: Path) -> None:
     """Remove QML modules not imported anywhere in the app's .qml files.
 
@@ -168,6 +428,8 @@ def strip_unused_qml_modules(dist_dir: Path) -> None:
     QtWebChannel, and QtWebEngine.
     """
     qml_root = dist_dir / "PySide6" / "qml"
+    if not qml_root.is_dir():
+        return
     keep = {"Qt", "QtQml", "QtQuick", "QtWebChannel", "QtWebEngine"}
     removed = 0
     for entry in sorted(qml_root.iterdir()):
@@ -260,7 +522,7 @@ def main() -> None:
     clean_qml_debug_artifacts()
 
     print(f"Step 1: Building standalone (release={release}, bundle_qt={bundle_qt})...")
-    args = get_standalone_args(release=release, bundle_qt=bundle_qt)
+    args = get_standalone_args(release=release)
     print(f"Running: {' '.join(args)}")
 
     result = subprocess.run(args, check=False)
@@ -268,6 +530,14 @@ def main() -> None:
         sys.exit(result.returncode)
 
     dist_dir = project_root / "dist" / "entrypoint.dist"
+    if system == "Darwin":
+        for candidate in [
+            project_root / "dist" / "PxModRim.app" / "Contents" / "MacOS",
+            project_root / "dist" / "entrypoint.app" / "Contents" / "MacOS",
+        ]:
+            if candidate.exists():
+                dist_dir = candidate
+                break
 
     print("\nStep 2a: Stripping non-English WebEngine locales...")
     strip_qt_locales(dist_dir)
@@ -281,32 +551,33 @@ def main() -> None:
     print("\nStep 2d: Stripping QtWebEngine DevTools...")
     strip_qt_devtools(dist_dir)
 
-    if bundle_qt:
+    if bundle_qt and system == "Linux":
         print("\nStep 2e: Copying missing Qt libraries...")
         copy_missing_libs(project_root)
-    else:
+    elif not bundle_qt and system == "Linux":
         print("\nStep 2e: Stripping bundled Qt libs (using system Qt)...")
         strip_bundled_qt(dist_dir)
 
-    output_name = "PxModRim"
-    if system == "Windows":
-        output_name += ".exe"
-
-    binary = dist_dir / "entrypoint.bin"
-    if binary.exists():
-        final_binary = dist_dir / output_name
-        binary.rename(final_binary)
-        print(f"Renamed to {final_binary}")
-
+    final_binary = normalize_executable(dist_dir, system=system)
     if system == "Linux":
         if bundle_qt:
-            print("\nStep 3: Creating AppImage...")
+            print("\nStep 3: Creating Linux packages (AppImage, deb, rpm)...")
             create_appimage(project_root)
+            create_deb(project_root)
+            create_rpm(project_root)
         else:
-            print("\nStep 3: Skipping AppImage (system Qt mode, not self-contained)")
+            print(
+                "\nStep 3: Skipping Linux packages (system Qt mode, not self-contained)"
+            )
+    elif system == "Windows":
+        print("\nStep 3: Creating Windows NSIS installer...")
+        create_nsis_installer(project_root)
+    elif system == "Darwin":
+        print("\nStep 3: Packaging macOS .app bundle...")
+        create_macos_bundle(project_root)
 
     print(f"\nBuild complete! Output: {dist_dir}")
-    print(f"Run with: {dist_dir / output_name}")
+    print(f"Run with: {final_binary}")
 
     size = _get_dir_size(dist_dir)
     print(f"Build size: {size // (1024 * 1024)} MB ({size:,} bytes)")

@@ -1,0 +1,42 @@
+app-id: com.github.PyXiion.PxModRim
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: PxModRim
+
+finish-args:
+  # Display and GPU
+  - --socket=x11
+  - --socket=wayland
+  - --share=ipc
+  - --device=dri
+  # Network (Workshop, updates, metadata)
+  - --share=network
+  # Explicit minimum filesystem permissions for Steam and RimWorld locations
+  - --filesystem=~/.steam
+  - --filesystem=xdg-data/Steam
+  - --filesystem=~/.var/app/com.valvesoftware.Steam
+  - --filesystem=xdg-config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios:create
+
+modules:
+  - name: pxmodrim
+    buildsystem: simple
+    build-commands:
+      - install -d /app/lib/pxmodrim
+      - cp -a entrypoint.dist/* /app/lib/pxmodrim/
+      - install -d /app/bin
+      - ln -s /app/lib/pxmodrim/PxModRim /app/bin/PxModRim
+      - install -Dm644 com.github.PyXiion.PxModRim.desktop /app/share/applications/com.github.PyXiion.PxModRim.desktop
+      - install -Dm644 com.github.PyXiion.PxModRim.svg /app/share/icons/hicolor/scalable/apps/com.github.PyXiion.PxModRim.svg
+      - install -Dm644 com.github.PyXiion.PxModRim.metainfo.xml /app/share/metainfo/com.github.PyXiion.PxModRim.metainfo.xml
+    sources:
+      - type: dir
+        path: ../../dist/entrypoint.dist
+        dest: entrypoint.dist
+      - type: file
+        path: com.github.PyXiion.PxModRim.desktop
+      - type: file
+        path: ../../src/pxmodrim/ui/assets/logo.svg
+        dest-filename: com.github.PyXiion.PxModRim.svg
+      - type: file
+        path: com.github.PyXiion.PxModRim.metainfo.xml

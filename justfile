@@ -13,7 +13,7 @@ run: build-js dev-setup
 test: build-js dev-setup
     uv run pytest {{pytest_opts}} -s
 
-test-verbose: dev-setup
+test-verbose: build-js dev-setup
     uv run pytest {{pytest_opts}} -v --tb=short -s
 
 pyright:

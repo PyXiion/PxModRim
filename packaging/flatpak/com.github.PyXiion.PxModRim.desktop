@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PxModRim
+Comment=Mod manager for RimWorld
+Icon=com.github.PyXiion.PxModRim
+Exec=PxModRim
+Categories=Game;
+StartupWMClass=PxModRim
+Terminal=false

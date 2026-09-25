@@ -22,18 +22,26 @@ No frozen UI. No guessing where your mods came from. Just scan, sort, and play.
 ## What it does
 
 - **Scans everything in one place** — Steam, local, and core mods all show up together.
+- **Instant warm startup** — persistent SQLite metadata cache skips re-parsing unchanged mods.
 - **Catches problems for you** — missing dependencies, load-order conflicts, and other issues appear right in the list.
 - **Sorts your load order automatically** — one click and your active mods are ordered by dependencies and community
   rules.
 - **Saves back to RimWorld** — writes your final mod list to `ModsConfig.xml` so the game sees exactly what you picked.
+- **Safeguards your configuration** — automatic timestamped snapshots with one-click rollback if something breaks.
 
 ---
 
 ## Installation
 
-**No packaged installer yet.** PxModRim is early work-in-progress. This section will be updated once releases are ready.
+Pre-built packages are generated automatically for tagged releases on GitHub:
 
-If you are comfortable running from source, see the developer notes in [`AGENTS.md`](./AGENTS.md).
+- **Linux:** AppImage, `.tar.gz`, `.deb`, `.rpm`, and Flatpak (`com.github.PyXiion.PxModRim`)
+- **Windows:** NSIS Installer (`.exe`) and portable `.zip`
+- **macOS:** Application bundle `.zip` and `.dmg`
+
+Download the appropriate package from the [Releases](https://github.com/PyXiion/PxModRim/releases) page for your platform.
+
+If you prefer to run or build from source, see the developer notes in [`AGENTS.md`](./AGENTS.md).
 
 ---
 
