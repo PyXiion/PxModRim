@@ -94,6 +94,22 @@ class TestUnityRichTextConverter:
             == '<a href="http://example.com">link</a>'
         )
 
+    def test_link_rejects_unsafe_urls(self) -> None:
+        for url in (
+            "javascript:alert(1)",
+            "steam://rungameid/294100",
+            "https:example.com",
+        ):
+            assert unity_rich_text_to_html(f'<link="{url}">link</link>') == "link"
+
+    def test_non_finite_size_uses_default(self) -> None:
+        html = unity_rich_text_to_html(f"<size={10**400}>large</size>")
+        assert html == '<span style="font-size: 13pt;">large</span>'
+
+    def test_non_finite_indent_uses_default(self) -> None:
+        html = unity_rich_text_to_html(f"<indent={10**400}>wide</indent>")
+        assert html == '<div style="margin-left: 20px;">wide</div>'
+
     def test_nested(self) -> None:
         assert (
             unity_rich_text_to_html("<b><i>bold italic</i></b>")

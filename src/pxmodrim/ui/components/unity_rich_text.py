@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import html
+import math
 import re
+from urllib.parse import urlsplit
 
 UNITY_TAG_PATTERN = re.compile(r"</?([a-zA-Z]+)(?:=([^>\s]+))?\s*>")
 UNITY_COLOR_PATTERN = re.compile(r"^(#?[0-9a-fA-F]{3,8}|[a-zA-Z]+)$")
@@ -206,11 +208,14 @@ class UnityRichTextConverter:
         value = float(raw_value)
         base_pt = 12.0
         if unit == "%":
-            pt = max(1, base_pt * value / 100)
+            pt = base_pt * value / 100
         elif unit == "em":
-            pt = max(1, base_pt * value)
+            pt = base_pt * value
         else:
-            pt = max(1, base_pt + value if is_relative else value)
+            pt = base_pt + value if is_relative else value
+        if not math.isfinite(pt):
+            pt = 13.0
+        pt = min(max(pt, 1.0), 200.0)
         pt_str = str(int(pt)) if pt == int(pt) else str(pt)
         return f'<span style="font-size: {pt_str}pt;">'
 
@@ -235,13 +240,16 @@ class UnityRichTextConverter:
         if not m:
             return '<div style="margin-left: 20px;">'
         value = float(m.group(1))
+        if not math.isfinite(value):
+            value = 20.0
         unit = m.group(2) or "px"
         if unit == "%":
-            px = int(400 * value / 100)
+            px = 400 * value / 100
         elif unit == "em":
-            px = int(16 * value)
+            px = 16 * value
         else:
-            px = int(value)
+            px = value
+        px = int(min(max(px, -10000.0), 10000.0))
         return f'<div style="margin-left: {px}px;">'
 
     def _mark_tag(self, attr: str | None) -> str:
@@ -256,8 +264,11 @@ class UnityRichTextConverter:
 
     def _link_tag(self, attr: str | None) -> str:
         if not attr:
-            return '<a href="#">'
+            return ""
         attr = attr.strip("\"'")
+        parsed = urlsplit(attr)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            return ""
         return f'<a href="{html.escape(attr)}">'
 
 

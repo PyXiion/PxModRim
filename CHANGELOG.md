@@ -25,3 +25,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Dependency cycle detection reports all overlapping cycles (SCC-based); sorting/cycle checks no longer hit recursion limits on long chains; tier sort no longer quadratic
 - Unused per-mod `community_rules`/`user_rules` and `overall_rules` merge
 - `About.xml` version keys match exactly (`v1.5` no longer matches `v1.50`); mods without `packageId` are invalid
+- Mod description links restricted to HTTP(S); oversized `<size>`/`<indent>` values no longer crash rendering
