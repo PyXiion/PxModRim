@@ -9,7 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Mod list snapshots and rollback (#24): automatic timestamped backups of `ModsConfig.xml` before save and on launch, configurable retention, and a restore snapshot dialog in the File menu
 - Persistent mod metadata cache (#29): SQLite-backed cache keyed by mod path and mtime to avoid re-parsing `About.xml` across launches, with automatic invalidation and corruption recovery
-- Native packaging artifacts and CI release pipeline (#36): Linux AppImage/tar, .deb, .rpm, and Flatpak manifest; Windows NSIS installer and portable zip; macOS .app bundle zip and DMG
+- Native packaging artifacts and CI release pipeline (#36): Linux AppImage/tar, architecture-aware
+  .deb/.rpm, and Flatpak with common Steam/RimWorld access; Windows NSIS installer and portable zip;
+  ad-hoc-signed macOS app zip and DMG, with optional Developer ID signing and notarization
 
 - Versioning and migration system for config files and database schemas
 - `core/migrator.py` — lightweight ordered step migrator

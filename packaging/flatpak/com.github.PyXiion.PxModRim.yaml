@@ -12,11 +12,12 @@ finish-args:
   - --device=dri
   # Network (Workshop, updates, metadata)
   - --share=network
-  # Explicit minimum filesystem permissions for Steam and RimWorld locations
-  - --filesystem=~/.steam
-  - --filesystem=xdg-data/Steam
-  - --filesystem=~/.var/app/com.valvesoftware.Steam
-  - --filesystem=xdg-config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios:create
+  # Steam library folders elsewhere must be granted explicitly by the user.
+  - "--filesystem=~/.steam:ro"
+  - "--filesystem=~/.local/share/Steam:ro"
+  - "--filesystem=xdg-data/Steam:ro"
+  - "--filesystem=~/.var/app/com.valvesoftware.Steam:ro"
+  - "--filesystem=~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios"
 
 modules:
   - name: pxmodrim

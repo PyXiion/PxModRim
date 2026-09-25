@@ -161,6 +161,14 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    env:
+      MACOS_SIGNING_CONFIGURED: >-
+        ${{ secrets.MACOS_CERT != '' &&
+            secrets.MACOS_CERT_PASSWORD != '' &&
+            secrets.MACOS_SIGNING_IDENTITY != '' &&
+            secrets.APPLE_ID != '' &&
+            secrets.APPLE_TEAM_ID != '' &&
+            secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -189,6 +197,57 @@ jobs:
 
       - name: Build with Nuitka
         run: just build-release-bundled
+
+      - name: Sign and notarize macOS app
+        if: env.MACOS_SIGNING_CONFIGURED == 'true'
+        env:
+          MACOS_CERT: ${{ secrets.MACOS_CERT }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain_password="$(openssl rand -hex 24)"
+          keychain_path="$RUNNER_TEMP/pxmodrim-signing.keychain-db"
+          certificate="$RUNNER_TEMP/pxmodrim-signing.p12"
+          notary_zip="$RUNNER_TEMP/PxModRim-notarize.zip"
+          printf '%s' "$MACOS_CERT" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate" \
+            -f pkcs12 \
+            -P "$MACOS_CERT_PASSWORD" \
+            -k "$keychain_path" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          codesign --force --deep --options runtime --timestamp \
+            --sign "$MACOS_SIGNING_IDENTITY" dist/PxModRim.app
+          codesign --verify --deep --strict dist/PxModRim.app
+          ditto -c -k --keepParent dist/PxModRim.app "$notary_zip"
+          xcrun notarytool submit "$notary_zip" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
+          xcrun stapler staple dist/PxModRim.app
+          rm -f dist/PxModRim-macOS.zip dist/PxModRim-macOS.dmg
+          ditto -c -k --keepParent dist/PxModRim.app dist/PxModRim-macOS.zip
+          hdiutil create -volname PxModRim \
+            -srcfolder dist/PxModRim.app \
+            -ov -format UDZO dist/PxModRim-macOS.dmg
+          xcrun notarytool submit dist/PxModRim-macOS.dmg \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
+          xcrun stapler staple dist/PxModRim-macOS.dmg
+          security delete-keychain "$keychain_path"
+          rm -f "$certificate" "$notary_zip"
 
       - name: Upload artifact (dmg)
         uses: actions/upload-artifact@v7

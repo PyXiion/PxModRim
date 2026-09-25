@@ -41,6 +41,13 @@ Pre-built packages are generated automatically for tagged releases on GitHub:
 
 Download the appropriate package from the [Releases](https://github.com/PyXiion/PxModRim/releases) page for your platform.
 
+Flatpak can access common Steam locations and the RimWorld config directory. If a Steam library is stored
+elsewhere, grant that folder to PxModRim in Flatseal; the app does not receive broad host-filesystem
+access.
+
+macOS builds are ad-hoc signed by default. Developer ID signing and notarization are enabled only when
+release signing secrets are configured; otherwise, macOS may require manual Gatekeeper approval.
+
 If you prefer to run or build from source, see the developer notes in [`AGENTS.md`](./AGENTS.md).
 
 ---
