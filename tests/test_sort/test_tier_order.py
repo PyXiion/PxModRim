@@ -8,6 +8,11 @@ from pxmodrim.core.models.metadata.structures import (
     CaseInsensitiveStr,
 )
 from pxmodrim.core.sort.config import SortSettings, Tier, TierConfig
+from pxmodrim.core.sort.tiers import (
+    find_cycle,
+    get_deps_recursive,
+    get_reverse_deps_recursive,
+)
 
 PackageId = CaseInsensitiveStr
 
@@ -230,3 +235,20 @@ class TestNonConfigMods:
         assert tier0_pids == ["zetrith.prepatcher", "brrainz.harmony"], (
             f"config mods in wrong order: {tier0_pids}"
         )
+
+
+def test_tier_graph_algorithms_handle_long_chains():
+    nodes = [PackageId(f"mod.{index}") for index in range(5000)]
+    deps = {nodes[index]: {nodes[index + 1]} for index in range(len(nodes) - 1)}
+    reverse_deps = {nodes[index + 1]: {nodes[index]} for index in range(len(nodes) - 1)}
+
+    assert get_deps_recursive(nodes[0], deps) == set(nodes[1:])
+    assert get_reverse_deps_recursive(nodes[-1], reverse_deps) == set(nodes[:-1])
+    assert find_cycle(set(nodes), deps) is None
+
+    deps[nodes[-1]] = {nodes[0]}
+    cycle = find_cycle(set(nodes), deps)
+    assert cycle is not None
+    assert len(cycle) == len(nodes) + 1
+    assert cycle[0] == cycle[-1]
+    assert set(cycle[:-1]) == set(nodes)

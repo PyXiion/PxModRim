@@ -27,7 +27,7 @@ class DependencyIssueChecker(ModIssueChecker):
     category_display_name = "Missing Dependency"
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
-        return bool(mod.overall_rules.dependencies)
+        return bool(mod.about_rules.dependencies)
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         """Report errors for unresolved deps, considering alternatives if enabled."""
@@ -37,7 +37,7 @@ class DependencyIssueChecker(ModIssueChecker):
         issues: list[ModIssue] = []
         consider_alternatives = ctx.settings.use_alternative_package_ids
 
-        for dep_id, dep_mod in mod.overall_rules.dependencies.items():
+        for dep_id, dep_mod in mod.about_rules.dependencies.items():
             satisfied = str(dep_id) in ctx.active_mods
             if not satisfied and consider_alternatives:
                 satisfied = any(
@@ -78,9 +78,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
         outgoing = ctx.graph.edges_of_type(pid, EdgeType.INCOMPATIBILITY)
         incoming = ctx.graph.incoming_of_type(pid, EdgeType.INCOMPATIBILITY)
         return (
-            bool(mod.overall_rules.incompatible_with)
-            or bool(outgoing)
-            or bool(incoming)
+            bool(mod.about_rules.incompatible_with) or bool(outgoing) or bool(incoming)
         )
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
@@ -89,7 +87,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
         pid = PackageId(mod.package_id)
 
         # Self-declared incompatibilities
-        for incomp in mod.overall_rules.incompatible_with:
+        for incomp in mod.about_rules.incompatible_with:
             if str(incomp) in ctx.active_mods:
                 other = ctx.active_mods.get(PackageId(incomp))
                 name = other.name if other else str(incomp)
@@ -105,7 +103,7 @@ class IncompatibilityIssueChecker(ModIssueChecker):
                     )
                 )
 
-        reported_sources = set(mod.overall_rules.incompatible_with)
+        reported_sources = set(mod.about_rules.incompatible_with)
         for edge in ctx.graph.incoming_of_type(pid, EdgeType.INCOMPATIBILITY):
             if (
                 edge.source not in ctx.active_mods
@@ -210,8 +208,8 @@ class CycleIssueChecker(ModIssueChecker):
                         severity="warning",
                         short_message="Dependency cycle detected",
                         detail_message=(
-                            "Part of a dependency cycle: "
-                            + " -> ".join(str(c) for c in cycle)
+                            "Participates in a dependency cycle involving: "
+                            + ", ".join(str(c) for c in cycle)
                         ),
                         related_package_ids=tuple(c for c in cycle if c != pid),
                     )

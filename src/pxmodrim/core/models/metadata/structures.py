@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import functools
 import os
 from collections.abc import Iterable, Iterator, MutableSet
@@ -69,9 +68,6 @@ class CaseInsensitiveSet(MutableSet[CaseInsensitiveStr]):
 
     def __ror__(self, other: AbstractSet[Any]) -> CaseInsensitiveSet:
         return self.__or__(other)
-
-    def __hash__(self) -> int:
-        return hash(self._data)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, CaseInsensitiveSet):
@@ -160,7 +156,7 @@ class BaseMod:
     """Base dataclass for all mod types with a name and UUID."""
 
     name: str = "Unknown Mod Name"
-    _uuid: str = str(uuid4())
+    _uuid: str = field(default_factory=lambda: str(uuid4()))
 
     @property
     def uuid(self) -> str:
@@ -300,14 +296,6 @@ class BaseRules:
 
 
 @dataclass(slots=True)
-class Rules(BaseRules):
-    """Load order rules extended with load_first and load_last flags."""
-
-    load_first: bool = False
-    load_last: bool = False
-
-
-@dataclass(slots=True)
 class AboutXmlMod(ListedMod, PackageIdMod):
     """A mod with an About.xml, including authors, version, rules, and DLC metadata."""
 
@@ -316,47 +304,8 @@ class AboutXmlMod(ListedMod, PackageIdMod):
     mod_icon_path: Path | None = None
     steam_app_id: int = -1
     url: str = ""
-
+    mtime: float = 0.0
     about_rules: BaseRules = field(default_factory=BaseRules)
-    community_rules: Rules = field(default_factory=Rules)
-    user_rules: Rules = field(default_factory=Rules)
-
-    @functools.cached_property
-    def overall_rules(self) -> Rules:
-        """Merged rules from about.xml, community, user; prefers community overrides."""
-        overall = Rules()
-
-        overall.load_before = (
-            self.about_rules.load_before
-            | self.community_rules.load_before
-            | self.user_rules.load_before
-        )
-        overall.load_after = (
-            self.about_rules.load_after
-            | self.community_rules.load_after
-            | self.user_rules.load_after
-        )
-        overall.incompatible_with = (
-            self.about_rules.incompatible_with
-            | self.community_rules.incompatible_with
-            | self.user_rules.incompatible_with
-        )
-        overall.dependencies = {
-            **self.about_rules.dependencies,
-            **self.community_rules.dependencies,
-            **self.user_rules.dependencies,
-        }
-        overall.load_first = (
-            self.community_rules.load_first or self.user_rules.load_first
-        )
-        overall.load_last = self.community_rules.load_last or self.user_rules.load_last
-
-        return overall
-
-    def clear_cache(self) -> None:
-        """Invalidate the cached `overall_rules` property."""
-        with contextlib.suppress(AttributeError):
-            del self.overall_rules
 
     def get_dlc_name(self) -> str | None:
         """Return the DLC name if this mod matches a known RimWorld DLC."""

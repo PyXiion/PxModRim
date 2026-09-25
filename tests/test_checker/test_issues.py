@@ -167,9 +167,7 @@ class TestIncompatibilityIssueChecker:
         graph.build(mods, list(mods), settings, community_rules)
         origins = {
             edge.origin
-            for edge in graph.incoming_of_type(
-                target_pid, EdgeType.INCOMPATIBILITY
-            )
+            for edge in graph.incoming_of_type(target_pid, EdgeType.INCOMPATIBILITY)
         }
         assert origins == {EdgeOrigin.ABOUT_XML, EdgeOrigin.COMMUNITY_RULES}
         ctx = _ctx(mods, graph=graph, settings=settings)

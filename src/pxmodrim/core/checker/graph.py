@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from collections.abc import Set as AbstractSet
 from enum import IntEnum, auto
 from typing import TYPE_CHECKING
@@ -9,7 +10,6 @@ from pxmodrim.core.models.metadata.structures import (
     BaseRules,
     CaseInsensitiveStr,
 )
-from pxmodrim.core.sort.tiers import find_cycle
 
 if TYPE_CHECKING:
     from pxmodrim.core.sort.community import CommunityRule
@@ -144,9 +144,7 @@ class ConstraintGraph:
             self._ensure_node(pid)
 
         alt_map = (
-            _build_alt_map(active_mods)
-            if settings.use_alternative_package_ids
-            else {}
+            _build_alt_map(active_mods) if settings.use_alternative_package_ids else {}
         )
 
         for pid, mod in active_mods.items():
@@ -181,9 +179,7 @@ class ConstraintGraph:
         self._rebuild_index()
 
         alt_map = (
-            _build_alt_map({pid: mod})
-            if settings.use_alternative_package_ids
-            else {}
+            _build_alt_map({pid: mod}) if settings.use_alternative_package_ids else {}
         )
         self._add_rules(pid, mod.about_rules, EdgeOrigin.ABOUT_XML, alt_map)
 
@@ -214,30 +210,73 @@ class ConstraintGraph:
     # ── Cycle detection ────────────────────────────────────────
 
     def find_cycles(self) -> list[list[PackageId]]:
-        """Detect dependency cycles in the current graph via tier-based finding."""
-        dep_graph: dict[PackageId, set[PackageId]] = {}
-        for pid in self._outgoing:
-            deps: set[PackageId] = set()
-            for edge in self._outgoing[pid]:
-                if edge.type in (EdgeType.DEPENDENCY, EdgeType.LOAD_AFTER):
-                    deps.add(edge.target)
-            if deps:
-                dep_graph[pid] = deps
+        """Return strongly connected components that contain dependency cycles."""
+        adjacency: dict[PackageId, set[PackageId]] = {
+            pid: {
+                edge.target
+                for edge in edges
+                if edge.type in (EdgeType.DEPENDENCY, EdgeType.LOAD_AFTER)
+            }
+            for pid, edges in self._outgoing.items()
+        }
 
-        all_nodes = set(dep_graph.keys())
-        found_cycles: list[list[PackageId]] = []
+        indices: dict[PackageId, int] = {}
+        lowlinks: dict[PackageId, int] = {}
+        active_stack: list[PackageId] = []
+        on_stack: set[PackageId] = set()
+        cycles: list[list[PackageId]] = []
+        next_index = 0
 
-        remaining = set(all_nodes)
-        while remaining:
-            cycle = find_cycle(remaining, dep_graph)
-            if cycle:
-                cycle_set = set(cycle)
-                remaining -= cycle_set
-                found_cycles.append(cycle)
-            else:
-                break
+        for root, root_neighbors in adjacency.items():
+            if root in indices:
+                continue
 
-        return found_cycles
+            indices[root] = next_index
+            lowlinks[root] = next_index
+            next_index += 1
+            active_stack.append(root)
+            on_stack.add(root)
+            dfs_stack: list[tuple[PackageId, Iterator[PackageId]]] = [
+                (root, iter(root_neighbors))
+            ]
+
+            while dfs_stack:
+                pid, neighbors = dfs_stack[-1]
+                try:
+                    neighbor = next(neighbors)
+                except StopIteration:
+                    dfs_stack.pop()
+                    if lowlinks[pid] == indices[pid]:
+                        component: list[PackageId] = []
+                        while True:
+                            member = active_stack.pop()
+                            on_stack.remove(member)
+                            component.append(member)
+                            if member == pid:
+                                break
+                        if len(component) > 1 or pid in adjacency[pid]:
+                            component.sort(
+                                key=lambda member: self._pid_to_index.get(
+                                    member, len(self._pid_to_index)
+                                )
+                            )
+                            cycles.append(component)
+                    if dfs_stack:
+                        parent = dfs_stack[-1][0]
+                        lowlinks[parent] = min(lowlinks[parent], lowlinks[pid])
+                    continue
+
+                if neighbor not in indices:
+                    indices[neighbor] = next_index
+                    lowlinks[neighbor] = next_index
+                    next_index += 1
+                    active_stack.append(neighbor)
+                    on_stack.add(neighbor)
+                    dfs_stack.append((neighbor, iter(adjacency[neighbor])))
+                elif neighbor in on_stack:
+                    lowlinks[pid] = min(lowlinks[pid], indices[neighbor])
+
+        return cycles
 
     # ── Private helpers ────────────────────────────────────────
 

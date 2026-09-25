@@ -86,9 +86,7 @@ class TestConstraintGraph:
         )
         enabled_targets = {
             edge.target
-            for edge in g.edges_of_type(
-                PackageId("mod.consumer"), EdgeType.DEPENDENCY
-            )
+            for edge in g.edges_of_type(PackageId("mod.consumer"), EdgeType.DEPENDENCY)
         }
         assert enabled_targets == {PackageId("mod.alternative")}
 
@@ -99,9 +97,7 @@ class TestConstraintGraph:
         )
         disabled_targets = {
             edge.target
-            for edge in g.edges_of_type(
-                PackageId("mod.consumer"), EdgeType.DEPENDENCY
-            )
+            for edge in g.edges_of_type(PackageId("mod.consumer"), EdgeType.DEPENDENCY)
         }
         assert disabled_targets == {PackageId("mod.dependency")}
 
@@ -213,6 +209,26 @@ class TestConstraintGraph:
         for pid in ("mod.a", "mod.b", "mod.c"):
             assert pid in cycle_pids
 
+    def test_cycle_detection_reports_overlapping_cycles(self):
+        g = ConstraintGraph()
+        a = _make_mod("mod.a")
+        b = _make_mod("mod.b")
+        c = _make_mod("mod.c")
+        a.about_rules.load_after = CaseInsensitiveSet(["mod.b"])
+        b.about_rules.load_after = CaseInsensitiveSet(["mod.a", "mod.c"])
+        c.about_rules.load_after = CaseInsensitiveSet(["mod.b"])
+        mods = {
+            PackageId("mod.a"): a,
+            PackageId("mod.b"): b,
+            PackageId("mod.c"): c,
+        }
+        g.build(mods, list(mods), _settings())
+
+        cycles = g.find_cycles()
+
+        assert len(cycles) == 1
+        assert set(cycles[0]) == set(mods)
+
     def test_no_cycle(self):
         g = ConstraintGraph()
         a = _make_mod("mod.a")
@@ -222,3 +238,15 @@ class TestConstraintGraph:
         g.build(mods, list(mods.keys()), _settings())
         cycles = g.find_cycles()
         assert len(cycles) == 0
+
+    def test_cycle_detection_handles_long_chain(self):
+        nodes = [PackageId(f"mod.{index}") for index in range(5000)]
+        mods = {pid: _make_mod(str(pid)) for pid in nodes}
+        for index in range(len(nodes) - 1):
+            mods[nodes[index]].about_rules.load_after = CaseInsensitiveSet(
+                [str(nodes[index + 1])]
+            )
+        g = ConstraintGraph()
+        g.build(mods, nodes, _settings())
+
+        assert g.find_cycles() == []

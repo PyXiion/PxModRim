@@ -32,9 +32,9 @@ def topological_sort(
     with t("build_deps"):
         deps, rev_deps = _build_deps_and_rev_deps(graph, all_pids)
     with t("build_load_first"):
-        load_first = _build_load_first(active_mods, community_rules, all_pids, settings)
+        load_first = _build_load_first(community_rules, all_pids, settings)
     with t("build_load_last"):
-        load_last = _build_load_last(active_mods, community_rules, all_pids, settings)
+        load_last = _build_load_last(community_rules, all_pids, settings)
 
     with t("assign_tiers"):
         tiers = assign_tiers(
@@ -42,9 +42,10 @@ def topological_sort(
         )
 
     order: list[PackageId] = []
+    ordered: set[PackageId] = set()
     for tier in (Tier.TIER_0, Tier.TIER_1, Tier.TIER_2, Tier.TIER_3):
         tier_pids = {
-            pid for pid in all_pids if pid not in order and tiers.get(pid) == tier
+            pid for pid in all_pids if pid not in ordered and tiers.get(pid) == tier
         }
         if not tier_pids:
             continue
@@ -69,14 +70,16 @@ def topological_sort(
             while queue:
                 _, pid = heapq.heappop(queue)
                 order.append(pid)
+                ordered.add(pid)
                 for dependent in rev.get(pid, set()):
                     indegree[dependent] -= 1
                     if indegree[dependent] == 0:
                         heapq.heappush(queue, (_key(dependent), dependent))
 
-            remaining = tier_pids - set(order)
+            remaining = tier_pids - ordered
             if remaining:
                 order.extend(sorted(remaining, key=_key))
+                ordered.update(remaining)
 
     return order
 
@@ -110,42 +113,33 @@ def _build_deps_and_rev_deps(
 
 
 def _build_load_first(
-    active_mods: dict[PackageId, AboutXmlMod],
     community_rules: dict[PackageId, CommunityRule] | None,
     all_pids: set[PackageId],
     settings: SortSettings,
 ) -> set[PackageId]:
-    """Collect PIDs that should be loaded first from mod rules and community rules."""
-    load_first: set[PackageId] = set()
-    for pid in all_pids:
-        mod = active_mods.get(pid)
-        if mod and mod.overall_rules.load_first:
-            load_first.add(pid)
-    if settings.use_community_rules and community_rules:
-        for pid, cr in community_rules.items():
-            if pid in all_pids and cr.load_first:
-                load_first.add(pid)
-    return load_first
+    """Collect PIDs that should be loaded first from community rules."""
+    if not settings.use_community_rules or not community_rules:
+        return set()
+    return {
+        pid
+        for pid, rule in community_rules.items()
+        if pid in all_pids and rule.load_first
+    }
 
 
 def _build_load_last(
-    active_mods: dict[PackageId, AboutXmlMod],
     community_rules: dict[PackageId, CommunityRule] | None,
     all_pids: set[PackageId],
     settings: SortSettings,
 ) -> set[PackageId]:
-    """Collect PIDs that should be loaded last from mod rules and community rules."""
-    load_last: set[PackageId] = set()
-    for pid in all_pids:
-        mod = active_mods.get(pid)
-        if mod and mod.overall_rules.load_last:
-            load_last.add(pid)
+    """Collect PIDs that should be loaded last from community rules."""
     if not settings.use_community_rules or not community_rules:
-        return load_last
-    for pid, cr in community_rules.items():
-        if pid in all_pids and cr.load_last:
-            load_last.add(pid)
-    return load_last
+        return set()
+    return {
+        pid
+        for pid, rule in community_rules.items()
+        if pid in all_pids and rule.load_last
+    }
 
 
 def _build_config_priority(tier_config: TierConfig) -> dict[PackageId, int]:

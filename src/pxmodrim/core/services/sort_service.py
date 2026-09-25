@@ -67,7 +67,7 @@ class SortService:
             mod = self._ctx.all_mods.get(uuid)
             if not isinstance(mod, AboutXmlMod):
                 continue
-            for dep_pid, dep_info in mod.overall_rules.dependencies.items():
+            for dep_pid, dep_info in mod.about_rules.dependencies.items():
                 dep_str = str(dep_pid)
                 if dep_str in active_pids:
                     continue

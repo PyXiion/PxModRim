@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     CaseInsensitiveSet,
@@ -46,6 +48,10 @@ class TestCaseInsensitiveSet:
     def test_empty_eq(self) -> None:
         assert CaseInsensitiveSet() == CaseInsensitiveSet()
 
+    def test_unhashable(self) -> None:
+        with pytest.raises(TypeError):
+            hash(CaseInsensitiveSet())
+
 
 class TestListedMod:
     def test_default_creation(self) -> None:
@@ -59,6 +65,9 @@ class TestListedMod:
         mod = ListedMod()
         mod.provider_id = "local"
         assert mod.provider_id == "local"
+
+    def test_pathless_mod_uuids_are_unique(self) -> None:
+        assert ListedMod().uuid != ListedMod().uuid
 
 
 class TestAboutXmlMod:
