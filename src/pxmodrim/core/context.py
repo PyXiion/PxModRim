@@ -150,6 +150,10 @@ class CoreContext:
         return self._cfg
 
     @property
+    def has_config_service(self) -> bool:
+        return self._config_service is not None
+
+    @property
     def config_service(self) -> ConfigService:
         assert self._config_service is not None
         return self._config_service
@@ -225,6 +229,7 @@ class CoreContext:
         svc = self._mod_service
         if svc is not None:
             await svc.startup_impact.close_connection()
+            await svc.close()
 
     def close_sync(self) -> None:
         """Synchronous teardown for use after the event loop has stopped."""
@@ -233,6 +238,7 @@ class CoreContext:
         svc = self._mod_service
         if svc is not None:
             svc.startup_impact.close_connection_sync()
+            svc.close_sync()
 
     def reset_providers(self, paths: PathConfig) -> None:
         """Replace providers when the config changes (e.g. after settings dialog)."""

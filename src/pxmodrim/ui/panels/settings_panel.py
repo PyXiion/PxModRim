@@ -333,6 +333,7 @@ class SettingsPanel(QDialog):
                 check_missing_dependencies=self.check_missing_cb.isChecked(),
                 use_community_rules=self.use_community_cb.isChecked(),
             ),
+            max_snapshots=self._config.max_snapshots,
         )
         self.accept()
 

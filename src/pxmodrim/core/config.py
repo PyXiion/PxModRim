@@ -65,6 +65,7 @@ class AppConfig(msgspec.Struct):
     sort: SortSettings = msgspec.field(
         default_factory=lambda: SortSettings(tier_config=TierConfig.default())
     )
+    max_snapshots: int = 10
 
 
 def _migrate_json(data: dict[str, Any], current: int) -> None:

@@ -16,7 +16,9 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QMainWindow,
+    QMessageBox,
     QSplitter,
     QStackedWidget,
     QVBoxLayout,
@@ -37,6 +39,10 @@ from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.about_panel import AboutPanel
+from pxmodrim.ui.panels.restore_snapshot_dialog import (
+    ConfirmRestoreDialog,
+    RestoreSnapshotDialog,
+)
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.theme.qml_theme import Theme
 from pxmodrim.ui.window.menu_bar import MenuBar
@@ -103,10 +109,10 @@ class MainWindow(QMainWindow):
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
 
-        self._menu_bar = MenuBar()
+        self._menu_bar = MenuBar(self)
         self._menu_bar.settings_requested.connect(self._open_settings)
         self._menu_bar.about_requested.connect(self._show_about)
-
+        self._menu_bar.restore_snapshot_requested.connect(self._restore_snapshot)
         QShortcut(QKeySequence("Ctrl+,"), self, self._open_settings)
         QShortcut(QKeySequence("Ctrl+Q"), self, self.close)
         QShortcut(QKeySequence("F5"), self, self._header_controller.refresh)
@@ -299,6 +305,31 @@ class MainWindow(QMainWindow):
     @asyncSlot()
     async def _show_about(self) -> None:
         await await_dialog(AboutPanel, self)
+
+    @asyncSlot()
+    async def _restore_snapshot(self) -> None:
+        snapshots = self._ctx.mod_service.get_snapshots()
+        if not snapshots:
+            self._toast_manager.warning("No saved mod lists are available", 3000)
+            return
+
+        result, dialog = await await_dialog(RestoreSnapshotDialog, snapshots, self)
+        if result != QDialog.DialogCode.Accepted:
+            return
+
+        chosen = dialog.selected_snapshot
+        if chosen is None:
+            return
+        confirm_result, _ = await await_dialog(ConfirmRestoreDialog, chosen.name, self)
+        if confirm_result != QMessageBox.StandardButton.Yes:
+            return
+
+        if await self._ctx.mod_service.restore_snapshot(chosen):
+            self._toast_manager.success(f"Restored mod list from {chosen.name}", 3000)
+        else:
+            self._toast_manager.error(
+                "The saved mod list is invalid or cannot be read", 5000
+            )
 
     @asyncSlot()
     async def _auto_sort(self) -> None:

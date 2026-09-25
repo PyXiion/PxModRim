@@ -27,9 +27,7 @@ def create_providers(
         providers.append(LocalModProvider(Path(paths.local), pool=pool))
         providers.append(SteamCmdModProvider(Path(paths.local), pool=pool))
     if paths.workshop:
-        providers.append(
-            SteamWorkshopModProvider(Path(paths.workshop), pool=pool)
-        )
+        providers.append(SteamWorkshopModProvider(Path(paths.workshop), pool=pool))
     return providers
 
 
