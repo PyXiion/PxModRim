@@ -54,7 +54,9 @@ async def test_db_migrations_checkpoint_wal_before_backup(
     backup_path = tmp_path / "cache.db.bak.1700000000"
 
     async with aiosqlite.connect(path) as conn:
-        journal_mode = await (await conn.execute("PRAGMA journal_mode = WAL")).fetchone()
+        journal_mode = await (
+            await conn.execute("PRAGMA journal_mode = WAL")
+        ).fetchone()
         assert journal_mode == ("wal",)
         await conn.execute("PRAGMA wal_autocheckpoint = 0")
         await conn.execute("CREATE TABLE state (value TEXT)")
