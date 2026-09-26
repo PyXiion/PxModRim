@@ -111,6 +111,7 @@ def test_windows_executable_normalization(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Executable not found"):
         pkg_build.normalize_executable(tmp_path / "missing", system="Windows")
 
+
 def test_macos_executable_normalization_preserves_runtime_directory(
     tmp_path: Path,
 ) -> None:
@@ -126,8 +127,6 @@ def test_macos_executable_normalization_preserves_runtime_directory(
     assert result == entrypoint
     assert result.read_bytes() == b"macOS executable"
     assert runtime_file.read_bytes() == b"runtime module"
-
-
 
 
 def test_deb_creation_requires_dpkg_deb(tmp_path: Path, monkeypatch) -> None:
