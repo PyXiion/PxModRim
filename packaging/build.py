@@ -143,16 +143,17 @@ def copy_missing_libs(project_root: Path) -> None:
 
 
 def normalize_executable(dist_dir: Path, system: str | None = None) -> Path:
-    """Normalize the Nuitka entrypoint binary to PxModRim (or PxModRim.exe on Windows).
-
-    Searches platform-appropriate candidate names, renames the first matching
-    source executable to the final target name, and fails clearly if neither
-    the final executable nor any source candidate exists.
-    """
+    """Normalize the Nuitka entrypoint executable for its platform."""
     if system is None:
         system = platform.system()
 
-    output_name = "PxModRim.exe" if system == "Windows" else "PxModRim"
+    if system == "Windows":
+        output_name = "PxModRim.exe"
+    elif system == "Darwin":
+        output_name = "entrypoint"
+    else:
+        output_name = "PxModRim"
+
     final_binary = dist_dir / output_name
 
     if final_binary.is_file():

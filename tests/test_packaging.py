@@ -111,6 +111,24 @@ def test_windows_executable_normalization(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Executable not found"):
         pkg_build.normalize_executable(tmp_path / "missing", system="Windows")
 
+def test_macos_executable_normalization_preserves_runtime_directory(
+    tmp_path: Path,
+) -> None:
+    entrypoint = tmp_path / "entrypoint"
+    entrypoint.write_bytes(b"macOS executable")
+    runtime_dir = tmp_path / "PxModRim"
+    runtime_dir.mkdir()
+    runtime_file = runtime_dir / "module.pyd"
+    runtime_file.write_bytes(b"runtime module")
+
+    result = pkg_build.normalize_executable(tmp_path, system="Darwin")
+
+    assert result == entrypoint
+    assert result.read_bytes() == b"macOS executable"
+    assert runtime_file.read_bytes() == b"runtime module"
+
+
+
 
 def test_deb_creation_requires_dpkg_deb(tmp_path: Path, monkeypatch) -> None:
     dist_dir = tmp_path / "dist" / "entrypoint.dist"
@@ -187,6 +205,9 @@ def test_macos_bundle_plist_update(tmp_path: Path, monkeypatch) -> None:
     macos_dir = contents / "MacOS"
     macos_dir.mkdir(parents=True)
     (macos_dir / "entrypoint").write_bytes(b"macOS executable")
+    runtime_dir = macos_dir / "PxModRim"
+    runtime_dir.mkdir()
+    (runtime_dir / "module.pyd").write_bytes(b"runtime module")
     plist_file = contents / "Info.plist"
 
     with open(plist_file, "wb") as f:
@@ -203,8 +224,8 @@ def test_macos_bundle_plist_update(tmp_path: Path, monkeypatch) -> None:
 
     res = pkg_build.create_macos_bundle(project_root)
     assert res == app_dir
-    assert (macos_dir / "PxModRim").read_bytes() == b"macOS executable"
-    assert not (macos_dir / "entrypoint").exists()
+    assert (macos_dir / "entrypoint").read_bytes() == b"macOS executable"
+    assert (runtime_dir / "module.pyd").read_bytes() == b"runtime module"
 
     with open(plist_file, "rb") as f:
         pl = plistlib.load(f)
@@ -212,12 +233,12 @@ def test_macos_bundle_plist_update(tmp_path: Path, monkeypatch) -> None:
     assert pl["CFBundleIdentifier"] == "com.github.PyXiion.PxModRim"
     assert pl["CFBundleName"] == "PxModRim"
     assert pl["CFBundleVersion"] == "0.9.0"
-    assert pl["CFBundleExecutable"] == "PxModRim"
+    assert pl["CFBundleExecutable"] == "entrypoint"
     assert pl["CFBundlePackageType"] == "APPL"
 
     assert any(command[0] == "codesign" and "-" in command for command in commands)
     with zipfile.ZipFile(project_root / "dist" / "PxModRim-macOS.zip") as archive:
-        assert "PxModRim.app/Contents/MacOS/PxModRim" in archive.namelist()
+        assert "PxModRim.app/Contents/MacOS/entrypoint" in archive.namelist()
 
 
 def test_macos_bundle_requires_hdiutil_for_release(tmp_path: Path, monkeypatch) -> None:
@@ -226,7 +247,7 @@ def test_macos_bundle_requires_hdiutil_for_release(tmp_path: Path, monkeypatch) 
     app_dir = tmp_path / "dist" / "PxModRim.app"
     macos_dir = app_dir / "Contents" / "MacOS"
     macos_dir.mkdir(parents=True)
-    (macos_dir / "PxModRim").write_bytes(b"macOS executable")
+    (macos_dir / "entrypoint").write_bytes(b"macOS executable")
     monkeypatch.setattr(pkg_build.subprocess, "run", lambda command, check: None)
     monkeypatch.setattr(pkg_build.shutil, "which", lambda cmd: None)
 
