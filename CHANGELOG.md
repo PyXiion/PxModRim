@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 ### Added
+- Mod organizer core (#37): SQLite-backed folder hierarchy, tags, placement rules, and tree resolver
 - Extended keyboard shortcuts (#35): search, mod toggling, fullscreen, view navigation, full metadata rescan, and a Help menu shortcut reference
 - Mod list snapshots and rollback (#24): automatic timestamped backups of `ModsConfig.xml` before save and on launch, configurable retention, and a restore snapshot dialog in the File menu
 - Persistent mod metadata cache (#29): SQLite-backed cache keyed by mod path and mtime to avoid re-parsing `About.xml` across launches, with automatic invalidation and corruption recovery

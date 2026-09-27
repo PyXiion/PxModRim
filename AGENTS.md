@@ -48,7 +48,7 @@ Output `inject.js` is gitignored; always build before running.
 
 ## Layer dependency checker
 `just check-deps` (`scripts/check-deps.py`) enforces strict import rules via pydeps.
-Defines 23 groups with explicit ALLOWED dependency matrices.
+Defines 24 groups with explicit ALLOWED dependency matrices.
 If a new import violates boundaries, update `scripts/check-deps.py`'s `ALLOWED` dict.
 
 ## CI matrix

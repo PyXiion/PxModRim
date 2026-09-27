@@ -165,6 +165,13 @@ class App:
         self._app_ctx = AppContext(ctx, ui_prefs)
         self._app_ctx.add_rail_view(ModsViewPanel)
 
+        from pxmodrim.core.organizer import OrganizerDb, OrganizerService
+        from pxmodrim.core.organizer.db import db_path
+
+        self._ctx.register_plugin(
+            OrganizerService(ctx, OrganizerDb(db_path(config_svc.config_dir)))
+        )
+
         disabled = _parse_disabled_plugins()
 
         if "steamcmd" not in disabled:
