@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - macOS packaging preserves the `entrypoint` binary alongside its `PxModRim` runtime directory and records the correct `CFBundleExecutable`
+- All six official Core/DLC mods (Core, Royalty, Ideology, Biotech, Anomaly, Odyssey) now show their names instead of "Unknown Mod Name"; stale metadata-cache entries are reparsed after upgrade
 - SteamCMD downloads accept only numeric Workshop IDs (prevents runscript command injection); queued/downloading rows can no longer be removed mid-batch
 - SteamCMD worker rewritten on asyncio subprocesses (no `QThread`); cancellation terminates and reaps the process
 - Mod description links restricted to HTTP(S); oversized `<size>`/`<indent>` values no longer crash rendering

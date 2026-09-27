@@ -38,9 +38,9 @@ class BaseModProvider(ABC):
         target_version: str,
         timer: Timer | None = None,
         metadata_cache: MetadataCache | None = None,
+        force_reparse: bool = False,
     ) -> dict[str, ListedMod]:
         """Discover mods from this provider's path."""
-        ...
 
     async def _load_mods(
         self,
@@ -48,6 +48,7 @@ class BaseModProvider(ABC):
         target_version: str,
         timer: Timer | None = None,
         metadata_cache: MetadataCache | None = None,
+        force_reparse: bool = False,
     ) -> dict[str, ListedMod]:
         tm = timer or Timer()
         cache = metadata_cache if metadata_cache is not None else self._metadata_cache
@@ -61,9 +62,9 @@ class BaseModProvider(ABC):
                 continue
 
         result: dict[str, ListedMod] = {}
-        missing: list[tuple[Path, Path, float, int]] = []
-
-        if cache is not None:
+        if force_reparse:
+            missing = candidates
+        elif cache is not None:
             with tm("cache_lookup"):
                 cached_mods, missing = await cache.get_mods(candidates, target_version)
                 for mod in cached_mods.values():

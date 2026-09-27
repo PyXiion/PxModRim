@@ -81,7 +81,9 @@ class ModService:
     def provider_colors(self) -> dict[str, str]:
         return {pid: p.color for pid, p in self._providers.items()}
 
-    async def discover(self, timer: Timer | None = None) -> None:
+    async def discover(
+        self, timer: Timer | None = None, force_reparse: bool = False
+    ) -> None:
         """Run all providers' discovery in parallel and load results into context."""
         own = timer is None
         if own:
@@ -89,7 +91,7 @@ class ModService:
         with timer("discover"):
             async with asyncio.TaskGroup() as tg:
                 provs = [
-                    tg.create_task(self._discover_one(p))
+                    tg.create_task(self._discover_one(p, force_reparse))
                     for p in self._providers.values()
                 ]
             all_mods: dict[str, ListedMod] = {}
@@ -114,7 +116,7 @@ class ModService:
             logger.debug("Profile report:\n{}", timer.render())
 
     async def _discover_one(
-        self, p: BaseModProvider
+        self, p: BaseModProvider, force_reparse: bool = False
     ) -> tuple[dict[str, ListedMod], Timer]:
         t = Timer()
         with t(f"provider.{p.provider_id}"):
@@ -122,6 +124,7 @@ class ModService:
                 self._ctx.target_version,
                 timer=t,
                 metadata_cache=self._metadata_cache,
+                force_reparse=force_reparse,
             )
         return mods, t
 
@@ -132,15 +135,18 @@ class ModService:
             await fn(t)
         return t
 
-    async def _run_refresh_pipeline(self, label: str) -> None:
-        """Discover mods, init diagnostics, and load startup impact, then rebuild
-        diagnostics and notify listeners. Shared by :meth:`initialize` and
-        :meth:`reload`."""
+    async def _run_refresh_pipeline(
+        self, label: str, force_reparse: bool = False
+    ) -> None:
+        """Discover mods, initialize diagnostics and load startup impact."""
         timer = Timer()
         with timer(f"mod_service.{label}"):
             async with asyncio.TaskGroup() as tg:
                 d = tg.create_task(
-                    self._timed("discover", lambda t: self.discover(timer=t))
+                    self._timed(
+                        "discover",
+                        lambda t: self.discover(timer=t, force_reparse=force_reparse),
+                    )
                 )
                 diag = tg.create_task(
                     self._timed(
@@ -180,9 +186,9 @@ class ModService:
         self._snapshot_current_config()
         await self._run_refresh_pipeline("initialize")
 
-    async def reload(self) -> None:
-        """Full refresh triggered by the user. Same pipeline as initialize."""
-        await self._run_refresh_pipeline("reload")
+    async def reload(self, full: bool = False) -> None:
+        """Reparse all About.xml files when full is requested."""
+        await self._run_refresh_pipeline("reload", force_reparse=full)
 
     def compute_stats(self, active_ids: list[str] | None = None) -> CollectionStats:
         return self._ctx.compute_stats(active_ids)

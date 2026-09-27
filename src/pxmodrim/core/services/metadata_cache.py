@@ -32,7 +32,7 @@ _SCHEMA = """
         ON mod_metadata(about_path);
 """
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 def metadata_cache_path(config_dir: Path) -> Path:
@@ -185,11 +185,15 @@ class MetadataCache:
             await conn.execute("PRAGMA busy_timeout=5000")
             await conn.execute("PRAGMA foreign_keys=ON")
             await conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
+
+            async def invalidate_metadata_payloads() -> None:
+                await conn.execute("DELETE FROM mod_metadata")
+
             await ensure_schema(
                 conn,
                 schema_sql=_SCHEMA,
                 schema_version=_SCHEMA_VERSION,
-                steps={},
+                steps={2: invalidate_metadata_payloads},
                 backup_path=self._db_path,
                 label="metadata cache schema",
             )

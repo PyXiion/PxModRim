@@ -130,6 +130,48 @@ async def test_warm_cache_avoids_reparse(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_force_reparse_bypasses_cache_and_refreshes_mod(tmp_path: Path) -> None:
+    mods_root = tmp_path / "mods"
+    mod_a = _create_mod(mods_root / "ModA", ABOUT_XML_V1)
+    cache = MetadataCache(tmp_path / "metadata-cache.db")
+    provider = LocalModProvider(mods_root, metadata_cache=cache)
+    real_create_mod = base_module.create_listed_mod_from_path
+    parse_call_count = 0
+
+    def counting_create_mod(*args, **kwargs):
+        nonlocal parse_call_count
+        parse_call_count += 1
+        _, mod = real_create_mod(*args, **kwargs)
+        if parse_call_count == 2:
+            mod.name = "Fresh parse result"
+        return _, mod
+
+    try:
+        with patch.object(
+            base_module, "create_listed_mod_from_path", side_effect=counting_create_mod
+        ):
+            first = await provider.discover("1.5")
+        assert first[str(mod_a)].name == "Sample Mod One"
+        assert parse_call_count == 1
+
+        with patch.object(
+            base_module, "create_listed_mod_from_path", side_effect=counting_create_mod
+        ):
+            cached = await provider.discover("1.5")
+        assert cached[str(mod_a)].name == "Sample Mod One"
+        assert parse_call_count == 1
+
+        with patch.object(
+            base_module, "create_listed_mod_from_path", side_effect=counting_create_mod
+        ):
+            reparsed = await provider.discover("1.5", force_reparse=True)
+        assert reparsed[str(mod_a)].name == "Fresh parse result"
+        assert parse_call_count == 2
+    finally:
+        await cache.close()
+
+
+@pytest.mark.asyncio
 async def test_changed_metadata_reparses(tmp_path: Path) -> None:
     mods_root = tmp_path / "mods"
     mod_a = _create_mod(mods_root / "ModA", ABOUT_XML_V1)

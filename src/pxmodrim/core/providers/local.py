@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 
 class LocalModProvider(BaseModProvider):
-    """Provider for local (non-Steam) mods."""
-
     provider_id = "local"
     color = "#2ecc71"
 
@@ -35,8 +33,8 @@ class LocalModProvider(BaseModProvider):
         target_version: str,
         timer: Timer | None = None,
         metadata_cache: MetadataCache | None = None,
+        force_reparse: bool = False,
     ) -> dict[str, ListedMod]:
-        """Scan local path for mods lacking `PublishedFileId.txt` (off main thread)."""
         tm = timer or Timer()
         if not self._path.exists():
             logger.debug("LocalModProvider path does not exist: {}", self._path)
@@ -44,23 +42,25 @@ class LocalModProvider(BaseModProvider):
         logger.debug("LocalModProvider scanning: {}", self._path)
         with tm("scan_dir"):
             dirs = await asyncio.to_thread(scan_mod_directory, self._path)
-
-        def _filter(d: Path) -> bool:
-            return not (d / "About/PublishedFileId.txt").exists()
-
         filtered_dirs = await asyncio.to_thread(
-            lambda: {d: a for d, a in dirs.items() if _filter(d)}
+            lambda: {
+                d: a
+                for d, a in dirs.items()
+                if not (d / "About/PublishedFileId.txt").exists()
+            }
         )
         discovered = await self._load_mods(
-            filtered_dirs, target_version, timer=tm, metadata_cache=metadata_cache
+            filtered_dirs,
+            target_version,
+            timer=tm,
+            metadata_cache=metadata_cache,
+            force_reparse=force_reparse,
         )
         logger.info("LocalModProvider discovered {} mods", len(discovered))
         return discovered
 
 
 class SteamCmdModProvider(BaseModProvider):
-    """Provider for Steam CMD / workshop mods - only mods with PublishedFileId.txt."""
-
     provider_id = "steam_cmd"
     color = "#3498db"
 
@@ -77,8 +77,8 @@ class SteamCmdModProvider(BaseModProvider):
         target_version: str,
         timer: Timer | None = None,
         metadata_cache: MetadataCache | None = None,
+        force_reparse: bool = False,
     ) -> dict[str, ListedMod]:
-        """Scan local path for mods with ``PublishedFileId.txt`` (off main thread)."""
         tm = timer or Timer()
         if not self._path.exists():
             logger.debug("SteamCmdModProvider path does not exist: {}", self._path)
@@ -86,21 +86,23 @@ class SteamCmdModProvider(BaseModProvider):
         logger.debug("SteamCmdModProvider scanning: {}", self._path)
         with tm("scan_dir"):
             dirs = await asyncio.to_thread(scan_mod_directory, self._path)
-
-        def _filter(d: Path) -> bool:
-            return (d / "About/PublishedFileId.txt").exists()
-
         filtered_dirs = await asyncio.to_thread(
-            lambda: {d: a for d, a in dirs.items() if _filter(d)}
+            lambda: {
+                d: a
+                for d, a in dirs.items()
+                if (d / "About/PublishedFileId.txt").exists()
+            }
         )
         discovered = await self._load_mods(
-            filtered_dirs, target_version, timer=tm, metadata_cache=metadata_cache
+            filtered_dirs,
+            target_version,
+            timer=tm,
+            metadata_cache=metadata_cache,
+            force_reparse=force_reparse,
         )
         logger.info("SteamCmdModProvider discovered {} mods", len(discovered))
         return discovered
 
 
 class SteamWorkshopModProvider(SteamCmdModProvider):
-    """Provider for mods installed by the Steam client."""
-
     provider_id = "steam"

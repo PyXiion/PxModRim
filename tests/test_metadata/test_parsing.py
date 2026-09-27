@@ -94,8 +94,44 @@ class TestCreateAboutMod:
         data = {"packageId": "ludeon.rimworld.royalty"}
         valid, mod = create_about_mod(data, "1.5")
         assert valid is True
-        assert mod.name == "RimWorld - Royalty"
+        assert mod.name == "Royalty"
         assert mod.steam_app_id == 1149640
+
+    @pytest.mark.parametrize(
+        ("package_id", "expected_name"),
+        [
+            ("Ludeon.RimWorld", "Core"),
+            ("Ludeon.RimWorld.Royalty", "Royalty"),
+            ("Ludeon.RimWorld.Ideology", "Ideology"),
+            ("Ludeon.RimWorld.Biotech", "Biotech"),
+            ("Ludeon.RimWorld.Anomaly", "Anomaly"),
+            ("Ludeon.RimWorld.Odyssey", "Odyssey"),
+        ],
+    )
+    def test_official_mod_without_name_uses_package_id_mapping(
+        self, tmp_path: Path, package_id: str, expected_name: str
+    ) -> None:
+        about_dir = tmp_path / "About"
+        about_dir.mkdir()
+        (about_dir / "About.xml").write_text(
+            f"<ModMetaData><packageId>{package_id}</packageId>"
+            "<author>Ludeon Studios</author></ModMetaData>",
+            encoding="utf-8",
+        )
+
+        valid, mod = create_listed_mod_from_path(tmp_path, "1.6")
+
+        assert valid
+        assert mod.name == expected_name
+
+    def test_explicit_name_wins_for_official_mod(self) -> None:
+        valid, mod = create_about_mod(
+            {"packageId": "ludeon.rimworld.royalty", "name": "Custom official name"},
+            "1.6",
+        )
+
+        assert valid
+        assert mod.name == "Custom official name"
 
 
 class TestFindAboutXml:

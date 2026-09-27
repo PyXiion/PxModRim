@@ -33,6 +33,7 @@ class CoreModProvider(BaseModProvider):
         target_version: str,
         timer: Timer | None = None,
         metadata_cache: MetadataCache | None = None,
+        force_reparse: bool = False,
     ) -> dict[str, ListedMod]:
         """Scan ``Data/`` directory for core mods (runs off the main thread)."""
         tm = timer or Timer()
@@ -45,7 +46,11 @@ class CoreModProvider(BaseModProvider):
             dirs = await asyncio.to_thread(scan_mod_directory, data_dir)
 
         discovered = await self._load_mods(
-            dirs, target_version, timer=tm, metadata_cache=metadata_cache
+            dirs,
+            target_version,
+            timer=tm,
+            metadata_cache=metadata_cache,
+            force_reparse=force_reparse,
         )
         for mod in discovered.values():
             logger.debug("CoreModProvider found: {} (uuid: {})", mod.name, mod.uuid)

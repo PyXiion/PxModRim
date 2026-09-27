@@ -92,6 +92,18 @@ def _set_mod_invalid(mod: ListedMod, message: str) -> ListedMod:
     return mod
 
 
+def _official_mod_name(package_id: str, name: str) -> str:
+    if name and name not in {"Unknown Mod Name", package_id}:
+        return name
+    if package_id == "ludeon.rimworld":
+        return "Core"
+    dlc_appid = _get_dlc_packageid_map().get(package_id)
+    dlc_meta = RIMWORLD_DLC_METADATA.get(dlc_appid, {}) if dlc_appid else {}
+    if dlc_meta:
+        return dlc_meta["name"].removeprefix("RimWorld - ")
+    return package_id
+
+
 def _parse_basic(mod_data: dict[str, Any], mod: AboutXmlMod) -> AboutXmlMod:
     """Populate an AboutXmlMod with basic fields (packageId, name, authors)."""
     package_id = value_extractor(mod_data.get("packageId", False))
@@ -114,12 +126,9 @@ def _parse_basic(mod_data: dict[str, Any], mod: AboutXmlMod) -> AboutXmlMod:
     dlc_meta = RIMWORLD_DLC_METADATA.get(dlc_appid, {}) if dlc_appid else {}
 
     name = value_extractor(mod_data.get("name", False))
-    if isinstance(name, str):
-        mod.name = name
-    elif dlc_meta:
-        mod.name = dlc_meta["name"]
-    else:
-        mod.name = str(mod.package_id)
+    mod.name = _official_mod_name(
+        str(mod.package_id), name if isinstance(name, str) else ""
+    )
 
     description = value_extractor(mod_data.get("description", False))
     if isinstance(description, str):
@@ -655,16 +664,12 @@ def _create_about_mod_from_element(
 
     mod.about_rules = rules
 
-    # DLC fallback for name/description/steamAppId
     str_pid = str(mod.package_id)
+    mod.name = _official_mod_name(str_pid, mod.name)
     dlc_appid = _get_dlc_packageid_map().get(str_pid)
     dlc_meta = RIMWORLD_DLC_METADATA.get(dlc_appid, {}) if dlc_appid else {}
-    if dlc_meta:
-        if not mod.name or mod.name == str_pid:
-            mod.name = dlc_meta["name"]
-        if not mod.description:
-            mod.description = dlc_meta["description"]
-
+    if dlc_meta and not mod.description:
+        mod.description = dlc_meta["description"]
     # DLC -> RimWorld dependency
     dlc_map = _get_dlc_packageid_map()
     if str_pid in dlc_map and dlc_map[str_pid] != RIMWORLD_STEAM_APP_ID:
