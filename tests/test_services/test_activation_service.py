@@ -58,14 +58,14 @@ def activation(ctx: CoreContext) -> ActivationService:
     return ActivationService(ctx)
 
 
-class TestSetEnabled:
+class TestApply:
     def test_enabling_appends_without_reordering(
         self, ctx: CoreContext, activation: ActivationService
     ) -> None:
         emitted: list[tuple[str, ...]] = []
         ctx.active_state_changed.connect(emitted.append)
 
-        assert activation.set_enabled(["uuid-f", "uuid-e"], True) is True
+        assert activation.apply(enable=["uuid-f", "uuid-e"]) is True
 
         expected = ["uuid-c", "uuid-d", "uuid-a", "uuid-b", "uuid-f", "uuid-e"]
         assert ctx.active_uuids == expected
@@ -74,45 +74,95 @@ class TestSetEnabled:
     def test_enabling_already_active_mod_keeps_its_position(
         self, ctx: CoreContext, activation: ActivationService
     ) -> None:
-        assert activation.set_enabled(["uuid-c", "uuid-f"], True) is True
+        assert activation.apply(enable=["uuid-c", "uuid-f"]) is True
 
         assert ctx.active_uuids == ["uuid-c", "uuid-d", "uuid-a", "uuid-b", "uuid-f"]
 
     def test_disabling_removes_and_keeps_remaining_order(
         self, ctx: CoreContext, activation: ActivationService
     ) -> None:
-        assert activation.set_enabled(["uuid-d", "uuid-a"], False) is True
+        assert activation.apply(disable=["uuid-d", "uuid-a"]) is True
 
         assert ctx.active_uuids == ["uuid-c", "uuid-b"]
 
     def test_unknown_ids_are_ignored(
         self, ctx: CoreContext, activation: ActivationService
     ) -> None:
-        assert activation.set_enabled(["uuid-missing", "uuid-f"], True) is True
+        assert activation.apply(enable=["uuid-missing", "uuid-f"]) is True
 
         assert ctx.active_uuids == ["uuid-c", "uuid-d", "uuid-a", "uuid-b", "uuid-f"]
 
+    def test_mixed_selection_applies_in_single_emission(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        emitted: list[tuple[str, ...]] = []
+        ctx.active_state_changed.connect(emitted.append)
+
+        assert (
+            activation.apply(
+                enable=["uuid-f", "uuid-e"],
+                disable=["uuid-a", "uuid-d"],
+            )
+            is True
+        )
+
+        expected = ["uuid-c", "uuid-b", "uuid-f", "uuid-e"]
+        assert ctx.active_uuids == expected
+        assert emitted == [tuple(expected)]
+
+    def test_uuid_in_both_enable_and_disable_favors_disable(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        emitted: list[tuple[str, ...]] = []
+        ctx.active_state_changed.connect(emitted.append)
+
+        assert (
+            activation.apply(
+                enable=["uuid-a", "uuid-f", "uuid-e"],
+                disable=["uuid-a", "uuid-f"],
+            )
+            is True
+        )
+
+        expected = ["uuid-c", "uuid-d", "uuid-b", "uuid-e"]
+        assert ctx.active_uuids == expected
+        assert emitted == [tuple(expected)]
+
+    def test_duplicate_enable_deduped_in_input_order(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        assert activation.apply(enable=["uuid-f", "uuid-e", "uuid-f"]) is True
+        assert ctx.active_uuids == [
+            "uuid-c",
+            "uuid-d",
+            "uuid-a",
+            "uuid-b",
+            "uuid-f",
+            "uuid-e",
+        ]
+
     @pytest.mark.parametrize(
-        ("uuids", "enabled"),
+        ("enable", "disable"),
         [
-            (["uuid-a", "uuid-c"], True),
-            (["uuid-e", "uuid-f"], False),
-            (["uuid-missing"], True),
-            (["uuid-missing"], False),
-            ([], True),
+            (["uuid-a", "uuid-c"], []),
+            ([], ["uuid-e", "uuid-f"]),
+            (["uuid-missing"], []),
+            ([], ["uuid-missing"]),
+            ([], []),
+            (["uuid-missing"], ["uuid-missing"]),
         ],
     )
     def test_noop_returns_false_without_emitting(
         self,
         ctx: CoreContext,
         activation: ActivationService,
-        uuids: list[str],
-        enabled: bool,
+        enable: list[str],
+        disable: list[str],
     ) -> None:
         emitted: list[tuple[str, ...]] = []
         ctx.active_state_changed.connect(emitted.append)
 
-        assert activation.set_enabled(uuids, enabled) is False
+        assert activation.apply(enable=enable, disable=disable) is False
 
         assert ctx.active_uuids == ["uuid-c", "uuid-d", "uuid-a", "uuid-b"]
         assert emitted == []
@@ -137,7 +187,7 @@ class TestDependentsOf:
     def test_reflects_graph_after_state_change(
         self, activation: ActivationService
     ) -> None:
-        activation.set_enabled(["uuid-e"], True)
+        activation.apply(enable=["uuid-e"])
 
         assert activation.dependents_of(["uuid-a"]) == ["uuid-c", "uuid-b", "uuid-e"]
 

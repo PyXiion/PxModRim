@@ -10,53 +10,21 @@ from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
 from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
-from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import svg_str
+from pxmodrim.ui.components.mod_activation import toggle_mods
 from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
 from pxmodrim.ui.theme.palette import PALETTE
 
 _QML_DIR = Path(__file__).parent
 _MOD_LIST_QML = _QML_DIR / "ModList.qml"
-
-
-def _dependent_detail(mod: ListedMod) -> str:
-    if isinstance(mod, AboutXmlMod):
-        return f"{mod.name} ({mod.package_id})"
-    return mod.name
-
-
-class _DependentModsDialog(QMessageBox):
-    def __init__(self, dependents: list[str], parent: QWidget) -> None:
-        super().__init__(parent)
-        self.setIcon(QMessageBox.Icon.Warning)
-        self.setWindowTitle("Disable dependent mods?")
-        self.setText(
-            "These active mods depend on the mod you are disabling:\n\n"
-            + "\n".join(f"• {dependent}" for dependent in dependents)
-        )
-        self.setInformativeText(
-            "Choose whether to disable only the selected mod or these dependents too."
-        )
-        self.setStandardButtons(
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No
-            | QMessageBox.StandardButton.Cancel
-        )
-        self.setDefaultButton(QMessageBox.StandardButton.No)
-        self.setButtonText(
-            QMessageBox.StandardButton.Yes, "Disable selected + dependents"
-        )
-        self.setButtonText(QMessageBox.StandardButton.No, "Disable selected only")
-        self.setButtonText(QMessageBox.StandardButton.Cancel, "Cancel")
 
 
 class ModListPanel(QWidget):
@@ -220,25 +188,8 @@ class ModListPanel(QWidget):
             item = self._model.get_item(self._proxy_to_source_row(proxy_row))
             if item is not None:
                 selected_uuids.append(item.uuid)
-        if not selected_uuids:
-            return
-
-        activation = self._ctx.activation
-        active = set(self._ctx.active_uuids)
-        disabling = [uuid for uuid in selected_uuids if uuid in active]
-        enabling = [uuid for uuid in selected_uuids if uuid not in active]
-        dependents = activation.dependents_of(disabling)
-        if dependents:
-            all_mods = self._ctx.all_mods
-            details = [_dependent_detail(all_mods[uuid]) for uuid in dependents]
-            result, _ = await await_dialog(_DependentModsDialog, details, self)
-            if result == QMessageBox.StandardButton.Cancel:
-                return
-            if result == QMessageBox.StandardButton.Yes:
-                disabling.extend(dependents)
-
-        activation.set_enabled(disabling, False)
-        activation.set_enabled(enabling, True)
+        if selected_uuids:
+            await toggle_mods(self._ctx, self, selected_uuids)
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:

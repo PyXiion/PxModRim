@@ -22,10 +22,10 @@ from pxmodrim.core.models.metadata.structures import (
 )
 from pxmodrim.core.services.activation_service import ActivationService
 from pxmodrim.core.sort.config import SortSettings
+from pxmodrim.ui.components import mod_activation
 from pxmodrim.ui.components.svg_provider import create_qml_engine
 from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
-from pxmodrim.ui.panels import mod_list_panel
 from pxmodrim.ui.panels.mod_list_panel import ModListPanel
 from pxmodrim.ui.theme.qml_theme import Theme
 
@@ -154,7 +154,7 @@ async def test_disabling_dependency_can_leave_dependents_active(
 
         return QMessageBox.StandardButton.No, None
 
-    monkeypatch.setattr(mod_list_panel, "await_dialog", choose)
+    monkeypatch.setattr(mod_activation, "await_dialog", choose)
     await panel._toggle_rows([0])
 
     assert panel.active_uuids() == ["uuid-b", "uuid-c"]
@@ -172,7 +172,7 @@ async def test_batch_disable_all_removes_transitive_dependents(
 
         return QMessageBox.StandardButton.Yes, None
 
-    monkeypatch.setattr(mod_list_panel, "await_dialog", choose)
+    monkeypatch.setattr(mod_activation, "await_dialog", choose)
     await panel._toggle_rows([0, 1])
 
     assert panel.active_uuids() == []
@@ -189,7 +189,7 @@ async def test_cancel_keeps_selected_mod_and_dependents_active(
 
         return QMessageBox.StandardButton.Cancel, None
 
-    monkeypatch.setattr(mod_list_panel, "await_dialog", choose)
+    monkeypatch.setattr(mod_activation, "await_dialog", choose)
     await panel._toggle_rows([0])
 
     assert panel.active_uuids() == ["uuid-a", "uuid-b", "uuid-c"]
@@ -206,7 +206,7 @@ async def test_reenabled_mod_is_appended_after_active_mods(
 
         return QMessageBox.StandardButton.No, None
 
-    monkeypatch.setattr(mod_list_panel, "await_dialog", choose)
+    monkeypatch.setattr(mod_activation, "await_dialog", choose)
     await panel._toggle_rows([1])
     assert panel.active_uuids() == ["uuid-a", "uuid-c"]
 

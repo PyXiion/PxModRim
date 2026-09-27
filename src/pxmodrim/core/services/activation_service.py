@@ -46,24 +46,25 @@ class ActivationService:
                 result.append(uuid)
         return result
 
-    def set_enabled(self, uuids: Iterable[str], enabled: bool) -> bool:
-        """Append newly enabled mods or drop disabled ones; return whether changed."""
+    def apply(self, enable: Iterable[str] = (), disable: Iterable[str] = ()) -> bool:
+        """Apply batch enable/disable changes; return whether active state changed."""
         active = self._ctx.active_uuids
+        disable_set = set(disable)
+        all_mods = self._ctx.all_mods
         active_set = set(active)
-        if enabled:
-            all_mods = self._ctx.all_mods
-            added = [
-                uuid
-                for uuid in dict.fromkeys(uuids)
-                if uuid in all_mods and uuid not in active_set
-            ]
-            if not added:
-                return False
-            self._ctx.set_active(active + added)
-            return True
 
-        removed = active_set.intersection(uuids)
-        if not removed:
+        new_active = [uuid for uuid in active if uuid not in disable_set]
+
+        seen: set[str] = set()
+        for uuid in enable:
+            if uuid in seen or uuid in disable_set:
+                continue
+            seen.add(uuid)
+            if uuid in all_mods and uuid not in active_set:
+                new_active.append(uuid)
+
+        if new_active == active:
             return False
-        self._ctx.set_active([uuid for uuid in active if uuid not in removed])
+
+        self._ctx.set_active(new_active)
         return True
