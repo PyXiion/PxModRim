@@ -39,6 +39,10 @@ from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.about_panel import AboutPanel
+from pxmodrim.ui.panels.keyboard_shortcuts_dialog import (
+    QML_SHORTCUTS,
+    KeyboardShortcutsDialog,
+)
 from pxmodrim.ui.panels.restore_snapshot_dialog import (
     ConfirmRestoreDialog,
     RestoreSnapshotDialog,
@@ -113,10 +117,62 @@ class MainWindow(QMainWindow):
         self._menu_bar.settings_requested.connect(self._open_settings)
         self._menu_bar.about_requested.connect(self._show_about)
         self._menu_bar.restore_snapshot_requested.connect(self._restore_snapshot)
-        QShortcut(QKeySequence("Ctrl+,"), self, self._open_settings)
-        QShortcut(QKeySequence("Ctrl+Q"), self, self.close)
-        QShortcut(QKeySequence("F5"), self, self._header_controller.refresh)
-        QShortcut(QKeySequence("Ctrl+S"), self, self._header_controller.save)
+        self._menu_bar.shortcuts_requested.connect(self._show_shortcuts)
+        self._setup_shortcuts()
+
+    def _setup_shortcuts(self) -> None:
+        self._python_shortcuts = (
+            ("Ctrl+,", "Settings", self._open_settings),
+            ("Ctrl+Q", "Quit", self.close),
+            ("F5", "Refresh mods", self._header_controller.refresh),
+            ("Ctrl+S", "Save mod list", self._header_controller.save),
+            ("Ctrl+F", "Focus mod list search", self._focus_search),
+            ("F1", "About PxModRim", self._show_about),
+            ("F11", "Toggle fullscreen", self._toggle_fullscreen),
+            ("Ctrl+Shift+R", "Force full mod rescan", self._full_rescan),
+            ("Ctrl+Tab", "Next view", lambda: self._cycle_view(1)),
+            ("Ctrl+Shift+Tab", "Previous view", lambda: self._cycle_view(-1)),
+            *(
+                (
+                    f"Ctrl+{i}",
+                    f"Switch to view {i}",
+                    lambda index=i - 1: self._select_view(index),
+                )
+                for i in range(1, 10)
+            ),
+        )
+        for sequence, _label, callback in self._python_shortcuts:
+            QShortcut(QKeySequence(sequence), self, callback)
+
+    def _focus_search(self) -> None:
+        if self._mods_view is not None:
+            self._mods_view.mod_list.search_input.setFocus()
+
+    def _toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def _select_view(self, index: int) -> None:
+        if 0 <= index < self._stack.count():
+            self._rail.set_current(index)
+
+    def _cycle_view(self, direction: int) -> None:
+        count = self._stack.count()
+        if count:
+            self._select_view((self._stack.currentIndex() + direction) % count)
+
+    @asyncSlot()
+    async def _full_rescan(self) -> None:
+        count = await self._app_ctx.refresh_mods(full=True)
+        if count:
+            self._toast_manager.success(f"Rescanned {count} mods")
+
+    @asyncSlot()
+    async def _show_shortcuts(self) -> None:
+        rows = tuple((sequence, label) for sequence, label, _ in self._python_shortcuts)
+        await await_dialog(KeyboardShortcutsDialog, rows + QML_SHORTCUTS, self)
 
     def _setup_content_and_views(self) -> None:
         logger.debug("main_window: setting up content and views")

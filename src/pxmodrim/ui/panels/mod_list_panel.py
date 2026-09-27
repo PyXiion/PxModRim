@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
-from pxmodrim.core.checker.graph import EdgeType, PackageId
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 from pxmodrim.ui.components.dialogs import await_dialog
@@ -27,6 +26,12 @@ from pxmodrim.ui.theme.palette import PALETTE
 
 _QML_DIR = Path(__file__).parent
 _MOD_LIST_QML = _QML_DIR / "ModList.qml"
+
+
+def _dependent_detail(mod: ListedMod) -> str:
+    if isinstance(mod, AboutXmlMod):
+        return f"{mod.name} ({mod.package_id})"
+    return mod.name
 
 
 class _DependentModsDialog(QMessageBox):
@@ -210,96 +215,30 @@ class ModListPanel(QWidget):
         await self._toggle_rows(rows)
 
     async def _toggle_rows(self, rows: list[int]) -> None:
-        if not rows:
-            return
-
-        source_rows: list[int] = []
         selected_uuids: list[str] = []
         for proxy_row in rows:
-            source_row = self._proxy_to_source_row(proxy_row)
-            item = self._model.get_item(source_row)
+            item = self._model.get_item(self._proxy_to_source_row(proxy_row))
             if item is not None:
-                source_rows.append(source_row)
                 selected_uuids.append(item.uuid)
         if not selected_uuids:
             return
 
-        active_uuids = self._model.active_uuids()
-        disabling_uuids = {uuid for uuid in selected_uuids if uuid in active_uuids}
-        affected_uuids = set(self._active_dependent_uuids(disabling_uuids)) - set(
-            selected_uuids
-        )
-        disable_all = False
-        if affected_uuids:
-            affected_details = [
-                self._dependent_detail(uuid)
-                for uuid in active_uuids
-                if uuid in affected_uuids
-            ]
-            result, _ = await await_dialog(_DependentModsDialog, affected_details, self)
+        activation = self._ctx.activation
+        active = set(self._ctx.active_uuids)
+        disabling = [uuid for uuid in selected_uuids if uuid in active]
+        enabling = [uuid for uuid in selected_uuids if uuid not in active]
+        dependents = activation.dependents_of(disabling)
+        if dependents:
+            all_mods = self._ctx.all_mods
+            details = [_dependent_detail(all_mods[uuid]) for uuid in dependents]
+            result, _ = await await_dialog(_DependentModsDialog, details, self)
             if result == QMessageBox.StandardButton.Cancel:
                 return
-            disable_all = result == QMessageBox.StandardButton.Yes
+            if result == QMessageBox.StandardButton.Yes:
+                disabling.extend(dependents)
 
-        changed_rows: list[int] = []
-        for source_row in source_rows:
-            item = self._model.get_item(source_row)
-            if item is None:
-                continue
-            new_checked = False if item.uuid in disabling_uuids else not item.checked
-            if item.checked != new_checked:
-                item.checked = new_checked
-                changed_rows.append(source_row)
-
-        if disable_all:
-            for source_row in range(self._model.rowCount()):
-                item = self._model.get_item(source_row)
-                if item is not None and item.uuid in affected_uuids and item.checked:
-                    item.checked = False
-                    changed_rows.append(source_row)
-        if not changed_rows:
-            return
-        top = self._model.index(min(changed_rows), 0)
-        bottom = self._model.index(max(changed_rows), 0)
-        self._model.dataChanged.emit(top, bottom, [ModListModel.CheckStateRole])
-        self._model.active_mods_changed.emit()
-        self._ctx.set_active(self._model.active_uuids())
-
-    def _active_dependent_uuids(self, uuids: set[str]) -> list[str]:
-        graph = self._ctx.diagnostics_service.constraint_graph
-        active_uuids = self._model.active_uuids()
-        all_mods = self._ctx.all_mods
-        roots: set[PackageId] = set()
-        for uuid in uuids:
-            mod = all_mods.get(uuid)
-            if isinstance(mod, AboutXmlMod):
-                roots.add(PackageId(str(mod.package_id)))
-
-        visited = set(roots)
-        pending = list(roots)
-        while pending:
-            target = pending.pop()
-            for edge in graph.incoming_of_type(target, EdgeType.DEPENDENCY):
-                if edge.source not in visited:
-                    visited.add(edge.source)
-                    pending.append(edge.source)
-
-        uuid_by_pid: dict[str, str] = {}
-        for uuid in active_uuids:
-            mod = all_mods.get(uuid)
-            if isinstance(mod, AboutXmlMod):
-                uuid_by_pid[str(mod.package_id)] = uuid
-        return [
-            uuid_by_pid[str(pid)]
-            for pid in visited
-            if str(pid) in uuid_by_pid and uuid_by_pid[str(pid)] not in uuids
-        ]
-
-    def _dependent_detail(self, uuid: str) -> str:
-        mod = self._ctx.all_mods[uuid]
-        if isinstance(mod, AboutXmlMod):
-            return f"{mod.name} ({mod.package_id})"
-        return mod.name
+        activation.set_enabled(disabling, False)
+        activation.set_enabled(enabling, True)
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:

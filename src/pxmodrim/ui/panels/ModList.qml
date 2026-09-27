@@ -536,6 +536,12 @@ Rectangle {
         onActivated: modListPanel.toggleChecked(listView.selectedIndices)
     }
     Shortcut {
+        sequence: "Space"
+        context: Qt.WindowShortcut
+        enabled: root.keyboardActive
+        onActivated: modListPanel.toggleChecked(listView.selectedIndices)
+    }
+    Shortcut {
         sequence: "Ctrl+A"
         context: Qt.WindowShortcut
         enabled: root.keyboardActive

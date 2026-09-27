@@ -20,6 +20,7 @@ from pxmodrim.core.models.metadata.structures import (
     DependencyMod,
     ListedMod,
 )
+from pxmodrim.core.services.activation_service import ActivationService
 from pxmodrim.core.sort.config import SortSettings
 from pxmodrim.ui.components.svg_provider import create_qml_engine
 from pxmodrim.ui.models.mod_list_model import ModListModel
@@ -124,13 +125,19 @@ def _panel(qapp: QApplication) -> ModListPanel:
         diagnostics_service=SimpleNamespace(constraint_graph=graph),
         active_uuids=["uuid-a", "uuid-b", "uuid-c"],
     )
-    ctx.set_active = lambda uuids: setattr(ctx, "active_uuids", list(uuids))
 
     panel = ModListPanel.__new__(ModListPanel)
     panel._ctx = cast(CoreContext, ctx)
     panel._model = ModListModel({})
     panel._proxy = ModListProxyModel(panel._model)
     panel._model.load_mods(cast(dict[str, ListedMod], mods), ctx.active_uuids)
+
+    def set_active(uuids: list[str]) -> None:
+        ctx.active_uuids = list(uuids)
+        panel._on_core_state_changed(tuple(uuids))
+
+    ctx.set_active = set_active
+    ctx.activation = ActivationService(cast(CoreContext, ctx))
     return panel
 
 
@@ -186,6 +193,27 @@ async def test_cancel_keeps_selected_mod_and_dependents_active(
     await panel._toggle_rows([0])
 
     assert panel.active_uuids() == ["uuid-a", "uuid-b", "uuid-c"]
+
+
+@pytest.mark.asyncio
+async def test_reenabled_mod_is_appended_after_active_mods(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    panel = _panel(qapp)
+
+    async def choose(*args: object) -> tuple[object, object]:
+        from PySide6.QtWidgets import QMessageBox
+
+        return QMessageBox.StandardButton.No, None
+
+    monkeypatch.setattr(mod_list_panel, "await_dialog", choose)
+    await panel._toggle_rows([1])
+    assert panel.active_uuids() == ["uuid-a", "uuid-c"]
+
+    await panel._toggle_rows([panel.rowForUuid("uuid-b")])
+
+    assert panel.active_uuids() == ["uuid-a", "uuid-c", "uuid-b"]
+    assert panel._ctx.active_uuids == ["uuid-a", "uuid-c", "uuid-b"]
 
 
 def test_hovering_drag_handle_does_not_show_drag_proxy(
@@ -275,9 +303,37 @@ def test_search_focus_disables_list_keyboard_actions(
     assert root.property("keyboardActive") is True
     panel.search_input.setFocus()
     qtbot.waitUntil(lambda: root.property("keyboardActive") is False)
-    assert root.property("keyboardActive") is False
     QTest.keyClick(panel.search_input, Qt.Key.Key_Return)
     assert panel.active_uuids() == []
+
+
+def test_space_in_search_inserts_text_without_toggling_mods(
+    qml_engine: QQmlEngine, qtbot: QtBot
+) -> None:
+    panel = _widget_panel(qml_engine)
+    panel.resize(420, 320)
+    panel.show()
+    qtbot.waitUntil(lambda: panel._qml.isVisible())
+    root = panel._qml.rootObject()
+    assert root is not None
+
+    QTest.mouseClick(
+        panel._qml,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        QPoint(100, 26),
+    )
+    qtbot.waitUntil(lambda: root.property("keyboardActive") is True)
+    root.selectRow(0, "uuid-a", 0)  # type: ignore[attr-defined]
+    active_before = panel.active_uuids()
+    panel.search_input.setFocus()
+    qtbot.waitUntil(lambda: root.property("keyboardActive") is False)
+
+    assert root.property("keyboardActive") is False
+    QTest.keyClick(panel.search_input, Qt.Key.Key_Space)
+
+    assert panel.search_input.text() == " "
+    assert panel.active_uuids() == active_before
 
 
 @pytest.mark.asyncio

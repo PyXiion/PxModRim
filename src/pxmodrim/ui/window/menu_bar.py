@@ -11,6 +11,7 @@ class MenuBar(QMenuBar):
     settings_requested = Signal()
     about_requested = Signal()
     restore_snapshot_requested = Signal()
+    shortcuts_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -40,6 +41,9 @@ class MenuBar(QMenuBar):
         logs_action.triggered.connect(self._open_logs_folder)
         help_menu.addAction(logs_action)
 
+        shortcuts_action = QAction("&Keyboard Shortcuts", self)
+        shortcuts_action.triggered.connect(self.shortcuts_requested.emit)
+        help_menu.addAction(shortcuts_action)
         help_menu.addSeparator()
 
         about_action = QAction("&About PxModRim", self)

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pxmodrim.core.mod_service import ModService
     from pxmodrim.core.plugin import Plugin
     from pxmodrim.core.providers.base import BaseModProvider
+    from pxmodrim.core.services.activation_service import ActivationService
     from pxmodrim.core.services.diagnostics_service import DiagnosticsService
     from pxmodrim.core.services.game_launcher import GameLauncher
     from pxmodrim.core.services.sort_service import SortService
@@ -35,6 +36,7 @@ class CoreContext:
     """Centralised application state for mods, config, and game version."""
 
     __slots__ = (
+        "_activation",
         "_active_state_changed",
         "_active_uuids",
         "_cfg",
@@ -63,6 +65,7 @@ class CoreContext:
         self._diagnostics_service: DiagnosticsService | None = None
         self._sort_service: SortService | None = None
         self._game_launcher: GameLauncher | None = None
+        self._activation: ActivationService | None = None
         self._providers: list[BaseModProvider] | None = None
         self._pool: ThreadPoolExecutor | None = None
         self._plugins = PluginRegistry()
@@ -180,6 +183,7 @@ class CoreContext:
         from pxmodrim.core.mod_service import ModService
         from pxmodrim.core.profiler import profile
         from pxmodrim.core.providers import create_providers
+        from pxmodrim.core.services.activation_service import ActivationService
         from pxmodrim.core.services.diagnostics_service import (
             DiagnosticsService,
         )
@@ -199,6 +203,8 @@ class CoreContext:
                 ctx._sort_service = SortService(ctx, ctx._diagnostics_service)
             with t("game_launcher"):
                 ctx._game_launcher = GameLauncher(ctx)
+            with t("activation"):
+                ctx._activation = ActivationService(ctx)
         return ctx
 
     # ── Service accessors ──────────────────────────────────────────────────────
@@ -214,6 +220,10 @@ class CoreContext:
     @property
     def sort_service(self) -> SortService:
         return _require_not_none(self._sort_service, "sort_service")
+
+    @property
+    def activation(self) -> ActivationService:
+        return _require_not_none(self._activation, "activation")
 
     @property
     def game_launcher(self) -> GameLauncher:
