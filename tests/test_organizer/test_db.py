@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 from pxmodrim.core.organizer.db import OrganizerDb
+from pxmodrim.core.organizer.defaults import StandardRule
 from pxmodrim.core.organizer.models import (
     ROOT_ID,
     OrganizerError,
@@ -104,6 +105,35 @@ async def test_placement_upsert_and_unplace(db: OrganizerDb) -> None:
         # Placing into non-existent folder raises OrganizerError
         with pytest.raises(OrganizerError):
             await db.place(["package.three"], 9999)
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_create_folder_with(db: OrganizerDb) -> None:
+    try:
+        f = await db.create_folder_with(
+            ROOT_ID, "CoreMods", ["Package.One", "package.two", "PACKAGE.THREE"]
+        )
+        assert f.id > ROOT_ID
+        assert f.name == "CoreMods"
+        assert f.parent_id == ROOT_ID
+
+        st = await db.load()
+        assert f.id in st.folders
+        assert st.placements["package.one"] == f.id
+        assert st.placements["package.two"] == f.id
+        assert st.placements["package.three"] == f.id
+
+        with pytest.raises(OrganizerError):
+            await db.create_folder_with(
+                ROOT_ID, "coremods", ["package.four", "package.five"]
+            )
+
+        st2 = await db.load()
+        assert "package.four" not in st2.placements
+        assert "package.five" not in st2.placements
+        assert len(st2.folders) == len(st.folders)
     finally:
         await db.close()
 
@@ -278,3 +308,42 @@ async def test_state_survives_close_and_reopen(tmp_path: Path) -> None:
         assert st.rules[0].folder_id == f.id
     finally:
         db2.close_sync()
+
+
+@pytest.mark.asyncio
+async def test_append_named_rules_is_atomic(db: OrganizerDb) -> None:
+    try:
+        existing = await db.create_folder(ROOT_ID, "Existing")
+        await db.replace_rules(
+            [RuleSpec(field="name", op="contains", pattern="a", folder_id=existing.id)]
+        )
+        before = await db.load()
+
+        with pytest.raises(OrganizerError, match="Missing"):
+            await db.append_named_rules(
+                ROOT_ID,
+                ["New"],
+                [
+                    StandardRule("New", "name", "contains", "b"),
+                    StandardRule("Missing", "name", "contains", "c"),
+                ],
+            )
+        assert await db.load() == before
+
+        await db.append_named_rules(
+            ROOT_ID,
+            ["New"],
+            [
+                StandardRule("existing", "name", "contains", "b"),
+                StandardRule("NEW", "name", "contains", "c"),
+            ],
+        )
+        state = await db.load()
+        new_id = next(f.id for f in state.folders.values() if f.name == "New")
+        assert [(r.position, r.pattern, r.folder_id) for r in state.rules] == [
+            (0, "a", existing.id),
+            (1, "b", existing.id),
+            (2, "c", new_id),
+        ]
+    finally:
+        await db.close()

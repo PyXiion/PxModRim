@@ -8,6 +8,7 @@ from pathlib import Path
 import aiosqlite
 
 from pxmodrim.core.migrator import ensure_schema
+from pxmodrim.core.organizer.defaults import StandardRule
 from pxmodrim.core.organizer.models import (
     ROOT_ID,
     Folder,
@@ -187,6 +188,43 @@ class OrganizerDb:
                 )
                 folder_id = cur.lastrowid
                 assert folder_id is not None
+                await conn.commit()
+                return Folder(
+                    id=folder_id,
+                    parent_id=parent_id,
+                    name=name,
+                    collapsed=False,
+                )
+            except (sqlite3.IntegrityError, aiosqlite.IntegrityError) as err:
+                await conn.rollback()
+                raise OrganizerError(str(err)) from err
+            except Exception:
+                await conn.rollback()
+                raise
+
+    async def create_folder_with(
+        self, parent_id: int, name: str, package_ids: Iterable[str]
+    ) -> Folder:
+        pids = list(dict.fromkeys(p.strip().lower() for p in package_ids if p.strip()))
+        async with self._lock:
+            conn = await self._get_conn()
+            try:
+                cur = await conn.execute(
+                    "INSERT INTO folders (parent_id, name) VALUES (?, ?)",
+                    (parent_id, name),
+                )
+                folder_id = cur.lastrowid
+                assert folder_id is not None
+                if pids:
+                    await conn.executemany(
+                        """
+                        INSERT INTO placements (package_id, folder_id)
+                        VALUES (?, ?)
+                        ON CONFLICT (package_id)
+                        DO UPDATE SET folder_id = excluded.folder_id
+                        """,
+                        [(pid, folder_id) for pid in pids],
+                    )
                 await conn.commit()
                 return Folder(
                     id=folder_id,
@@ -454,6 +492,57 @@ class OrganizerDb:
                     )
                 await conn.commit()
                 return tuple(rules)
+            except (sqlite3.IntegrityError, aiosqlite.IntegrityError) as err:
+                await conn.rollback()
+                raise OrganizerError(str(err)) from err
+            except Exception:
+                await conn.rollback()
+                raise
+
+    async def append_named_rules(
+        self,
+        parent_id: int,
+        new_folders: Sequence[str],
+        rules: Sequence[StandardRule],
+    ) -> None:
+        """Create *new_folders* under *parent_id*, then append *rules* after the
+        existing ones, resolving each rule's folder by name among its children.
+        """
+        async with self._lock:
+            conn = await self._get_conn()
+            try:
+                await conn.executemany(
+                    "INSERT INTO folders (parent_id, name) VALUES (?, ?)",
+                    [(parent_id, name) for name in new_folders],
+                )
+                folder_ids: dict[str, int] = {}
+                async with conn.execute(
+                    "SELECT id, name FROM folders WHERE parent_id = ?", (parent_id,)
+                ) as cur:
+                    async for row in cur:
+                        folder_ids[row[1].casefold()] = row[0]
+                async with conn.execute(
+                    "SELECT COALESCE(MAX(position), -1) + 1 FROM rules"
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row is not None
+                    start = int(row[0])
+                params: list[tuple[int, str, str, str, int]] = []
+                for offset, rule in enumerate(rules):
+                    folder_id = folder_ids.get(rule.folder.casefold())
+                    if folder_id is None:
+                        raise OrganizerError(f'Folder "{rule.folder}" does not exist.')
+                    params.append(
+                        (start + offset, rule.field, rule.op, rule.pattern, folder_id)
+                    )
+                await conn.executemany(
+                    """
+                    INSERT INTO rules (position, field, op, pattern, folder_id)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    params,
+                )
+                await conn.commit()
             except (sqlite3.IntegrityError, aiosqlite.IntegrityError) as err:
                 await conn.rollback()
                 raise OrganizerError(str(err)) from err

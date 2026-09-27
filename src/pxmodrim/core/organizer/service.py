@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, get_args
 import msgspec
 
 from pxmodrim.core.events import Event
+from pxmodrim.core.organizer.defaults import STANDARD_RULES, StandardRule
 from pxmodrim.core.organizer.models import (
     MAX_DEPTH,
     ROOT_ID,
@@ -18,7 +19,13 @@ from pxmodrim.core.organizer.models import (
     RuleSpec,
     Tag,
 )
-from pxmodrim.core.organizer.resolve import FolderNode, TreeQuery, build_tree
+from pxmodrim.core.organizer.resolve import (
+    FolderNode,
+    TreeFilter,
+    TreeQuery,
+    build_tree,
+    tree_filters,
+)
 from pxmodrim.core.plugin import Plugin
 
 if TYPE_CHECKING:
@@ -58,9 +65,15 @@ class OrganizerService(Plugin):
 
     async def init(self, ctx: CoreContext) -> None:
         self._state = await self._db.load()
+        self.changed.emit(None)
 
     async def shutdown(self) -> None:
         await self._db.close()
+
+    @property
+    def ready(self) -> bool:
+        """Whether ``init()`` has loaded state; views built earlier must wait."""
+        return self._state is not None
 
     @property
     def state(self) -> OrganizerState:
@@ -157,10 +170,12 @@ class OrganizerService(Plugin):
     async def create_folder_from(
         self, name: str, package_ids: Iterable[str], parent_id: int = ROOT_ID
     ) -> Folder:
+        cleaned = _clean_name(name, "Folder")
+        self._folder(parent_id)
+        self._check_depth(parent_id, 1)
+        self._check_unique_folder_name(parent_id, cleaned)
         pids = _clean_package_ids(package_ids)
-        folder = await self._create_folder(name, parent_id)
-        if pids:
-            await self._db.place(pids, folder.id)
+        folder = await self._db.create_folder_with(parent_id, cleaned, pids)
         await self._commit()
         return folder
 
@@ -273,14 +288,76 @@ class OrganizerService(Plugin):
         await self._db.replace_rules(cleaned)
         await self._commit()
 
+    async def add_standard_rules(self) -> int:
+        """Append missing built-in rules, creating their top-level folders.
+
+        Returns the number of rules added.
+        """
+        present = {
+            (rule.field, rule.op, rule.pattern.casefold()) for rule in self.state.rules
+        }
+        existing = {folder.name.casefold() for folder in self._children(ROOT_ID)}
+        rules: list[StandardRule] = []
+        new_folders: dict[str, str] = {}
+        for rule in STANDARD_RULES:
+            key = (rule.field, rule.op, rule.pattern.casefold())
+            if key in present:
+                continue
+            present.add(key)
+            rules.append(rule)
+            folder_key = rule.folder.casefold()
+            if folder_key not in existing:
+                new_folders.setdefault(folder_key, rule.folder)
+        if not rules:
+            return 0
+        await self._db.append_named_rules(ROOT_ID, list(new_folders.values()), rules)
+        await self._commit()
+        return len(rules)
+
     # ── Read helpers ──────────────────────────────────────────────────────────
 
     def tree(self, query: TreeQuery | None = None) -> FolderNode:
         return build_tree(self.state, self._ctx.all_mods, self._ctx.active_uuids, query)
 
-    def folder_mod_uuids(self, folder_id: int) -> list[str]:
+    def folder_mod_uuids(self, folder_id: int, recursive: bool = True) -> list[str]:
+        """Mods under *folder_id*; ``recursive=False`` keeps only its direct mods."""
         self._folder(folder_id)
         for node in self.tree().walk():
             if node.folder.id == folder_id:
-                return [leaf.uuid for leaf in node.all_mods()]
+                leaves = node.all_mods() if recursive else node.mods
+                return [leaf.uuid for leaf in leaves]
         return []
+
+    def folder_toggle(
+        self, folder_id: int, recursive: bool = True
+    ) -> tuple[list[str], list[str]]:
+        """(enable, disable) for a folder checkbox click.
+
+        A fully enabled folder disables everything; partial or off enables all.
+        """
+        self._folder(folder_id)
+        for node in self.tree().walk():
+            if node.folder.id == folder_id:
+                leaves = node.all_mods() if recursive else node.mods
+                uuids = [leaf.uuid for leaf in leaves]
+                check = node.check if recursive else node.own_check
+                return ([], uuids) if check == "on" else (uuids, [])
+        return [], []
+
+    def folder_move_targets(self, folder_id: int) -> frozenset[int]:
+        """Legal destinations, excluding the folder's current parent."""
+        folder = self._non_root(folder_id)
+        subtree = self._subtree_ids(folder_id)
+        height = self._height(folder_id)
+        key = folder.name.casefold()
+        return frozenset(
+            candidate.id
+            for candidate in self.state.folders.values()
+            if candidate.id not in subtree
+            and candidate.id != folder.parent_id
+            and self._depth(candidate.id) + height <= MAX_DEPTH
+            and all(c.name.casefold() != key for c in self._children(candidate.id))
+        )
+
+    def tree_filters(self) -> list[TreeFilter]:
+        return tree_filters(self._ctx.all_mods, self._ctx.active_uuids, self.state)

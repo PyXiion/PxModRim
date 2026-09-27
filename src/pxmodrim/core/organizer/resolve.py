@@ -6,6 +6,7 @@ from typing import Literal
 import msgspec
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.models.view.sidebar import PROVIDER_LABELS
 from pxmodrim.core.organizer.models import ROOT_ID, Folder, OrganizerState, Rule
 
 Placement = Literal["manual", "rule", "none"]
@@ -29,6 +30,29 @@ class TreeQuery(msgspec.Struct, frozen=True):
         )
 
 
+class TreeFilter(msgspec.Struct, frozen=True):
+    """A sidebar preset (status, provider, or tag) and the mods it selects."""
+
+    key: str
+    label: str
+    count: int
+    status: StatusFilter = "all"
+    provider_id: str | None = None
+    tag_id: int | None = None
+
+    def query(self, text: str = "") -> TreeQuery:
+        providers = (
+            frozenset() if self.provider_id is None else frozenset((self.provider_id,))
+        )
+        tag_ids = frozenset() if self.tag_id is None else frozenset((self.tag_id,))
+        return TreeQuery(
+            text=text,
+            tag_ids=tag_ids,
+            status=self.status,
+            provider_ids=providers,
+        )
+
+
 class ModLeaf(msgspec.Struct, frozen=True):
     uuid: str
     package_id: str | None
@@ -48,6 +72,14 @@ class FolderNode(msgspec.Struct, frozen=True):
     enabled: int
     check: CheckState
     visible_total: int
+    own_total: int
+    own_enabled: int
+    has_rules: bool
+
+    @property
+    def own_check(self) -> CheckState:
+        """Check state of the folder's direct mods only (the root's Ungrouped)."""
+        return _check_state(self.own_total, self.own_enabled)
 
     def walk(self) -> Iterator[FolderNode]:
         yield self
@@ -152,6 +184,52 @@ def _folder_sort_key(folder: Folder) -> tuple[str, int]:
     return folder.name.casefold(), folder.id
 
 
+def tree_filters(
+    mods: Mapping[str, ListedMod],
+    active: Collection[str],
+    state: OrganizerState | None = None,
+) -> list[TreeFilter]:
+    active_set = active if isinstance(active, (set, frozenset)) else set(active)
+    enabled = sum(1 for uuid in mods if uuid in active_set)
+    per_provider: dict[str, int] = {}
+    for mod in mods.values():
+        per_provider[mod.provider_id] = per_provider.get(mod.provider_id, 0) + 1
+    filters = [
+        TreeFilter("all", "All", len(mods)),
+        TreeFilter("active", "Active", enabled, status="active"),
+        TreeFilter("inactive", "Inactive", len(mods) - enabled, status="inactive"),
+    ]
+    labelled = sorted(
+        (PROVIDER_LABELS.get(pid, pid.replace("_", " ").title()), pid)
+        for pid in per_provider
+    )
+    filters.extend(
+        TreeFilter(f"provider:{pid}", label, per_provider[pid], provider_id=pid)
+        for label, pid in labelled
+    )
+    if state is not None and state.tags:
+        tag_counts: dict[int, int] = dict.fromkeys(state.tags, 0)
+        for mod in mods.values():
+            pid = mod_package_id(mod)
+            if pid and pid in state.mod_tags:
+                for tid in state.mod_tags[pid]:
+                    if tid in tag_counts:
+                        tag_counts[tid] += 1
+        sorted_tags = sorted(
+            state.tags.values(), key=lambda t: (t.name.casefold(), t.id)
+        )
+        filters.extend(
+            TreeFilter(
+                key=f"tag:{tag.id}",
+                label=tag.name,
+                count=tag_counts[tag.id],
+                tag_id=tag.id,
+            )
+            for tag in sorted_tags
+        )
+    return filters
+
+
 def build_tree(
     state: OrganizerState,
     mods: Mapping[str, ListedMod],
@@ -191,6 +269,7 @@ def build_tree(
     for folder in state.folders.values():
         if folder.parent_id is not None:
             children_of.setdefault(folder.parent_id, []).append(folder)
+    ruled = {rule.folder_id for rule in state.rules}
 
     visited: set[int] = set()
 
@@ -211,8 +290,9 @@ def build_tree(
                 children.append(node)
         own = all_by_folder.get(folder.id, ())
         visible = sorted(visible_by_folder.get(folder.id, ()), key=_mod_sort_key)
+        own_enabled = sum(1 for leaf in own if leaf.enabled)
         total += len(own)
-        enabled += sum(1 for leaf in own if leaf.enabled)
+        enabled += own_enabled
         visible_total += len(visible)
         return FolderNode(
             folder=folder,
@@ -223,6 +303,9 @@ def build_tree(
             enabled=enabled,
             check=_check_state(total, enabled),
             visible_total=visible_total,
+            own_total=len(own),
+            own_enabled=own_enabled,
+            has_rules=folder.id in ruled,
         )
 
     return build(state.folders[ROOT_ID], 0)

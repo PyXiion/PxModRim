@@ -12,12 +12,15 @@ from pxmodrim.core.organizer.models import (
     Rule,
     RuleField,
     RuleOp,
+    Tag,
 )
 from pxmodrim.core.organizer.resolve import (
     FolderNode,
+    TreeFilter,
     TreeQuery,
     build_tree,
     folder_for,
+    tree_filters,
 )
 
 ROOT = Folder(id=ROOT_ID, parent_id=None, name="")
@@ -28,14 +31,20 @@ def _state(
     placements: dict[str, int] | None = None,
     rules: list[tuple[RuleField, RuleOp, str, int]] | None = None,
     mod_tags: dict[str, frozenset[int]] | None = None,
+    tags: list[Tag] | dict[int, Tag] | None = None,
 ) -> OrganizerState:
     all_folders = {ROOT_ID: ROOT}
     for f in folders or []:
         all_folders[f.id] = f
+    tag_dict: dict[int, Tag] = {}
+    if isinstance(tags, dict):
+        tag_dict = tags
+    elif tags:
+        tag_dict = {t.id: t for t in tags}
     return OrganizerState(
         folders=all_folders,
         placements=placements or {},
-        tags={},
+        tags=tag_dict,
         mod_tags=mod_tags or {},
         rules=tuple(
             Rule(id=i + 1, position=i, field=fld, op=op, pattern=pat, folder_id=fid)
@@ -215,3 +224,115 @@ class TestBuildTree:
         folder = _find(build_tree(state, mods, []), 2)
         assert [m.uuid for m in folder.mods] == ["u1", "u2"]
         assert all(m.tag_ids == frozenset({7}) for m in folder.mods)
+
+    def test_own_counts_and_rule_flag(self) -> None:
+        state, mods = self._nested()
+        state = _state(
+            folders=list(state.folders.values())[1:],
+            placements=state.placements,
+            rules=[("name", "contains", "zzz", 3)],
+        )
+        root = build_tree(state, mods, {"u5", "u1"}, TreeQuery(text="nothing"))
+        assert (root.own_total, root.own_enabled, root.own_check) == (1, 1, "on")
+        assert (root.total, root.check) == (5, "partial")
+        full = build_tree(state, mods, set())
+        assert [n.folder.id for n in full.walk() if n.has_rules] == [3]
+        assert _find(full, 2).own_total == 1
+
+
+class TestTreeFilters:
+    def test_query_includes_tag_id(self) -> None:
+        tf = TreeFilter("tag:10", "Medieval", 3, tag_id=10)
+        q = tf.query("sword")
+        assert q.tag_ids == frozenset({10})
+        assert q.text == "sword"
+        assert q.status == "all"
+        assert q.provider_ids == frozenset()
+        assert not q.is_empty
+
+    def test_tree_filters_preserves_order_and_counts_tags(self) -> None:
+        state = _state(
+            tags=[
+                Tag(id=1, name="Medieval", color="#5eead4"),
+                Tag(id=2, name="Combat", color="#fb923c"),
+                Tag(id=3, name="Magic", color="#a3e635"),
+            ],
+            mod_tags={
+                "a.one": frozenset({1, 2}),
+                "a.two": frozenset({1}),
+            },
+        )
+        mods = {
+            "u1": _mod("u1", "One", "a.one", provider="steam"),
+            "u2": _mod("u2", "Two", "a.two", provider="local"),
+            "u3": _mod("u3", "Three", "a.three", provider="steam"),
+        }
+        filters = tree_filters(mods, {"u1"}, state)
+        assert [f.key for f in filters[:3]] == ["all", "active", "inactive"]
+        assert [f.count for f in filters[:3]] == [3, 1, 2]
+
+        providers = [f for f in filters if f.provider_id is not None]
+        assert [f.key for f in providers] == ["provider:local", "provider:steam"]
+        assert [f.count for f in providers] == [1, 2]
+
+        tag_filters = [f for f in filters if f.tag_id is not None]
+        assert [f.key for f in tag_filters] == ["tag:2", "tag:3", "tag:1"]
+        assert [f.label for f in tag_filters] == ["Combat", "Magic", "Medieval"]
+        assert [f.count for f in tag_filters] == [1, 0, 2]
+
+    def test_tree_filters_shared_package_ids_count_all_mods(self) -> None:
+        state = _state(
+            tags=[Tag(id=5, name="Overhaul", color="#5eead4")],
+            mod_tags={"shared.mod": frozenset({5})},
+        )
+        mods = {
+            "u1": _mod("u1", "Steam Copy", "Shared.Mod", provider="steam"),
+            "u2": _mod("u2", "Local Copy", "shared.mod", provider="local"),
+            "u3": _mod("u3", "Other Mod", "other.mod", provider="local"),
+        }
+        filters = tree_filters(mods, set(), state)
+        tag_filter = next(f for f in filters if f.key == "tag:5")
+        assert tag_filter.count == 2
+        assert tag_filter.label == "Overhaul"
+        assert tag_filter.tag_id == 5
+
+    def test_tree_filters_without_state_or_without_tags(self) -> None:
+        mods = {"u1": _mod("u1", "One", "a.one")}
+        assert [f.key for f in tree_filters(mods, set(), None)] == [
+            "all",
+            "active",
+            "inactive",
+            "provider:local",
+        ]
+        assert [f.key for f in tree_filters(mods, set(), _state())] == [
+            "all",
+            "active",
+            "inactive",
+            "provider:local",
+        ]
+
+    def test_filtering_tree_with_tag_query(self) -> None:
+        state = _state(
+            tags=[
+                Tag(id=1, name="Tagged", color="#5eead4"),
+                Tag(id=2, name="Empty", color="#fb923c"),
+            ],
+            mod_tags={"a.one": frozenset({1}), "a.two": frozenset({1})},
+        )
+        mods = {
+            "u1": _mod("u1", "Mod One", "a.one"),
+            "u2": _mod("u2", "Mod Two", "a.two"),
+            "u3": _mod("u3", "Mod Three", "a.three"),
+        }
+        filters = tree_filters(mods, set(), state)
+        tag1_filter = next(f for f in filters if f.key == "tag:1")
+        tree = build_tree(state, mods, set(), tag1_filter.query())
+        assert {m.uuid for m in tree.all_mods()} == {"u1", "u2"}
+
+        empty_filter = next(f for f in filters if f.key == "tag:2")
+        empty_tree = build_tree(state, mods, set(), empty_filter.query())
+        assert list(empty_tree.all_mods()) == []
+        assert empty_tree.visible_total == 0
+
+        narrowed = build_tree(state, mods, set(), tag1_filter.query("Two"))
+        assert {m.uuid for m in narrowed.all_mods()} == {"u2"}

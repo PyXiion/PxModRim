@@ -12,7 +12,9 @@ from pxmodrim.core.models.metadata.structures import (
     ListedMod,
 )
 from pxmodrim.core.organizer.db import OrganizerDb
+from pxmodrim.core.organizer.defaults import STANDARD_RULES
 from pxmodrim.core.organizer.models import ROOT_ID, OrganizerError, RuleSpec
+from pxmodrim.core.organizer.resolve import folder_for
 from pxmodrim.core.organizer.service import OrganizerService
 
 if TYPE_CHECKING:
@@ -117,6 +119,29 @@ async def test_empty_name_rejected(svc: OrganizerService, changes: _Counter) -> 
     assert changes.count == 0
 
 
+async def test_create_folder_from_emits_once_and_rejects_duplicate(
+    svc: OrganizerService, changes: _Counter
+) -> None:
+    initial_changes = changes.count
+    f = await svc.create_folder_from("Core", ["mod.a", "mod.b"])
+    assert changes.count == initial_changes + 1
+    assert f.name == "Core"
+    assert svc.state.placements["mod.a"] == f.id
+    assert svc.state.placements["mod.b"] == f.id
+
+    state_before = svc.state
+    changes_before = changes.count
+
+    with pytest.raises(OrganizerError):
+        await svc.create_folder_from("core", ["mod.c"])
+
+    assert changes.count == changes_before
+    assert svc.state == state_before
+    db_state = await svc._db.load()
+    assert "mod.c" not in db_state.placements
+    assert len(db_state.folders) == len(state_before.folders)
+
+
 async def test_delete_folder_ungroups_mods(
     svc: OrganizerService, ctx: _FakeCtx, changes: _Counter
 ) -> None:
@@ -196,3 +221,215 @@ async def test_state_persists(tmp_path: Path, ctx: _FakeCtx) -> None:
     await second.init(cast("CoreContext", ctx))
     assert second.state.folders[folder.id].name == "Kept"
     await second.shutdown()
+
+
+async def test_init_signals_readiness(tmp_path: Path, ctx: _FakeCtx) -> None:
+    service = OrganizerService(
+        cast("CoreContext", ctx), OrganizerDb(tmp_path / "organizer.db")
+    )
+    counter = _Counter()
+    service.changed.connect(counter)
+    assert not service.ready
+    await service.init(cast("CoreContext", ctx))
+    assert service.ready
+    assert counter.count == 1
+    await service.shutdown()
+
+
+async def test_folder_toggle_enables_partial_and_disables_full(
+    svc: OrganizerService, ctx: _FakeCtx
+) -> None:
+    ctx.add("u1", "One", "a.one")
+    ctx.add("u2", "Two", "a.two")
+    ctx.add("u3", "Loose", "loose.mod")
+    a = await svc.create_folder_from("A", ["a.one"])
+    b = await svc.create_folder("B", a.id)
+    await svc.place(["a.two"], b.id)
+
+    ctx.active_uuids = ["u1"]
+    enable, disable = svc.folder_toggle(a.id)
+    assert (sorted(enable), disable) == (["u1", "u2"], [])
+
+    ctx.active_uuids = ["u1", "u2"]
+    enable, disable = svc.folder_toggle(a.id)
+    assert (enable, sorted(disable)) == ([], ["u1", "u2"])
+
+    assert svc.folder_toggle(ROOT_ID, recursive=False) == (["u3"], [])
+    ctx.active_uuids = ["u3"]
+    assert svc.folder_toggle(ROOT_ID, recursive=False) == ([], ["u3"])
+    assert svc.folder_mod_uuids(ROOT_ID, recursive=False) == ["u3"]
+
+
+async def test_folder_move_targets_respect_subtree_depth_and_names(
+    svc: OrganizerService,
+) -> None:
+    a = await svc.create_folder("A")
+    b = await svc.create_folder("B", a.id)
+    c = await svc.create_folder("C", b.id)
+    x = await svc.create_folder("X")
+    y = await svc.create_folder("Y", x.id)
+    clash = await svc.create_folder("Clash")
+    inner_x = await svc.create_folder("X", clash.id)
+
+    assert svc.folder_move_targets(b.id) == {x.id, clash.id, ROOT_ID}
+    assert svc.folder_move_targets(x.id) == {a.id}
+    assert svc.folder_move_targets(c.id) == {
+        a.id,
+        x.id,
+        y.id,
+        clash.id,
+        inner_x.id,
+        ROOT_ID,
+    }
+    with pytest.raises(OrganizerError):
+        svc.folder_move_targets(ROOT_ID)
+
+
+async def test_tree_filters_count_status_and_providers(
+    svc: OrganizerService, ctx: _FakeCtx
+) -> None:
+    ctx.add("u1", "One", "a.one")
+    ctx.add("u2", "Two", "a.two")
+    ctx.active_uuids = ["u1"]
+    filters = {f.key: f for f in svc.tree_filters()}
+    assert [(k, f.count) for k, f in filters.items()][:3] == [
+        ("all", 2),
+        ("active", 1),
+        ("inactive", 1),
+    ]
+    provider = next(f for f in filters.values() if f.provider_id is not None)
+    assert provider.count == 2
+    assert provider.query("x").provider_ids == frozenset({provider.provider_id})
+    assert filters["active"].query("one").status == "active"
+
+
+async def test_tree_filters_with_persisted_tags_and_empty_tag(
+    svc: OrganizerService, ctx: _FakeCtx
+) -> None:
+    ctx.add("u1", "One", "a.one")
+    ctx.add("u2", "Two", "a.two")
+    ctx.add("u3", "Three", "a.three")
+
+    t1 = await svc.create_tag("Medieval", "#5eead4")
+    t2 = await svc.create_tag("Combat", "#fb923c")
+    t3 = await svc.create_tag("Empty", "#a3e635")
+
+    await svc.set_mod_tags(["a.one"], add=[t1.id, t2.id])
+    await svc.set_mod_tags(["a.two"], add=[t1.id])
+
+    filters = {f.key: f for f in svc.tree_filters()}
+    assert f"tag:{t1.id}" in filters
+    assert filters[f"tag:{t1.id}"].count == 2
+    assert filters[f"tag:{t1.id}"].label == "Medieval"
+    assert filters[f"tag:{t1.id}"].tag_id == t1.id
+
+    assert filters[f"tag:{t2.id}"].count == 1
+    assert filters[f"tag:{t2.id}"].label == "Combat"
+
+    assert filters[f"tag:{t3.id}"].count == 0
+    assert filters[f"tag:{t3.id}"].label == "Empty"
+
+    await svc.delete_tag(t2.id)
+    after_del = {f.key: f for f in svc.tree_filters()}
+    assert f"tag:{t2.id}" not in after_del
+    assert f"tag:{t1.id}" in after_del
+
+
+async def test_tree_filters_shared_package_ids_count_in_service(
+    svc: OrganizerService, ctx: _FakeCtx
+) -> None:
+    ctx.add("u1", "Steam Copy", "shared.pkg")
+    ctx.add("u2", "Local Copy", "shared.pkg")
+    ctx.add("u3", "Other Mod", "other.pkg")
+
+    tag = await svc.create_tag("Overhaul", "#5eead4")
+    await svc.set_mod_tags(["shared.pkg"], add=[tag.id])
+
+    filters = {f.key: f for f in svc.tree_filters()}
+    assert filters[f"tag:{tag.id}"].count == 2
+
+
+def _rule_rows(svc: OrganizerService) -> list[tuple[str, str, str, str]]:
+    folders = svc.state.folders
+    return [
+        (folders[r.folder_id].name, r.field, r.op, r.pattern) for r in svc.state.rules
+    ]
+
+
+def _standard_rows() -> list[tuple[str, str, str, str]]:
+    return [(r.folder, r.field, r.op, r.pattern) for r in STANDARD_RULES]
+
+
+async def test_add_standard_rules_fresh_and_idempotent(
+    svc: OrganizerService, changes: _Counter
+) -> None:
+    assert await svc.add_standard_rules() == 13
+    assert changes.count == 1
+    assert _rule_rows(svc) == _standard_rows()
+    top = [f for f in svc.state.folders.values() if f.parent_id == ROOT_ID]
+    assert sorted(f.name for f in top) == sorted(
+        {
+            "Official",
+            "Frameworks & Libraries",
+            "Vanilla Expanded",
+            "Combat Extended",
+            "Alpha Mods",
+            "Performance",
+        }
+    )
+    assert len(svc.state.folders) == 7
+    assert [r.position for r in svc.state.rules] == list(range(13))
+
+    assert await svc.add_standard_rules() == 0
+    assert changes.count == 1
+    assert len(svc.state.rules) == 13
+    assert len(svc.state.folders) == 7
+
+
+async def test_add_standard_rules_reuses_folder_and_keeps_user_rules(
+    svc: OrganizerService, changes: _Counter
+) -> None:
+    official = await svc.create_folder("OFFICIAL")
+    mine = await svc.create_folder("Mine")
+    await svc.set_rules(
+        [
+            RuleSpec("author", "contains", "me", mine.id),
+            RuleSpec("package_id", "prefix", "SARG.", mine.id),
+        ]
+    )
+    changes.count = 0
+
+    assert await svc.add_standard_rules() == 12
+    assert changes.count == 1
+    names = [f.name for f in svc.state.folders.values()]
+    assert "Official" not in names
+    assert "Alpha Mods" not in names
+    assert names.count("OFFICIAL") == 1
+    rows = _rule_rows(svc)
+    assert rows[:2] == [
+        ("Mine", "author", "contains", "me"),
+        ("Mine", "package_id", "prefix", "SARG."),
+    ]
+    expected = [row for row in _standard_rows() if row[3] != "sarg."]
+    expected[0] = ("OFFICIAL", *expected[0][1:])
+    assert rows[2:] == expected
+    assert svc.state.rules[2].folder_id == official.id
+
+
+async def test_standard_rules_resolve_mods(svc: OrganizerService) -> None:
+    await svc.add_standard_rules()
+    state = svc.state
+
+    def folder(pid: str, name: str = "Mod", author: str = "") -> str:
+        return state.folders[folder_for(state, pid, name, author)[0]].name
+
+    assert folder("oskarpotocki.vfe.core") == "Vanilla Expanded"
+    assert folder("someone.vfe", author="Oskar Potocki, Taranchuk") == (
+        "Vanilla Expanded"
+    )
+    assert folder("ludeon.rimworld.biotech", "Biotech") == "Official"
+    assert folder("brrainz.harmony", "Harmony") == "Frameworks & Libraries"
+    assert folder("ceteam.combatextended", "Combat Extended") == "Combat Extended"
+    assert folder("sarg.alphagenes") == "Alpha Mods"
+    assert folder("someone.perf", "Performance Fish") == "Performance"
+    assert folder("someone.other", "Other") == "Root"
