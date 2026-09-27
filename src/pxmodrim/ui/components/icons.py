@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         "chevron",
         "chevron-left",
         "folder",
+        "tag",
         "steam",
         "local",
         "git",
@@ -169,6 +170,14 @@ _ICONS: dict[str, str] = {
         ' stroke-linecap="round" stroke-linejoin="round">'
         '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9'
         'a2 2 0 012 2z"/>'
+        "</svg>"
+    ),
+    "tag": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M20.5 13.5 13.5 20.5a2 2 0 0 1-2.8 0l-8.2-8.2V3h9.3l8.7 7.7'
+        'a2 2 0 0 1 0 2.8z"/>'
+        '<circle cx="7.5" cy="7.5" r="1"/>'
         "</svg>"
     ),
     "steam": (

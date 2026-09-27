@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 ### Added
-- Mod organizer core (#37): SQLite-backed folder hierarchy, tags, placement rules, and tree resolver
+- Mod organizer (#37): SQLite-backed folder hierarchy, tags, placement rules, and tree resolver; QML TreeView with nested folders, search, source/status/tag filters, bulk toggles, folder actions, organizational drag-and-drop that leaves load order unchanged, the shared mod-info sidebar, and QML editors for tags and ordered auto-folder rules built on shared themed QML controls (`ui/components/controls`); an on-demand set of standard rules (Official, Frameworks & Libraries, Vanilla Expanded, Combat Extended, Alpha Mods, Performance)
 - Extended keyboard shortcuts (#35): search, mod toggling, fullscreen, view navigation, full metadata rescan, and a Help menu shortcut reference
 - Mod list snapshots and rollback (#24): automatic timestamped backups of `ModsConfig.xml` before save and on launch, configurable retention, and a restore snapshot dialog in the File menu
 - Persistent mod metadata cache (#29): SQLite-backed cache keyed by mod path and mtime to avoid re-parsing `About.xml` across launches, with automatic invalidation and corruption recovery
@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Mod description links restricted to HTTP(S); oversized `<size>`/`<indent>` values no longer crash rendering
 - Saving `ModsConfig.xml` preserves unknown elements and attributes
 - Startup no longer crashes on config failure cleanup, and closing the window during startup shuts down cleanly
+- Closing the last window waits for asynchronous plugin shutdown before stopping the Qt event loop
 - Plugins shut down in reverse dependency order
 - Dependency cycle detection reports all overlapping cycles (SCC-based); sorting/cycle checks no longer hit recursion limits on long chains; tier sort no longer quadratic
 - `About.xml` version keys match exactly (`v1.5` no longer matches `v1.50`); mods without `packageId` are invalid

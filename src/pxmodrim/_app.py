@@ -117,6 +117,8 @@ class App:
 
         self._ctx: CoreContext | None = None
         self.qt_app = QApplication(sys.argv)
+        # async_run owns the exit: plugin shutdown awaits I/O after the window closes.
+        self.qt_app.setQuitOnLastWindowClosed(False)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         self.qt_app.setWindowIcon(icon)
         self.qt_app.setApplicationName("PxModRim")
@@ -171,6 +173,9 @@ class App:
         self._ctx.register_plugin(
             OrganizerService(ctx, OrganizerDb(db_path(config_svc.config_dir)))
         )
+        from pxmodrim.ui.plugins.organizer import OrganizerUiPlugin
+
+        self._app_ctx.register_plugin(OrganizerUiPlugin())
 
         disabled = _parse_disabled_plugins()
 
