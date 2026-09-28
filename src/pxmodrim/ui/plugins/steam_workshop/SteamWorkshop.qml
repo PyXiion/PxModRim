@@ -1,8 +1,9 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
 import QtWebEngine
-import QtWebChannel 1.15
+import QtWebChannel
+import "../../components/controls"
 
 Rectangle {
     id: root
@@ -39,149 +40,75 @@ Rectangle {
                 anchors.rightMargin: 4
                 spacing: 4
 
-                Rectangle {
+                PxButton {
                     id: homeBtn
-                    width: 28; height: 28
-                    radius: Theme.radiusSm
-                    color: homeMouse.containsMouse ? Theme.elevate3 : "transparent"
-
-                    Image {
-                        anchors.centerIn: parent
-                        source: "image://icons/home?color=" + encodeURIComponent(Theme.textDim)
-                        sourceSize.width: 14; sourceSize.height: 14
-                    }
-
-                    MouseArea {
-                        id: homeMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: steamWorkshopPanel.navigateHome()
-                    }
+                    variant: "ghost"
+                    iconName: "home"
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    ToolTip.text: "Home"
+                    onClicked: steamWorkshopPanel.navigateHome()
                 }
 
-                Rectangle {
+                PxButton {
                     id: backBtn
-                    width: 28; height: 28
-                    radius: Theme.radiusSm
-                    color: backMouse.containsMouse ? Theme.elevate3 : "transparent"
-                    opacity: webView.canGoBack ? 1.0 : 0.4
-
-                    Image {
-                        anchors.centerIn: parent
-                        source: "image://icons/chevron-left?color=" + encodeURIComponent(Theme.textDim)
-                        sourceSize.width: 14; sourceSize.height: 14
-                    }
-
-                    MouseArea {
-                        id: backMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: webView.canGoBack ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            if (webView.canGoBack)
-                                webView.goBack()
-                        }
-                    }
+                    variant: "ghost"
+                    iconName: "chevron-left"
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    ToolTip.text: "Back"
+                    enabled: webView.canGoBack
+                    onClicked: webView.goBack()
                 }
 
-                Rectangle {
+                PxButton {
                     id: fwdBtn
-                    width: 28; height: 28
-                    radius: Theme.radiusSm
-                    color: fwdMouse.containsMouse ? Theme.elevate3 : "transparent"
-                    opacity: webView.canGoForward ? 1.0 : 0.4
-
-                    Image {
-                        anchors.centerIn: parent
-                        source: "image://icons/chevron?color=" + encodeURIComponent(Theme.textDim)
-                        sourceSize.width: 14; sourceSize.height: 14
-                    }
-
-                    MouseArea {
-                        id: fwdMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: webView.canGoForward ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            if (webView.canGoForward)
-                                webView.goForward()
-                        }
-                    }
+                    variant: "ghost"
+                    iconName: "chevron"
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    ToolTip.text: "Forward"
+                    enabled: webView.canGoForward
+                    onClicked: webView.goForward()
                 }
 
-                Rectangle {
+                PxButton {
                     id: clearCacheBtn
-                    width: 28; height: 28
-                    radius: Theme.radiusSm
-                    color: clearCacheMouse.containsMouse ? Theme.elevate3 : "transparent"
-
-                    Image {
-                        anchors.centerIn: parent
-                        source: "image://icons/trash?color=" + encodeURIComponent(Theme.textDim)
-                        sourceSize.width: 14; sourceSize.height: 14
-                    }
-
-                    MouseArea {
-                        id: clearCacheMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
+                    variant: "ghost"
+                    iconName: "trash"
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    ToolTip.text: "Clear cache"
+                    onClicked: {
                         // Stale Steam SSR JS in the disk cache fails SRI and gets
                         // blocked; drop it and reload once the clear completes.
-                        onClicked: {
-                            root._pendingReload = true
-                            webView.profile.clearHttpCache()
-                        }
+                        root._pendingReload = true
+                        webView.profile.clearHttpCache()
                     }
                 }
 
-                Rectangle {
+                PxButton {
                     id: reloadBtn
-                    width: 28; height: 28
-                    radius: Theme.radiusSm
-                    color: reloadMouse.containsMouse ? Theme.elevate3 : "transparent"
-
-                    Image {
-                        anchors.centerIn: parent
-                        source: "image://icons/refresh?color=" + encodeURIComponent(Theme.textDim)
-                        sourceSize.width: 14; sourceSize.height: 14
-                    }
-
-                    MouseArea {
-                        id: reloadMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: webView.reload()
-                    }
+                    variant: "ghost"
+                    iconName: "refresh"
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    ToolTip.text: "Reload"
+                    onClicked: webView.reload()
                 }
 
-                Rectangle {
+                PxTextField {
+                    id: urlInput
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 24
-                    radius: Theme.radiusSm
-                    color: Theme.elevate0
-                    border.width: 1
-                    border.color: Theme.elevate3
-
-                    TextInput {
-                        id: urlInput
-                        anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        verticalAlignment: TextInput.AlignVCenter
-                        color: Theme.textMain
-                        font.pixelSize: Theme.fontSizeSm
-                        text: webView.url.toString()
-                        onAccepted: steamWorkshopPanel.navigateToUrl(text)
-                    }
+                    implicitHeight: 24
+                    font.pixelSize: Theme.fontSizeSm
+                    text: webView.url.toString()
+                    onAccepted: steamWorkshopPanel.navigateToUrl(text)
                 }
 
-                Text {
-                    text: "\u27F3"
-                    color: Theme.textDim
-                    font.pixelSize: Theme.fontSizeMd
+                PxProgressBar {
+                    Layout.preferredWidth: 48
+                    indeterminate: true
                     visible: webView.loading
                 }
             }
@@ -258,7 +185,7 @@ Rectangle {
                     } else if (loadRequest.status === WebEngineView.LoadFailedStatus) {
                         console.warn("[steam] load failed:", loadRequest.url, loadRequest.errorString,
                                      "domain:", loadRequest.errorDomain, "code:", loadRequest.errorCode)
-                        root._placeholderText = "Failed to load Steam Workshop.\n\nCheck your network connection and try again."
+                        root._placeholderText = "Failed to load Steam Workshop"
                         root._showError = true
                     }
                 }
@@ -275,13 +202,11 @@ Rectangle {
                 color: Theme.elevate0
                 visible: root._firstLoad || root._showError
 
-                Text {
-                    anchors.centerIn: parent
-                    text: root._placeholderText
-                    color: Theme.textDim
-                    font.pixelSize: Theme.fontSizeMd
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
+                EmptyState {
+                    anchors.fill: parent
+                    iconName: root._showError ? "warning" : "steam"
+                    title: root._placeholderText
+                    detail: root._showError ? "Check your network connection and try again." : ""
                 }
             }
         }
