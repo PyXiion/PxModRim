@@ -16,6 +16,7 @@ from PySide6.QtGui import (
     QKeySequence,
     QResizeEvent,
 )
+from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -142,6 +143,10 @@ class MainWindow(QMainWindow):
         self._qml_engine = create_qml_engine(self)
         self._theme = Theme(self)
         self._qml_engine.rootContext().setContextProperty("Theme", self._theme)
+
+    @property
+    def qml_engine(self) -> QQmlEngine:
+        return self._qml_engine
 
     def _setup_header_and_shortcuts(self) -> None:
         logger.debug("main_window: setting up header and shortcuts")
@@ -441,7 +446,9 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _open_settings(self) -> None:
-        result, dialog = await await_dialog(SettingsPanel, self._ctx, self)
+        result, dialog = await await_dialog(
+            SettingsPanel, self._ctx, self._qml_engine, self
+        )
         if result != QDialog.DialogCode.Accepted:
             return
         cfg = dialog.get_config()

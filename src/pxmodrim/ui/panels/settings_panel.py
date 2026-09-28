@@ -1,22 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QDialog,
-    QFileDialog,
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtCore import Property, QObject, Qt, QTimer, QUrl, Signal, Slot
+from PySide6.QtGui import QColor
+from PySide6.QtQml import QQmlEngine
+from PySide6.QtQuickWidgets import QQuickWidget
+from PySide6.QtWidgets import QDialog, QFileDialog, QVBoxLayout, QWidget
 from qasync import asyncSlot
 
 from pxmodrim.core.config import (
@@ -29,9 +20,18 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
 from pxmodrim.core.sort.config import SortSettings
-from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
+from pxmodrim.ui.theme.palette import PALETTE
+
+_QML = Path(__file__).parent / "Settings.qml"
+
+_FOLDER_TITLES = {
+    "game": "Select RimWorld Game Folder",
+    "local": "Select Local Mods Folder",
+    "workshop": "Select Workshop Mods Folder",
+    "config": "Select RimWorld Config Folder",
+}
 
 
 class _FolderDialog(QFileDialog):
@@ -41,247 +41,183 @@ class _FolderDialog(QFileDialog):
         self.setOption(QFileDialog.Option.ShowDirsOnly)
 
 
+class _SettingsBackend(QObject):
+    """State and actions behind Settings.qml; the dialog owns accept/reject."""
+
+    pathPicked = Signal(str, str)
+    saveRequested = Signal(dict)
+    cancelRequested = Signal()
+    communityChanged = Signal()
+    cacheChanged = Signal()
+
+    def __init__(self, ctx: CoreContext, dialog: QDialog) -> None:
+        super().__init__(dialog)
+        self._ctx = ctx
+        self._dialog = dialog
+        cfg = ctx.config
+        self._initial: dict[str, Any] = {
+            "game": cfg.paths.game,
+            "local": cfg.paths.local,
+            "workshop": cfg.paths.workshop,
+            "config": cfg.paths.config_folder,
+            "compact": cfg.compact_mod_list,
+            "useAltIds": cfg.sort.use_alternative_package_ids,
+            "checkMissing": cfg.sort.check_missing_dependencies,
+            "useCommunity": cfg.sort.use_community_rules,
+        }
+        rules = community_rules_file()
+        self._community_status = (
+            f"Found: {rules}" if rules.exists() else "Not downloaded"
+        )
+        self._community_busy = False
+        self._cache_available = bool(cfg.paths.config_folder)
+        self._cache_status = (
+            "Cache ready"
+            if self._cache_available
+            else "No config folder — not available"
+        )
+        self._cache_busy = False
+
+    @Property(dict, constant=True)  # type: ignore[arg-type]
+    def initial(self) -> dict[str, Any]:
+        return self._initial
+
+    @Property(str, notify=communityChanged)  # type: ignore[arg-type]
+    def communityStatus(self) -> str:
+        return self._community_status
+
+    @Property(bool, notify=communityChanged)  # type: ignore[arg-type]
+    def communityBusy(self) -> bool:
+        return self._community_busy
+
+    @Property(str, notify=cacheChanged)  # type: ignore[arg-type]
+    def cacheStatus(self) -> str:
+        return self._cache_status
+
+    @Property(bool, notify=cacheChanged)  # type: ignore[arg-type]
+    def cacheAvailable(self) -> bool:
+        return self._cache_available
+
+    @Property(bool, notify=cacheChanged)  # type: ignore[arg-type]
+    def cacheBusy(self) -> bool:
+        return self._cache_busy
+
+    def _set_community(self, status: str, busy: bool) -> None:
+        self._community_status = status
+        self._community_busy = busy
+        self.communityChanged.emit()
+
+    def _set_cache(self, status: str, busy: bool) -> None:
+        self._cache_status = status
+        self._cache_busy = busy
+        self.cacheChanged.emit()
+
+    @asyncSlot(str)
+    async def browse(self, key: str) -> None:
+        title = _FOLDER_TITLES.get(key)
+        if title is None:
+            return
+        result, dialog = await await_dialog(_FolderDialog, self._dialog, title)
+        files = dialog.selectedFiles()
+        if result == QDialog.DialogCode.Accepted and files:
+            self.pathPicked.emit(key, files[0])
+
+    @Slot(str, result=str)
+    def localCandidate(self, game_path: str) -> str:
+        candidate = Path(game_path) / "Mods"
+        return str(candidate) if candidate.is_dir() else ""
+
+    @Slot()
+    def autoDetect(self) -> None:
+        detected = detect_game_paths()
+        for key, value in (
+            ("game", detected.game),
+            ("local", detected.local),
+            ("workshop", detected.workshop),
+            ("config", detected.config_folder),
+        ):
+            if value:
+                self.pathPicked.emit(key, value)
+
+    @asyncSlot()
+    async def downloadCommunityRules(self) -> None:
+        self._set_community("Downloading…", True)
+        status = "Download failed"
+        try:
+            async with ProgressDialog(LoadingState(self), self._dialog) as dialog:
+                service = CommunityRulesService(self._ctx.config_service)
+                path = await service.ensure_rules(dialog.loading, force=True)
+            QTimer.singleShot(1000, dialog, dialog.deleteLater)
+            if path:
+                status = f"Downloaded: {path}"
+        finally:
+            self._set_community(status, False)
+
+    @asyncSlot()
+    async def clearCache(self) -> None:
+        self._set_cache("Clearing…", True)
+        status = "Cache cleared"
+        try:
+            await self._ctx.mod_service.startup_impact.clear()
+        except OSError as exc:
+            status = f"Error: {exc}"
+        finally:
+            self._set_cache(status, False)
+
+    @Slot("QVariantMap")
+    def save(self, values: dict[str, Any]) -> None:
+        self.saveRequested.emit(values)
+
+    @Slot()
+    def cancel(self) -> None:
+        self.cancelRequested.emit()
+
+
 class SettingsPanel(QDialog):
-    def __init__(self, ctx: CoreContext, parent: QWidget) -> None:
+    def __init__(
+        self,
+        ctx: CoreContext,
+        qml_engine: QQmlEngine,
+        parent: QWidget,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("settingsPanel")
         self.setWindowTitle("Settings")
         self.setModal(True)
-        self.resize(700, 500)
+        self.resize(700, 560)
 
         self._ctx = ctx
         self._config = ctx.config
 
+        self._backend = _SettingsBackend(ctx, self)
+        self._backend.saveRequested.connect(self._save)
+        self._backend.cancelRequested.connect(self.reject)
+
         layout = QVBoxLayout(self)
-        tabs = QTabWidget(self)
-        layout.addWidget(tabs)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
+        self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        self._qml.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)
+        self._qml.setClearColor(QColor(PALETTE["ELEVATE_2"]))
+        self._qml.rootContext().setContextProperty("settings", self._backend)
+        self._qml.setSource(QUrl.fromLocalFile(str(_QML)))
+        layout.addWidget(self._qml)
 
-        tabs.addTab(self._create_general_tab(), "General")
-        tabs.addTab(self._create_sorting_tab(), "Sorting")
-
-        buttons = QHBoxLayout()
-        buttons.addStretch()
-
-        cancel_btn = AppButton("Cancel", self)
-        cancel_btn.clicked.connect(self.reject)
-        buttons.addWidget(cancel_btn)
-
-        save_btn = AppButton("Save", self)
-        save_btn.setObjectName("primaryAction")
-        save_btn.clicked.connect(self._save)
-        buttons.addWidget(save_btn)
-        layout.addLayout(buttons)
-
-    # ── General tab ──────────────────────────────────────────────────────────
-
-    def _create_general_tab(self) -> QWidget:
-        tab = QWidget(self)
-        layout = QVBoxLayout(tab)
-
-        folders_group = QGroupBox("Folders", tab)
-        form = QFormLayout(folders_group)
-
-        self.game_edit, self.game_browse = self._add_path_row(
-            form,
-            "Game folder:",
-            self._config.paths.game,
-            "Select RimWorld Game Folder",
-            after_pick=self._auto_fill_local,
-        )
-        self.local_edit, self.local_browse = self._add_path_row(
-            form,
-            "Local mods folder:",
-            self._config.paths.local,
-            "Select Local Mods Folder",
-        )
-        self.workshop_edit, self.workshop_browse = self._add_path_row(
-            form,
-            "Workshop mods folder:",
-            self._config.paths.workshop,
-            "Select Workshop Mods Folder",
-        )
-        self.config_edit, self.config_browse = self._add_path_row(
-            form,
-            "Config folder:",
-            self._config.paths.config_folder,
-            "Select RimWorld Config Folder",
-        )
-
-        detect_btn = AppButton("Auto-detect", folders_group)
-        detect_btn.clicked.connect(self._auto_detect)
-        form.addRow("", detect_btn)
-        layout.addWidget(folders_group)
-
-        appearance_group = QGroupBox("Appearance", tab)
-        appearance_layout = QVBoxLayout(appearance_group)
-        self.compact_mod_list_cb = QCheckBox("Compact mod list", appearance_group)
-        self.compact_mod_list_cb.setChecked(self._config.compact_mod_list)
-        appearance_layout.addWidget(self.compact_mod_list_cb)
-        layout.addWidget(appearance_group)
-
-        layout.addStretch()
-        return tab
-
-    # ── Sorting tab ──────────────────────────────────────────────────────────
-
-    def _create_sorting_tab(self) -> QWidget:
-        tab = QWidget(self)
-        layout = QVBoxLayout(tab)
-
-        opts_group = QGroupBox("Sorting options", tab)
-        opts_layout = QVBoxLayout(opts_group)
-
-        self.use_alt_ids_cb = QCheckBox("Use alternative package IDs", opts_group)
-        self.use_alt_ids_cb.setChecked(self._config.sort.use_alternative_package_ids)
-        opts_layout.addWidget(self.use_alt_ids_cb)
-
-        self.check_missing_cb = QCheckBox("Check missing dependencies", opts_group)
-        self.check_missing_cb.setChecked(self._config.sort.check_missing_dependencies)
-        opts_layout.addWidget(self.check_missing_cb)
-
-        self.use_community_cb = QCheckBox("Use community rules database", opts_group)
-        self.use_community_cb.setChecked(self._config.sort.use_community_rules)
-        opts_layout.addWidget(self.use_community_cb)
-        layout.addWidget(opts_group)
-
-        cr_group = QGroupBox("Community rules database", tab)
-        cr_layout = QVBoxLayout(cr_group)
-
-        cr_path = community_rules_file()
-        self.cr_status = QLabel(
-            f"Found: {cr_path}" if cr_path.exists() else "Not downloaded", cr_group
-        )
-        self.cr_status.setWordWrap(True)
-        cr_layout.addWidget(self.cr_status)
-
-        self.cr_download_btn = AppButton("Download or update", cr_group)
-        self.cr_download_btn.clicked.connect(self._download_community_rules)
-        cr_layout.addWidget(self.cr_download_btn)
-        layout.addWidget(cr_group)
-
-        si_group = QGroupBox("Startup impact cache", tab)
-        si_layout = QVBoxLayout(si_group)
-
-        self.si_status = QLabel(si_group)
-        self.si_status.setWordWrap(True)
-        si_layout.addWidget(self.si_status)
-
-        self.si_clear_btn = AppButton("Clear cache", si_group)
-        self.si_clear_btn.clicked.connect(self._clear_startup_impact)
-        si_layout.addWidget(self.si_clear_btn)
-
-        if self._ctx.config.paths.config_folder:
-            self.si_status.setText("Cache ready")
-        else:
-            self.si_status.setText("No config folder — not available")
-            self.si_clear_btn.setEnabled(False)
-        layout.addWidget(si_group)
-
-        layout.addStretch()
-        return tab
-
-    # ── Helpers ──────────────────────────────────────────────────────────────
-
-    def _add_path_row(
-        self,
-        form: QFormLayout,
-        label: str,
-        value: str,
-        dialog_title: str,
-        after_pick: Callable[[str], None] | None = None,
-    ) -> tuple[QLineEdit, AppButton]:
-        parent = form.parentWidget()
-        edit = QLineEdit(value, parent)
-        browse = AppButton("Browse…", parent)
-        browse.clicked.connect(
-            lambda: self._browse_folder(edit, dialog_title, after_pick)
-        )
-        row = QHBoxLayout()
-        row.addWidget(edit, 1)
-        row.addWidget(browse)
-        form.addRow(label, row)
-        return edit, browse
-
-    @asyncSlot()
-    async def _browse_folder(
-        self,
-        edit: QLineEdit,
-        title: str,
-        after_pick: Callable[[str], None] | None,
-    ) -> None:
-        result, dialog = await await_dialog(_FolderDialog, self, title)
-        files = dialog.selectedFiles()
-        if result != QDialog.DialogCode.Accepted or not files:
-            return
-        edit.setText(files[0])
-        if after_pick is not None:
-            after_pick(files[0])
-
-    def _auto_fill_local(self, game_path: str) -> None:
-        if not self.local_edit.text():
-            candidate = Path(game_path) / "Mods"
-            if candidate.is_dir():
-                self.local_edit.setText(str(candidate))
-
-    def _auto_detect(self) -> None:
-        detected = detect_game_paths()
-        self._apply_detected(detected)
-
-    def _apply_detected(self, detected: PathConfig) -> None:
-        for edit, val in [
-            (self.game_edit, detected.game),
-            (self.local_edit, detected.local),
-            (self.workshop_edit, detected.workshop),
-            (self.config_edit, detected.config_folder),
-        ]:
-            if val:
-                edit.setText(val)
-
-    @asyncSlot()
-    async def _download_community_rules(self) -> None:
-        self.cr_download_btn.setEnabled(False)
-        self.cr_status.setText("Downloading…")
-        try:
-            async with ProgressDialog(LoadingState(self), self) as dialog:
-                service = CommunityRulesService(self._ctx.config_service)
-                path = await service.ensure_rules(dialog.loading, force=True)
-
-            QTimer.singleShot(1000, dialog, dialog.deleteLater)
-
-            if path:
-                self.cr_status.setText(f"Downloaded: {path}")
-            else:
-                self.cr_status.setText("Download failed")
-        finally:
-            self.cr_download_btn.setEnabled(True)
-
-    @asyncSlot()
-    async def _clear_startup_impact(self) -> None:
-        self.si_clear_btn.setEnabled(False)
-        self.si_status.setText("Clearing…")
-        try:
-            await self._ctx.mod_service.startup_impact.clear()
-            self.si_status.setText("Cache cleared")
-        except OSError as exc:
-            self.si_status.setText(f"Error: {exc}")
-        finally:
-            self.si_clear_btn.setEnabled(True)
-
-    def _save(self) -> None:
+    def _save(self, values: dict[str, Any]) -> None:
         self._config = AppConfig(
             paths=PathConfig(
-                game=self.game_edit.text().strip(),
-                local=self.local_edit.text().strip(),
-                workshop=self.workshop_edit.text().strip(),
-                config_folder=self.config_edit.text().strip(),
+                game=values["game"].strip(),
+                local=values["local"].strip(),
+                workshop=values["workshop"].strip(),
+                config_folder=values["config"].strip(),
             ),
             sort=SortSettings(
-                use_alternative_package_ids=self.use_alt_ids_cb.isChecked(),
-                check_missing_dependencies=self.check_missing_cb.isChecked(),
-                use_community_rules=self.use_community_cb.isChecked(),
+                use_alternative_package_ids=bool(values["useAltIds"]),
+                check_missing_dependencies=bool(values["checkMissing"]),
+                use_community_rules=bool(values["useCommunity"]),
             ),
             max_snapshots=self._config.max_snapshots,
-            compact_mod_list=self.compact_mod_list_cb.isChecked(),
+            compact_mod_list=bool(values["compact"]),
         )
         self.accept()
 

@@ -246,7 +246,9 @@ class App:
 
         if not ctx.config.paths.game:
             logger.info("No game path found, showing settings dialog")
-            result, dialog = await await_dialog(SettingsPanel, ctx, self.main_window)
+            result, dialog = await await_dialog(
+                SettingsPanel, ctx, self.main_window.qml_engine, self.main_window
+            )
             if app_close_event.is_set():
                 await self._app_ctx.shutdown_all()
                 return 0

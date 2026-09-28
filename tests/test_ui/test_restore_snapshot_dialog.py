@@ -273,11 +273,15 @@ async def test_mod_service_configurable_retention_honored(
 
 
 def test_settings_panel_save_preserves_max_snapshots(qapp: QApplication) -> None:
+    from pxmodrim.ui.components.svg_provider import create_qml_engine
     from pxmodrim.ui.panels.settings_panel import SettingsPanel
+    from pxmodrim.ui.theme.qml_theme import Theme
 
     cfg = AppConfig(max_snapshots=7)
     ctx = CoreContext(cfg)
     host = QWidget()
-    panel = SettingsPanel(ctx, host)
-    panel._save()
+    engine = create_qml_engine()
+    engine.rootContext().setContextProperty("Theme", Theme(engine))
+    panel = SettingsPanel(ctx, engine, host)
+    panel._save(panel._backend._initial)
     assert panel.get_config().max_snapshots == 7
