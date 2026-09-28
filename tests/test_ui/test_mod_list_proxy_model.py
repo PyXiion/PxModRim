@@ -277,3 +277,30 @@ class TestClampedMove:
         assert proxy.isFiltered is True
         ok = proxy.move_row(0, 1, clamp_to_active=True)
         assert ok is False
+
+
+def test_move_refreshes_load_indices_only_after_move_completes(
+    qapp: QApplication,
+) -> None:
+    source = ModListModel(_provider_colors())
+    mods: dict[str, ListedMod] = {f"u{i}": _mod(f"Mod {i}") for i in range(3)}
+    source.load_mods(mods, ["u0", "u1", "u2"])
+    proxy = ModListProxyModel(source)
+    events: list[tuple[str, int, int]] = []
+    proxy.rowsAboutToBeMoved.connect(lambda *_: events.append(("begin", -1, -1)))
+    proxy.rowsMoved.connect(lambda *_: events.append(("end", -1, -1)))
+    proxy.dataChanged.connect(
+        lambda top, bottom, _roles: events.append(("data", top.row(), bottom.row()))
+    )
+
+    assert proxy.move_row(0, 2) is True
+
+    assert events == [("begin", -1, -1), ("end", -1, -1), ("data", 0, 2)]
+    rows = [
+        (
+            proxy.data(proxy.index(row, 0), ModListModel.UuidRole),
+            proxy.data(proxy.index(row, 0), ModListModel.LoadIndexRole),
+        )
+        for row in range(3)
+    ]
+    assert rows == [("u1", 1), ("u2", 2), ("u0", 3)]

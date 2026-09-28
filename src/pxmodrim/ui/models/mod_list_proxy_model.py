@@ -13,7 +13,7 @@ from PySide6.QtCore import (
 )
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
-from pxmodrim.ui.models.mod_list_model import ModListModel
+from pxmodrim.ui.models.mod_list_model import ModListModel, section_name
 
 
 class ModListProxyModel(QAbstractListModel):
@@ -156,11 +156,11 @@ class ModListProxyModel(QAbstractListModel):
             return None
         if role == ModListModel.SectionNameRole:
             item = self._source.get_item(source_row)
-            if item is None or item.checked:
-                return ""
-            if self._visible_active_count > 0 and self._visible_inactive_count > 0:
-                return f"Inactive ({self._visible_inactive_count})"
-            return ""
+            return section_name(
+                item is None or item.checked,
+                self._visible_active_count,
+                self._visible_inactive_count,
+            )
         return self._source.data(self._source.index(source_row, 0), role)
 
     def setData(
@@ -219,30 +219,23 @@ class ModListProxyModel(QAbstractListModel):
     def move_row(
         self, proxy_source: int, proxy_target: int, *, clamp_to_active: bool = False
     ) -> bool:
+        if not (0 <= proxy_source < len(self._visible_uuids)):
+            return False
+        source_uuid = self._visible_uuids[proxy_source]
+        source_source_row = self._source_row_for_uuid.get(source_uuid, -1)
         if clamp_to_active:
-            if self.is_filtered:
-                return False
-            if not (0 <= proxy_source < len(self._visible_uuids)):
-                return False
-            source_uuid = self._visible_uuids[proxy_source]
-            source_source_row = self._source_row_for_uuid.get(source_uuid, -1)
             item = self._source.get_item(source_source_row)
-            if item is None or not item.checked:
-                return False
-            if self._visible_active_count <= 0:
+            if self.is_filtered or item is None or not item.checked:
                 return False
             proxy_target = max(0, min(proxy_target, self._visible_active_count - 1))
         if proxy_source == proxy_target:
             return False
-        if not (0 <= proxy_source < len(self._visible_uuids)):
-            return False
         if not (0 <= proxy_target < len(self._visible_uuids)):
             return False
 
-        source_uuid = self._visible_uuids[proxy_source]
-        target_uuid = self._visible_uuids[proxy_target]
-        source_source_row = self._source_row_for_uuid.get(source_uuid, -1)
-        source_target_row = self._source_row_for_uuid.get(target_uuid, -1)
+        source_target_row = self._source_row_for_uuid.get(
+            self._visible_uuids[proxy_target], -1
+        )
         if source_source_row < 0 or source_target_row < 0:
             return False
 
@@ -250,6 +243,8 @@ class ModListProxyModel(QAbstractListModel):
             proxy_target + 1 if proxy_source < proxy_target else proxy_target
         )
 
+        # Source signals carry post-move rows; forwarding them before endMoveRows
+        # would make views apply the data to delegates still at pre-move rows.
         self._in_proxy_move = True
         try:
             self.beginMoveRows(
@@ -264,21 +259,23 @@ class ModListProxyModel(QAbstractListModel):
             self._proxy_row_by_uuid = {
                 uuid: row for row, uuid in enumerate(self._visible_uuids)
             }
-            self._source.move_row(
-                source_source_row, source_target_row, clamp_to_active=clamp_to_active
-            )
+            self._source.move_row(source_source_row, source_target_row)
             self._rebuild_source_mapping()
             self.endMoveRows()
         finally:
             self._in_proxy_move = False
+        self.dataChanged.emit(
+            self.index(min(proxy_source, proxy_target), 0),
+            self.index(max(proxy_source, proxy_target), 0),
+            [ModListModel.LoadIndexRole, ModListModel.SectionNameRole],
+        )
         return True
-
-    def clamped_move(self, proxy_source: int, proxy_target: int) -> bool:
-        return self.move_row(proxy_source, proxy_target, clamp_to_active=True)
 
     def _on_source_data_changed(
         self, top_left: QModelIndex, bottom_right: QModelIndex, roles: list[int]
     ) -> None:
+        if self._in_proxy_move:
+            return
         if (
             not roles
             or ModListModel.CheckStateRole in roles
@@ -353,11 +350,3 @@ class ModListProxyModel(QAbstractListModel):
         self._visible_inactive_count = inactive
         if changed:
             self.active_count_changed.emit()
-
-    @property
-    def visible_active_count(self) -> int:
-        return self._visible_active_count
-
-    @property
-    def visible_inactive_count(self) -> int:
-        return self._visible_inactive_count

@@ -37,6 +37,12 @@ def _provider_label(provider_id: str, package_id: str = "") -> str:
     return pid.capitalize() if pid else ""
 
 
+def section_name(checked: bool, active_count: int, inactive_count: int) -> str:
+    if checked or active_count == 0 or inactive_count == 0:
+        return ""
+    return f"Inactive ({inactive_count})"
+
+
 @dataclass(slots=True)
 class ModItem:
     mod: ListedMod
@@ -79,7 +85,6 @@ class ModListModel(QAbstractListModel):
         self._provider_colors = provider_colors
         self._items: list[ModItem] = []
         self._active_count: int = 0
-        self._inactive_count: int = 0
         self._diag = diagnostics
         if diagnostics is not None:
             diagnostics.diagnostics_summary_changed.connect(
@@ -139,11 +144,9 @@ class ModListModel(QAbstractListModel):
         if role == self.IsActiveRole:
             return item.checked
         if role == self.SectionNameRole:
-            if item.checked:
-                return ""
-            if self._active_count > 0 and self._inactive_count > 0:
-                return f"Inactive ({self._inactive_count})"
-            return ""
+            return section_name(
+                item.checked, self._active_count, len(self._items) - self._active_count
+            )
         if role == self.ProviderLabelRole:
             if item.provider_label:
                 return item.provider_label
@@ -168,26 +171,7 @@ class ModListModel(QAbstractListModel):
             return False
 
         if role == self.CheckStateRole:
-            item = self._items[index.row()]
-            new_checked = value == Qt.CheckState.Checked
-            if item.checked == new_checked:
-                return True
-            item.checked = new_checked
-            load_changed = self._update_load_indices()
-            all_affected = set(load_changed) | {index.row()}
-            top = self.index(min(all_affected), 0)
-            bottom = self.index(len(self._items) - 1, 0)
-            self.dataChanged.emit(
-                top,
-                bottom,
-                [
-                    self.CheckStateRole,
-                    self.LoadIndexRole,
-                    self.IsActiveRole,
-                    self.SectionNameRole,
-                ],
-            )
-            self.active_mods_changed.emit()
+            self.set_check_states([index.row()], value == Qt.CheckState.Checked)
             return True
 
         return False
@@ -266,18 +250,10 @@ class ModListModel(QAbstractListModel):
     def update_provider_colors(self, provider_colors: dict[str, str]) -> None:
         self._provider_colors = provider_colors
 
-    def move_row(
-        self, source_row: int, target_row: int, *, clamp_to_active: bool = False
-    ) -> bool:
-        if not (0 <= source_row < len(self._items)):
-            return False
-        if clamp_to_active:
-            if not self._items[source_row].checked:
-                return False
-            if self._active_count <= 0:
-                return False
-            target_row = max(0, min(target_row, self._active_count - 1))
+    def move_row(self, source_row: int, target_row: int) -> bool:
         if source_row == target_row:
+            return False
+        if not (0 <= source_row < len(self._items)):
             return False
         if not (0 <= target_row < len(self._items)):
             return False
@@ -298,9 +274,6 @@ class ModListModel(QAbstractListModel):
                 [self.LoadIndexRole, self.SectionNameRole],
             )
         return True
-
-    def clamped_move(self, source_row: int, target_row: int) -> bool:
-        return self.move_row(source_row, target_row, clamp_to_active=True)
 
     def commitOrder(self, new_ordered_uuids: list[str]) -> None:
         item_by_uuid = {item.uuid: item for item in self._items}
@@ -339,49 +312,28 @@ class ModListModel(QAbstractListModel):
             self.changePersistentIndexList(persistent_indexes, new_persistent)
         self.layoutChanged.emit()
 
-    def reorder(self, ordered_uuids: list[str]) -> None:
-        self.commitOrder(ordered_uuids)
+    def _make_item(self, uuid: str, mod: ListedMod, checked: bool) -> ModItem:
+        return ModItem(
+            mod=mod,
+            uuid=uuid,
+            checked=checked,
+            provider_color=self._provider_colors.get(mod.provider_id, "#808080"),
+            provider_label=_provider_label(
+                mod.provider_id, str(getattr(mod, "package_id", ""))
+            ),
+        )
 
     def load_mods(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         self.beginResetModel()
         try:
             active_set = set(active_uuids)
-            active_items = [
-                ModItem(
-                    mod=mods[uuid],
-                    uuid=uuid,
-                    checked=True,
-                    provider_color=self._provider_colors.get(
-                        mods[uuid].provider_id, "#808080"
-                    ),
-                    provider_label=_provider_label(
-                        mods[uuid].provider_id,
-                        str(getattr(mods[uuid], "package_id", "")),
-                    ),
-                )
-                for uuid in active_uuids
-            ]
-            inactive_uuids = [
-                uuid
-                for uuid, _ in sorted(mods.items(), key=lambda kv: kv[1].name.lower())
-                if uuid not in active_set
-            ]
-            inactive_items = [
-                ModItem(
-                    mod=mods[uuid],
-                    uuid=uuid,
-                    checked=False,
-                    provider_color=self._provider_colors.get(
-                        mods[uuid].provider_id, "#808080"
-                    ),
-                    provider_label=_provider_label(
-                        mods[uuid].provider_id,
-                        str(getattr(mods[uuid], "package_id", "")),
-                    ),
-                )
-                for uuid in inactive_uuids
-            ]
-            self._items = active_items + inactive_items
+            inactive = sorted(
+                ((uuid, mod) for uuid, mod in mods.items() if uuid not in active_set),
+                key=lambda kv: kv[1].name.lower(),
+            )
+            self._items = [
+                self._make_item(uuid, mods[uuid], True) for uuid in active_uuids
+            ] + [self._make_item(uuid, mod, False) for uuid, mod in inactive]
             self._update_load_indices()
         finally:
             self.endResetModel()
@@ -450,7 +402,6 @@ class ModListModel(QAbstractListModel):
                 changed.append(row)
         old_active = self._active_count
         self._active_count = counter
-        self._inactive_count = len(self._items) - counter
         if old_active != self._active_count:
             self.active_count_changed.emit()
         return changed
@@ -458,7 +409,3 @@ class ModListModel(QAbstractListModel):
     @property
     def active_count(self) -> int:
         return self._active_count
-
-    @property
-    def inactive_count(self) -> int:
-        return self._inactive_count
