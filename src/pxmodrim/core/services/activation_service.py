@@ -3,7 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator
 from heapq import heapify, heappop, heappush
 
-from pxmodrim.core.checker.graph import ConstraintGraph, EdgeType, PackageId
+from pxmodrim.core.checker.graph import (
+    ConstraintEdge,
+    ConstraintGraph,
+    EdgeType,
+    PackageId,
+)
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
@@ -79,9 +84,12 @@ class ActivationService:
         return candidates
 
     def _build_edges(
-        self, mods: dict[PackageId, AboutXmlMod], order: list[PackageId]
+        self,
+        mods: dict[PackageId, AboutXmlMod],
+        order: list[PackageId],
+        candidates: Iterable[PackageId],
     ) -> list[tuple[PackageId, PackageId]]:
-        """(before, after) pairs between *mods* only.
+        """(before, after) pairs between *mods* touching any of *candidates*.
 
         Edges through ids outside *mods* (uninstalled optional mods) are
         dropped so they cannot chain unrelated mods together.
@@ -93,17 +101,22 @@ class ActivationService:
             self._ctx.config.sort,
             self._ctx.diagnostics_service.community_rules,
         )
+        # Placement ignores active-to-active edges, so only edges incident to a
+        # candidate matter; the graph still resolves the full alternative map.
+        incident: set[ConstraintEdge] = set()
+        for pid in candidates:
+            incident.update(graph.outgoing(pid))
+            incident.update(graph.incoming(pid))
         edges: list[tuple[PackageId, PackageId]] = []
-        for source in graph.nodes:
-            for edge in graph.outgoing(source):
-                if edge.type == EdgeType.LOAD_BEFORE:
-                    before, after = edge.source, edge.target
-                elif edge.type in (EdgeType.DEPENDENCY, EdgeType.LOAD_AFTER):
-                    before, after = edge.target, edge.source
-                else:
-                    continue
-                if before != after and before in mods and after in mods:
-                    edges.append((before, after))
+        for edge in incident:
+            if edge.type == EdgeType.LOAD_BEFORE:
+                before, after = edge.source, edge.target
+            elif edge.type in (EdgeType.DEPENDENCY, EdgeType.LOAD_AFTER):
+                before, after = edge.target, edge.source
+            else:
+                continue
+            if before != after and before in mods and after in mods:
+                edges.append((before, after))
         return edges
 
 
@@ -122,7 +135,7 @@ class _Placement:
         candidates: list[str],
         all_mods: dict[str, ListedMod],
         build_edges: Callable[
-            [dict[PackageId, AboutXmlMod], list[PackageId]],
+            [dict[PackageId, AboutXmlMod], list[PackageId], Iterable[PackageId]],
             list[tuple[PackageId, PackageId]],
         ],
     ) -> None:
@@ -161,7 +174,7 @@ class _Placement:
         self._floor: dict[str, int] = {}
         self._ceiling: dict[str, int] = {}
         if self._uuids_by_pid:
-            for before, after in build_edges(mods, order):
+            for before, after in build_edges(mods, order, self._uuids_by_pid):
                 self._add_edge(before, after)
 
     def _add_edge(self, before: PackageId, after: PackageId) -> None:
