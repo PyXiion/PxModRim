@@ -1,67 +1,60 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices
+from collections.abc import Mapping
+
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenuBar, QWidget
 
-from pxmodrim.core.config import config_dir
+from pxmodrim.ui.window.actions import ActionId
+
+MENU_LAYOUT: tuple[tuple[str, tuple[ActionId | None, ...]], ...] = (
+    (
+        "&File",
+        (
+            ActionId.SAVE,
+            ActionId.RESTORE,
+            ActionId.SETTINGS,
+            None,
+            ActionId.QUIT,
+        ),
+    ),
+    (
+        "&Mods",
+        (ActionId.REFRESH, ActionId.FULL_RESCAN, ActionId.AUTO_SORT),
+    ),
+    (
+        "&View",
+        (
+            ActionId.FOCUS_SEARCH,
+            ActionId.NEXT_VIEW,
+            ActionId.PREV_VIEW,
+            None,
+            ActionId.FULLSCREEN,
+        ),
+    ),
+    (
+        "&Help",
+        (
+            ActionId.REPORT_ISSUE,
+            ActionId.UPLOAD_LOGS,
+            ActionId.OPEN_LOGS,
+            ActionId.SHORTCUTS,
+            None,
+            ActionId.ABOUT,
+        ),
+    ),
+)
 
 
 class MenuBar(QMenuBar):
-    settings_requested = Signal()
-    about_requested = Signal()
-    restore_snapshot_requested = Signal()
-    shortcuts_requested = Signal()
-    upload_logs_requested = Signal()
-
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, actions: Mapping[ActionId, QAction], parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
-
-        file_menu = self.addMenu("&File")
-
-        restore_action = QAction("&Restore Mod List\u2026", self)
-        restore_action.triggered.connect(self.restore_snapshot_requested.emit)
-        file_menu.addAction(restore_action)
-
-        settings_action = QAction("&Settings\u2026", self)
-        settings_action.triggered.connect(self.settings_requested.emit)
-        file_menu.addAction(settings_action)
-        file_menu.addSeparator()
-
-        quit_action = QAction("&Quit", self)
-        quit_action.triggered.connect(self._close_window)
-        file_menu.addAction(quit_action)
-
-        help_menu = self.addMenu("&Help")
-
-        report_action = QAction("Report &Issue", self)
-        report_action.triggered.connect(self._open_report)
-        help_menu.addAction(report_action)
-
-        upload_action = QAction("&Upload Log && System Info\u2026", self)
-        upload_action.triggered.connect(self.upload_logs_requested.emit)
-        help_menu.addAction(upload_action)
-
-        logs_action = QAction("Open &Logs Folder", self)
-        logs_action.triggered.connect(self._open_logs_folder)
-        help_menu.addAction(logs_action)
-
-        shortcuts_action = QAction("&Keyboard Shortcuts", self)
-        shortcuts_action.triggered.connect(self.shortcuts_requested.emit)
-        help_menu.addAction(shortcuts_action)
-        help_menu.addSeparator()
-
-        about_action = QAction("&About PxModRim", self)
-        about_action.triggered.connect(self.about_requested.emit)
-        help_menu.addAction(about_action)
-
-    def _close_window(self) -> None:
-        self.window().close()
-
-    @staticmethod
-    def _open_report() -> None:
-        QDesktopServices.openUrl(QUrl("https://github.com/PyXiion/PxModRim/issues"))
-
-    @staticmethod
-    def _open_logs_folder() -> None:
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(config_dir() / "logs")))
+        for title, action_ids in MENU_LAYOUT:
+            menu = self.addMenu(title)
+            for action_id in action_ids:
+                if action_id is None:
+                    menu.addSeparator()
+                else:
+                    menu.addAction(actions[action_id])

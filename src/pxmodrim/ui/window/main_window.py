@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
 from loguru import logger
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, QUrl
 from PySide6.QtGui import (
+    QAction,
     QCloseEvent,
+    QDesktopServices,
     QIcon,
     QKeyEvent,
     QKeySequence,
     QResizeEvent,
-    QShortcut,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -28,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
+from pxmodrim.core.config import config_dir
 from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.ui.components import (
@@ -38,6 +41,7 @@ from pxmodrim.ui.components import (
     create_qml_engine,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.about_panel import AboutPanel
@@ -51,8 +55,31 @@ from pxmodrim.ui.panels.restore_snapshot_dialog import (
 )
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
+from pxmodrim.ui.theme.constants import (
+    RAIL_COLLAPSE_WIDTH,
+    RAIL_MAX_WIDTH,
+    RAIL_MIN_WIDTH,
+)
 from pxmodrim.ui.theme.qml_theme import Theme
+from pxmodrim.ui.window.actions import (
+    ACTIONS,
+    VIEW_SWITCH_KEYS,
+    ActionId,
+    create_actions,
+    shortcut_rows,
+)
 from pxmodrim.ui.window.menu_bar import MenuBar
+
+_ISSUES_URL = "https://github.com/PyXiion/PxModRim/issues"
+_WINDOW_TITLE = "PxModRim[*]"
+
+
+def _app_version() -> str:
+    try:
+        return version("pxmodrim")
+    except PackageNotFoundError:
+        return "0.1.0"
+
 
 if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModDiagnosticsView
@@ -62,7 +89,7 @@ class UnsavedChangesDialog(QMessageBox):
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setIcon(QMessageBox.Icon.Question)
-        self.setWindowTitle("Unsaved changes")
+        self.setWindowTitle("Unsaved Changes")
         self.setText("The active mod list has unsaved changes.")
         self.setInformativeText(
             "Save before closing, discard the changes, or cancel closing."
@@ -86,6 +113,8 @@ class MainWindow(QMainWindow):
         self._ctx = app_ctx.core
         self._ui_prefs = app_ctx.ui_prefs
         self._selected_uuid: str | None = None
+        self._mods_view = None
+        self._selection: ModSelectionPresenter | None = None
         self._saved_active_uuids = self._ctx.loaded_active_uuids
         self._unsaved_changes = False
         self._close_prompt_open = False
@@ -102,7 +131,7 @@ class MainWindow(QMainWindow):
 
     def _setup_window_basics(self) -> None:
         logger.debug("main_window: setting up window basics")
-        self.setWindowTitle("PxModRim")
+        self.setWindowTitle(_WINDOW_TITLE)
         self.setWindowIcon(
             QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         )
@@ -126,6 +155,13 @@ class MainWindow(QMainWindow):
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ui_prefs.launch_strategy),
+            app_version=_app_version(),
+            tooltips={
+                "refresh": ACTIONS[ActionId.REFRESH].tooltip(),
+                "sort": ACTIONS[ActionId.AUTO_SORT].tooltip(),
+                "save": ACTIONS[ActionId.SAVE].tooltip(),
+                "settings": ACTIONS[ActionId.SETTINGS].tooltip(),
+            },
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
@@ -140,37 +176,35 @@ class MainWindow(QMainWindow):
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
 
-        self._menu_bar = MenuBar(self)
-        self._menu_bar.settings_requested.connect(self._open_settings)
-        self._menu_bar.about_requested.connect(self._show_about)
-        self._menu_bar.restore_snapshot_requested.connect(self._restore_snapshot)
-        self._menu_bar.shortcuts_requested.connect(self._show_shortcuts)
-        self._menu_bar.upload_logs_requested.connect(self._upload_log_and_system_info)
-        self._setup_shortcuts()
+        self._actions = create_actions(self)
+        handlers = {
+            ActionId.SAVE: self._save_mods_config,
+            ActionId.RESTORE: self._restore_snapshot,
+            ActionId.SETTINGS: self._open_settings,
+            ActionId.QUIT: self.close,
+            ActionId.REFRESH: self._refresh_mods,
+            ActionId.FULL_RESCAN: self._full_rescan,
+            ActionId.AUTO_SORT: self._auto_sort,
+            ActionId.FOCUS_SEARCH: self._focus_search,
+            ActionId.NEXT_VIEW: lambda: self._cycle_view(1),
+            ActionId.PREV_VIEW: lambda: self._cycle_view(-1),
+            ActionId.FULLSCREEN: self._toggle_fullscreen,
+            ActionId.REPORT_ISSUE: self._open_issue_tracker,
+            ActionId.UPLOAD_LOGS: self._upload_log_and_system_info,
+            ActionId.OPEN_LOGS: self._open_logs_folder,
+            ActionId.SHORTCUTS: self._show_shortcuts,
+            ActionId.ABOUT: self._show_about,
+        }
+        for action_id, handler in handlers.items():
+            self._actions[action_id].triggered.connect(handler)
 
-    def _setup_shortcuts(self) -> None:
-        self._python_shortcuts = (
-            ("Ctrl+,", "Settings", self._open_settings),
-            ("Ctrl+Q", "Quit", self.close),
-            ("F5", "Refresh mods", self._header_controller.refresh),
-            ("Ctrl+S", "Save mod list", self._header_controller.save),
-            ("Ctrl+F", "Focus current view search", self._focus_search),
-            ("F1", "About PxModRim", self._show_about),
-            ("F11", "Toggle fullscreen", self._toggle_fullscreen),
-            ("Ctrl+Shift+R", "Force full mod rescan", self._full_rescan),
-            ("Ctrl+Tab", "Next view", lambda: self._cycle_view(1)),
-            ("Ctrl+Shift+Tab", "Previous view", lambda: self._cycle_view(-1)),
-            *(
-                (
-                    f"Ctrl+{i}",
-                    f"Switch to view {i}",
-                    lambda index=i - 1: self._select_view(index),
-                )
-                for i in range(1, 10)
-            ),
-        )
-        for sequence, _label, callback in self._python_shortcuts:
-            QShortcut(QKeySequence(sequence), self, callback)
+        for index, key in enumerate(VIEW_SWITCH_KEYS):
+            switch = QAction(self)
+            switch.setShortcut(QKeySequence(key))
+            switch.triggered.connect(lambda _=False, i=index: self._select_view(i))
+            self.addAction(switch)
+
+        self._menu_bar = MenuBar(self._actions, self)
 
     def _focus_search(self) -> None:
         search = getattr(self._stack.currentWidget(), "search_input", None)
@@ -196,14 +230,21 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _full_rescan(self) -> None:
-        count = await self._app_ctx.refresh_mods(full=True)
-        if count:
-            self._toast_manager.success(f"Rescanned {count} mods")
+        await self._reload_mods(full=True)
 
     @asyncSlot()
     async def _show_shortcuts(self) -> None:
-        rows = tuple((sequence, label) for sequence, label, _ in self._python_shortcuts)
-        await await_dialog(KeyboardShortcutsDialog, rows + QML_SHORTCUTS, self)
+        await await_dialog(
+            KeyboardShortcutsDialog, shortcut_rows() + QML_SHORTCUTS, self
+        )
+
+    @staticmethod
+    def _open_issue_tracker() -> None:
+        QDesktopServices.openUrl(QUrl(_ISSUES_URL))
+
+    @staticmethod
+    def _open_logs_folder() -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(config_dir() / "logs")))
 
     def _setup_content_and_views(self) -> None:
         logger.debug("main_window: setting up content and views")
@@ -224,8 +265,8 @@ class MainWindow(QMainWindow):
         ]
         self._rail = ViewRailPanel(rail_tabs, self._qml_engine)
         self._rail.setObjectName("viewRail")
-        self._rail.setMinimumWidth(52)
-        self._rail.setMaximumWidth(180)
+        self._rail.setMinimumWidth(RAIL_MIN_WIDTH)
+        self._rail.setMaximumWidth(RAIL_MAX_WIDTH)
         self._stack = QStackedWidget()
         self._stack.setObjectName("viewStack")
 
@@ -238,7 +279,7 @@ class MainWindow(QMainWindow):
         self._splitter.setStretchFactor(1, 1)
         self._splitter.setCollapsible(0, False)
         self._splitter.setCollapsible(1, False)
-        self._splitter.setSizes([180, self.width() - 180])
+        self._splitter.setSizes([RAIL_MAX_WIDTH, self.width() - RAIL_MAX_WIDTH])
         self._rail.currentChanged.connect(self._on_rail_tab_changed)
         self._rail.hovered.connect(self._on_rail_hovered)
         self._splitter.splitterMoved.connect(self._snap_rail)
@@ -258,7 +299,7 @@ class MainWindow(QMainWindow):
             self.mod_info = self._mods_view.mod_info
             self._mods_view.entry_selected.connect(self._on_entry_selected)
             self._mods_view.mod_selected.connect(self._on_mod_selected)
-        self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
+            self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
 
         outer_layout.addWidget(self._splitter, stretch=1)
         self.setCentralWidget(outer)
@@ -385,12 +426,19 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _refresh_mods(self) -> None:
-        self._toast_manager.info("Refreshing mods...")
-        count = await self._app_ctx.refresh_mods()
+        await self._reload_mods(full=False)
+
+    async def _reload_mods(self, *, full: bool) -> None:
+        self._toast_manager.info(
+            "Rescanning all mods\u2026" if full else "Refreshing mods\u2026"
+        )
+        count = await self._app_ctx.refresh_mods(full=full)
         if not count:
             self._toast_manager.warning("No mods found")
             return
-        self._toast_manager.success(f"Reloaded {count} mods")
+        self._toast_manager.success(
+            f"Rescanned {count} mods" if full else f"Reloaded {count} mods"
+        )
 
     # ── Private slots ───────────────────────────────────────
 
@@ -399,8 +447,8 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _open_settings(self) -> None:
-        result, dialog = await await_dialog(SettingsPanel, self._ctx)
-        if result != 1:
+        result, dialog = await await_dialog(SettingsPanel, self._ctx, self)
+        if result != QDialog.DialogCode.Accepted:
             return
         cfg = dialog.get_config()
         if not cfg.paths.game:
@@ -409,6 +457,7 @@ class MainWindow(QMainWindow):
         self._ctx.update_config(cfg)
         self._ctx.reset_providers(cfg.paths)
         await self._ctx.mod_service.reload()
+        self._toast_manager.success("Settings saved")
 
     @asyncSlot()
     async def _show_about(self) -> None:
@@ -424,7 +473,7 @@ class MainWindow(QMainWindow):
     async def _restore_snapshot(self) -> None:
         snapshots = self._ctx.mod_service.get_snapshots()
         if not snapshots:
-            self._toast_manager.warning("No saved mod lists are available", 3000)
+            self._toast_manager.warning("No saved mod lists are available")
             return
 
         result, dialog = await await_dialog(RestoreSnapshotDialog, snapshots, self)
@@ -439,16 +488,14 @@ class MainWindow(QMainWindow):
             return
 
         if await self._ctx.mod_service.restore_snapshot(chosen):
-            self._toast_manager.success(f"Restored mod list from {chosen.name}", 3000)
+            self._toast_manager.success(f"Restored mod list from {chosen.name}")
         else:
-            self._toast_manager.error(
-                "The saved mod list is invalid or cannot be read", 5000
-            )
+            self._toast_manager.error("The saved mod list is invalid or cannot be read")
 
     @asyncSlot()
     async def _auto_sort(self) -> None:
         count, elapsed = await self._ctx.auto_sort()
-        self._toast_manager.success(f"Sorted {count} mods in {elapsed:.0f}ms", 5000)
+        self._toast_manager.success(f"Sorted {count} mods in {elapsed:.0f}ms")
 
     def _on_active_state_changed(self, _active_uuids: tuple[str, ...]) -> None:
         self._refresh_unsaved_state()
@@ -463,7 +510,7 @@ class MainWindow(QMainWindow):
     def _refresh_unsaved_state(self) -> None:
         self._unsaved_changes = self._ctx.active_uuids != self._saved_active_uuids
         self._header_controller.set_unsaved_changes(self._unsaved_changes)
-        self.setWindowTitle("*PxModRim" if self._unsaved_changes else "PxModRim")
+        self.setWindowModified(self._unsaved_changes)
 
     async def _write_active_layout(self) -> list[str] | None:
         """Persist the active list; return it on success, None if not saved."""
@@ -481,9 +528,9 @@ class MainWindow(QMainWindow):
     async def _save_active_mods(self) -> bool:
         saved = await self._write_active_layout()
         if saved is None:
-            self._toast_manager.warning("Config folder not set", 3000)
+            self._toast_manager.warning("Config folder not set")
             return False
-        self._toast_manager.success(f"Saved {len(saved)} active mods", 3000)
+        self._toast_manager.success(f"Saved {len(saved)} active mods")
         return True
 
     @asyncSlot()
@@ -504,20 +551,20 @@ class MainWindow(QMainWindow):
             self._toast_manager.success(msg)
         else:
             logger.warning(msg)
-            self._toast_manager.warning(msg, 5000)
+            self._toast_manager.warning(msg)
 
     def _on_strategy_changed(self, index: int) -> None:
         new_strategy = LaunchStrategy(index)
         if self._ui_prefs.launch_strategy != new_strategy:
             logger.info("Launch strategy changed to {}", new_strategy.name)
             self._ui_prefs.launch_strategy = new_strategy
-            from pxmodrim.ui.config import save_ui_prefs
-
             save_ui_prefs(self._ui_prefs, self._ctx.config_service)
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:
         self._selected_uuid = uuid or None
+        if self._selection is None:
+            return
         if uuid:
             await self._selection.show(uuid)
         else:
@@ -559,9 +606,12 @@ class MainWindow(QMainWindow):
                 preload()
 
     def _snap_rail(self) -> None:
-        target = 180 if self._rail.width() >= 116 else 52
-        total = self.width()
-        self._splitter.setSizes([target, total - target])
+        target = (
+            RAIL_MAX_WIDTH
+            if self._rail.width() >= RAIL_COLLAPSE_WIDTH
+            else RAIL_MIN_WIDTH
+        )
+        self._splitter.setSizes([target, self._splitter.width() - target])
 
     # ── Diagnostics summary callback ─────────────────────────
 
@@ -569,7 +619,7 @@ class MainWindow(QMainWindow):
         self, diagnostics: dict[str, ModDiagnosticsView]
     ) -> None:
         self._apply_current_sidebar_filter()
-        if self._selected_uuid is not None:
+        if self._mods_view is not None and self._selected_uuid is not None:
             self.mod_info.set_issues(
                 self._ctx.diagnostics_service.issues_for(self._selected_uuid)
             )
