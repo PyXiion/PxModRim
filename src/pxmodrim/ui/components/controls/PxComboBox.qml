@@ -34,7 +34,7 @@ ComboBox {
         implicitWidth: 120
         implicitHeight: 32
         radius: Theme.radiusMd
-        opacity: control.enabled ? 1 : 0.45
+        opacity: control.enabled ? 1 : Theme.disabledOpacity
         color: Theme.elevate0
         border.width: 1
         border.color: control.activeFocus || control.popup.visible ? Theme.primary

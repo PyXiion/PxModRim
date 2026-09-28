@@ -17,8 +17,8 @@ CheckBox {
         y: (control.height - height) / 2
         implicitWidth: 16
         implicitHeight: 16
-        radius: 3
-        opacity: control.enabled ? 1 : 0.45
+        radius: Theme.radiusXs
+        opacity: control.enabled ? 1 : Theme.disabledOpacity
         color: control.checkState === Qt.Checked ? Theme.primary
              : control.checkState === Qt.PartiallyChecked ? Theme.primaryBg
              : "transparent"
@@ -32,7 +32,8 @@ CheckBox {
             visible: control.checkState !== Qt.Unchecked
             text: control.checkState === Qt.Checked ? "\u2713" : "\u2212"
             color: control.checkState === Qt.Checked ? Theme.elevate0 : Theme.primary
-            font.pixelSize: 12
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeMd
             font.bold: true
         }
     }
