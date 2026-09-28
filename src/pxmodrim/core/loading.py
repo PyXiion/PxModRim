@@ -25,6 +25,11 @@ class LoadingState(QObject):
         super().__init__(parent)
         self._stack: list[StackFrame] = []
 
+    @property
+    def statuses(self) -> tuple[str, ...]:
+        """Status text of every active frame, outermost first."""
+        return tuple(frame.status for frame in self._stack)
+
     def push(self, status: str, total_steps: int = 100) -> None:
         """Start a new subtask, pushing a frame onto the loading stack."""
         self._stack.append(StackFrame(status=status, total_steps=total_steps))

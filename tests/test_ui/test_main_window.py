@@ -63,7 +63,7 @@ def test_dirty_state_tracks_active_list_order_and_updates_header() -> None:
             _saved_active_uuids=["uuid-a", "uuid-b"],
             _unsaved_changes=False,
             _header_controller=header,
-            setWindowTitle=lambda _title: None,
+            setWindowModified=lambda _modified: None,
         ),
     )
 
@@ -99,7 +99,7 @@ def test_reload_baseline_is_list_loaded_from_disk_not_later_edits() -> None:
             _saved_active_uuids=[],
             _unsaved_changes=False,
             _header_controller=header,
-            setWindowTitle=lambda _title: None,
+            setWindowModified=lambda _modified: None,
         ),
     )
 
@@ -138,7 +138,7 @@ async def test_successful_save_clears_unsaved_state() -> None:
             _saved_active_uuids=["uuid-a", "uuid-b"],
             _unsaved_changes=True,
             _header_controller=header,
-            setWindowTitle=lambda _title: None,
+            setWindowModified=lambda _modified: None,
             _toast_manager=SimpleNamespace(
                 success=lambda *_args: None, warning=lambda *_args: None
             ),

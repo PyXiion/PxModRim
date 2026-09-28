@@ -9,7 +9,6 @@ class HeaderController(QObject):
     save_requested = Signal()
     settings_requested = Signal()
     launch_requested = Signal()
-    launch_menu_requested = Signal()
     strategy_changed = Signal(int)
     minimize_requested = Signal()
     maximize_requested = Signal()
@@ -22,17 +21,24 @@ class HeaderController(QObject):
         is_frameless: bool = False,
         parent: QObject | None = None,
         initial_strategy: int = 0,
+        app_version: str = "",
+        tooltips: dict[str, str] | None = None,
     ) -> None:
         super().__init__(parent)
         self._is_frameless = is_frameless
         self._maximized = False
         self._strategy_index: int = initial_strategy
         self._unsaved_changes = False
+        self._app_version = app_version
+        self._tooltips = tooltips or {}
 
     def is_frameless_getter(self) -> bool:
         return self._is_frameless
 
     is_frameless = Property(bool, is_frameless_getter, constant=True)
+
+    appVersion = Property(str, lambda self: self._app_version, constant=True)
+    tooltips = Property(dict, lambda self: self._tooltips, constant=True)
 
     def set_maximized(self, value: bool) -> None:
         if self._maximized != value:
@@ -81,10 +87,6 @@ class HeaderController(QObject):
         if self._strategy_index != index:
             self._strategy_index = index
             self.strategy_changed.emit(index)
-
-    @Slot()
-    def showLaunchMenu(self) -> None:
-        self.launch_menu_requested.emit()
 
     @Slot()
     def dragStarted(self) -> None:

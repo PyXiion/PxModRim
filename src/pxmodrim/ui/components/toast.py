@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPropertyAnimation, Qt, QTimer
+from typing import Literal
+
+from PySide6.QtCore import QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QGraphicsOpacityEffect,
     QHBoxLayout,
@@ -13,7 +15,9 @@ from PySide6.QtWidgets import (
 from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.theme.palette import PALETTE
 
-_TOAST_LEVELS = {
+ToastLevel = Literal["info", "success", "warning", "error"]
+
+_TOAST_LEVELS: dict[ToastLevel, tuple[str, str]] = {
     "info": ("info", PALETTE["PRIMARY"]),
     "success": ("toast-success", PALETTE["SUCCESS"]),
     "warning": ("toast-warning", PALETTE["WARNING"]),
@@ -22,10 +26,12 @@ _TOAST_LEVELS = {
 
 
 class Toast(QWidget):
+    dismissed = Signal()
+
     def __init__(
         self,
         message: str,
-        level: str = "info",
+        level: ToastLevel = "info",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -33,7 +39,7 @@ class Toast(QWidget):
         self.setFixedWidth(320)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
-        icon_name, accent = _TOAST_LEVELS.get(level, _TOAST_LEVELS["info"])
+        icon_name, accent = _TOAST_LEVELS[level]
 
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self._opacity_effect.setOpacity(0.0)
@@ -55,9 +61,10 @@ class Toast(QWidget):
 
         close_btn = QPushButton()
         close_btn.setObjectName("toastClose")
-        close_btn.setIcon(icon("close", 10, "#6c737f"))
+        close_btn.setIcon(icon("close", 10, PALETTE["TEXT_DIM"]))
         close_btn.setFixedSize(20, 20)
-        close_btn.clicked.connect(self.hide)
+        close_btn.setToolTip("Dismiss")
+        close_btn.clicked.connect(self.dismiss)
         layout.addWidget(close_btn)
 
         self._opacity_anim = QPropertyAnimation(self._opacity_effect, b"opacity")
@@ -65,11 +72,25 @@ class Toast(QWidget):
         self._opacity_anim.setStartValue(0.0)
         self._opacity_anim.setEndValue(1.0)
 
+        self._fade_out_anim = QPropertyAnimation(self._opacity_effect, b"opacity", self)
+        self._fade_out_anim.setDuration(150)
+        self._fade_out_anim.setEndValue(0.0)
+        self._fade_out_anim.finished.connect(self.dismissed)
+        self._dismissing = False
+
     def show_with_animation(self) -> None:
         self.show()
         self.raise_()
         self._opacity_anim.setDirection(QPropertyAnimation.Direction.Forward)
         self._opacity_anim.start()
+
+    def dismiss(self) -> None:
+        if self._dismissing:
+            return
+        self._dismissing = True
+        self._opacity_anim.stop()
+        self._fade_out_anim.setStartValue(self._opacity_effect.opacity())
+        self._fade_out_anim.start()
 
 
 class ToastManager(QWidget):
@@ -91,25 +112,25 @@ class ToastManager(QWidget):
     def show_toast(
         self,
         message: str,
-        level: str = "info",
+        level: ToastLevel = "info",
         duration_ms: int = 3000,
     ) -> None:
         toast = Toast(message, level, self)
         self._layout.addWidget(toast)
         self._active_toasts.append(toast)
+        toast.dismissed.connect(lambda: self._remove(toast))
 
         toast.show_with_animation()
 
         if duration_ms > 0:
+            QTimer.singleShot(duration_ms, toast, toast.dismiss)
 
-            def _dismiss(toast=toast) -> None:
-                toast.hide()
-                self._layout.removeWidget(toast)
-                toast.deleteLater()
-                if toast in self._active_toasts:
-                    self._active_toasts.remove(toast)
-
-            QTimer.singleShot(duration_ms, toast, _dismiss)
+    def _remove(self, toast: Toast) -> None:
+        toast.hide()
+        self._layout.removeWidget(toast)
+        toast.deleteLater()
+        if toast in self._active_toasts:
+            self._active_toasts.remove(toast)
 
     def info(self, message: str, duration: int = 3000) -> None:
         self.show_toast(message, "info", duration)

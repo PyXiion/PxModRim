@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QDialog,
+    QHBoxLayout,
     QHeaderView,
     QTableWidget,
     QTableWidgetItem,
@@ -9,13 +10,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pxmodrim.ui.components.button import AppButton
+
 QML_SHORTCUTS = (
-    ("Up", "Navigate mod list"),
-    ("Down", "Navigate mod list"),
-    ("Shift+Up", "Extend mod selection"),
-    ("Shift+Down", "Extend mod selection"),
-    ("Return", "Toggle selected mod(s)"),
-    ("Space", "Toggle selected mod(s)"),
+    ("Up / Down", "Navigate mod list"),
+    ("Shift+Up / Shift+Down", "Extend mod selection"),
+    ("Return / Space", "Toggle selected mods"),
     ("Ctrl+A", "Select all mods"),
 )
 
@@ -26,7 +26,7 @@ class KeyboardShortcutsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Keyboard Shortcuts")
-        self.resize(520, 480)
+        self.resize(520, 600)
         layout = QVBoxLayout(self)
         table = QTableWidget(len(rows), 2, self)
         table.setHorizontalHeaderLabels(("Shortcut", "Action"))
@@ -41,3 +41,12 @@ class KeyboardShortcutsDialog(QDialog):
             table.setItem(row, 0, QTableWidgetItem(shortcut))
             table.setItem(row, 1, QTableWidgetItem(action))
         layout.addWidget(table)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        close_btn = AppButton("Close", self)
+        close_btn.setObjectName("primaryAction")
+        close_btn.setDefault(True)
+        close_btn.clicked.connect(self.accept)
+        buttons.addWidget(close_btn)
+        layout.addLayout(buttons)
