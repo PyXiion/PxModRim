@@ -5,6 +5,7 @@
 2. `just check` — ruff → `build-js` → pyright → check-deps
 3. `just test` — run full test suite
 4. `just ci` — `check` then `test` (matches CI pipeline)
+5. Always make commits on the go — atomic, conventional commits as milestones are reached; never leave uncommitted work.
 
 ## Environment
 **uv**, **Python 3.12.\*** only, **PySide6 >=6.11 + qasync**.
@@ -35,6 +36,7 @@ src/pxmodrim/
 - Git renames: `git mv`, never `shutil.move`
 - Always ask user about Qt/QML widget type choice.
 - Never orphan Qt objects -- always pass parent.
+- Always make commits on the go -- never leave working tree uncommitted at milestones or task completion.
 
 ## TypeScript / JS build
 Steam Workshop WebView injection uses TypeScript sources in `src/pxmodrim/ui/plugins/steam_workshop/ts/`, bundled to `inject.js` via esbuild:
