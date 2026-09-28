@@ -42,8 +42,10 @@ Button {
 
     Accessible.name: text.length > 0 ? text : ToolTip.text
 
-    ToolTip.visible: hovered && ToolTip.text.length > 0
-    ToolTip.delay: Theme.tooltipDelay
+    PxToolTip {
+        visible: control.hovered && text.length > 0
+        text: control.ToolTip.text
+    }
 
     contentItem: Item {
         implicitWidth: content.implicitWidth

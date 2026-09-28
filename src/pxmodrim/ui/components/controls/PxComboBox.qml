@@ -47,7 +47,12 @@ ComboBox {
         required property int index
         required property var model
         width: ListView.view ? ListView.view.width : control.width
-        height: 30
+        height: 28
+        hoverEnabled: true
+        leftPadding: 8
+        rightPadding: 8
+        topPadding: 0
+        bottomPadding: 0
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: option.model[control.textRole] !== undefined ? option.model[control.textRole] : option.model.modelData
@@ -58,7 +63,7 @@ ComboBox {
         }
         background: Rectangle {
             radius: Theme.radiusSm
-            color: option.highlighted ? Theme.elevate4 : "transparent"
+            color: option.highlighted ? Theme.elevate3 : "transparent"
         }
     }
 
@@ -73,12 +78,13 @@ ComboBox {
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
-            ScrollIndicator.vertical: ScrollIndicator {}
+            ScrollBar.vertical: PxScrollBar {}
         }
 
         background: Rectangle {
             radius: Theme.radiusMd
             color: Theme.elevate2
+            border.width: 1
             border.color: Theme.border
         }
     }
