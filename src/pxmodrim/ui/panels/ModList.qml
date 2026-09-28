@@ -7,7 +7,7 @@ Rectangle {
     clip: true
 
     property bool keyboardActive: modListHasFocus && listView.activeFocus
-
+    readonly property bool compactMode: Boolean(modListPanel && modListPanel.compactMode)
     ListView {
         id: listView
         objectName: "listView"
@@ -123,7 +123,7 @@ Rectangle {
         objectName: "dragProxy"
         visible: false
         width: listView.width
-        height: 52
+        height: root.compactMode ? 32 : 52
         radius: Theme.radiusMd
         color: Theme.elevate3
         opacity: 0.92
@@ -180,9 +180,10 @@ Rectangle {
             if (targetItem) {
                 return targetItem.y - listView.contentY
             }
+            var rowH = root.compactMode ? 34 : 54
             return Math.max(0, Math.min(
                 listView.height - height,
-                listView.dragTargetIndex * 54 - listView.contentY
+                listView.dragTargetIndex * rowH - listView.contentY
             ))
         }
         width: listView.width
@@ -197,7 +198,7 @@ Rectangle {
         Rectangle {
             id: delegateRect
             width: listView.width
-            height: 52
+            height: root.compactMode ? 32 : 52
             radius: Theme.radiusMd
 
             color: {
@@ -396,8 +397,9 @@ Rectangle {
                 }
             }
 
-            // ── Avatar ──
+            // ── Avatar (hidden in compact mode) ──
             Rectangle {
+                visible: !root.compactMode
                 x: 88; y: 8; width: 36; height: 36
                 radius: Theme.radiusSm
                 color: model.providerColor || Theme.elevate3
@@ -411,8 +413,9 @@ Rectangle {
                 }
             }
 
-            // ── Name + Package ID ──
+            // ── Standard 2-line layout (name + packageId) ──
             Column {
+                visible: !root.compactMode
                 x: 132; y: 8
                 width: parent.width - badgesRow.width - 142
                 spacing: 1
@@ -439,6 +442,41 @@ Rectangle {
                 }
             }
 
+            // ── Compact single-line layout ──
+            Row {
+                visible: root.compactMode
+                x: 92
+                width: parent.width - badgesRow.width - 102
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                clip: true
+
+                Text {
+                    id: compactNameText
+                    text: model.name || ""
+                    color: Theme.textMain
+                    font.bold: true
+                    font.pixelSize: Theme.fontSizeSm
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, parent.width - (compactSubText.visible ? Math.min(compactSubText.implicitWidth + 6, parent.width * 0.45) : 0))
+                }
+
+                Text {
+                    id: compactSubText
+                    text: (model.modVersion ? model.modVersion + " " : "") + (model.packageId ? "(" + model.packageId + ")" : "")
+                    visible: text !== "" && (parent.width - compactNameText.width - 6) >= 40
+                    width: Math.min(implicitWidth, Math.max(0, parent.width - compactNameText.width - 6))
+                    color: Theme.textDim
+                    font.pixelSize: Theme.fontSizeXs
+                    font.family: "monospace"
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
             // ── Badges row (right-aligned) ──
             Row {
                 id: badgesRow
@@ -450,7 +488,7 @@ Rectangle {
                 // Startup impact pill
                 Rectangle {
                     visible: model.startupImpact > 0
-                    height: 20
+                    height: root.compactMode ? 18 : 20
                     width: siText.width + 12
                     radius: Theme.radiusSm
                     color: model.startupImpact < 1.0 ? "#3d8b3d" :
@@ -480,10 +518,39 @@ Rectangle {
                     }
                 }
 
+                // Provider pill
+                Rectangle {
+                    id: providerPill
+                    visible: !!model.providerLabel
+                    height: root.compactMode ? 18 : 20
+                    width: providerText.width + 12
+                    radius: Theme.radiusSm
+                    color: Theme.elevate3
+                    border.width: 1
+                    border.color: model.providerColor || Theme.border
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        color: model.providerColor || "transparent"
+                        opacity: 0.18
+                    }
+
+                    Text {
+                        id: providerText
+                        anchors.centerIn: parent
+                        text: model.providerLabel || ""
+                        color: model.providerColor || Theme.textMuted
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Font.Bold
+                    }
+                }
+
                 // Version pill
                 Rectangle {
                     visible: !!model.modVersion
-                    height: 20
+                    height: root.compactMode ? 18 : 20
                     width: vText.width + 12
                     radius: Theme.radiusSm
                     color: Theme.primaryBg
@@ -502,7 +569,7 @@ Rectangle {
                 // Error badge
                 Rectangle {
                     visible: !!model.hasError
-                    height: 20
+                    height: root.compactMode ? 18 : 20
                     width: eText.width + 12
                     radius: Theme.radiusSm
                     color: Theme.danger
@@ -534,7 +601,7 @@ Rectangle {
                 // Warning badge
                 Rectangle {
                     visible: !!model.hasWarning
-                    height: 20
+                    height: root.compactMode ? 18 : 20
                     width: wText.width + 12
                     radius: Theme.radiusSm
                     color: Theme.warning
@@ -758,6 +825,7 @@ Rectangle {
         idx = listView.indexAt(x, y - 16)
         if (idx >= 0)
             return Math.max(0, Math.min(idx, maxActiveTarget))
-        return Math.max(0, Math.min(Math.floor(y / 54), maxActiveTarget))
+        var rowH = root.compactMode ? 34 : 54
+        return Math.max(0, Math.min(Math.floor(y / rowH), maxActiveTarget))
     }
 }

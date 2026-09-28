@@ -19,6 +19,24 @@ if TYPE_CHECKING:
     from pxmodrim.core.services.diagnostics_service import DiagnosticsService
 
 
+def _provider_label(provider_id: str, package_id: str = "") -> str:
+    pid = provider_id.lower().strip()
+    pkg = package_id.lower().strip()
+    if pid in {"steam", "downloaded"}:
+        return "Workshop"
+    if pid == "local":
+        return "Local"
+    if pid == "core":
+        if pkg and pkg != "ludeon.rimworld":
+            return "DLC"
+        return "Core"
+    if pkg.startswith("ludeon.rimworld.") and pkg != "ludeon.rimworld":
+        return "DLC"
+    if pkg == "ludeon.rimworld":
+        return "Core"
+    return pid.capitalize() if pid else ""
+
+
 @dataclass(slots=True)
 class ModItem:
     mod: ListedMod
@@ -27,6 +45,7 @@ class ModItem:
     provider_color: str = "#808080"
     startup_impact_s: float = 0.0
     load_index: int = -1
+    provider_label: str = ""
 
 
 class ModListModel(QAbstractListModel):
@@ -43,6 +62,7 @@ class ModListModel(QAbstractListModel):
     LoadIndexRole = Qt.ItemDataRole.UserRole + 11
     IsActiveRole = Qt.ItemDataRole.UserRole + 12
     SectionNameRole = Qt.ItemDataRole.UserRole + 13
+    ProviderLabelRole = Qt.ItemDataRole.UserRole + 14
     active_mods_changed = Signal()
     active_count_changed = Signal()
 
@@ -124,6 +144,11 @@ class ModListModel(QAbstractListModel):
             if self._active_count > 0 and self._inactive_count > 0:
                 return f"Inactive ({self._inactive_count})"
             return ""
+        if role == self.ProviderLabelRole:
+            if item.provider_label:
+                return item.provider_label
+            pkg = str(getattr(item.mod, "package_id", ""))
+            return _provider_label(item.mod.provider_id, pkg)
         if (
             role == Qt.ItemDataRole.ToolTipRole
             and hasattr(item.mod, "description")
@@ -234,6 +259,7 @@ class ModListModel(QAbstractListModel):
             self.LoadIndexRole: QByteArray(b"loadIndex"),
             self.IsActiveRole: QByteArray(b"isActive"),
             self.SectionNameRole: QByteArray(b"sectionName"),
+            self.ProviderLabelRole: QByteArray(b"providerLabel"),
             Qt.ItemDataRole.ToolTipRole: QByteArray(b"toolTip"),
         }
 
@@ -325,9 +351,12 @@ class ModListModel(QAbstractListModel):
                     provider_color=self._provider_colors.get(
                         mods[uuid].provider_id, "#808080"
                     ),
+                    provider_label=_provider_label(
+                        mods[uuid].provider_id,
+                        str(getattr(mods[uuid], "package_id", "")),
+                    ),
                 )
                 for uuid in active_uuids
-                if uuid in mods
             ]
             inactive_uuids = [
                 uuid
@@ -341,6 +370,10 @@ class ModListModel(QAbstractListModel):
                     checked=False,
                     provider_color=self._provider_colors.get(
                         mods[uuid].provider_id, "#808080"
+                    ),
+                    provider_label=_provider_label(
+                        mods[uuid].provider_id,
+                        str(getattr(mods[uuid], "package_id", "")),
                     ),
                 )
                 for uuid in inactive_uuids

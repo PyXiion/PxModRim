@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QObject, Qt, QUrl, Signal, Slot
+from PySide6.QtCore import Property, QEvent, QObject, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -23,6 +24,8 @@ from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
 from pxmodrim.ui.theme.palette import PALETTE
 
+if TYPE_CHECKING:
+    from pxmodrim.core.config import AppConfig
 _QML_DIR = Path(__file__).parent
 _MOD_LIST_QML = _QML_DIR / "ModList.qml"
 
@@ -32,10 +35,25 @@ class ModListPanel(QWidget):
     active_mods_changed = Signal()
     order_changed = Signal()
     selection_changed = Signal(list)
+    compact_mode_changed = Signal(bool)
+
+    @Property(bool, notify=compact_mode_changed)
+    def compactMode(self) -> bool:
+        return self._compact_mode
+
+    @Slot(bool)
+    def setCompactMode(self, enabled: bool) -> None:
+        if self._compact_mode != enabled:
+            self._compact_mode = enabled
+            self.compact_mode_changed.emit(enabled)
 
     def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
         super().__init__()
         self._ctx = ctx
+        cfg = getattr(ctx, "config", None)
+        self._compact_mode: bool = (
+            getattr(cfg, "compact_mod_list", False) if cfg else False
+        )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -100,7 +118,8 @@ class ModListPanel(QWidget):
         self._qml.installEventFilter(self)
 
         ctx.active_state_changed.connect(self._on_core_state_changed)
-
+        if hasattr(ctx, "config_changed"):
+            ctx.config_changed.connect(self._on_config_changed)
         # Reactive bindings
         ctx.mod_service.mods_changed.connect(self._on_mods_changed)
 
@@ -206,6 +225,11 @@ class ModListPanel(QWidget):
         self._model.set_checkable(current - new, False)
         if list(active_uuids) != self._model.active_uuids():
             self._model.commitOrder(list(active_uuids))
+
+    def _on_config_changed(self, cfg: AppConfig) -> None:
+        if self._compact_mode != cfg.compact_mod_list:
+            self._compact_mode = cfg.compact_mod_list
+            self.compact_mode_changed.emit(self._compact_mode)
 
     @Slot(list)
     def commitOrder(self, uuids: list[str]) -> None:

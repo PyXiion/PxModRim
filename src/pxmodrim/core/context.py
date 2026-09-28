@@ -40,6 +40,7 @@ class CoreContext:
         "_active_state_changed",
         "_active_uuids",
         "_cfg",
+        "_config_changed",
         "_config_service",
         "_diagnostics_service",
         "_game_launcher",
@@ -70,6 +71,7 @@ class CoreContext:
         self._pool: ThreadPoolExecutor | None = None
         self._plugins = PluginRegistry()
         self._active_state_changed = Event[tuple[str, ...]]()
+        self._config_changed = Event()
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         """Replace all mods and active UUIDs, taking ownership of the data."""
@@ -109,6 +111,7 @@ class CoreContext:
         """Replace the live config and refresh derived values (game version)."""
         self._cfg = cfg
         self._refresh_game_version()
+        self._config_changed.emit(cfg)
 
     # ── Game version ──────────────────────────────────────────────────────────
 
@@ -151,6 +154,10 @@ class CoreContext:
     @property
     def config(self) -> AppConfig:
         return self._cfg
+
+    @property
+    def config_changed(self) -> Event[AppConfig]:
+        return self._config_changed
 
     @property
     def has_config_service(self) -> bool:

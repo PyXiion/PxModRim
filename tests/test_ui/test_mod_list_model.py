@@ -6,7 +6,11 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QPersistentModelIndex, Qt
 from PySide6.QtWidgets import QApplication
 
-from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.models.metadata.structures import (
+    AboutXmlMod,
+    CaseInsensitiveStr,
+    ListedMod,
+)
 from pxmodrim.ui.models.mod_list_model import ModListModel
 
 
@@ -163,6 +167,47 @@ class TestLoadIndex:
         assert model.data(model.index(1, 0), ModListModel.LoadIndexRole) == 1
         assert model.data(model.index(2, 0), ModListModel.LoadIndexRole) == 2
         assert any(ModListModel.LoadIndexRole in roles for roles in changed_roles)
+
+
+class TestProviderLabel:
+    def test_provider_label_mapping(self, qapp: QApplication) -> None:
+        m = ModListModel({})
+        mods: dict[str, ListedMod] = {
+            "uuid-steam": AboutXmlMod(
+                name="Workshop Mod", provider_id="steam", valid=True
+            ),
+            "uuid-downloaded": AboutXmlMod(
+                name="Downloaded Mod", provider_id="downloaded", valid=True
+            ),
+            "uuid-local": AboutXmlMod(
+                name="Local Mod", provider_id="local", valid=True
+            ),
+            "uuid-core": AboutXmlMod(
+                name="Core",
+                package_id=CaseInsensitiveStr("ludeon.rimworld"),
+                provider_id="core",
+                valid=True,
+            ),
+            "uuid-dlc": AboutXmlMod(
+                name="Royalty",
+                package_id=CaseInsensitiveStr("ludeon.rimworld.royalty"),
+                provider_id="core",
+                valid=True,
+            ),
+        }
+        m.load_mods(mods, list(mods.keys()))
+
+        labels = {
+            m.data(m.index(r, 0), ModListModel.UuidRole): m.data(
+                m.index(r, 0), ModListModel.ProviderLabelRole
+            )
+            for r in range(m.rowCount())
+        }
+        assert labels["uuid-steam"] == "Workshop"
+        assert labels["uuid-downloaded"] == "Workshop"
+        assert labels["uuid-local"] == "Local"
+        assert labels["uuid-core"] == "Core"
+        assert labels["uuid-dlc"] == "DLC"
 
 
 def test_setting_startup_impact_on_empty_model_emits_no_data_changed(

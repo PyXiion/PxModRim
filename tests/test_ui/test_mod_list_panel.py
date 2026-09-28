@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
 from pxmodrim.core.checker.graph import ConstraintGraph, PackageId
+from pxmodrim.core.config import AppConfig
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
@@ -122,8 +123,11 @@ def _panel(qapp: QApplication) -> ModListPanel:
     )
     ctx = SimpleNamespace(
         all_mods=mods,
-        diagnostics_service=SimpleNamespace(constraint_graph=graph),
+        diagnostics_service=SimpleNamespace(
+            constraint_graph=graph, community_rules=None
+        ),
         active_uuids=["uuid-a", "uuid-b", "uuid-c"],
+        config=AppConfig(),
     )
 
     panel = ModListPanel.__new__(ModListPanel)

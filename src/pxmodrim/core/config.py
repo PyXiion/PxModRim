@@ -65,6 +65,7 @@ class AppConfig(msgspec.Struct):
         default_factory=lambda: SortSettings(tier_config=TierConfig.default())
     )
     max_snapshots: int = 10
+    compact_mod_list: bool = False
 
 
 def _migrate_json(data: dict[str, Any], current: int) -> None:

@@ -127,6 +127,9 @@ class SettingsPanel(QDialog):
         self.use_community_cb.setChecked(self._config.sort.use_community_rules)
         opts_layout.addWidget(self.use_community_cb)
 
+        self.compact_mod_list_cb = QCheckBox("Compact mod list")
+        self.compact_mod_list_cb.setChecked(self._config.compact_mod_list)
+        opts_layout.addWidget(self.compact_mod_list_cb)
         layout.addWidget(opts_group)
 
         # Community rules group
@@ -272,6 +275,7 @@ class SettingsPanel(QDialog):
                 use_community_rules=self.use_community_cb.isChecked(),
             ),
             max_snapshots=self._config.max_snapshots,
+            compact_mod_list=self.compact_mod_list_cb.isChecked(),
         )
         self.accept()
 
