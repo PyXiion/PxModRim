@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 from pxmodrim.ui.plugins.steam_workshop.download_queue_model import (
     DownloadQueueModel,
 )
+from pxmodrim.ui.theme.constants import SIDEBAR_WIDTH
 from pxmodrim.ui.theme.palette import PALETTE
 
 _QML_DIR = Path(__file__).parent
@@ -29,7 +30,7 @@ class DownloadSidebar(QWidget):
         """Initialize the download sidebar with queue model and QML view."""
         super().__init__(parent)
         self.setObjectName("downloadSidebar")
-        self.setFixedWidth(240)
+        self.setFixedWidth(SIDEBAR_WIDTH)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

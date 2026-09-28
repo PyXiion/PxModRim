@@ -11,20 +11,23 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 
+from pxmodrim.ui.theme.constants import BANNER_MAX_HEIGHT, BANNER_OVERLAY_HEIGHT
 from pxmodrim.ui.theme.palette import PANEL_BG_Q, TEXT_MAIN_Q, TEXT_MUTED_Q
 
 
 class AspectRatioBanner(QWidget):
     """Banner that scales pixmap to width, preserves aspect ratio, clamps max height."""
 
-    def __init__(self, parent: QWidget | None = None, max_height: int = 260) -> None:
+    def __init__(
+        self, parent: QWidget | None = None, max_height: int = BANNER_MAX_HEIGHT
+    ) -> None:
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._scaled_pixmap: QPixmap | None = None
         self._title = ""
         self._subtitle = ""
         self._max_height = max_height
-        self._overlay_height = 120
+        self._overlay_height = BANNER_OVERLAY_HEIGHT
         self._show_overlay = True
         self.setSizePolicy(
             self.sizePolicy().Policy.Expanding,

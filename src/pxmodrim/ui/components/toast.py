@@ -19,9 +19,9 @@ ToastLevel = Literal["info", "success", "warning", "error"]
 
 _TOAST_LEVELS: dict[ToastLevel, tuple[str, str]] = {
     "info": ("info", PALETTE["PRIMARY"]),
-    "success": ("toast-success", PALETTE["SUCCESS"]),
-    "warning": ("toast-warning", PALETTE["WARNING"]),
-    "error": ("toast-error", PALETTE["DANGER"]),
+    "success": ("check-circle", PALETTE["SUCCESS"]),
+    "warning": ("warning", PALETTE["WARNING"]),
+    "error": ("error", PALETTE["DANGER"]),
 }
 
 

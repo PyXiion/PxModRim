@@ -7,6 +7,7 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from pxmodrim.core.context import CoreContext
+from pxmodrim.ui.context import RailView
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.ui_prefs import UIPrefs
 
@@ -14,17 +15,13 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
 
 
-class BaseViewPanel(QWidget):
+class BaseViewPanel(RailView):
     """
     UI-side whole-window view contributed to the left icon rail.
 
     Core never imports this; views are discovered entirely within ``ui/``.
     Subclasses must define ``view_id``, ``icon_name`` and ``label``.
     """
-
-    view_id: str
-    icon_name: str
-    label: str
 
     def __init__(
         self,
@@ -33,7 +30,7 @@ class BaseViewPanel(QWidget):
         parent: QWidget | None = None,
         app_ctx: AppContext | None = None,
     ) -> None:
-        super().__init__(parent)
+        super().__init__(ctx, qml_engine, parent, app_ctx)
         self._ctx = ctx
         self._app_ctx = app_ctx
         self._qml_engine = qml_engine

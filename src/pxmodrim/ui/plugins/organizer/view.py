@@ -45,7 +45,6 @@ from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
-from pxmodrim.ui.components.toast import ToastManager
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.plugins.organizer.dialogs import (
@@ -55,6 +54,7 @@ from pxmodrim.ui.plugins.organizer.dialogs import (
 )
 from pxmodrim.ui.plugins.organizer.filter_model import OrganizerFilterModel
 from pxmodrim.ui.plugins.organizer.tree_model import ModTreeModel, TreeNode
+from pxmodrim.ui.theme.constants import SIDEBAR_WIDTH
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.views.base import BaseViewPanel
 
@@ -62,7 +62,6 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
 
 _QML_DIR = Path(__file__).parent
-_SIDEBAR_WIDTH = 240
 
 
 def _plural(count: int, singular: str, plural: str | None = None) -> str:
@@ -108,7 +107,7 @@ class OrganizerViewPanel(BaseViewPanel):
 
         self._sidebar = QQuickWidget(qml_engine, content)  # pyright: ignore[reportCallIssue, reportArgumentType]
         self._sidebar.setObjectName("sidebarPanel")
-        self._sidebar.setFixedWidth(_SIDEBAR_WIDTH)
+        self._sidebar.setFixedWidth(SIDEBAR_WIDTH)
         self._sidebar.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self._sidebar.setClearColor(QColor(PALETTE["ELEVATE_2"]))
         sidebar_ctx = self._sidebar.rootContext()
@@ -862,7 +861,7 @@ class OrganizerViewPanel(BaseViewPanel):
             await self._error(exc)
 
     async def _error(self, exc: OrganizerError) -> None:
-        toast = self.window().findChild(ToastManager)
+        toast = self._app_ctx.toasts if self._app_ctx is not None else None
         if toast is not None:
             toast.error(str(exc))
         else:

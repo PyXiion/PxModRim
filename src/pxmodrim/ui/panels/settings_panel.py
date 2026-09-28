@@ -42,7 +42,7 @@ class _FolderDialog(QFileDialog):
 
 
 class SettingsPanel(QDialog):
-    def __init__(self, ctx: CoreContext, parent: QWidget | None = None) -> None:
+    def __init__(self, ctx: CoreContext, parent: QWidget) -> None:
         super().__init__(parent)
         self.setObjectName("settingsPanel")
         self.setWindowTitle("Settings")
