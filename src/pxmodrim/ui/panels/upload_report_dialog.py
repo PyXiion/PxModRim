@@ -26,9 +26,16 @@ if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
     from pxmodrim.ui.components.toast import ToastManager
 
+_DEFAULT_ENDPOINT = "https://paste.rs/"
+
 
 class UploadConfirmDialog(QDialog):
-    """Confirmation dialog explaining what will be uploaded and anonymized."""
+    """Confirmation dialog explaining what will be uploaded and anonymized.
+
+    Finishes with Accepted for upload, SAVE_TO_FILE for saving, Rejected to cancel.
+    """
+
+    SAVE_TO_FILE = 2
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -36,8 +43,6 @@ class UploadConfirmDialog(QDialog):
         self.setWindowTitle("Upload Log & System Info")
         self.setModal(True)
         self.resize(520, 320)
-
-        self.choice: str = "cancel"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -59,8 +64,9 @@ class UploadConfirmDialog(QDialog):
             "  • RimWorld version and configured directory paths\n"
             "  • Mod collection count and active mod list in load order\n\n"
             "Privacy & Security:\n"
-            "  • Home directory paths are replaced with '~'\n"
-            "  • Operating system username is replaced with '<user>'\n\n"
+            "  • Your home directory path is replaced with '~'\n"
+            "  • Your username in other user-directory paths is replaced "
+            "with '<user>'\n\n"
             "Notice: The uploaded report will be publicly viewable "
             "by anyone with the link."
         )
@@ -74,7 +80,7 @@ class UploadConfirmDialog(QDialog):
         button_row.setSpacing(10)
 
         self._save_file_btn = AppButton("Save to file instead…", self)
-        self._save_file_btn.clicked.connect(self._on_save_file)
+        self._save_file_btn.clicked.connect(lambda: self.done(self.SAVE_TO_FILE))
         button_row.addWidget(self._save_file_btn)
 
         button_row.addStretch()
@@ -85,22 +91,14 @@ class UploadConfirmDialog(QDialog):
 
         self._upload_btn = AppButton("Upload", self)
         self._upload_btn.setObjectName("primaryAction")
-        self._upload_btn.clicked.connect(self._on_upload)
+        self._upload_btn.clicked.connect(self.accept)
         button_row.addWidget(self._upload_btn)
 
         layout.addLayout(button_row)
 
-    def _on_upload(self) -> None:
-        self.choice = "upload"
-        self.accept()
-
-    def _on_save_file(self) -> None:
-        self.choice = "save"
-        self.accept()
-
 
 class UploadFailedDialog(QDialog):
-    """Error dialog shown on upload failure offering saving to a file instead."""
+    """Error dialog shown on upload failure; Accepted means save to a file."""
 
     def __init__(self, error_message: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -108,8 +106,6 @@ class UploadFailedDialog(QDialog):
         self.setWindowTitle("Upload Failed")
         self.setModal(True)
         self.resize(460, 220)
-
-        self.choice: str = "close"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -141,101 +137,69 @@ class UploadFailedDialog(QDialog):
 
         save_btn = AppButton("Save to file…", self)
         save_btn.setObjectName("primaryAction")
-        save_btn.clicked.connect(self._on_save)
+        save_btn.clicked.connect(self.accept)
         button_row.addWidget(save_btn)
 
         layout.addLayout(button_row)
 
-    def _on_save(self) -> None:
-        self.choice = "save"
-        self.accept()
+
+class _SaveReportFileDialog(QFileDialog):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(
+            parent,
+            "Save Diagnostic Report",
+            "pxmodrim-report.txt",
+            "Text Files (*.txt);;All Files (*)",
+        )
+        self.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
 
 
 async def _save_report_via_file_dialog(
-    parent: QWidget, report: str, toast: ToastManager | None = None
-) -> bool:
+    parent: QWidget, report: str, toast: ToastManager
+) -> None:
     """Prompt user for a destination file and write the report."""
-    file_path, _ = QFileDialog.getSaveFileName(
-        parent,
-        "Save Diagnostic Report",
-        "pxmodrim-report.txt",
-        "Text Files (*.txt);;All Files (*)",
-    )
-    if not file_path:
-        return False
+    result, dialog = await await_dialog(_SaveReportFileDialog, parent)
+    files = dialog.selectedFiles()
+    if result != QDialog.DialogCode.Accepted or not files:
+        return
 
+    path = Path(files[0])
     try:
-        await asyncio.to_thread(Path(file_path).write_text, report, "utf-8")
-        if toast is not None:
-            toast.success(f"Report saved to {Path(file_path).name}", 3000)
-        return True
+        await asyncio.to_thread(path.write_text, report, "utf-8")
     except OSError as exc:
-        if toast is not None:
-            toast.error(f"Failed to save file: {exc}", 5000)
-        return False
+        toast.error(f"Failed to save file: {exc}", 5000)
+        return
+    toast.success(f"Report saved to {path.name}", 3000)
 
 
 async def handle_upload_report(
-    parent: QWidget,
-    ctx: CoreContext | Any,
-    toast_manager: ToastManager | None = None,
+    parent: QWidget, ctx: CoreContext | Any, toast: ToastManager
 ) -> str | None:
-    """Execute the upload confirmation, upload / save-to-file, and clipboard flow."""
-    # Find toast manager if not provided
-    toast = toast_manager
-    if toast is None and hasattr(parent, "window"):
-        win = parent.window()
-        toast = getattr(win, "_toast_manager", None)
-
-    # 1. Confirmation dialog
-    result, dialog = await await_dialog(UploadConfirmDialog, parent)
-    if result != QDialog.DialogCode.Accepted:
+    """Confirm, then upload or save the report; return the uploaded URL if any."""
+    choice, _ = await await_dialog(UploadConfirmDialog, parent)
+    if choice not in (QDialog.DialogCode.Accepted, UploadConfirmDialog.SAVE_TO_FILE):
         return None
 
-    # 2. Build report in background thread
     report = await asyncio.to_thread(build_report, ctx)
 
-    # 3. User selected "Save to file instead"
-    if dialog.choice == "save":
+    if choice == UploadConfirmDialog.SAVE_TO_FILE:
         await _save_report_via_file_dialog(parent, report, toast)
         return None
 
-    # 4. User confirmed upload
-    if dialog.choice == "upload":
-        if toast is not None:
-            toast.info("Uploading log & system info…", 2000)
+    toast.info("Uploading log & system info…", 2000)
+    cfg = getattr(ctx, "config", None)
+    endpoint = getattr(cfg, "log_upload_endpoint", "") or _DEFAULT_ENDPOINT
+    try:
+        url = await PasteUploader(endpoint=endpoint).async_upload(report)
+    except (ReportUploadError, OSError, RuntimeError) as exc:
+        toast.error(f"Upload failed: {exc}", 5000)
+        failed_result, _ = await await_dialog(UploadFailedDialog, str(exc), parent)
+        if failed_result == QDialog.DialogCode.Accepted:
+            await _save_report_via_file_dialog(parent, report, toast)
+        return None
 
-        cfg = getattr(ctx, "config", None)
-        endpoint = (
-            getattr(cfg, "log_upload_endpoint", "")
-            if cfg is not None
-            else "https://paste.rs/"
-        )
-        uploader = PasteUploader(endpoint=endpoint or "https://paste.rs/")
-
-        try:
-            url = await uploader.async_upload(report)
-        except (ReportUploadError, OSError, RuntimeError) as exc:
-            if toast is not None:
-                toast.error(f"Upload failed: {exc}", 5000)
-
-            # Offer saving to file on failure
-            failed_res, failed_dlg = await await_dialog(
-                UploadFailedDialog, str(exc), parent
-            )
-            if (
-                failed_res == QDialog.DialogCode.Accepted
-                and failed_dlg.choice == "save"
-            ):
-                await _save_report_via_file_dialog(parent, report, toast)
-            return None
-
-        # 5. Success: copy to clipboard and notify
-        clipboard = QGuiApplication.clipboard()
-        if clipboard is not None:
-            clipboard.setText(url)
-        if toast is not None:
-            toast.success(f"Link copied: {url}", 5000)
-        return url
-
-    return None
+    clipboard = QGuiApplication.clipboard()
+    if clipboard is not None:
+        clipboard.setText(url)
+    toast.success(f"Link copied: {url}", 5000)
+    return url

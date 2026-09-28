@@ -21,11 +21,12 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
+from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
-from pxmodrim.ui.components import AppButton
+    from pxmodrim.ui.components.toast import ToastManager
 
 
 class AboutPanel(QDialog):
@@ -44,10 +45,15 @@ class AboutPanel(QDialog):
     )
 
     def __init__(
-        self, parent: QWidget | None = None, ctx: CoreContext | None = None
+        self,
+        parent: QWidget | None,
+        *,
+        ctx: CoreContext,
+        toast_manager: ToastManager,
     ) -> None:
         super().__init__(parent)
         self._ctx = ctx
+        self._toast_manager = toast_manager
         self.setObjectName("aboutPanel")
         self.setWindowTitle("About PxModRim")
         self.setModal(True)
@@ -295,16 +301,9 @@ class AboutPanel(QDialog):
 
     @asyncSlot()
     async def _on_upload_clicked(self) -> None:
-        ctx = self._ctx
-        if ctx is None:
-            parent = self.parent()
-            if parent is not None:
-                ctx = getattr(parent, "_ctx", None)
-        if ctx is None:
-            return
         self._upload_button.setEnabled(False)
         try:
-            await handle_upload_report(self, ctx)
+            await handle_upload_report(self, self._ctx, self._toast_manager)
         finally:
             self._upload_button.setEnabled(True)
 

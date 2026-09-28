@@ -28,15 +28,20 @@ def get_app_version() -> str:
         return "unknown"
 
 
+# Username directories under these roots; matched case-insensitively.
+_USER_DIR_PREFIX = r"(?:/home|/Users|\\Users)[\\/]"
+# Path components start and end where no adjacent name characters exist.
+_COMPONENT_START = r"(?<![\w.-])"
+_COMPONENT_END = r"(?![\w.-])"
+
+
 def redact(
     text: str,
     home_dir: str | Path | None = None,
     username: str | None = None,
 ) -> str:
-    """Replace user home directory path with ~ and OS username with <user>."""
-    home_path = Path.home() if home_dir is None else Path(home_dir)
-
-    home_str = str(home_path).rstrip("/\\")
+    """Replace the home directory with ~ and user-directory usernames with <user>."""
+    home_str = str(Path.home() if home_dir is None else Path(home_dir)).rstrip("/\\")
 
     if username is None:
         try:
@@ -44,20 +49,22 @@ def redact(
         except (OSError, KeyError):
             username = ""
 
-    # Redact home path first (handling native and alternate slash formats)
-    if home_str and home_str not in ("/", "\\"):
-        text = text.replace(home_str, "~")
-        alt_slash = home_str.replace("\\", "/")
-        if alt_slash != home_str:
-            text = text.replace(alt_slash, "~")
-        back_slash = home_str.replace("/", "\\")
-        if back_slash != home_str:
-            text = text.replace(back_slash, "~")
+    if home_str:
+        variants = {home_str, home_str.replace("\\", "/"), home_str.replace("/", "\\")}
+        alternatives = "|".join(
+            re.escape(v) for v in sorted(variants, key=len, reverse=True)
+        )
+        text = re.sub(
+            f"{_COMPONENT_START}(?:{alternatives}){_COMPONENT_END}", "~", text
+        )
 
-    # Redact username if at least 3 chars using word-boundary regex
-    if username and len(username) >= 3:
-        pattern = re.compile(rf"(?<![\w]){re.escape(username)}(?![\w])", re.IGNORECASE)
-        text = pattern.sub("<user>", text)
+    # Only path contexts: a bare word match would corrupt ids like ludeon.rimworld.
+    if username:
+        pattern = re.compile(
+            f"({_USER_DIR_PREFIX}){re.escape(username)}{_COMPONENT_END}",
+            re.IGNORECASE,
+        )
+        text = pattern.sub(r"\1<user>", text)
     return text
 
 
@@ -70,24 +77,40 @@ def _format_size(size_bytes: int) -> str:
     return f"{size_bytes} B"
 
 
+def _log_line_text(line: str) -> str:
+    """Unpack a loguru serialized JSON record to its text; pass other lines through."""
+    trimmed = line.strip()
+    if not (trimmed.startswith("{") and trimmed.endswith("}")):
+        return line
+    try:
+        data = json.loads(trimmed)
+    except ValueError:
+        return line
+    if isinstance(data, dict) and "text" in data:
+        return str(data["text"]).rstrip("\r\n")
+    return line
+
+
 def _parse_log_text(raw_text: str) -> str:
     """Extract plain text lines from log, unpacking loguru JSON lines if present."""
-    plain_lines: list[str] = []
-    for line in raw_text.splitlines():
-        trimmed = line.strip()
-        if trimmed.startswith("{") and trimmed.endswith("}"):
-            try:
-                data = json.loads(trimmed)
-                if isinstance(data, dict) and "text" in data:
-                    plain_lines.append(str(data["text"]).rstrip("\r\n"))
-                    continue
-            except (json.JSONDecodeError, ValueError):
-                pass
-        plain_lines.append(line)
-    result = "\n".join(plain_lines)
+    result = "\n".join(_log_line_text(line) for line in raw_text.splitlines())
     if raw_text.endswith("\n") and result:
         result += "\n"
     return result
+
+
+def _after_first_newline(data: bytes) -> bytes:
+    """Drop the partial leading line of a tail slice."""
+    nl = data.find(b"\n")
+    return data[nl + 1 :] if nl != -1 else data
+
+
+def _read_raw_tail(path: Path, size: int, window: int) -> bytes:
+    with path.open("rb") as f:
+        if size <= window:
+            return f.read()
+        f.seek(size - window)
+        return _after_first_newline(f.read(window))
 
 
 def read_log_tail(log_path: Path | None = None, max_bytes: int = MAX_LOG_BYTES) -> str:
@@ -104,40 +127,24 @@ def read_log_tail(log_path: Path | None = None, max_bytes: int = MAX_LOG_BYTES) 
     if size == 0:
         return "<empty log file>"
 
+    # JSON-serialized records shrink when unpacked, so read a wider raw window.
+    read_window = max(max_bytes * 5, 10 * 1024 * 1024)
     try:
-        read_window = max(max_bytes * 5, 10 * 1024 * 1024)
-        with path.open("rb") as f:
-            if size <= read_window:
-                raw_bytes = f.read()
-            else:
-                f.seek(size - read_window)
-                raw_bytes = f.read(read_window)
-                nl = raw_bytes.find(b"\n")
-                if nl != -1:
-                    raw_bytes = raw_bytes[nl + 1 :]
-
-        raw_text = raw_bytes.decode("utf-8", errors="replace")
-        plain_text = _parse_log_text(raw_text)
-        encoded = plain_text.encode("utf-8")
-        total_bytes = len(encoded)
-
-        if total_bytes <= max_bytes:
-            return plain_text
-
-        tail_bytes = encoded[-max_bytes:]
-        tail_text = tail_bytes.decode("utf-8", errors="replace")
-        first_newline = tail_text.find("\n")
-        if first_newline != -1:
-            tail_text = tail_text[first_newline + 1 :]
-
-        kept_bytes = len(tail_text.encode("utf-8"))
-        marker = (
-            f"[... truncated, showing last {_format_size(kept_bytes)} "
-            f"of {_format_size(total_bytes)} ...]\n"
-        )
-        return marker + tail_text
+        raw_bytes = _read_raw_tail(path, size, read_window)
     except OSError as exc:
         return f"<error reading log file: {exc}>"
+
+    plain_text = _parse_log_text(raw_bytes.decode("utf-8", errors="replace"))
+    encoded = plain_text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return plain_text
+
+    tail = _after_first_newline(encoded[-max_bytes:])
+    marker = (
+        f"[... truncated, showing last {_format_size(len(tail))} "
+        f"of {_format_size(len(encoded))} ...]\n"
+    )
+    return marker + tail.decode("utf-8", errors="replace")
 
 
 def build_report(

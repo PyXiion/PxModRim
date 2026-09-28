@@ -21,39 +21,38 @@ from pxmodrim.core.support.report import (
 
 
 class TestRedact:
-    def test_redacts_home_dir_and_username(self) -> None:
-        raw = "User alice at /home/alice/.config/pxmodrim/log.txt"
+    def test_redacts_home_dir_and_username_in_user_paths(self) -> None:
+        raw = "User alice at /home/alice/.config/log.txt and /mnt/home/alice/x"
         result = redact(raw, home_dir="/home/alice", username="alice")
-        assert result == "User <user> at ~/.config/pxmodrim/log.txt"
+        assert result == "User alice at ~/.config/log.txt and /mnt/home/<user>/x"
 
     def test_redacts_windows_style_paths(self) -> None:
-        raw = r"Loaded C:\Users\Bob\AppData\Local\pxmodrim\test.log for Bob"
+        raw = r"Loaded C:\Users\Bob\AppData\Local\pxmodrim\test.log"
         result = redact(raw, home_dir=r"C:\Users\Bob", username="Bob")
-        assert result == r"Loaded ~\AppData\Local\pxmodrim\test.log for <user>"
+        assert result == r"Loaded ~\AppData\Local\pxmodrim\test.log"
 
     def test_redacts_forward_slash_windows_path(self) -> None:
-        raw = "Loaded C:/Users/Bob/AppData/test.log for Bob"
+        raw = "Loaded C:/Users/Bob/AppData/test.log"
         result = redact(raw, home_dir=r"C:\Users\Bob", username="Bob")
-        assert result == "Loaded ~/AppData/test.log for <user>"
+        assert result == "Loaded ~/AppData/test.log"
 
-    def test_preserves_text_when_no_user_match(self) -> None:
-        raw = "General info: RimWorld 1.5 is running"
-        result = redact(raw, home_dir="/home/other", username="other")
-        assert result == raw
+    def test_home_dir_respects_path_boundary(self) -> None:
+        raw = "/home/bob/a and /home/bobby/b and /home/bob"
+        result = redact(raw, home_dir="/home/bob", username="bob")
+        assert result == "~/a and /home/bobby/b and ~"
 
-    def test_skips_short_username_but_redacts_home_path(self) -> None:
-        raw = "User ed checked /home/ed/.config/ed_log.txt and ed went to bed"
+    def test_short_username_redacted_in_other_user_paths(self) -> None:
+        raw = r"ed saw D:\Users\ed\mods and /Users/ED/x but not /Users/edgar"
         result = redact(raw, home_dir="/home/ed", username="ed")
-        assert result == "User ed checked ~/.config/ed_log.txt and ed went to bed"
-
-    def test_redacts_username_word_boundary_preserves_substrings(self) -> None:
-        raw = "Admin admin logged in to administrator panel with admin and ADMIN"
-        result = redact(raw, home_dir="/home/admin", username="admin")
         expected = (
-            "<user> <user> logged in to administrator panel with <user> and <user>"
+            r"ed saw D:\Users\<user>\mods and /Users/<user>/x but not /Users/edgar"
         )
         assert result == expected
-        assert "administrator" in result
+
+    def test_common_word_username_does_not_corrupt_package_ids(self) -> None:
+        raw = "Core (ludeon.rimworld) from /opt/rimworld; rimworld started"
+        result = redact(raw, home_dir="/home/rimworld", username="rimworld")
+        assert result == raw
 
 
 class TestReadLogTail:
@@ -166,7 +165,7 @@ class TestBuildReport:
         log_path = tmp_path / "app.log"
 
         log_path.write_text(
-            "INFO | Application started for testuser\n", encoding="utf-8"
+            "INFO | Loaded /home/testuser/mods for testuser\n", encoding="utf-8"
         )
 
         report = build_report(
@@ -206,9 +205,8 @@ class TestBuildReport:
         )
         assert expected_order in report
 
-        # Verify username is redacted in log tail
-        assert "Application started for <user>" in report
-        assert "testuser" not in report
+        # Username is redacted only in user-directory paths
+        assert "Loaded /home/<user>/mods for testuser" in report
 
 
 class TestPasteUploader:
@@ -292,13 +290,3 @@ class TestPasteUploader:
             pytest.raises(ReportUploadError, match="timed out"),
         ):
             uploader.upload("Report content")
-
-    @pytest.mark.asyncio
-    async def test_async_upload(self) -> None:
-        uploader = PasteUploader()
-        with patch.object(
-            uploader, "upload", return_value="https://paste.rs/xyz"
-        ) as mock_up:
-            res = await uploader.async_upload("test content")
-            assert res == "https://paste.rs/xyz"
-            mock_up.assert_called_once_with("test content")
