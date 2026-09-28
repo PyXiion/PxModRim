@@ -6,7 +6,15 @@ from itertools import pairwise
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QObject, QPoint, QPointF, Qt
+from PySide6.QtCore import (
+    Q_ARG,
+    QCoreApplication,
+    QMetaObject,
+    QObject,
+    QPoint,
+    QPointF,
+    Qt,
+)
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
@@ -50,10 +58,15 @@ def _click(widget: QWidget, item: QQuickItem) -> None:
     )
 
 
-def _type(widget: QWidget, item: QQuickItem, value: str) -> None:
-    _click(widget, item)
-    QTest.keyClick(widget, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
-    QTest.keyClicks(widget, value)
+
+def _set_pattern(editor: QObject, index: int, value: str) -> None:
+    assert QMetaObject.invokeMethod(
+        editor,
+        "setRulePattern",
+        Qt.ConnectionType.DirectConnection,
+        Q_ARG("QVariant", index),
+        Q_ARG("QVariant", value),
+    )
 
 
 def _find_quick_item(root_item: QQuickItem, name: str) -> QQuickItem | None:
@@ -142,12 +155,16 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
     assert QTest.qWaitForWindowActive(parent)
     view._rebuild()
     try:
-        qml = view._qml
-        root = qml.rootObject()
-        assert root is not None
-        dialog = root.findChild(QObject, "organizerRuleEditor")
+        qml = view._rules_qml
+        dialog = qml.rootObject()
         assert dialog is not None
         rules_button = view.rules_button
+
+        assert view._rules_dialog.parentWidget() is parent
+        assert view._rules_dialog.windowTitle() == "Auto-Folder Rules"
+        assert view._rules_dialog.isModal()
+        assert view._rules_dialog.windowFlags() & Qt.WindowType.Dialog
+        assert view._rules_dialog.windowFlags() & Qt.WindowType.WindowMinMaxButtonsHint
 
         async def open_editor(count: int) -> list[QQuickItem]:
             QTest.mouseClick(rules_button, Qt.MouseButton.LeftButton)
@@ -160,6 +177,16 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
             await _until(lambda: not dialog.property("visible"))
 
         await open_editor(0)
+        assert view._rules_dialog.isVisible()
+        assert dialog.property("width") == qml.width()
+        assert dialog.property("height") == qml.height()
+        initial_size = view._rules_dialog.size()
+        view._rules_dialog.resize(initial_size.width() + 24, initial_size.height() + 24)
+        await _until(
+            lambda: dialog.property("width") == qml.width()
+            and dialog.property("height") == qml.height()
+        )
+        assert qml.width() > initial_size.width()
         add = dialog.findChild(QQuickItem, "organizerAddRule")
         save = dialog.findChild(QQuickItem, "organizerSaveRules")
         assert add is not None and save is not None
@@ -168,7 +195,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         # Add a rule, type its pattern, save.
         _click(qml, add)
         (row,) = await _laid_out_rows(dialog, 1)
-        _type(qml, _control(row, "organizerRulePattern"), "example")
+        _set_pattern(dialog, 0, "example")
         assignable = dialog.findChild(QQuickItem, "organizerRuleAssignable")
         assert assignable is not None
         await _until(lambda: "1 mod matches first here" in _hits(dialog, 0))
@@ -185,7 +212,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         await open_editor(1)
         _click(qml, add)
         _, new_row = await _laid_out_rows(dialog, 2)
-        _type(qml, _control(new_row, "organizerRulePattern"), "example.mod")
+        _set_pattern(dialog, 1, "example.mod")
         new_row = (await _laid_out_rows(dialog, 2))[1]
         operator_box = _control(new_row, "organizerRuleOperator")
         _click(qml, operator_box)
@@ -217,7 +244,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
 
         # An invalid pattern keeps the dialog and the unsaved draft visible.
         top, _ = await open_editor(2)
-        _type(qml, _control(top, "organizerRulePattern"), "   ")
+        _set_pattern(dialog, 0, "   ")
         _click(qml, save)
         await _until(
             lambda: "pattern cannot be empty" in str(dialog.property("errorMessage"))
@@ -266,10 +293,8 @@ async def test_rule_editor_adds_standard_rules_only_from_clean_draft(
     assert QTest.qWaitForWindowActive(parent)
     view._rebuild()
     try:
-        qml = view._qml
-        root = qml.rootObject()
-        assert root is not None
-        dialog = root.findChild(QObject, "organizerRuleEditor")
+        qml = view._rules_qml
+        dialog = qml.rootObject()
         assert dialog is not None
         QTest.mouseClick(view.rules_button, Qt.MouseButton.LeftButton)
         await _until(lambda: bool(dialog.property("opened")))
@@ -281,6 +306,9 @@ async def test_rule_editor_adds_standard_rules_only_from_clean_draft(
         _click(qml, standard)
         rows = await _laid_out_rows(dialog, len(STANDARD_RULES))
         assert len(rows) == len(STANDARD_RULES)
+        scroll_area = dialog.findChild(QQuickItem, "organizerRuleScrollArea")
+        assert scroll_area is not None
+        assert scroll_area.property("contentHeight") > scroll_area.height()
         assert _patterns(dialog) == [rule.pattern for rule in STANDARD_RULES]
         assert dialog.property("visible")
         assert dialog.property("errorMessage") == ""
@@ -293,7 +321,7 @@ async def test_rule_editor_adds_standard_rules_only_from_clean_draft(
 
         # A dirty draft must be saved or discarded before adding more rules.
         assert standard.property("enabled")
-        _type(qml, _control(rows[0], "organizerRulePattern"), "edited")
+        _set_pattern(dialog, 0, "edited")
         await _until(lambda: not standard.property("enabled"))
     finally:
         view.close()

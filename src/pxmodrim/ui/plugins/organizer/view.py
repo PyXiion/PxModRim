@@ -146,6 +146,30 @@ class OrganizerViewPanel(BaseViewPanel):
         qml_ctx.setContextProperty("organizerPanel", self)
         qml_ctx.setContextProperty("modTreeModel", self.model)
         self._qml.setSource(QUrl.fromLocalFile(str(_QML_DIR / "ModTree.qml")))
+        rules_flags = (
+            Qt.WindowType.Dialog
+            | Qt.WindowType.WindowTitleHint
+            | Qt.WindowType.WindowSystemMenuHint
+            | Qt.WindowType.WindowCloseButtonHint
+            | Qt.WindowType.WindowMinMaxButtonsHint
+        )
+        self._rules_dialog = QDialog(self.window(), rules_flags)
+        self._rules_dialog.setObjectName("organizerRuleEditorWindow")
+        self._rules_dialog.setWindowTitle("Auto-Folder Rules")
+        self._rules_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._rules_dialog.setMinimumSize(720, 520)
+        self._rules_dialog.setSizeGripEnabled(True)
+        self._rules_dialog_opened_once = False
+        rules_layout = QVBoxLayout(self._rules_dialog)
+        rules_layout.setContentsMargins(0, 0, 0, 0)
+        self._rules_qml = QQuickWidget(qml_engine, self._rules_dialog)  # pyright: ignore[reportCallIssue, reportArgumentType]
+        self._rules_qml.setObjectName("organizerRuleEditorQuickWidget")
+        self._rules_qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        self._rules_qml.setClearColor(QColor(PALETTE["ELEVATE_2"]))
+        self._rules_qml.rootContext().setContextProperty("organizerPanel", self)
+        self._rules_qml.setSource(QUrl.fromLocalFile(str(_QML_DIR / "RuleEditor.qml")))
+        rules_layout.addWidget(self._rules_qml)
+        self._rules_dialog.finished.connect(self._on_rules_dialog_finished)
         hint = QWidget(main)
         hint.setObjectName("organizerHint")
         hint_layout = QHBoxLayout(hint)
@@ -222,9 +246,32 @@ class OrganizerViewPanel(BaseViewPanel):
         super().showEvent(event)  # type: ignore[arg-type]
         if self._dirty:
             self._rebuild()
-        root = self._qml.rootObject()
-        if root is not None:
-            QMetaObject.invokeMethod(root, "refreshRules")
+        rules_root = self._rules_qml.rootObject()
+        if rules_root is not None:
+            QMetaObject.invokeMethod(rules_root, "schedulePreview")
+
+    def _position_rules_dialog(self) -> None:
+        parent = self._rules_dialog.parentWidget()
+        if parent is None:
+            return
+        parent_geometry = parent.frameGeometry()
+        if not self._rules_dialog_opened_once:
+            available = parent.screen().availableGeometry()
+            width = min(
+                960,
+                max(800, parent_geometry.width() - 48),
+                available.width() - 32,
+            )
+            height = min(
+                760,
+                max(600, parent_geometry.height() - 80),
+                available.height() - 32,
+            )
+            self._rules_dialog.resize(width, height)
+            self._rules_dialog_opened_once = True
+        self._rules_dialog.move(
+            parent_geometry.center() - self._rules_dialog.rect().center()
+        )
 
     def _clear_selection_anchor(self) -> None:
         self._selection_anchor = QModelIndex()
@@ -434,9 +481,24 @@ class OrganizerViewPanel(BaseViewPanel):
     @Slot()
     def openRules(self) -> None:
         self._set_editor_error()
-        root = self._qml.rootObject()
+        root = self._rules_qml.rootObject()
+        if root is None:
+            return
+        self._position_rules_dialog()
+        self._rules_dialog.open()
+        self._rules_dialog.activateWindow()
+        self._rules_qml.setFocus(Qt.FocusReason.OtherFocusReason)
+        QMetaObject.invokeMethod(root, "prepareForOpen")
+
+    @Slot()
+    def closeRules(self) -> None:
+        self._rules_dialog.close()
+
+    @Slot(int)
+    def _on_rules_dialog_finished(self, _result: int) -> None:
+        root = self._rules_qml.rootObject()
         if root is not None:
-            QMetaObject.invokeMethod(root, "openRules")
+            QMetaObject.invokeMethod(root, "closeEditor")
 
     @asyncSlot(str, str)
     async def createTag(self, name: str, color: str) -> None:

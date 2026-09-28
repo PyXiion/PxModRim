@@ -13,8 +13,6 @@ Rectangle {
     property var dropTarget: null
 
     function openTags() { tagEditor.open() }
-    function openRules() { ruleEditor.open() }
-    function refreshRules() { ruleEditor.schedulePreview() }
 
     function expandAll() {
         tree.expandRecursively()
@@ -399,14 +397,6 @@ Rectangle {
         onAssignmentRequested: (id, add) => organizerPanel.assignTag(id, add)
     }
 
-    RuleEditor {
-        id: ruleEditor
-        ruleRows: organizerPanel ? organizerPanel.ruleRows : []
-        ruleFolders: organizerPanel ? organizerPanel.ruleFolders : []
-        errorMessage: organizerPanel ? organizerPanel.editorError : ""
-        onSaveRequested: rules => organizerPanel.saveRules(rules)
-        onStandardRulesRequested: organizerPanel.addStandardRules()
-    }
 
     Connections {
         target: organizerPanel

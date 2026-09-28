@@ -3,19 +3,19 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../../components/controls"
 
-PxDialog {
+FocusScope {
     id: root
     objectName: "organizerRuleEditor"
-    width: Math.min(900, parent ? parent.width - 24 : 760)
-    height: Math.min(660, parent ? parent.height - 24 : 540)
-    title: "Auto-Folder Rules"
+    implicitWidth: 900
+    implicitHeight: 640
+    property bool opened: false
+    visible: opened
+    focus: opened
 
-    property var ruleRows: []
-    property var ruleFolders: []
-    property string errorMessage: ""
+    property var ruleRows: organizerPanel ? organizerPanel.ruleRows : []
+    property var ruleFolders: organizerPanel ? organizerPanel.ruleFolders : []
+    property string errorMessage: organizerPanel ? organizerPanel.editorError : ""
 
-    signal saveRequested(var rules)
-    signal standardRulesRequested()
 
     readonly property var fieldOptions: [
         { text: "Package ID", value: "package_id" },
@@ -35,7 +35,7 @@ PxDialog {
     property bool previewPending: false
 
     function schedulePreview() {
-        if (!visible || loadingDraft || !organizerPanel || !organizerPanel.visible || !organizerPanel.ready)
+        if (!opened || loadingDraft || !organizerPanel || !organizerPanel.visible || !organizerPanel.ready)
             return
         previewRevision++
         previewPending = true
@@ -46,7 +46,7 @@ PxDialog {
         id: previewTimer
         interval: 100
         onTriggered: {
-            if (root.visible && organizerPanel && organizerPanel.visible && organizerPanel.ready)
+            if (root.opened && organizerPanel && organizerPanel.visible && organizerPanel.ready)
                 organizerPanel.requestRulePreview(root.draftRules(), root.previewRevision)
         }
     }
@@ -123,9 +123,9 @@ PxDialog {
     }
 
     onRuleRowsChanged: {
-        if (!visible && !draftMatches(ruleRows))
+        if (!opened && !draftMatches(ruleRows))
             loadDraft()
-        else if (visible && draftMatches(loadedRows) && !draftMatches(ruleRows))
+        else if (opened && draftMatches(loadedRows) && !draftMatches(ruleRows))
             loadDraft()
         schedulePreview()
     }
@@ -145,6 +145,9 @@ PxDialog {
     function removeRule(index) {
         if (index >= 0 && index < draftModel.count)
             draftModel.remove(index)
+    }
+    function setRulePattern(index, pattern) {
+        draftModel.setProperty(index, "pattern", pattern)
     }
 
     function moveUp(index) {
@@ -172,36 +175,44 @@ PxDialog {
     }
 
     function submitRules() {
-        root.saveRequested(draftRules())
+        organizerPanel.saveRules(draftRules())
     }
 
 
     Connections {
         target: organizerPanel
         function onRulesSaved() {
-            root.close()
+            organizerPanel.closeRules()
         }
         function onRulePreviewReady(revision, result) {
-            if (root.visible && revision === root.previewRevision) {
+            if (root.opened && revision === root.previewRevision) {
                 root.preview = result
                 root.previewPending = false
             }
         }
     }
 
-    onAboutToShow: {
+    function prepareForOpen() {
         if (!draftMatches(ruleRows))
             loadDraft()
+        opened = true
+        schedulePreview()
     }
-    onOpened: schedulePreview()
-    onClosed: {
+
+    function closeEditor() {
+        opened = false
         previewTimer.stop()
         previewRevision++
         previewPending = false
     }
-    onRejected: root.close()
 
-    contentItem: ColumnLayout {
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.elevate2
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
         anchors.margins: 12
         spacing: 10
 
@@ -231,7 +242,7 @@ PxDialog {
                 variant: "secondary"
                 enabled: !root.draftDirty
                 ToolTip.text: "Add the built-in set of common folders and rules"
-                onClicked: root.standardRulesRequested()
+                onClicked: organizerPanel.addStandardRules()
             }
 
             Text {
@@ -276,15 +287,17 @@ PxDialog {
 
         ScrollView {
             id: scrollArea
+            objectName: "organizerRuleScrollArea"
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
             contentWidth: availableWidth
-            contentHeight: rulesColumn.implicitHeight
+            contentHeight: rulesColumn.height
 
-            ColumnLayout {
+            Column {
                 id: rulesColumn
                 width: scrollArea.availableWidth
+                height: childrenRect.height
                 spacing: 6
 
                 Repeater {
@@ -300,7 +313,8 @@ PxDialog {
                         required property string pattern
                         required property int folder_id
 
-                        Layout.fillWidth: true
+                        width: rulesColumn.width
+                        height: implicitHeight
                         implicitHeight: rowCol.implicitHeight + 12
                         color: Theme.elevate1
                         border.color: Theme.border
@@ -351,7 +365,7 @@ PxDialog {
                                     Layout.minimumWidth: 60
                                     text: rowItem.pattern
                                     placeholderText: "Pattern..."
-                                    onTextEdited: draftModel.setProperty(rowItem.index, "pattern", text)
+                                    onTextEdited: root.setRulePattern(rowItem.index, text)
                                 }
 
                             }
@@ -445,37 +459,40 @@ PxDialog {
             color: Theme.textDim
             font.pixelSize: Theme.fontSizeMd
         }
-    }
+        DialogButtonBox {
+            Layout.fillWidth: true
+            alignment: Qt.AlignRight
+            spacing: 8
+            padding: 12
+            leftPadding: 16
+            rightPadding: 16
 
-    footer: DialogButtonBox {
-        alignment: Qt.AlignRight
-        spacing: 8
-        padding: 12
-        leftPadding: 16
-        rightPadding: 16
+            background: Item {
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 1
+                    color: Theme.border
+                }
+            }
 
-        background: Item {
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 1
-                color: Theme.border
+            onRejected: organizerPanel.closeRules()
+
+            PxButton {
+                text: "Cancel"
+                variant: "ghost"
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+
+            PxButton {
+                objectName: "organizerSaveRules"
+                text: "Save"
+                variant: "primary"
+                DialogButtonBox.buttonRole: DialogButtonBox.ApplyRole
+                onClicked: root.submitRules()
             }
         }
-
-        PxButton {
-            text: "Cancel"
-            variant: "ghost"
-            DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-        }
-
-        PxButton {
-            objectName: "organizerSaveRules"
-            text: "Save"
-            variant: "primary"
-            DialogButtonBox.buttonRole: DialogButtonBox.ApplyRole
-            onClicked: root.submitRules()
-        }
     }
+
 }

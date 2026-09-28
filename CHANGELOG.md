@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - Organizer is the first view; its left navigation and right mod-info sidebar match Mods in width. Its search, folder actions, selection controls, and tree layout follow the #37 mockup while retaining the existing mod-info sidebar.
 - Auto-folder rules show first-match and newly assignable mod counts without blocking the editor; folder expansion controls persist their state.
+- Organizer auto-rules open in a centered, resizable window parented to the main window, with the rule list scrolling inside the window.
 - Standard auto-folder rules come from popular Workshop collections: exact About.xml package ids for libraries, performance and quality-of-life mods, family prefixes for Vanilla Expanded (including Races/Quests/Storytellers), Alpha, Combat Extended and Dubs. Loose `framework`/`performance` name matching is removed to avoid false positives.
 
 
