@@ -308,8 +308,7 @@ class ModListPanel(QWidget):
         new = frozenset(active_uuids)
         self._model.set_checkable(new - current, True)
         self._model.set_checkable(current - new, False)
-        if list(active_uuids) != self._model.active_uuids():
-            self._model.commitOrder(list(active_uuids))
+        self._model.commitOrder(list(active_uuids))
         self._highlight_generation += 1
 
     def _on_config_changed(self, cfg: AppConfig) -> None:

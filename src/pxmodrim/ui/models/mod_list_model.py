@@ -303,18 +303,21 @@ class ModListModel(QAbstractListModel):
         return self.move_row(source_row, target_row, clamp_to_active=True)
 
     def commitOrder(self, new_ordered_uuids: list[str]) -> None:
-        if not new_ordered_uuids:
-            return
-
         item_by_uuid = {item.uuid: item for item in self._items}
         existing_uuids = [uuid for uuid in new_ordered_uuids if uuid in item_by_uuid]
-        if not existing_uuids:
-            return
 
         ordered_set = set(existing_uuids)
         ordered_items = [item_by_uuid[uuid] for uuid in existing_uuids]
         remaining = [item for item in self._items if item.uuid not in ordered_set]
-        new_items = ordered_items + remaining
+        # Keep the load_mods invariant: active block first, inactive block by name.
+        new_items = (
+            ordered_items
+            + [item for item in remaining if item.checked]
+            + sorted(
+                (item for item in remaining if not item.checked),
+                key=lambda item: item.mod.name.lower(),
+            )
+        )
 
         if new_items == self._items:
             return

@@ -223,6 +223,28 @@ async def test_reenabled_mod_is_placed_between_dependency_and_dependent(
     assert panel._ctx.active_uuids == ["uuid-a", "uuid-b", "uuid-c"]
 
 
+@pytest.mark.asyncio
+async def test_disabled_mod_leaves_active_block(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    panel = _panel(qapp)
+
+    async def keep_dependents(*args: object) -> tuple[object, object]:
+        from PySide6.QtWidgets import QMessageBox
+
+        return QMessageBox.StandardButton.No, None
+
+    monkeypatch.setattr(mod_activation, "await_dialog", keep_dependents)
+    await panel._toggle_rows([panel.rowForUuid("uuid-b")])
+
+    rows = [(item.uuid, item.checked, item.load_index) for item in panel._model._items]
+    assert rows == [
+        ("uuid-a", True, 1),
+        ("uuid-c", True, 2),
+        ("uuid-b", False, -1),
+    ]
+
+
 def test_hovering_drag_handle_does_not_show_drag_proxy(
     qml_engine: QQmlEngine,
     qtbot: QtBot,
