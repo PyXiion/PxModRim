@@ -121,9 +121,9 @@ class TestApply:
         assert activation.apply(enable=["uuid-j"]) is True
 
         assert ctx.active_uuids == [
-            "uuid-j",
             "uuid-c",
             "uuid-d",
+            "uuid-j",
             "uuid-a",
             "uuid-b",
         ]
@@ -260,6 +260,58 @@ class TestApply:
 
         assert ctx.active_uuids == ["uuid-c", "uuid-d", "uuid-a", "uuid-b"]
         assert emitted == []
+
+    def test_edges_through_uninstalled_mod_add_no_constraint(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        mods: dict[str, ListedMod] = {
+            "uuid-a": _mod("Mod A", "mod.a"),
+            "uuid-w": _mod("Mod W", "mod.w", load_after=("ce.absent",)),
+            "uuid-y": _mod("Mod Y", "mod.y", load_before=("ce.absent",)),
+        }
+        ctx.load(mods, ["uuid-a", "uuid-w"])
+        ctx.diagnostics_service.rebuild()
+
+        assert activation.apply(enable=["uuid-y"]) is True
+
+        assert ctx.active_uuids == ["uuid-a", "uuid-w", "uuid-y"]
+
+    def test_bounds_ignore_inconsistent_active_order(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        # Active c depends on b but sits before it; X must still land in d..b.
+        mods = dict(_MODS)
+        mods["uuid-x"] = _mod("Mod X", "mod.x", "mod.d", load_before=("mod.b",))
+        ctx.load(mods, ["uuid-c", "uuid-d", "uuid-a", "uuid-b"])
+        ctx.diagnostics_service.rebuild()
+
+        assert activation.apply(enable=["uuid-x"]) is True
+
+        assert ctx.active_uuids == ["uuid-c", "uuid-d", "uuid-x", "uuid-a", "uuid-b"]
+
+    def test_batch_cycle_does_not_unplace_downstream_mods(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        mods = dict(_MODS)
+        mods["uuid-p"] = _mod("Mod P", "mod.p", "mod.q")
+        mods["uuid-q"] = _mod("Mod Q", "mod.q", "mod.p")
+        mods["uuid-z"] = _mod("Mod Z", "mod.z", "mod.p")
+        mods["uuid-k"] = _mod("Mod K", "mod.k", "mod.d", load_before=("mod.a",))
+        ctx.load(mods, ["uuid-c", "uuid-d", "uuid-a", "uuid-b"])
+        ctx.diagnostics_service.rebuild()
+
+        assert activation.apply(enable=["uuid-z", "uuid-k", "uuid-q", "uuid-p"])
+
+        assert ctx.active_uuids == [
+            "uuid-c",
+            "uuid-d",
+            "uuid-k",
+            "uuid-a",
+            "uuid-b",
+            "uuid-q",
+            "uuid-p",
+            "uuid-z",
+        ]
 
 
 class TestDependentsOf:
