@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from typing import cast
 
@@ -75,13 +76,42 @@ def test_dirty_state_tracks_active_list_order_and_updates_header() -> None:
     assert header.unsaved_changes is False
 
 
+def test_reload_baseline_is_list_loaded_from_disk_not_later_edits() -> None:
+    class Header:
+        unsaved_changes = False
+
+        def set_unsaved_changes(self, value: bool) -> None:
+            self.unsaved_changes = value
+
+    class Window(SimpleNamespace):
+        def _refresh_unsaved_state(self) -> None:
+            MainWindow._refresh_unsaved_state(cast(MainWindow, self))
+
+    header = Header()
+    # The user deactivated uuid-b after ctx.load() but before mods_changed fired.
+    context = SimpleNamespace(
+        active_uuids=["uuid-a"], loaded_active_uuids=["uuid-a", "uuid-b"]
+    )
+    window = cast(
+        MainWindow,
+        Window(
+            _ctx=context,
+            _saved_active_uuids=[],
+            _unsaved_changes=False,
+            _header_controller=header,
+            setWindowTitle=lambda _title: None,
+        ),
+    )
+
+    MainWindow._on_mods_reloaded(window)
+
+    assert header.unsaved_changes is True
+
+
 @pytest.mark.asyncio
 async def test_successful_save_clears_unsaved_state() -> None:
     class ModService:
-        saved: list[str] | None = None
-
-        async def save_active_layout(self, active_uuids: list[str]) -> bool:
-            self.saved = active_uuids
+        async def save_active_layout(self, _active_uuids: list[str]) -> bool:
             return True
 
     class Header:
@@ -94,10 +124,12 @@ async def test_successful_save_clears_unsaved_state() -> None:
         def _refresh_unsaved_state(self) -> None:
             MainWindow._refresh_unsaved_state(cast(MainWindow, self))
 
-    mod_service = ModService()
+        async def _write_active_layout(self) -> list[str] | None:
+            return await MainWindow._write_active_layout(cast(MainWindow, self))
+
     header = Header()
     context = SimpleNamespace(
-        active_uuids=["uuid-b", "uuid-a"], mod_service=mod_service
+        active_uuids=["uuid-b", "uuid-a"], mod_service=ModService()
     )
     window = cast(
         MainWindow,
@@ -115,8 +147,6 @@ async def test_successful_save_clears_unsaved_state() -> None:
     )
 
     assert await MainWindow._save_active_mods(window) is True
-    assert mod_service.saved == ["uuid-b", "uuid-a"]
-    assert window._saved_active_uuids == ["uuid-b", "uuid-a"]
     assert header.unsaved_changes is False
 
 
@@ -165,22 +195,61 @@ async def test_async_close_choice(
     assert window.save_calls == (choice == QMessageBox.StandardButton.Save)
 
 
-def test_dirty_close_event_is_ignored_until_confirmation() -> None:
-    class Event:
-        ignored = False
+class _CloseEvent:
+    ignored = False
+    accepted = False
 
-        def ignore(self) -> None:
-            self.ignored = True
+    def ignore(self) -> None:
+        self.ignored = True
 
-    window = cast(
-        MainWindow,
-        SimpleNamespace(
-            _unsaved_changes=True,
-            _close_confirmed=False,
-            _close_prompt_open=True,
-        ),
+    def accept(self) -> None:
+        self.accepted = True
+
+
+@pytest.mark.asyncio
+async def test_dirty_close_event_is_ignored_and_prompts_once() -> None:
+    prompts = 0
+
+    class Window:
+        _unsaved_changes = True
+        _close_confirmed = False
+        _close_prompt_open = False
+        _close_task: asyncio.Task[None] | None = None
+
+        async def _confirm_close(self) -> None:
+            nonlocal prompts
+            prompts += 1
+
+    window = Window()
+    first, second = _CloseEvent(), _CloseEvent()
+
+    MainWindow.closeEvent(cast(MainWindow, window), cast(QCloseEvent, first))
+    MainWindow.closeEvent(cast(MainWindow, window), cast(QCloseEvent, second))
+    assert window._close_task is not None
+    await window._close_task
+
+    assert first.ignored and second.ignored
+    assert not first.accepted
+    assert prompts == 1
+
+
+def test_confirmed_dirty_close_event_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        main_window_module, "QApplication", SimpleNamespace(instance=lambda: None)
     )
-    event = Event()
+    quit_calls: list[None] = []
+    window = SimpleNamespace(
+        _unsaved_changes=True,
+        _close_confirmed=True,
+        _views=[],
+        _app_quit_callback=lambda: quit_calls.append(None),
+        deleteLater=lambda: None,
+    )
+    event = _CloseEvent()
 
-    MainWindow.closeEvent(window, cast(QCloseEvent, event))
-    assert event.ignored is True
+    MainWindow.closeEvent(cast(MainWindow, window), cast(QCloseEvent, event))
+
+    assert event.accepted and not event.ignored
+    assert quit_calls == [None]

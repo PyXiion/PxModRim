@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
         self._ctx = app_ctx.core
         self._ui_prefs = app_ctx.ui_prefs
         self._selected_uuid: str | None = None
-        self._saved_active_uuids = self._ctx.active_uuids
+        self._saved_active_uuids = self._ctx.loaded_active_uuids
         self._unsaved_changes = False
         self._close_prompt_open = False
         self._close_confirmed = False
@@ -412,7 +412,9 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _show_about(self) -> None:
-        await await_dialog(AboutPanel, self, ctx=self._ctx)
+        await await_dialog(
+            AboutPanel, self, ctx=self._ctx, toast_manager=self._toast_manager
+        )
 
     @asyncSlot()
     async def _upload_log_and_system_info(self) -> None:
@@ -452,9 +454,10 @@ class MainWindow(QMainWindow):
         self._refresh_unsaved_state()
 
     def _on_mods_reloaded(self, _: None = None) -> None:
-        # ctx.load() replaces the active list without emitting active_state_changed,
-        # so the freshly loaded list becomes the new clean baseline.
-        self._saved_active_uuids = self._ctx.active_uuids
+        # mods_changed fires after the refresh finishes, so edits made since
+        # ctx.load() are already in ctx.active_uuids; the baseline must be the
+        # list that was read from disk.
+        self._saved_active_uuids = self._ctx.loaded_active_uuids
         self._refresh_unsaved_state()
 
     def _refresh_unsaved_state(self) -> None:
@@ -462,31 +465,32 @@ class MainWindow(QMainWindow):
         self._header_controller.set_unsaved_changes(self._unsaved_changes)
         self.setWindowTitle("*PxModRim" if self._unsaved_changes else "PxModRim")
 
+    async def _write_active_layout(self) -> list[str] | None:
+        """Persist the active list; return it on success, None if not saved."""
+        active_ids = self.mod_list.active_uuids()
+        if not await self._ctx.mod_service.save_active_layout(active_ids):
+            return None
+        self._saved_active_uuids = list(active_ids)
+        self._refresh_unsaved_state()
+        return active_ids
+
     @asyncSlot()
     async def _save_mods_config(self) -> None:
         await self._save_active_mods()
 
     async def _save_active_mods(self) -> bool:
-        active_ids = self.mod_list.active_uuids()
-        ok = await self._ctx.mod_service.save_active_layout(active_ids)
-        if ok:
-            self._saved_active_uuids = list(active_ids)
-            self._refresh_unsaved_state()
-            self._toast_manager.success(f"Saved {len(active_ids)} active mods", 3000)
-        else:
+        saved = await self._write_active_layout()
+        if saved is None:
             self._toast_manager.warning("Config folder not set", 3000)
-        return ok
+            return False
+        self._toast_manager.success(f"Saved {len(saved)} active mods", 3000)
+        return True
 
     @asyncSlot()
     async def _launch_game(self) -> None:
         logger.info("Launch requested")
 
-        active_ids = self.mod_list.active_uuids()
-        ok = await self._ctx.mod_service.save_active_layout(active_ids)
-        if ok:
-            self._saved_active_uuids = list(active_ids)
-            self._refresh_unsaved_state()
-        else:
+        if await self._write_active_layout() is None:
             logger.warning("Config folder not set — mod list not saved before launch")
             self._toast_manager.warning(
                 "Config folder not set — mod list won't be saved"

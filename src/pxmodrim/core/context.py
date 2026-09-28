@@ -46,6 +46,7 @@ class CoreContext:
         "_diagnostics_service",
         "_game_launcher",
         "_game_version",
+        "_loaded_active_uuids",
         "_mod_service",
         "_mods",
         "_plugins",
@@ -61,6 +62,7 @@ class CoreContext:
         self._config_service = config_service
         self._mods: dict[str, ListedMod] = {}
         self._active_uuids: list[str] = []
+        self._loaded_active_uuids: tuple[str, ...] = ()
         self._game_version: str = "Unknown"
         self._refresh_game_version()
         self._mod_service: ModService | None = None
@@ -78,6 +80,7 @@ class CoreContext:
         """Replace all mods and active UUIDs, taking ownership of the data."""
         self._mods = dict(mods)
         self._active_uuids = list(active_uuids)
+        self._loaded_active_uuids = tuple(active_uuids)
 
     def set_active(self, uuids: list[str]) -> None:
         old_set = frozenset(self._active_uuids)
@@ -147,6 +150,11 @@ class CoreContext:
     @property
     def active_uuids(self) -> list[str]:
         return list(self._active_uuids)
+
+    @property
+    def loaded_active_uuids(self) -> list[str]:
+        """Active UUIDs as last loaded from disk, unaffected by later edits."""
+        return list(self._loaded_active_uuids)
 
     @property
     def active_state_changed(self) -> Event[tuple[str, ...]]:
