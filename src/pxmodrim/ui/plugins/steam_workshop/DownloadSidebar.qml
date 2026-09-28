@@ -1,6 +1,7 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "../../components/controls"
 
 Rectangle {
     id: root
@@ -27,8 +28,9 @@ Rectangle {
 
         Text {
             id: titleLabel
-            text: "Download Queue" + (listView.count > 0 ? " (" + listView.count + ")" : "")
+            text: "Download queue" + (listView.count > 0 ? " (" + listView.count + ")" : "")
             color: Theme.textMain
+            font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.Bold
             Layout.bottomMargin: 8
@@ -46,27 +48,17 @@ Rectangle {
                           + " / " + root.formatMegabytes(root.queueBytesTotal) + " MB"
                         : "")
                 color: Theme.textDim
+                font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
             }
 
-            ProgressBar {
+            PxProgressBar {
                 id: progressBar
                 from: 0
                 to: root.queueBytesTotal > 0 ? root.queueBytesTotal : Math.max(root.queueTotal, 1)
                 value: root.queueBytesTotal > 0 ? root.queueBytesDone : root.queueCompleted
+                thickness: 6
                 Layout.fillWidth: true
-                height: 6
-                contentItem: Rectangle {
-                    radius: 3
-                    color: Theme.elevate3
-                    Rectangle {
-                        width: progressBar.visualPosition * parent.width
-                        height: parent.height
-                        radius: 3
-                        color: Theme.primary
-                        Behavior on width { NumberAnimation { duration: 200 } }
-                    }
-                }
             }
         }
 
@@ -76,13 +68,11 @@ Rectangle {
             Layout.bottomMargin: 8
             clip: true
 
-            Text {
-                anchors.centerIn: parent
+            EmptyState {
+                anchors.fill: parent
                 visible: listView.count === 0
-                text: "No mods in download queue\n\nClick + on a mod to add it"
-                color: Theme.textDim
-                font.pixelSize: Theme.fontSizeSm
-                horizontalAlignment: Text.AlignHCenter
+                title: "Download queue is empty"
+                detail: "Click + on a mod to add it"
             }
 
             ListView {
@@ -93,9 +83,8 @@ Rectangle {
                 spacing: 2
                 model: downloadQueueModel
 
-                ScrollBar.vertical: ScrollBar {
+                ScrollBar.vertical: PxScrollBar {
                     policy: ScrollBar.AsNeeded
-                    width: Theme.scrollbarWidth
                 }
 
                 delegate: Rectangle {
@@ -117,26 +106,30 @@ Rectangle {
                             Layout.fillWidth: true
                             text: model.display
                             color: Theme.textMain
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSm
                             elide: Text.ElideRight
                             maximumLineCount: 1
                         }
 
-                        Text {
-                            text: model.status === "downloading" ? "\u21BB"
-                                : model.status === "success" ? "\u2713"
-                                : model.status === "error" ? "\u2715" : ""
-                            color: model.status === "error" ? Theme.danger
-                                : model.status === "success" ? Theme.success
-                                : Theme.textDim
-                            font.pixelSize: 12
+                        Image {
+                            readonly property string iconName: model.status === "downloading" ? "refresh"
+                                : model.status === "success" ? "check"
+                                : model.status === "error" ? "close" : ""
+                            visible: iconName.length > 0
+                            sourceSize.width: 12
+                            sourceSize.height: 12
+                            source: visible ? "image://icons/" + iconName + "?color="
+                                + encodeURIComponent(model.status === "error" ? Theme.danger
+                                    : model.status === "success" ? Theme.success
+                                    : Theme.textDim) : ""
                         }
 
-                        Text {
-                            text: "\u2715"
-                            color: Theme.textDim
-                            font.pixelSize: 12
-                            visible: removeArea.containsMouse
+                        Image {
+                            visible: removeArea.containsMouse && removeArea.enabled
+                            sourceSize.width: 12
+                            sourceSize.height: 12
+                            source: visible ? "image://icons/close?color=" + encodeURIComponent(Theme.textDim) : ""
                         }
                     }
 
@@ -145,7 +138,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         width: parent.width * model.progress
                         height: 2
-                        radius: 1
+                        radius: Theme.radiusXs
                         color: Theme.primary
                         visible: model.status === "downloading"
                         opacity: 0.5
@@ -156,96 +149,41 @@ Rectangle {
                         anchors.fill: parent
                         enabled: model.status !== "queued" && model.status !== "downloading"
                         hoverEnabled: true
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                         onClicked: downloadSidebar.removeItem(model.id)
                     }
                 }
             }
         }
 
-        Rectangle {
+        PxButton {
             id: clearButton
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
-            Layout.topMargin: 0
-            radius: Theme.radiusMd
-            color: clearBtnMouse.containsMouse ? Theme.dangerBg : "transparent"
+            variant: "danger"
+            text: "Clear queue"
             visible: listView.count > 0 && root.downloadEnabled
-
-            Text {
-                anchors.centerIn: parent
-                text: "Clear Queue"
-                color: clearBtnMouse.containsMouse ? Theme.danger : Theme.textDim
-                font.pixelSize: Theme.fontSizeSm
-                font.weight: Font.Medium
-            }
-
-            MouseArea {
-                id: clearBtnMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: downloadSidebar.clearQueue()
-            }
+            onClicked: downloadSidebar.clearQueue()
         }
 
-        Rectangle {
+        PxButton {
             id: downloadButton
             Layout.fillWidth: true
-            Layout.preferredHeight: 36
             Layout.topMargin: visible ? 4 : 0
-            radius: Theme.radiusMd
-            color: {
-                if (!enabled) return Theme.elevate3
-                return downloadBtnMouse.containsMouse ? Qt.lighter(Theme.success, 1.15) : Theme.success
-            }
+            variant: "success"
+            text: "Download all"
             visible: root.downloadEnabled
-
-            property bool enabled: listView.count > 0 && root.downloadEnabled
-
-            Text {
-                anchors.centerIn: parent
-                text: "Download All"
-                color: downloadButton.enabled ? "#0b0d10" : Theme.textDim
-                font.pixelSize: Theme.fontSizeMd
-                font.weight: Font.Medium
-            }
-
-            MouseArea {
-                id: downloadBtnMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: downloadButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                    if (downloadButton.enabled)
-                        downloadSidebar.downloadRequested()
-                }
-            }
+            enabled: listView.count > 0
+            onClicked: downloadSidebar.downloadRequested()
         }
 
-        Rectangle {
+        PxButton {
             id: stopButton
             Layout.fillWidth: true
-            Layout.preferredHeight: 36
             Layout.topMargin: 4
-            radius: Theme.radiusMd
-            color: stopBtnMouse.containsMouse ? Qt.lighter(Theme.danger, 1.15) : Theme.danger
+            variant: "dangerSolid"
+            text: "Stop"
             visible: !root.downloadEnabled
-
-            Text {
-                anchors.centerIn: parent
-                text: "Stop"
-                color: "white"
-                font.pixelSize: Theme.fontSizeMd
-                font.weight: Font.Medium
-            }
-
-            MouseArea {
-                id: stopBtnMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: downloadSidebar.stopRequested()
-            }
+            onClicked: downloadSidebar.stopRequested()
         }
     }
 }
