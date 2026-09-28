@@ -54,10 +54,12 @@ FocusScope {
     property bool loadingDraft: false
     property int draftRevision: 0
     property var loadedRows: []
-    readonly property bool draftDirty: {
-        draftRevision
-        return !draftMatches(ruleRows)
+    property bool draftDirty: false
+
+    function refreshDirty() {
+        draftDirty = !draftMatches(ruleRows)
     }
+
 
     function draftMatches(rows) {
         if (draftModel.count !== rows.length)
@@ -120,6 +122,7 @@ FocusScope {
         loadedRows = ruleRows
         loadingDraft = false
         draftRevision++
+        refreshDirty()
     }
 
     onRuleRowsChanged: {
@@ -127,9 +130,13 @@ FocusScope {
             loadDraft()
         else if (opened && draftMatches(loadedRows) && !draftMatches(ruleRows))
             loadDraft()
+        refreshDirty()
         schedulePreview()
     }
-    onDraftRevisionChanged: schedulePreview()
+    onDraftRevisionChanged: {
+        refreshDirty()
+        schedulePreview()
+    }
 
     function addRule() {
         if (!hasFolders)
@@ -197,6 +204,7 @@ FocusScope {
             loadDraft()
         opened = true
         schedulePreview()
+        refreshDirty()
     }
 
     function closeEditor() {

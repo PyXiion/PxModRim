@@ -58,7 +58,6 @@ def _click(widget: QWidget, item: QQuickItem) -> None:
     )
 
 
-
 def _set_pattern(editor: QObject, index: int, value: str) -> None:
     assert QMetaObject.invokeMethod(
         editor,
@@ -183,8 +182,10 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         initial_size = view._rules_dialog.size()
         view._rules_dialog.resize(initial_size.width() + 24, initial_size.height() + 24)
         await _until(
-            lambda: dialog.property("width") == qml.width()
-            and dialog.property("height") == qml.height()
+            lambda: (
+                dialog.property("width") == qml.width()
+                and dialog.property("height") == qml.height()
+            )
         )
         assert qml.width() > initial_size.width()
         add = dialog.findChild(QQuickItem, "organizerAddRule")
@@ -194,7 +195,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
 
         # Add a rule, type its pattern, save.
         _click(qml, add)
-        (row,) = await _laid_out_rows(dialog, 1)
+        await _laid_out_rows(dialog, 1)
         _set_pattern(dialog, 0, "example")
         assignable = dialog.findChild(QQuickItem, "organizerRuleAssignable")
         assert assignable is not None
