@@ -209,8 +209,8 @@ class ListedMod(BaseMod):
         if self._mod_path:
             raise ValueError("Mod path already set. Cannot override.")
         self._mod_path = path
-        if hasattr(self, "published_file_id"):
-            del self.published_file_id
+        # hasattr() would compute the cached_property (disk I/O) just to discard it.
+        self.__dict__.pop("published_file_id", None)
 
     @property
     def mod_folder(self) -> str | None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -14,6 +15,36 @@ from pxmodrim.core.services.mod_discovery import scan_mod_directory
 
 if TYPE_CHECKING:
     from pxmodrim.core.services.metadata_cache import MetadataCache
+
+
+_in_flight_scans: dict[Path, asyncio.Task[dict[Path, tuple[Path, bool]]]] = {}
+
+
+def _scan_with_pfid(path: Path) -> dict[Path, tuple[Path, bool]]:
+    return {
+        d: (a, os.path.exists(os.path.join(d, "About", "PublishedFileId.txt")))
+        for d, a in scan_mod_directory(path).items()
+    }
+
+
+async def _shared_scan(path: Path) -> dict[Path, tuple[Path, bool]]:
+    """Scan *path* once for concurrent callers.
+
+    Local and downloaded providers share a root and run in parallel; joining an
+    in-flight scan halves the disk work while never reusing a finished result.
+    """
+    task = _in_flight_scans.get(path)
+    if task is None or task.get_loop() is not asyncio.get_running_loop():
+        task = asyncio.ensure_future(asyncio.to_thread(_scan_with_pfid, path))
+        _in_flight_scans[path] = task
+        task.add_done_callback(
+            lambda t: (
+                _in_flight_scans.pop(path, None)
+                if _in_flight_scans.get(path) is t
+                else None
+            )
+        )
+    return await asyncio.shield(task)
 
 
 class LocalModProvider(BaseModProvider):
@@ -41,14 +72,8 @@ class LocalModProvider(BaseModProvider):
             return {}
         logger.debug("LocalModProvider scanning: {}", self._path)
         with tm("scan_dir"):
-            dirs = await asyncio.to_thread(scan_mod_directory, self._path)
-        filtered_dirs = await asyncio.to_thread(
-            lambda: {
-                d: a
-                for d, a in dirs.items()
-                if not (d / "About/PublishedFileId.txt").exists()
-            }
-        )
+            scanned = await _shared_scan(self._path)
+        filtered_dirs = {d: a for d, (a, has_pfid) in scanned.items() if not has_pfid}
         discovered = await self._load_mods(
             filtered_dirs,
             target_version,
@@ -85,14 +110,8 @@ class DownloadedModProvider(BaseModProvider):
             return {}
         logger.debug("DownloadedModProvider scanning: {}", self._path)
         with tm("scan_dir"):
-            dirs = await asyncio.to_thread(scan_mod_directory, self._path)
-        filtered_dirs = await asyncio.to_thread(
-            lambda: {
-                d: a
-                for d, a in dirs.items()
-                if (d / "About/PublishedFileId.txt").exists()
-            }
-        )
+            scanned = await _shared_scan(self._path)
+        filtered_dirs = {d: a for d, (a, has_pfid) in scanned.items() if has_pfid}
         discovered = await self._load_mods(
             filtered_dirs,
             target_version,

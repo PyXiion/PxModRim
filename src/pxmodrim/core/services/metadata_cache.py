@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,24 @@ def metadata_cache_path(config_dir: Path) -> Path:
 
 
 def normalize_path(path: Path | str) -> str:
-    return str(Path(path).resolve())
+    # Same result as str(Path(path).resolve()) without the pathlib round-trips.
+    return os.path.realpath(path)
+
+
+def normalize_paths(paths: list[Path]) -> list[str]:
+    """``normalize_path`` for many paths, resolving each shared parent only once."""
+    parents: dict[str, str] = {}
+    out: list[str] = []
+    for path in paths:
+        head, tail = os.path.split(os.fspath(path))
+        if not head or tail in ("", ".", "..") or os.path.islink(path):
+            out.append(os.path.realpath(path))
+            continue
+        real_head = parents.get(head)
+        if real_head is None:
+            real_head = parents[head] = os.path.realpath(head)
+        out.append(os.path.join(real_head, tail))
+    return out
 
 
 def serialize_mod(mod: AboutXmlMod) -> dict[str, Any]:
@@ -114,6 +132,34 @@ def deserialize_mod(mod_path: Path, data: dict[str, Any]) -> AboutXmlMod:
     rules.dependencies = deps
     mod.about_rules = rules
     return mod
+
+
+def _decode_rows(
+    rows: list[Any],
+    norm_map: dict[str, tuple[Path, Path, float, int]],
+    target_version: str,
+) -> tuple[dict[Path, AboutXmlMod], list[tuple[Path, Path, float, int]]]:
+    cached_mods: dict[Path, AboutXmlMod] = {}
+    found_norms: set[str] = set()
+    for norm_p, _about_p, mtime, file_size, ver, payload in rows:
+        cand = norm_map.get(norm_p)
+        if cand is None:
+            continue
+        orig_mod_path, _orig_about_path, cur_mtime, cur_size = cand
+        if (
+            abs(mtime - cur_mtime) < 1e-4
+            and file_size == cur_size
+            and ver == target_version
+        ):
+            try:
+                mod = deserialize_mod(orig_mod_path, json.loads(payload))
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning("Corrupted metadata cache payload for {}: {}", norm_p, e)
+                continue
+            cached_mods[orig_mod_path] = mod
+            found_norms.add(norm_p)
+    missing = [c for n, c in norm_map.items() if n not in found_norms]
+    return cached_mods, missing
 
 
 class MetadataCache:
@@ -241,44 +287,22 @@ class MetadataCache:
         if conn is None:
             return {}, list(candidates)
 
-        norm_map = {normalize_path(c[0]): c for c in candidates}
-        cached_mods: dict[Path, AboutXmlMod] = {}
-        missing: list[tuple[Path, Path, float, int]] = []
+        norm_map = await asyncio.to_thread(
+            lambda: dict(
+                zip(
+                    normalize_paths([c[0] for c in candidates]), candidates, strict=True
+                )
+            )
+        )
 
         try:
             async with self._lock:
                 rows = await self._fetch_candidates(conn, list(norm_map.keys()))
-
-            found_norms: set[str] = set()
-            for row in rows:
-                norm_p, _about_p, mtime, file_size, ver, payload = row
-                cand = norm_map.get(norm_p)
-                if cand is None:
-                    continue
-                orig_mod_path, _orig_about_path, cur_mtime, cur_size = cand
-                if (
-                    abs(mtime - cur_mtime) < 1e-4
-                    and file_size == cur_size
-                    and ver == target_version
-                ):
-                    try:
-                        data = json.loads(payload)
-                        mod = deserialize_mod(orig_mod_path, data)
-                        cached_mods[orig_mod_path] = mod
-                        found_norms.add(norm_p)
-                    except (json.JSONDecodeError, KeyError) as e:
-                        logger.warning(
-                            "Corrupted metadata cache payload for {}: {}", norm_p, e
-                        )
-
-            for norm_p, cand in norm_map.items():
-                if norm_p not in found_norms:
-                    missing.append(cand)
-
-            return cached_mods, missing
         except (sqlite3.Error, aiosqlite.Error, OSError) as exc:
             logger.warning("Error reading metadata cache: {}", exc)
             return {}, list(candidates)
+
+        return await asyncio.to_thread(_decode_rows, rows, norm_map, target_version)
 
     async def _fetch_candidates(
         self, conn: aiosqlite.Connection, norm_paths: list[str]

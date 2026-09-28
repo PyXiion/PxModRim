@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -53,13 +54,17 @@ class BaseModProvider(ABC):
         tm = timer or Timer()
         cache = metadata_cache if metadata_cache is not None else self._metadata_cache
 
-        candidates: list[tuple[Path, Path, float, int]] = []
-        for d, a in dirs.items():
-            try:
-                st = a.stat()
-                candidates.append((d, a, st.st_mtime, st.st_size))
-            except OSError:
-                continue
+        def _stat_all() -> list[tuple[Path, Path, float, int]]:
+            out: list[tuple[Path, Path, float, int]] = []
+            for d, a in dirs.items():
+                try:
+                    st = os.stat(a)
+                except OSError:
+                    continue
+                out.append((d, a, st.st_mtime, st.st_size))
+            return out
+
+        candidates = await asyncio.to_thread(_stat_all)
 
         result: dict[str, ListedMod] = {}
         if force_reparse:
@@ -87,6 +92,8 @@ class BaseModProvider(ABC):
                     mod.provider_id = self.provider_id
                     result[mod.uuid] = mod
 
+        # Warm the disk-backed cached_property off the UI thread.
+        await asyncio.to_thread(lambda: [m.published_file_id for m in result.values()])
         return result
 
     async def _parse_candidates(

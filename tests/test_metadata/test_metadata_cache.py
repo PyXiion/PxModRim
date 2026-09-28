@@ -370,3 +370,22 @@ async def test_minimal_context_does_not_use_user_cache(tmp_path: Path) -> None:
     provider = LocalModProvider(mods_root)
     mod_service = ModService(ctx, [provider])
     assert mod_service._metadata_cache is None
+
+
+def test_normalize_paths_matches_normalize_path(tmp_path: Path) -> None:
+    from pxmodrim.core.services.metadata_cache import normalize_path, normalize_paths
+
+    real = tmp_path / "real"
+    (real / "mod").mkdir(parents=True)
+    (tmp_path / "other").mkdir()
+    (tmp_path / "linkdir").symlink_to(real)
+    (real / "linkmod").symlink_to(tmp_path / "other")
+    paths = [
+        real / "mod",
+        tmp_path / "linkdir" / "mod",
+        tmp_path / "linkdir" / "linkmod",
+        tmp_path / "linkdir" / ".." / "real" / "mod",
+        tmp_path / "missing" / "x",
+        Path("relative/mod"),
+    ]
+    assert normalize_paths(paths) == [normalize_path(p) for p in paths]

@@ -27,18 +27,23 @@ USE_THIS_INSTEAD_URL = (
 class NoVersionWarningService:
     """Service to download and cache the NoVersionWarning package-ID list."""
 
-    __slots__ = ("_cache_dir", "_pids", "_xml_path")
+    __slots__ = ("_cache_dir", "_loaded_stamp", "_pids", "_xml_path")
 
     def __init__(self, config_service: ConfigService) -> None:
         self._cache_dir = config_service.config_dir
         self._xml_path = self._cache_dir / "ModIdsToFix.xml"
         self._pids: set[PackageId] = set()
+        self._loaded_stamp: tuple[int, int] | None = None
 
     async def ensure(self, force: bool = False) -> set[PackageId]:
         """Return cached PIDs, or download and cache them if missing or forced."""
-        if self._xml_path.exists() and not force:
-            self._pids = self._load()
-            return self._pids
+        if not force:
+            stamp = await asyncio.to_thread(_file_stamp, self._xml_path)
+            if stamp is not None:
+                if stamp != self._loaded_stamp:
+                    self._pids = await asyncio.to_thread(self._load)
+                    self._loaded_stamp = stamp
+                return self._pids
         return await self._download()
 
     def load_if_exists(self) -> set[PackageId]:
@@ -104,18 +109,23 @@ class NoVersionWarningService:
 class UseThisInsteadService:
     """Service to download and cache the UseThisInstead replacement database."""
 
-    __slots__ = ("_cache_dir", "_entries", "_json_path")
+    __slots__ = ("_cache_dir", "_entries", "_json_path", "_loaded_stamp")
 
     def __init__(self, config_service: ConfigService) -> None:
         self._cache_dir = config_service.config_dir
         self._json_path = self._cache_dir / "replacements.json.gz"
         self._entries: dict[str, ReplacementInfo] = {}
+        self._loaded_stamp: tuple[int, int] | None = None
 
     async def ensure(self, force: bool = False) -> Mapping[str, ReplacementInfo]:
         """Return cached replacement entries, download if missing or forced."""
-        if self._json_path.exists() and not force:
-            self._entries = self._load()
-            return self._entries
+        if not force:
+            stamp = await asyncio.to_thread(_file_stamp, self._json_path)
+            if stamp is not None:
+                if stamp != self._loaded_stamp:
+                    self._entries = await asyncio.to_thread(self._load)
+                    self._loaded_stamp = stamp
+                return self._entries
         return await self._download()
 
     def load_if_exists(self) -> Mapping[str, ReplacementInfo]:
@@ -192,6 +202,15 @@ class UseThisInsteadService:
 
         _rmtree(zip_path, extract_dir)
         return {}
+
+
+def _file_stamp(path: Path) -> tuple[int, int] | None:
+    """(mtime_ns, size) of *path*, or None when it does not exist."""
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
 
 
 def _rmtree(zip_path: Path, extract_dir: Path) -> None:

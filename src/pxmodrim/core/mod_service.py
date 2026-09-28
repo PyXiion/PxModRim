@@ -26,7 +26,7 @@ from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.services.metadata_cache import (
     MetadataCache,
     metadata_cache_path,
-    normalize_path,
+    normalize_paths,
 )
 from pxmodrim.core.services.mod_discovery import resolve_active_uuids
 from pxmodrim.core.services.startup_impact_service import StartupImpactService
@@ -101,11 +101,12 @@ class ModService:
                 all_mods.update(mods)
             with timer("cache_prune"):
                 if self._metadata_cache is not None:
-                    live_paths = {
-                        normalize_path(m.mod_path)
-                        for m in all_mods.values()
-                        if m.mod_path is not None
-                    }
+                    mod_paths = [
+                        m.mod_path for m in all_mods.values() if m.mod_path is not None
+                    ]
+                    live_paths = await asyncio.to_thread(
+                        lambda: set(normalize_paths(mod_paths))
+                    )
                     await self._metadata_cache.prune_disappeared(live_paths)
             with timer("resolve_active"):
                 active = resolve_active_uuids(
@@ -235,18 +236,21 @@ class ModService:
             if isinstance(mod, AboutXmlMod):
                 package_ids.append(mod.package_id)
         config_path = Path(config_folder) / "ModsConfig.xml"
-        existing = parse_mods_config(config_path)
-        data = ModsConfig(
-            version=self._ctx.target_version,
-            activeMods=package_ids,
-            knownExpansions=existing.knownExpansions if existing else [],
-        )
-        write_mods_config(
-            config_path,
-            data,
-            snapshots_dir,
-            max_snapshots=self._ctx.config.max_snapshots,
-        )
+        target_version = self._ctx.target_version
+        max_snapshots = self._ctx.config.max_snapshots
+
+        def _write() -> None:
+            existing = parse_mods_config(config_path)
+            data = ModsConfig(
+                version=target_version,
+                activeMods=package_ids,
+                knownExpansions=existing.knownExpansions if existing else [],
+            )
+            write_mods_config(
+                config_path, data, snapshots_dir, max_snapshots=max_snapshots
+            )
+
+        await asyncio.to_thread(_write)
         return True
 
     async def close(self) -> None:
