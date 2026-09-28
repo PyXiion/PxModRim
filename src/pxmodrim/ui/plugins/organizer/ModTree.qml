@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../../components/controls"
 
 Rectangle {
     id: root
@@ -74,9 +75,35 @@ Rectangle {
         return -1
     }
 
+    property int modelRevision: 0
+    readonly property bool noModsInstalled: {
+        modelRevision
+        if (tree.rows !== 1)
+            return false
+        var idx = tree.index(0, 0)
+        return modTreeModel.data(idx, Qt.UserRole + 1) === "ungrouped"
+            && modTreeModel.data(idx, Qt.UserRole + 7) === 0
+    }
+
+    function selectAll() {
+        if (tree.rows === 0)
+            return
+        var all = []
+        for (var r = 0; r < tree.rows; ++r)
+            all.push(tree.index(r, 0))
+        organizerPanel.selectRow(all[0], Qt.NoModifier, [])
+        organizerPanel.selectRow(all[all.length - 1], Qt.ShiftModifier, all)
+        root.anchorRow = 0
+        root.focusedRow = tree.rows - 1
+    }
+
     Connections {
         target: modTreeModel
+        function onDataChanged() { root.modelRevision++ }
+        function onRowsInserted() { root.modelRevision++ }
+        function onRowsRemoved() { root.modelRevision++ }
         function onModelReset() {
+            root.modelRevision++
             root.anchorRow = -1
             Qt.callLater(root.restoreExpansion)
             root.focusedRow = -1
@@ -96,7 +123,7 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         reuseItems: false
         focus: true
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
         Keys.onPressed: function(event) {
             var row = root.activeRow()
             if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
@@ -121,6 +148,16 @@ Rectangle {
                 event.accepted = true
             } else if (event.key === Qt.Key_Space && row >= 0) {
                 organizerPanel.toggleCheck(tree.index(row, 0))
+                event.accepted = true
+            } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && row >= 0) {
+                var enterIndex = tree.index(row, 0)
+                if (tree.hasChildren(row))
+                    root.toggleRow(enterIndex, row)
+                else
+                    organizerPanel.toggleCheck(enterIndex)
+                event.accepted = true
+            } else if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
+                root.selectAll()
                 event.accepted = true
             }
         }
@@ -185,26 +222,15 @@ Rectangle {
                 Item {
                     Layout.preferredWidth: 20
                     Layout.preferredHeight: 28
-                    Rectangle {
+                    PxCheckIndicator {
                         anchors.centerIn: parent
-                        width: 16
-                        height: 16
-                        radius: 3
-                        color: item.model.checkState === Qt.Checked ? Theme.primary
-                               : item.model.checkState === Qt.PartiallyChecked ? Theme.primaryBg : Theme.elevate3
-                        border.color: item.model.checkState === Qt.Unchecked ? Theme.textDim : Theme.primary
-                        border.width: 1.5
-                        Text {
-                            anchors.centerIn: parent
-                            visible: item.model.checkState !== Qt.Unchecked
-                            text: item.model.checkState === Qt.Checked ? "\u2713" : "−"
-                            color: Theme.elevate0
-                            font.pixelSize: 12
-                            font.bold: true
-                        }
+                        checkState: item.model.checkState
+                        hovered: checkMouse.containsMouse
                     }
                     MouseArea {
+                        id: checkMouse
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         Accessible.role: Accessible.CheckBox
                         Accessible.name: (item.model.checkState === Qt.Checked ? "Disable " : "Enable ") + item.model.name
@@ -232,6 +258,7 @@ Rectangle {
                     Layout.fillWidth: true
                     color: item.model.kind === "ungrouped" || (item.model.kind === "mod" && item.model.checkState !== Qt.Checked)
                            ? Theme.textMuted : Theme.textMain
+                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeMd
                     font.bold: item.model.kind !== "mod"
                     font.italic: item.model.kind === "ungrouped"
@@ -242,13 +269,14 @@ Rectangle {
                     visible: !!item.model.hasRule
                     Layout.preferredWidth: ruleText.implicitWidth + 12
                     Layout.preferredHeight: 18
-                    radius: 9
+                    radius: Theme.radiusPill
                     color: Theme.warningBg
                     Text {
                         id: ruleText
                         anchors.centerIn: parent
-                        text: "auto"
+                        text: "Auto"
                         color: Theme.warning
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                     }
                 }
@@ -260,13 +288,14 @@ Rectangle {
                         property color chipColor: modelData.color
                         Layout.preferredWidth: tagLabel.implicitWidth + 14
                         Layout.preferredHeight: 18
-                        radius: 9
+                        radius: Theme.radiusPill
                         color: Qt.rgba(chipColor.r, chipColor.g, chipColor.b, 0.14)
                         Text {
                             id: tagLabel
                             anchors.centerIn: parent
                             text: modelData.name
                             color: modelData.color
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.bold: true
                         }
@@ -278,33 +307,21 @@ Rectangle {
                     Layout.maximumWidth: Math.max(80, item.width * 0.30)
                     color: Theme.textDim
                     font.pixelSize: Theme.fontSizeSm
-                    font.family: "monospace"
+                    font.family: Theme.fontMono
                     horizontalAlignment: Text.AlignRight
                     elide: Text.ElideLeft
                 }
 
-                Image {
+                DiagnosticBadge {
                     visible: !!item.model.hasError
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 16
-                    source: "image://icons/error?color=" + encodeURIComponent(Theme.danger)
-                    sourceSize.width: 16
-                    sourceSize.height: 16
-                    ToolTip.visible: errorHover.containsMouse
-                    ToolTip.text: item.model.errorTooltip || ""
-                    MouseArea { id: errorHover; anchors.fill: parent; hoverEnabled: true }
+                    level: "error"
+                    tooltip: item.model.errorTooltip || ""
                 }
 
-                Image {
+                DiagnosticBadge {
                     visible: !!item.model.hasWarning
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 16
-                    source: "image://icons/warning?color=" + encodeURIComponent(Theme.warning)
-                    sourceSize.width: 16
-                    sourceSize.height: 16
-                    ToolTip.visible: warningHover.containsMouse
-                    ToolTip.text: item.model.warningTooltip || ""
-                    MouseArea { id: warningHover; anchors.fill: parent; hoverEnabled: true }
+                    level: "warning"
+                    tooltip: item.model.warningTooltip || ""
                 }
 
                 Rectangle {
@@ -320,6 +337,7 @@ Rectangle {
                               ? item.model.visibleCount + " of " + item.model.totalCount
                               : item.model.enabledCount + "/" + item.model.totalCount
                         color: Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                     }
                 }
@@ -403,16 +421,15 @@ Rectangle {
         function onTagCreated() { tagEditor.clearInputs() }
     }
 
-    Text {
+    EmptyState {
         anchors.centerIn: parent
         width: parent.width - 48
-        horizontalAlignment: Text.AlignHCenter
-        wrapMode: Text.WordWrap
-        visible: organizerPanel && (!organizerPanel.ready || tree.rows === 0)
-        text: organizerPanel && organizerPanel.ready
-              ? "No mods match this filter"
-              : "Loading organizer..."
-        color: Theme.textDim
-        font.pixelSize: Theme.fontSizeMd
+        visible: organizerPanel && (!organizerPanel.ready || tree.rows === 0 || root.noModsInstalled)
+        iconName: organizerPanel && organizerPanel.ready ? "empty" : ""
+        title: !organizerPanel || !organizerPanel.ready ? "Loading organizer…"
+               : root.noModsInstalled ? "No mods installed"
+               : "No mods match this filter"
+        detail: organizerPanel && organizerPanel.ready && !root.noModsInstalled
+                ? "Try a different filter or search." : ""
     }
 }

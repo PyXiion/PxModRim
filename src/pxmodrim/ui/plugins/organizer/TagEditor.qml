@@ -8,14 +8,14 @@ PxDialog {
     objectName: "organizerTagEditor"
     width: Math.min(520, parent ? parent.width - 32 : 520)
     height: Math.min(570, parent ? parent.height - 32 : 570)
-    title: "Manage tags"
+    title: "Manage Tags"
     standardButtons: Dialog.Close
 
     property var tagRows: []
     property int selectedCount: 0
     function clearInputs() {
         nameInput.text = ""
-        colorInput.text = "#66c0f4"
+        colorInput.text = String(Theme.primary)
     }
     property string errorMessage: ""
     signal createRequested(string name, string color)
@@ -27,17 +27,22 @@ PxDialog {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 16
         spacing: 10
 
-        Label {
+        Text {
             Layout.fillWidth: true
-            text: editor.selectedCount ? "Toggle tags for " + editor.selectedCount + " selected mod(s). Changes apply immediately." : "Create and edit tags. Select mods to assign tags."
+            text: editor.selectedCount
+                  ? "Toggle tags for " + editor.selectedCount + " selected "
+                    + (editor.selectedCount === 1 ? "mod" : "mods") + ". Changes apply immediately."
+                  : "Create and edit tags. Select mods to assign tags."
             color: Theme.textMuted
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
             wrapMode: Text.WordWrap
         }
 
         ScrollView {
+            ScrollBar.vertical: PxScrollBar {}
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -63,8 +68,10 @@ PxDialog {
                             checkState: tagRow.row.checkState === 2 ? Qt.PartiallyChecked : tagRow.row.checkState === 1 ? Qt.Checked : Qt.Unchecked
                             nextCheckState: function() { return checkState === Qt.Checked ? Qt.Unchecked : Qt.Checked }
                             onClicked: editor.assignmentRequested(tagRow.row.id, checkState === Qt.Checked)
-                            ToolTip.visible: hovered
-                            ToolTip.text: checkState === Qt.PartiallyChecked ? "Assigned to some selected mods" : "Assign or remove for selected mods"
+                            PxToolTip {
+                                visible: parent.hovered
+                                text: parent.checkState === Qt.PartiallyChecked ? "Assigned to some selected mods" : "Assign or remove for selected mods"
+                            }
                         }
                         Rectangle {
                             Layout.preferredWidth: 14
@@ -126,7 +133,13 @@ PxDialog {
             }
         }
 
-        Label { text: "New tag"; color: Theme.textMain }
+        Text {
+            text: "New tag"
+            color: Theme.textMain
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeMd
+            font.weight: Font.Medium
+        }
         RowLayout {
             Layout.fillWidth: true
             PxTextField {
@@ -152,13 +165,10 @@ PxDialog {
                 onClicked: editor.createRequested(nameInput.text, colorInput.text)
             }
         }
-        Label {
+        ErrorBanner {
             objectName: "organizerTagError"
-            visible: editor.errorMessage.length > 0
             Layout.fillWidth: true
             text: editor.errorMessage
-            color: Theme.danger
-            wrapMode: Text.WordWrap
         }
     }
 
@@ -166,37 +176,30 @@ PxDialog {
         id: deleteConfirm
         objectName: "organizerDeleteTagConfirm"
         width: Math.min(360, parent ? parent.width - 32 : 360)
-        title: "Delete tag?"
+        title: "Delete Tag?"
         property int tagId: -1
         property string tagName: ""
 
-        Label {
+        Text {
             width: parent.width
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeMd
             text: "Delete ‘" + deleteConfirm.tagName + "’ from all mods?"
             color: Theme.textMain
             wrapMode: Text.WordWrap
         }
 
-        footer: DialogButtonBox {
-            alignment: Qt.AlignRight
-            background: Item {
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: 1
-                    color: Theme.border
-                }
-            }
+        footer: PxDialogFooter {
             PxButton {
                 text: "Cancel"
                 variant: "ghost"
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+                onClicked: deleteConfirm.reject()
             }
             PxButton {
+                objectName: "organizerDeleteTagConfirmButton"
                 text: "Delete"
-                variant: "danger"
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+                variant: "dangerSolid"
+                onClicked: deleteConfirm.accept()
             }
         }
 

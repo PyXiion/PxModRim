@@ -220,14 +220,18 @@ FocusScope {
     }
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 12
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: footer.top
+        anchors.margins: 16
         spacing: 10
 
         Text {
             Layout.fillWidth: true
             text: "Evaluated top to bottom: first match wins. Rules choose folders only for mods without a manual placement. Moving a mod manually always takes priority; saving updates rule-based folders immediately."
             color: Theme.textMuted
+            font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSm
             wrapMode: Text.WordWrap
         }
@@ -238,9 +242,10 @@ FocusScope {
 
             PxButton {
                 objectName: "organizerAddRule"
-                text: "Add Rule"
+                text: "Add rule"
                 variant: "secondary"
                 enabled: root.hasFolders
+                ToolTip.text: root.hasFolders ? "" : "Create a folder first"
                 onClicked: root.addRule()
             }
 
@@ -253,48 +258,25 @@ FocusScope {
                 onClicked: organizerPanel.addStandardRules()
             }
 
-            Text {
-                visible: !root.hasFolders
-                text: "Create a folder first."
-                color: Theme.warning
-                font.pixelSize: Theme.fontSizeSm
-            }
-
             Item { Layout.fillWidth: true }
 
             Text {
                 text: draftModel.count === 1 ? "1 rule" : draftModel.count + " rules"
                 color: Theme.textDim
+                font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSm
             }
         }
 
-        Rectangle {
-            id: errorBanner
+        ErrorBanner {
+            objectName: "organizerRuleError"
             Layout.fillWidth: true
-            visible: root.errorMessage !== ""
-            color: Theme.dangerBg
-            border.color: Theme.danger
-            border.width: 1
-            radius: Theme.radiusSm
-            implicitHeight: errorText.implicitHeight + 14
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 6
-                Text {
-                    id: errorText
-                    Layout.fillWidth: true
-                    text: root.errorMessage
-                    color: Theme.danger
-                    font.pixelSize: Theme.fontSizeSm
-                    wrapMode: Text.Wrap
-                }
-            }
+            text: root.errorMessage
         }
 
         ScrollView {
             id: scrollArea
+            ScrollBar.vertical: PxScrollBar {}
             objectName: "organizerRuleScrollArea"
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -342,6 +324,7 @@ FocusScope {
                                 Text {
                                     text: String(rowItem.index + 1)
                                     color: Theme.textDim
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeSm
                                     Layout.preferredWidth: 16
                                     horizontalAlignment: Text.AlignHCenter
@@ -372,7 +355,7 @@ FocusScope {
                                     Layout.fillWidth: true
                                     Layout.minimumWidth: 60
                                     text: rowItem.pattern
-                                    placeholderText: "Pattern..."
+                                    placeholderText: "Pattern…"
                                     onTextEdited: root.setRulePattern(rowItem.index, text)
                                 }
 
@@ -385,6 +368,8 @@ FocusScope {
                                 Text {
                                     text: "→"
                                     color: Theme.textMuted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeMd
                                 }
 
                                 PxComboBox {
@@ -403,8 +388,8 @@ FocusScope {
                                     variant: "ghost"
                                     iconName: "chevron-down"
                                     iconRotation: 180
-                                    Layout.preferredWidth: 28
-                                    Layout.preferredHeight: 30
+                                    Layout.preferredWidth: 32
+                                    Layout.preferredHeight: 32
                                     ToolTip.text: "Move rule up"
                                     enabled: rowItem.index > 0
                                     onClicked: root.moveUp(rowItem.index)
@@ -414,8 +399,8 @@ FocusScope {
                                     objectName: "organizerRuleDown"
                                     variant: "ghost"
                                     iconName: "chevron-down"
-                                    Layout.preferredWidth: 28
-                                    Layout.preferredHeight: 30
+                                    Layout.preferredWidth: 32
+                                    Layout.preferredHeight: 32
                                     ToolTip.text: "Move rule down"
                                     enabled: rowItem.index < draftModel.count - 1
                                     onClicked: root.moveDown(rowItem.index)
@@ -425,8 +410,8 @@ FocusScope {
                                     objectName: "organizerRuleRemove"
                                     variant: "danger"
                                     iconName: "trash"
-                                    Layout.preferredWidth: 28
-                                    Layout.preferredHeight: 30
+                                    Layout.preferredWidth: 32
+                                    Layout.preferredHeight: 32
                                     ToolTip.text: "Remove rule"
                                     onClicked: root.removeRule(rowItem.index)
                                 }
@@ -442,6 +427,7 @@ FocusScope {
                                     return hits + (hits === 1 ? " mod matches first here" : " mods match first here")
                                 }
                                 color: Theme.textDim
+                                font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSm
                             }
                         }
@@ -458,49 +444,38 @@ FocusScope {
                 + (root.preview.assignable === 1 ? "mod would" : "mods would")
                 + " be assigned by these rules"
             color: Theme.textMuted
+            font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSm
-        }
-        Text {
-            Layout.alignment: Qt.AlignHCenter
-            visible: draftModel.count === 0
-            text: root.hasFolders ? "No rules configured. Click 'Add Rule'." : "No folders available."
-            color: Theme.textDim
-            font.pixelSize: Theme.fontSizeMd
-        }
-        DialogButtonBox {
-            Layout.fillWidth: true
-            alignment: Qt.AlignRight
-            spacing: 8
-            padding: 12
-            leftPadding: 16
-            rightPadding: 16
-
-            background: Item {
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: 1
-                    color: Theme.border
-                }
-            }
-
-            onRejected: organizerPanel.closeRules()
-
-            PxButton {
-                text: "Cancel"
-                variant: "ghost"
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-
-            PxButton {
-                objectName: "organizerSaveRules"
-                text: "Save"
-                variant: "primary"
-                DialogButtonBox.buttonRole: DialogButtonBox.ApplyRole
-                onClicked: root.submitRules()
-            }
         }
     }
 
+    EmptyState {
+        anchors.centerIn: parent
+        width: parent.width - 64
+        visible: draftModel.count === 0
+        iconName: "folder"
+        title: root.hasFolders ? "No rules configured" : "No folders available"
+        detail: root.hasFolders ? "Click “Add rule” to create one." : "Create a folder first."
+    }
+
+    PxDialogFooter {
+        id: footer
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+
+        PxButton {
+            objectName: "organizerCancelRules"
+            text: "Cancel"
+            variant: "ghost"
+            onClicked: organizerPanel.closeRules()
+        }
+
+        PxButton {
+            objectName: "organizerSaveRules"
+            text: "Save"
+            variant: "primary"
+            onClicked: root.submitRules()
+        }
+    }
 }
