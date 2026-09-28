@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
@@ -57,6 +58,23 @@ if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModDiagnosticsView
 
 
+class UnsavedChangesDialog(QMessageBox):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setIcon(QMessageBox.Icon.Question)
+        self.setWindowTitle("Unsaved changes")
+        self.setText("The active mod list has unsaved changes.")
+        self.setInformativeText(
+            "Save before closing, discard the changes, or cancel closing."
+        )
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel
+        )
+        self.setDefaultButton(QMessageBox.StandardButton.Save)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, app_ctx: AppContext) -> None:
         """Initialize the main application window."""
@@ -68,10 +86,17 @@ class MainWindow(QMainWindow):
         self._ctx = app_ctx.core
         self._ui_prefs = app_ctx.ui_prefs
         self._selected_uuid: str | None = None
+        self._saved_active_uuids = self._ctx.active_uuids
+        self._unsaved_changes = False
+        self._close_prompt_open = False
+        self._close_confirmed = False
+        self._close_task: asyncio.Task[None] | None = None
 
         self._setup_window_basics()
         self._setup_qml()
         self._setup_header_and_shortcuts()
+        self._ctx.active_state_changed.connect(self._on_active_state_changed)
+        self._ctx.mod_service.mods_changed.connect(self._on_mods_reloaded)
         self._setup_content_and_views()
         self._setup_toast_and_events()
 
@@ -285,7 +310,28 @@ class MainWindow(QMainWindow):
         """Store the callback used to end the async run loop on close."""
         self._app_quit_callback = callback
 
+    async def _confirm_close(self) -> None:
+        try:
+            result, _ = await await_dialog(UnsavedChangesDialog, self)
+        finally:
+            self._close_prompt_open = False
+
+        if result == QMessageBox.StandardButton.Save:
+            if not await self._save_active_mods():
+                return
+        elif result != QMessageBox.StandardButton.Discard:
+            return
+
+        self._close_confirmed = True
+        self.close()
+
     def closeEvent(self, event: QCloseEvent) -> None:
+        if self._unsaved_changes and not self._close_confirmed:
+            event.ignore()
+            if not self._close_prompt_open:
+                self._close_prompt_open = True
+                self._close_task = asyncio.create_task(self._confirm_close())
+            return
         logger.info("main_window: shutting down")
         # Release WebEngine views (their dedicated profiles) before the
         # Qt widget tree is torn down. Then disconnect aboutToQuit: on this
@@ -402,23 +448,45 @@ class MainWindow(QMainWindow):
         count, elapsed = await self._ctx.auto_sort()
         self._toast_manager.success(f"Sorted {count} mods in {elapsed:.0f}ms", 5000)
 
+    def _on_active_state_changed(self, _active_uuids: tuple[str, ...]) -> None:
+        self._refresh_unsaved_state()
+
+    def _on_mods_reloaded(self, _: None = None) -> None:
+        # ctx.load() replaces the active list without emitting active_state_changed,
+        # so the freshly loaded list becomes the new clean baseline.
+        self._saved_active_uuids = self._ctx.active_uuids
+        self._refresh_unsaved_state()
+
+    def _refresh_unsaved_state(self) -> None:
+        self._unsaved_changes = self._ctx.active_uuids != self._saved_active_uuids
+        self._header_controller.set_unsaved_changes(self._unsaved_changes)
+        self.setWindowTitle("*PxModRim" if self._unsaved_changes else "PxModRim")
+
     @asyncSlot()
     async def _save_mods_config(self) -> None:
+        await self._save_active_mods()
+
+    async def _save_active_mods(self) -> bool:
         active_ids = self.mod_list.active_uuids()
         ok = await self._ctx.mod_service.save_active_layout(active_ids)
         if ok:
+            self._saved_active_uuids = list(active_ids)
+            self._refresh_unsaved_state()
             self._toast_manager.success(f"Saved {len(active_ids)} active mods", 3000)
         else:
             self._toast_manager.warning("Config folder not set", 3000)
+        return ok
 
     @asyncSlot()
     async def _launch_game(self) -> None:
         logger.info("Launch requested")
 
-        ok = await self._ctx.mod_service.save_active_layout(
-            self.mod_list.active_uuids()
-        )
-        if not ok:
+        active_ids = self.mod_list.active_uuids()
+        ok = await self._ctx.mod_service.save_active_layout(active_ids)
+        if ok:
+            self._saved_active_uuids = list(active_ids)
+            self._refresh_unsaved_state()
+        else:
             logger.warning("Config folder not set — mod list not saved before launch")
             self._toast_manager.warning(
                 "Config folder not set — mod list won't be saved"

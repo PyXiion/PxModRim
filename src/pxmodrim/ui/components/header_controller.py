@@ -15,6 +15,7 @@ class HeaderController(QObject):
     maximize_requested = Signal()
     close_requested = Signal()
     drag_started = Signal()
+    unsaved_changes_changed = Signal()
 
     def __init__(
         self,
@@ -26,6 +27,7 @@ class HeaderController(QObject):
         self._is_frameless = is_frameless
         self._maximized = False
         self._strategy_index: int = initial_strategy
+        self._unsaved_changes = False
 
     def is_frameless_getter(self) -> bool:
         return self._is_frameless
@@ -94,3 +96,19 @@ class HeaderController(QObject):
         return self._strategy_index
 
     strategyIndex = Property(int, _get_strategy_index, notify=strategy_changed)
+
+    def _get_unsaved_changes(self) -> bool:
+        return self._unsaved_changes
+
+    @Slot(bool)
+    def set_unsaved_changes(self, value: bool) -> None:
+        if self._unsaved_changes != value:
+            self._unsaved_changes = value
+            self.unsaved_changes_changed.emit()
+
+    unsavedChanges = Property(
+        bool,
+        _get_unsaved_changes,
+        set_unsaved_changes,
+        notify=unsaved_changes_changed,
+    )

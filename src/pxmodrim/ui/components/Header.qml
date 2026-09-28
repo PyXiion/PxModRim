@@ -87,8 +87,15 @@ Rectangle {
                 HeaderButton {
                     iconName: "save"
                     bgColor: Theme.elevate0
-                    tooltip: "Save (Ctrl+S)"
+                    tooltip: root.controller.unsavedChanges ? "Save unsaved changes (Ctrl+S)" : "Save (Ctrl+S)"
                     onClicked: root.controller.save()
+                }
+                Text {
+                    visible: root.controller.unsavedChanges
+                    text: "• Unsaved"
+                    color: Theme.warning
+                    font.pixelSize: 12
+                    verticalAlignment: Text.AlignVCenter
                 }
 
                 HeaderButton {
