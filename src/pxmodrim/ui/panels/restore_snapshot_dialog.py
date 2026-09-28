@@ -60,8 +60,8 @@ class RestoreSnapshotDialog(QDialog):
         cancel_btn = AppButton("Cancel", self)
         cancel_btn.clicked.connect(self.reject)
 
-        buttons.addWidget(self._restore_btn)
         buttons.addWidget(cancel_btn)
+        buttons.addWidget(self._restore_btn)
         layout.addLayout(buttons)
 
         self._list_widget.currentItemChanged.connect(self._on_item_changed)
@@ -102,16 +102,14 @@ class RestoreSnapshotDialog(QDialog):
             if parsed is not None:
                 active_count = len(parsed.activeMods)
                 noun = "mod" if active_count == 1 else "mods"
-                text = (
-                    f"{ts} — {active_count} active {noun}, RimWorld "
-                    f"{parsed.version}\n   {path.name}"
-                )
+                text = f"{ts} — {active_count} active {noun}, RimWorld {parsed.version}"
                 item.setData(Qt.ItemDataRole.UserRole, (path, True, parsed))
             else:
-                text = f"{ts} — Snapshot cannot be read\n   {path.name}"
+                text = f"{ts} — Cannot be read"
                 item.setData(Qt.ItemDataRole.UserRole, (path, False, None))
 
             item.setText(text)
+            item.setToolTip(path.name)
 
     def _on_item_changed(
         self, current: QListWidgetItem | None, _: QListWidgetItem | None
@@ -135,7 +133,7 @@ class RestoreSnapshotDialog(QDialog):
             self._selected_snapshot = None
             self._restore_btn.setEnabled(False)
             warn_msg = (
-                f"<b>This snapshot cannot be read.</b> "
+                f"<b>This saved mod list cannot be read.</b> "
                 f"{path.name} will not be restored."
             )
             self._details_label.setText(warn_msg)
@@ -168,6 +166,4 @@ class ConfirmRestoreDialog(QMessageBox):
         yes_btn = self.button(QMessageBox.StandardButton.Yes)
         if yes_btn:
             yes_btn.setText("Restore")
-        cancel_btn = self.button(QMessageBox.StandardButton.Cancel)
-        if cancel_btn:
-            cancel_btn.setText("Cancel")
+            yes_btn.setObjectName("primaryAction")
