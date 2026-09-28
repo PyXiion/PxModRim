@@ -159,7 +159,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         assert dialog is not None
         rules_button = view.rules_button
 
-        assert view._rules_dialog.parentWidget() is parent
+        assert view._rules_dialog.parentWidget() is view
         assert view._rules_dialog.windowTitle() == "Auto-Folder Rules"
         assert view._rules_dialog.isModal()
         assert view._rules_dialog.windowFlags() & Qt.WindowType.Dialog

@@ -153,7 +153,7 @@ class OrganizerViewPanel(BaseViewPanel):
             | Qt.WindowType.WindowCloseButtonHint
             | Qt.WindowType.WindowMinMaxButtonsHint
         )
-        self._rules_dialog = QDialog(self.window(), rules_flags)
+        self._rules_dialog = QDialog(self, rules_flags)
         self._rules_dialog.setObjectName("organizerRuleEditorWindow")
         self._rules_dialog.setWindowTitle("Auto-Folder Rules")
         self._rules_dialog.setWindowModality(Qt.WindowModality.WindowModal)
@@ -251,26 +251,24 @@ class OrganizerViewPanel(BaseViewPanel):
             QMetaObject.invokeMethod(rules_root, "schedulePreview")
 
     def _position_rules_dialog(self) -> None:
-        parent = self._rules_dialog.parentWidget()
-        if parent is None:
-            return
-        parent_geometry = parent.frameGeometry()
+        host = self.window()
+        host_geometry = host.frameGeometry()
         if not self._rules_dialog_opened_once:
-            available = parent.screen().availableGeometry()
+            available = host.screen().availableGeometry()
             width = min(
                 960,
-                max(800, parent_geometry.width() - 48),
+                max(800, host_geometry.width() - 48),
                 available.width() - 32,
             )
             height = min(
                 760,
-                max(600, parent_geometry.height() - 80),
+                max(600, host_geometry.height() - 80),
                 available.height() - 32,
             )
             self._rules_dialog.resize(width, height)
             self._rules_dialog_opened_once = True
         self._rules_dialog.move(
-            parent_geometry.center() - self._rules_dialog.rect().center()
+            host_geometry.center() - self._rules_dialog.rect().center()
         )
 
     def _clear_selection_anchor(self) -> None:
