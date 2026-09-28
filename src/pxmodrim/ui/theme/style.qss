@@ -103,6 +103,29 @@ QPushButton#primaryAction:hover {
     background-color: $PRIMARY_HOVER;
     border-color: $PRIMARY_HOVER;
 }
+/* Platform themes (e.g. Breeze) add dark icons to standard dialog buttons that
+   vanish on our dark background; drop them and match AppButton sizing. */
+QDialogButtonBox {
+    dialogbuttonbox-buttons-have-icons: 0;
+}
+QMessageBox QPushButton,
+QDialogButtonBox QPushButton {
+    padding: 6px 14px;
+    min-height: 18px;
+    min-width: 64px;
+}
+QMessageBox QPushButton:default,
+QDialogButtonBox QPushButton:default {
+    background-color: $PRIMARY;
+    border-color: $PRIMARY;
+    color: $ELEVATE_0;
+    font-weight: 600;
+}
+QMessageBox QPushButton:default:hover,
+QDialogButtonBox QPushButton:default:hover {
+    background-color: $PRIMARY_HOVER;
+    border-color: $PRIMARY_HOVER;
+}
 
 /* ── Line Edit ── */
 QLineEdit {
