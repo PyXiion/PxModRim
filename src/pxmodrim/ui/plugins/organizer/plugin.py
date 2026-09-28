@@ -14,4 +14,4 @@ class OrganizerUiPlugin(Plugin):
     dependencies: ClassVar[list[str]] = ["organizer"]
 
     def setup(self, ctx: AppContext) -> None:  # type: ignore[override]
-        ctx.add_rail_view(OrganizerViewPanel)
+        ctx.add_rail_view(OrganizerViewPanel, position=0)

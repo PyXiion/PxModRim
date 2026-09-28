@@ -17,6 +17,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QSplitter,
@@ -126,7 +127,7 @@ class MainWindow(QMainWindow):
             ("Ctrl+Q", "Quit", self.close),
             ("F5", "Refresh mods", self._header_controller.refresh),
             ("Ctrl+S", "Save mod list", self._header_controller.save),
-            ("Ctrl+F", "Focus mod list search", self._focus_search),
+            ("Ctrl+F", "Focus current view search", self._focus_search),
             ("F1", "About PxModRim", self._show_about),
             ("F11", "Toggle fullscreen", self._toggle_fullscreen),
             ("Ctrl+Shift+R", "Force full mod rescan", self._full_rescan),
@@ -145,7 +146,10 @@ class MainWindow(QMainWindow):
             QShortcut(QKeySequence(sequence), self, callback)
 
     def _focus_search(self) -> None:
-        if self._mods_view is not None:
+        search = getattr(self._stack.currentWidget(), "search_input", None)
+        if isinstance(search, QLineEdit):
+            search.setFocus()
+        elif self._mods_view is not None:
             self._mods_view.mod_list.search_input.setFocus()
 
     def _toggle_fullscreen(self) -> None:

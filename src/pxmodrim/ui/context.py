@@ -29,8 +29,11 @@ class AppContext:
 
     # ── Rail views ────────────────────────────────────
 
-    def add_rail_view(self, view_cls: type) -> None:
-        self._rail_views.append(view_cls)
+    def add_rail_view(self, view_cls: type, *, position: int | None = None) -> None:
+        if position is None:
+            self._rail_views.append(view_cls)
+        else:
+            self._rail_views.insert(position, view_cls)
 
     @property
     def rail_views(self) -> tuple[type, ...]:
