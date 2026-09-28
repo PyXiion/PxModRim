@@ -24,7 +24,7 @@ from pxmodrim.core.models.metadata.structures import (
 from pxmodrim.core.models.view.diagnostics import ModDiagnosticsView
 from pxmodrim.core.organizer import ROOT_ID, OrganizerDb, OrganizerService, TreeFilter
 from pxmodrim.ui.components import create_qml_engine
-from pxmodrim.ui.components.button import AppButton
+from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.plugins.organizer.filter_model import OrganizerFilterModel
 from pxmodrim.ui.plugins.organizer.tree_model import ModTreeModel
@@ -425,7 +425,7 @@ def test_organizer_filter_model_sections_icons_and_fallbacks(
     # IconRole checks
     assert [
         model.data(model.index(i), OrganizerFilterModel.IconRole) for i in range(6)
-    ] == ["grid", "check-circle", "x-circle", "steam", "tag", "tag"]
+    ] == ["grid", "check-circle", "ban", "steam", "tag", "tag"]
 
     # Key and Display role checks
     assert model.data(model.index(4), OrganizerFilterModel.KeyRole) == "tag:1"
@@ -483,7 +483,7 @@ async def test_organizer_sidebar_geometry_matches_mods_after_dismissing_hint(
         mods.hide()
         hint = organizer.findChild(QWidget, "organizerHint")
         assert hint is not None
-        dismiss = hint.findChild(AppButton)
+        dismiss = hint.findChild(IconButton)
         assert dismiss is not None
         width = organizer.mod_info.width()
         dismiss.click()

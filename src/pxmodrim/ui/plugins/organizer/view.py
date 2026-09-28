@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from loguru import logger
 from PySide6.QtCore import (
     Property,
     QMetaObject,
@@ -24,7 +25,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QMessageBox,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -43,10 +43,16 @@ from pxmodrim.core.organizer import (
 from pxmodrim.core.organizer.resolve import preview_rule_matches
 from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
+from pxmodrim.ui.components.toast import ToastManager
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
-from pxmodrim.ui.plugins.organizer.dialogs import FolderNameDialog, FolderPickerDialog
+from pxmodrim.ui.plugins.organizer.dialogs import (
+    DeleteFolderDialog,
+    FolderNameDialog,
+    FolderPickerDialog,
+)
 from pxmodrim.ui.plugins.organizer.filter_model import OrganizerFilterModel
 from pxmodrim.ui.plugins.organizer.tree_model import ModTreeModel, TreeNode
 from pxmodrim.ui.theme.palette import PALETTE
@@ -56,6 +62,11 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
 
 _QML_DIR = Path(__file__).parent
+_SIDEBAR_WIDTH = 240
+
+
+def _plural(count: int, singular: str, plural: str | None = None) -> str:
+    return f"{count} {singular if count == 1 else plural or singular + 's'}"
 
 
 class OrganizerViewPanel(BaseViewPanel):
@@ -88,14 +99,16 @@ class OrganizerViewPanel(BaseViewPanel):
         self._selected_uuid: str | None = None
         self._editor_error = ""
 
+        self._tasks: set[asyncio.Task[None]] = set()
         content = QWidget(self)
+        content.setObjectName("contentArea")
         row = QHBoxLayout(content)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(0)
 
         self._sidebar = QQuickWidget(qml_engine, content)  # pyright: ignore[reportCallIssue, reportArgumentType]
-        self._sidebar.setObjectName("organizerSidebar")
-        self._sidebar.setFixedWidth(240)
+        self._sidebar.setObjectName("sidebarPanel")
+        self._sidebar.setFixedWidth(_SIDEBAR_WIDTH)
         self._sidebar.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self._sidebar.setClearColor(QColor(PALETTE["ELEVATE_2"]))
         sidebar_ctx = self._sidebar.rootContext()
@@ -112,19 +125,18 @@ class OrganizerViewPanel(BaseViewPanel):
         main_layout.setSpacing(0)
         toolbar = QWidget(main)
         toolbar.setObjectName("searchBox")
-        toolbar.setFixedHeight(52)
+        toolbar.setFixedHeight(56)
         toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(12, 8, 12, 8)
+        toolbar_layout.setContentsMargins(16, 8, 16, 8)
         self.search_input = QLineEdit(toolbar)
         self.search_input.setPlaceholderText("Search mods, package ID, author…")
         self.search_input.setClearButtonEnabled(True)
         toolbar_layout.addWidget(self.search_input, 1)
-        create = QPushButton("New folder", toolbar)
+        create = AppButton("New folder", toolbar)
         create.setObjectName("primaryAction")
-        create.setCursor(Qt.CursorShape.PointingHandCursor)
         create.clicked.connect(self.newFolder)
         toolbar_layout.addWidget(create)
-        self.rules_button = AppButton("Auto-rules", toolbar)
+        self.rules_button = AppButton("Auto-folder rules", toolbar)
         self.rules_button.clicked.connect(self.openRules)
         toolbar_layout.addWidget(self.rules_button)
         for label, method in (
@@ -181,7 +193,7 @@ class OrganizerViewPanel(BaseViewPanel):
         )
         hint_label.setWordWrap(True)
         hint_layout.addWidget(hint_label, 1)
-        dismiss = AppButton("✕", hint)
+        dismiss = IconButton("close", "Dismiss", size=24, parent=hint)
         dismiss.clicked.connect(hint.hide)
         hint_layout.addWidget(dismiss)
         main_layout.addWidget(hint)
@@ -194,8 +206,8 @@ class OrganizerViewPanel(BaseViewPanel):
         for label, action in (
             ("Enable", "enable"),
             ("Disable", "disable"),
-            ("Move to…", "move"),
-            ("Tags…", "tags"),
+            ("Move to folder…", "move"),
+            ("Manage tags…", "tags"),
             ("Create folder from selection", "create"),
         ):
             button = AppButton(label, self._selection_bar)
@@ -209,14 +221,13 @@ class OrganizerViewPanel(BaseViewPanel):
         self.mod_info = ModInfoPanel(
             self._ctx, self._qml_engine, ui_prefs=self._ui_prefs
         )
-        self.mod_info.setObjectName("organizerModInfoPanel")
+        self.mod_info.setObjectName("modInfoPanel")
         self.mod_info.setMinimumWidth(300)
         row.addWidget(self.mod_info, 2)
         self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
         self._root.addWidget(content, 1)
         self._status = QLabel(self)
         self._status.setObjectName("organizerStatus")
-        self._status.setStyleSheet(f"color: {PALETTE['TEXT_DIM']}; padding: 5px 12px;")
         self._root.addWidget(self._status)
 
         self._menu = QMenu(self)
@@ -278,7 +289,7 @@ class OrganizerViewPanel(BaseViewPanel):
         selected = self.model.selected_nodes()
         self.editorChanged.emit()
         mod_count = sum(node.kind == "mod" for node in selected)
-        self._selection_label.setText(f"{mod_count} selected")
+        self._selection_label.setText(f"{_plural(mod_count, 'mod')} selected")
         self._selection_bar.setVisible(mod_count > 1)
         node = selected[0] if len(selected) == 1 else None
         uuid = node.leaf.uuid if node is not None and node.leaf is not None else None
@@ -288,7 +299,9 @@ class OrganizerViewPanel(BaseViewPanel):
         if uuid is None:
             self._selection.clear()
         else:
-            asyncio.create_task(self._selection.show(uuid))
+            task = asyncio.create_task(self._selection.show(uuid))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
     def _invalidate(self, _event: object = None) -> None:
         self._dirty = True
@@ -318,9 +331,9 @@ class OrganizerViewPanel(BaseViewPanel):
         )
         full_tree = tree if query.is_empty else self._service.tree()
         self._status.setText(
-            f"{len(self._ctx.all_mods)} mods    "
-            f"{len(self._ctx.active_uuids)} active    "
-            f"{len(self._service.state.folders) - 1} folders    "
+            f"{_plural(len(self._ctx.all_mods), 'mod')} · "
+            f"{len(self._ctx.active_uuids)} active · "
+            f"{_plural(len(self._service.state.folders) - 1, 'folder')} · "
             f"{len(full_tree.mods)} ungrouped"
         )
         self._sync_info(force=True)
@@ -630,7 +643,7 @@ class OrganizerViewPanel(BaseViewPanel):
         node = self.model.node_at(index)
         if node is None:
             self._menu.clear()
-            self._menu.addAction("New folder...", self.newFolder)
+            self._menu.addAction("New folder…", self.newFolder)
         elif node.kind == "mod":
             self.selectSingle(index)
             self._mod_menu()
@@ -657,16 +670,16 @@ class OrganizerViewPanel(BaseViewPanel):
         )
         placeable = bool(pids) and all(n.leaf and n.leaf.package_id for n in nodes)
         tooltip = "Mods without a package ID cannot be placed in folders"
-        move = self._menu.addAction("Move to folder...", lambda: self._move_mods(pids))
+        move = self._menu.addAction("Move to folder…", lambda: self._move_mods(pids))
         remove = self._menu.addAction("Remove from folder", lambda: self._ungroup(pids))
         create = self._menu.addAction(
-            "Create folder from selection...", lambda: self._new_folder_from(pids)
+            "Create folder from selection…", lambda: self._new_folder_from(pids)
         )
         for action in (move, remove, create):
             action.setEnabled(placeable)
             action.setToolTip(tooltip if not placeable else "")
         remove.setEnabled(placeable and any(n.folder_id != ROOT_ID for n in nodes))
-        tag_action = self._menu.addAction("Manage tags...", self.openTags)
+        tag_action = self._menu.addAction("Manage tags…", self.openTags)
         tag_action.setEnabled(placeable)
         manual = list(
             dict.fromkeys(
@@ -690,17 +703,15 @@ class OrganizerViewPanel(BaseViewPanel):
         ).setEnabled(bool(uuids))
         self._menu.addSeparator()
         if node.kind == "ungrouped":
-            self._menu.addAction("New folder...", self.newFolder)
+            self._menu.addAction("New folder…", self.newFolder)
             return
         folder_id = node.folder_id
         if node.folder is not None and node.folder.depth < MAX_DEPTH:
-            self._menu.addAction(
-                "New subfolder...", lambda: self._new_folder(folder_id)
-            )
-        self._menu.addAction("Rename...", lambda: self._rename(folder_id))
-        move = self._menu.addAction("Move to...", lambda: self._move_folder(folder_id))
+            self._menu.addAction("New subfolder…", lambda: self._new_folder(folder_id))
+        self._menu.addAction("Rename…", lambda: self._rename(folder_id))
+        move = self._menu.addAction("Move to…", lambda: self._move_folder(folder_id))
         move.setEnabled(bool(self._service.folder_move_targets(folder_id)))
-        self._menu.addAction("Delete...", lambda: self._delete(folder_id))
+        self._menu.addAction("Delete…", lambda: self._delete(folder_id))
 
     @asyncSlot()
     async def newFolder(self) -> None:
@@ -708,7 +719,9 @@ class OrganizerViewPanel(BaseViewPanel):
 
     @asyncSlot()
     async def _new_folder(self, parent_id: int) -> None:
-        result, dialog = await await_dialog(FolderNameDialog, "New folder", "", self)
+        result, dialog = await await_dialog(
+            FolderNameDialog, "New Folder", "", self, "Create"
+        )
         if result == QDialog.DialogCode.Accepted:
             try:
                 await self._service.create_folder(dialog.textValue(), parent_id)
@@ -718,7 +731,7 @@ class OrganizerViewPanel(BaseViewPanel):
     @asyncSlot()
     async def _new_folder_from(self, package_ids: list[str]) -> None:
         result, dialog = await await_dialog(
-            FolderNameDialog, "Create folder from selection", "", self
+            FolderNameDialog, "Create Folder from Selection", "", self, "Create"
         )
         if result == QDialog.DialogCode.Accepted:
             try:
@@ -730,7 +743,7 @@ class OrganizerViewPanel(BaseViewPanel):
     async def _rename(self, folder_id: int) -> None:
         current = self._service.state.folders[folder_id]
         result, dialog = await await_dialog(
-            FolderNameDialog, "Rename folder", current.name, self
+            FolderNameDialog, "Rename Folder", current.name, self
         )
         if result == QDialog.DialogCode.Accepted:
             try:
@@ -744,7 +757,7 @@ class OrganizerViewPanel(BaseViewPanel):
         result, dialog = await await_dialog(
             FolderPickerDialog,
             self._service.tree(),
-            "Move mods to folder",
+            "Move to Folder",
             allowed,
             self,
         )
@@ -761,7 +774,7 @@ class OrganizerViewPanel(BaseViewPanel):
     async def _move_folder(self, folder_id: int) -> None:
         targets = self._service.folder_move_targets(folder_id)
         result, dialog = await await_dialog(
-            FolderPickerDialog, self._service.tree(), "Move folder to...", targets, self
+            FolderPickerDialog, self._service.tree(), "Move Folder", targets, self
         )
         if result == QDialog.DialogCode.Accepted:
             try:
@@ -772,17 +785,7 @@ class OrganizerViewPanel(BaseViewPanel):
     @asyncSlot()
     async def _delete(self, folder_id: int) -> None:
         folder = self._service.state.folders[folder_id]
-        result, _ = await await_dialog(
-            QMessageBox,
-            QMessageBox.Icon.Warning,
-            "Delete folder?",
-            (
-                f'Delete "{folder.name}" and its subfolders? '
-                "Their mods become ungrouped. Load order is not affected."
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            self,
-        )
+        result, _ = await await_dialog(DeleteFolderDialog, folder.name, self)
         if result == QMessageBox.StandardButton.Yes:
             try:
                 await self._service.delete_folder(folder_id)
@@ -859,11 +862,8 @@ class OrganizerViewPanel(BaseViewPanel):
             await self._error(exc)
 
     async def _error(self, exc: OrganizerError) -> None:
-        await await_dialog(
-            QMessageBox,
-            QMessageBox.Icon.Warning,
-            "Organizer",
-            str(exc),
-            QMessageBox.StandardButton.Ok,
-            self,
-        )
+        toast = self.window().findChild(ToastManager)
+        if toast is not None:
+            toast.error(str(exc))
+        else:
+            logger.warning("organizer: {}", exc)
