@@ -12,30 +12,13 @@ CheckBox {
 
     HoverHandler { cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor }
 
-    indicator: Rectangle {
+    indicator: PxCheckIndicator {
         x: control.leftPadding
         y: (control.height - height) / 2
-        implicitWidth: 16
-        implicitHeight: 16
-        radius: Theme.radiusXs
+        checkState: control.checkState
+        hovered: control.hovered
+        focused: control.visualFocus
         opacity: control.enabled ? 1 : Theme.disabledOpacity
-        color: control.checkState === Qt.Checked ? Theme.primary
-             : control.checkState === Qt.PartiallyChecked ? Theme.primaryBg
-             : "transparent"
-        border.width: 1.5
-        border.color: control.checkState !== Qt.Unchecked || control.visualFocus ? Theme.primary
-                    : control.hovered ? Theme.textDim
-                    : Theme.border
-
-        Text {
-            anchors.centerIn: parent
-            visible: control.checkState !== Qt.Unchecked
-            text: control.checkState === Qt.Checked ? "\u2713" : "\u2212"
-            color: control.checkState === Qt.Checked ? Theme.elevate0 : Theme.primary
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeMd
-            font.bold: true
-        }
     }
 
     contentItem: Text {

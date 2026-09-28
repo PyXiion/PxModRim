@@ -49,28 +49,29 @@ Dialog {
         }
     }
 
-    footer: DialogButtonBox {
-        visible: count > 0
-        alignment: Qt.AlignRight
-        spacing: 8
-        padding: 12
-        leftPadding: 16
-        rightPadding: 16
+    footer: PxDialogFooter {
+        visible: buttonBox.count > 0
 
-        background: Rectangle {
-            color: "transparent"
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 1
-                color: Theme.border
+        DialogButtonBox {
+            id: buttonBox
+
+            standardButtons: dialog.standardButtons
+            alignment: Qt.AlignRight
+            spacing: 8
+            padding: 0
+            background: null
+
+            onAccepted: dialog.accept()
+            onRejected: dialog.reject()
+            onApplied: dialog.applied()
+            onDiscarded: dialog.discarded()
+            onHelpRequested: dialog.helpRequested()
+            onReset: dialog.reset()
+
+            delegate: PxButton {
+                variant: DialogButtonBox.buttonRole === DialogButtonBox.AcceptRole
+                         || DialogButtonBox.buttonRole === DialogButtonBox.YesRole ? "primary" : "ghost"
             }
-        }
-
-        delegate: PxButton {
-            variant: DialogButtonBox.buttonRole === DialogButtonBox.AcceptRole
-                     || DialogButtonBox.buttonRole === DialogButtonBox.YesRole ? "primary" : "ghost"
         }
     }
 }
