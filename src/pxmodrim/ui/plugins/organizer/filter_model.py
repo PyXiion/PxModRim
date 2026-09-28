@@ -90,6 +90,9 @@ class OrganizerFilterModel(QAbstractListModel):
                     [self.CountRole, self.LabelRole, Qt.ItemDataRole.DisplayRole],
                 )
 
+    def key_at(self, row: int) -> str | None:
+        return self._items[row].key if 0 <= row < len(self._items) else None
+
     def for_key(self, key: str) -> TreeFilter:
         for item in self._items:
             if item.key == key:

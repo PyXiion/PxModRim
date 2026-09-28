@@ -1,19 +1,28 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "../../components/controls"
+import "controls"
 
+// Shared filter list (Mods and Organizer). The model exposes: filterLabel, count,
+// iconName, sectionName and optionally iconColor, badgeBg, badgeFg.
 Rectangle {
+    id: root
+
+    property var model: null
+    property alias currentIndex: filters.currentIndex
+    signal activated(int index)
+
     color: Theme.elevate2
 
     ListView {
         id: filters
+        objectName: "listView"
         anchors.fill: parent
         anchors.margins: 12
         anchors.topMargin: 8
         clip: true
         spacing: 2
-        model: organizerFilters
+        model: root.model
         currentIndex: 0
         section.property: "sectionName"
         section.delegate: Item {
@@ -43,34 +52,31 @@ Rectangle {
 
         delegate: Rectangle {
             id: row
-            required property int index
-            required property string key
-            required property string filterLabel
-            required property int count
-            required property string iconName
+            readonly property bool selected: filters.currentIndex === index
             width: filters.width
             height: 36
             radius: Theme.radiusMd
-            color: filters.currentIndex === index ? Theme.elevate4
+            color: selected ? Theme.elevate4
                    : (mouse.containsMouse ? Theme.elevate3 : "transparent")
             Rectangle {
-                visible: filters.currentIndex === row.index
+                visible: row.selected
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 width: 3
                 height: 18
-                radius: 1.5
+                radius: Theme.radiusXs
                 color: Theme.primary
             }
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: filters.currentIndex === row.index ? 13 : 16
+                anchors.leftMargin: row.selected ? 13 : 16
                 anchors.rightMargin: 10
                 spacing: 8
                 Image {
-                    source: "image://icons/" + row.iconName + "?color="
-                            + encodeURIComponent(filters.currentIndex === row.index ? Theme.primary : Theme.textDim)
+                    source: "image://icons/" + (model.iconName || "folder") + "?color="
+                            + encodeURIComponent(row.selected ? Theme.primary
+                                                              : (model.iconColor || Theme.textDim))
                     sourceSize.width: 14
                     sourceSize.height: 14
                     Layout.preferredWidth: 16
@@ -80,25 +86,26 @@ Rectangle {
                     verticalAlignment: Image.AlignVCenter
                 }
                 Text {
-                    text: row.filterLabel
+                    text: model.filterLabel || ""
                     Layout.fillWidth: true
-                    color: filters.currentIndex === row.index ? Theme.primary : Theme.textMain
+                    color: row.selected ? Theme.primary : Theme.textMain
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeMd
-                    font.weight: filters.currentIndex === row.index ? Font.Medium : Font.Normal
+                    font.weight: row.selected ? Font.Medium : Font.Normal
                     elide: Text.ElideRight
+                    maximumLineCount: 1
                 }
                 Rectangle {
-                    visible: row.count > 0
+                    visible: (model.count || 0) > 0
                     Layout.preferredWidth: countText.contentWidth + 12
                     Layout.preferredHeight: 20
                     radius: Theme.radiusPill
-                    color: Theme.elevate4
+                    color: model.badgeBg || Theme.elevate4
                     Text {
                         id: countText
                         anchors.centerIn: parent
-                        text: String(row.count)
-                        color: Theme.textMuted
+                        text: String(model.count || 0)
+                        color: model.badgeFg || Theme.textMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Medium
@@ -111,8 +118,8 @@ Rectangle {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    filters.currentIndex = row.index
-                    organizerPanel.chooseFilter(row.key)
+                    filters.currentIndex = index
+                    root.activated(index)
                 }
             }
         }

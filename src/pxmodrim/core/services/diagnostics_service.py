@@ -286,28 +286,31 @@ class DiagnosticsService:
             if diag.has_warnings:
                 warnings.add(u)
 
+        all_entry = AllModsEntry()
+        active_entry = ActiveModsEntry()
+        inactive_entry = InactiveModsEntry()
+        error_entry = ErrorModsEntry()
+        warning_entry = WarningModsEntry()
+        all_entry.visible_uuids = set(base.all_uuids)
+        active_entry.visible_uuids = set(active)
+        inactive_entry.visible_uuids = (
+            all_entry.visible_uuids - active_entry.visible_uuids
+        )
+        error_entry.visible_uuids = errors
+        warning_entry.visible_uuids = warnings
         entries: list[SidebarEntry] = [
-            AllModsEntry(),
-            ActiveModsEntry(),
+            all_entry,
+            active_entry,
+            inactive_entry,
+            error_entry,
+            warning_entry,
         ]
+        for entry in entries:
+            entry.refresh_count()
         for pid, uuids in base.by_provider:
             entries.append(
                 ProviderModsEntry(pid, PROVIDER_LABELS.get(pid, pid), set(uuids))
             )
-        entries.append(InactiveModsEntry())
-        entries.append(ErrorModsEntry())
-        entries.append(WarningModsEntry())
-
-        entries[0].visible_uuids = set(base.all_uuids)
-        entries[0].refresh_count()
-        entries[1].visible_uuids = set(active)
-        entries[1].refresh_count()
-        entries[-3].visible_uuids = entries[0].visible_uuids - entries[1].visible_uuids
-        entries[-3].refresh_count()
-        entries[-2].visible_uuids = errors
-        entries[-2].refresh_count()
-        entries[-1].visible_uuids = warnings
-        entries[-1].refresh_count()
 
         return entries
 

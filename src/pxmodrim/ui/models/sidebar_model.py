@@ -16,16 +16,16 @@ from pxmodrim.ui.theme.palette import PALETTE
 
 # (badge_bg, badge_fg, icon_name, icon_color)
 _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
-    "all": (PALETTE["ELEVATE_4"], PALETTE["TEXT_MAIN"], "grid", PALETTE["TEXT_DIM"]),
+    "all": (PALETTE["ELEVATE_4"], PALETTE["TEXT_MUTED"], "grid", PALETTE["TEXT_DIM"]),
     "active": (
-        PALETTE["SUCCESS_BG_QML"],
-        PALETTE["SUCCESS"],
+        PALETTE["ELEVATE_4"],
+        PALETTE["TEXT_MUTED"],
         "check-circle",
-        PALETTE["SUCCESS"],
+        PALETTE["TEXT_DIM"],
     ),
     "inactive": (
         PALETTE["ELEVATE_4"],
-        PALETTE["TEXT_MAIN"],
+        PALETTE["TEXT_MUTED"],
         "ban",
         PALETTE["TEXT_DIM"],
     ),
@@ -38,17 +38,12 @@ _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
     ),
     "provider": (
         PALETTE["ELEVATE_4"],
-        PALETTE["TEXT_MAIN"],
+        PALETTE["TEXT_MUTED"],
         "folder",
         PALETTE["TEXT_DIM"],
     ),
 }
 
-_PROVIDER_ICON_COLORS: dict[str, str] = {
-    "steam": PALETTE["SUCCESS"],
-    "downloaded": PALETTE["SUCCESS"],
-    "local": PALETTE["WARNING"],
-}
 
 # Provider icon overrides
 _PROVIDER_ICONS: dict[str, str] = {
@@ -108,12 +103,8 @@ def _detect_entry_type(entry: object) -> str:
     return "provider"
 
 
-def _section_for_index(idx: int) -> str:
-    if idx < 3:
-        return "Library"
-    if idx < 5:
-        return "Diagnostics"
-    return "Providers"
+def _section_for(entry: object) -> str:
+    return "Providers" if _detect_entry_type(entry) == "provider" else "Status"
 
 
 def _icon_for_provider(entry: object) -> str:
@@ -130,11 +121,6 @@ def _style_for(entry: object) -> tuple[str, str, str, str]:
     bg, fg, icon_name, icon_color = _ENTRY_TYPES[entry_type]
     if entry_type == "provider":
         icon_name = _icon_for_provider(entry)
-        label_lower = getattr(entry, "label", "").lower()
-        for keyword, color in _PROVIDER_ICON_COLORS.items():
-            if keyword in label_lower:
-                icon_color = color
-                break
     return bg, fg, icon_name, icon_color
 
 
@@ -189,7 +175,7 @@ class SidebarModel(QAbstractListModel):
 
     def roleNames(self) -> dict[int, QByteArray]:
         return {
-            self.LabelRole: QByteArray(b"label"),
+            self.LabelRole: QByteArray(b"filterLabel"),
             self.CountRole: QByteArray(b"count"),
             self.BadgeBgRole: QByteArray(b"badgeBg"),
             self.BadgeFgRole: QByteArray(b"badgeFg"),
@@ -201,9 +187,9 @@ class SidebarModel(QAbstractListModel):
     def set_entries(self, entries: Sequence[object]) -> None:
         self.beginResetModel()
         self._items = []
-        for i, e in enumerate(entries):
+        for e in entries:
             bg, fg, icon_name, icon_color = _style_for(e)
-            section = _section_for_index(i)
+            section = _section_for(e)
             self._items.append(
                 SidebarItem(
                     label=getattr(e, "label", ""),

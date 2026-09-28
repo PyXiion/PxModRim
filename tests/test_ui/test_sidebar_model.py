@@ -13,7 +13,7 @@ class ProviderEntry:
         self.count = 2
 
 
-def test_update_entries_refreshes_provider_icon_and_color() -> None:
+def test_update_entries_refreshes_provider_icon() -> None:
     app = QCoreApplication.instance()
     if app is None:
         app = QApplication([])
@@ -27,7 +27,6 @@ def test_update_entries_refreshes_provider_icon_and_color() -> None:
 
     assert model.data(model.index(0, 0), SidebarModel.IconRole) == "folder"
     assert (
-        model.data(model.index(0, 0), SidebarModel.IconColorRole) == PALETTE["WARNING"]
+        model.data(model.index(0, 0), SidebarModel.IconColorRole) == PALETTE["TEXT_DIM"]
     )
     assert SidebarModel.IconRole in changed_roles[0]
-    assert SidebarModel.IconColorRole in changed_roles[0]

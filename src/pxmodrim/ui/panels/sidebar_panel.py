@@ -1,23 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Signal
 from PySide6.QtQml import QQmlEngine
-from PySide6.QtQuickWidgets import QQuickWidget
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QWidget
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.view.sidebar import SidebarEntry
+from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.models.sidebar_model import SidebarModel
-from pxmodrim.ui.theme.palette import PALETTE
-
-_QML_DIR = Path(__file__).parent
-_SIDEBAR_QML = _QML_DIR / "Sidebar.qml"
 
 
-class SidebarPanel(QWidget):
+class SidebarPanel(FilterSidebar):
     entry_selected = Signal(object)  # SidebarEntry
 
     def __init__(
@@ -26,50 +19,28 @@ class SidebarPanel(QWidget):
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
     ) -> None:
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
-
-        # Model
-        self._model = SidebarModel(self)
-
-        # QML view
-        self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
-        self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
-        self._qml.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, False)
-        self._qml.setClearColor(QColor(PALETTE["ELEVATE_2"]))
-
-        qml_ctx = self._qml.rootContext()
-        qml_ctx.setContextProperty("sidebarPanel", self)
-        qml_ctx.setContextProperty("sidebarModel", self._model)
-        self._qml.setSource(QUrl.fromLocalFile(str(_SIDEBAR_QML)))
-
-        layout.addWidget(self._qml)
-
+        self._model = SidebarModel()
+        super().__init__(qml_engine, self._model, parent)
+        self._model.setParent(self)
         self._entries: list[SidebarEntry] = []
-
+        self.activated.connect(self._on_activated)
         ctx.diagnostics_service.sidebar_entries_changed.connect(self.set_entries)
 
     def set_entries(self, entries: list[SidebarEntry]) -> None:
+        reset = len(entries) != len(self._entries)
         self._entries = entries
         self._model.update_entries(entries)
+        if reset:
+            current = self.current_entry()
+            if current is not None:
+                self.entry_selected.emit(current)
 
     def current_entry(self) -> SidebarEntry | None:
-        root = self._qml.rootObject()
-        if root is None:
-            return None
-        list_view = root.findChild(QObject, "listView")
-        if list_view is None:
-            return None
-        selected = list_view.property("currentIndex")
+        selected = self.current_index()
         if 0 <= selected < len(self._entries):
             return self._entries[selected]
         return None
 
-    # ── Slots called from QML ─────────────────────────────────
-
-    @Slot(int)
-    def entrySelected(self, row: int) -> None:
+    def _on_activated(self, row: int) -> None:
         if 0 <= row < len(self._entries):
             self.entry_selected.emit(self._entries[row])

@@ -476,7 +476,7 @@ async def test_organizer_sidebar_geometry_matches_mods_after_dismissing_hint(
         assert organizer._sidebar.width() == mods.sidebar.width()
         assert (
             organizer._sidebar.rootObject().childItems()[0].width()
-            == mods.sidebar._qml.width()
+            == mods.sidebar.rootObject().childItems()[0].width()
         )
         assert organizer.mod_info.width() == mods.mod_info.width()
 

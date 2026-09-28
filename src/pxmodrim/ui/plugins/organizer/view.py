@@ -43,6 +43,7 @@ from pxmodrim.core.organizer import (
 from pxmodrim.core.organizer.resolve import preview_rule_matches
 from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
@@ -105,17 +106,9 @@ class OrganizerViewPanel(BaseViewPanel):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(0)
 
-        self._sidebar = QQuickWidget(qml_engine, content)  # pyright: ignore[reportCallIssue, reportArgumentType]
-        self._sidebar.setObjectName("sidebarPanel")
+        self._sidebar = FilterSidebar(qml_engine, self.filters, content)
         self._sidebar.setFixedWidth(SIDEBAR_WIDTH)
-        self._sidebar.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
-        self._sidebar.setClearColor(QColor(PALETTE["ELEVATE_2"]))
-        sidebar_ctx = self._sidebar.rootContext()
-        sidebar_ctx.setContextProperty("organizerPanel", self)
-        sidebar_ctx.setContextProperty("organizerFilters", self.filters)
-        self._sidebar.setSource(
-            QUrl.fromLocalFile(str(_QML_DIR / "OrganizerSidebar.qml"))
-        )
+        self._sidebar.activated.connect(self._choose_filter_at)
         row.addWidget(self._sidebar)
 
         main = QWidget(content)
@@ -344,9 +337,9 @@ class OrganizerViewPanel(BaseViewPanel):
             self._search_text = text
             self._invalidate()
 
-    @Slot(str)
-    def chooseFilter(self, key: str) -> None:
-        if key != self._filter_key:
+    def _choose_filter_at(self, row: int) -> None:
+        key = self.filters.key_at(row)
+        if key is not None and key != self._filter_key:
             self._filter_key = key
             self._invalidate()
 
