@@ -48,6 +48,7 @@ class ModListPanel(QWidget):
     order_changed = Signal()
     selection_changed = Signal(list)
     compact_mode_changed = Signal(bool)
+    highlighted_uuids_changed = Signal()
 
     @Property(bool, notify=compact_mode_changed)
     def compactMode(self) -> bool:
@@ -59,6 +60,10 @@ class ModListPanel(QWidget):
             self._compact_mode = enabled
             self.compact_mode_changed.emit(enabled)
 
+    @Property(list, notify=highlighted_uuids_changed)
+    def highlightedUuids(self) -> list[str]:
+        return self._highlighted_uuids
+
     def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
         super().__init__()
         self._ctx = ctx
@@ -66,6 +71,7 @@ class ModListPanel(QWidget):
         self._compact_mode: bool = (
             getattr(cfg, "compact_mod_list", False) if cfg else False
         )
+        self._highlighted_uuids: list[str] = []
         self._highlight_generation = 0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -177,7 +183,6 @@ class ModListPanel(QWidget):
 
     @Slot()
     def clearSelection(self) -> None:
-        self._highlight_generation += 1
         root = self._qml.rootObject()
         if root is not None:
             list_view = root.findChild(QObject, "listView")
@@ -224,7 +229,6 @@ class ModListPanel(QWidget):
         if not selected_uuids:
             return
 
-        self._highlight_generation += 1
         previously_active = set(self._ctx.active_uuids)
         await toggle_mods(self._ctx, self, selected_uuids)
         active_after = set(self._ctx.active_uuids)
@@ -237,63 +241,35 @@ class ModListPanel(QWidget):
             self._highlight_rows(newly_enabled)
 
     def _highlight_rows(self, uuids: list[str]) -> None:
-        visible_rows = [
-            (row, uuid)
+        rows = [
+            row
             for uuid in uuids
             if (row := self._proxy.proxy_row_for_uuid(uuid)) is not None
         ]
         root = self._qml.rootObject()
-        if not visible_rows or root is None:
+        if not rows or root is None:
             return
         list_view = root.findChild(QObject, "listView")
-        if list_view is None:
-            return
-
-        previous_state = [
-            (name, list_view.property(name))
-            for name in (
-                "selectedIndices",
-                "selectedUuids",
-                "currentIndex",
-                "currentUuid",
-                "anchorIndex",
-                "anchorUuid",
+        if list_view is not None:
+            QMetaObject.invokeMethod(
+                list_view,
+                "positionViewAtIndex",
+                Qt.ConnectionType.DirectConnection,
+                Q_ARG("int", rows[-1]),
+                Q_ARG("int", _LIST_VIEW_CONTAIN),
             )
-        ]
-        indices = [row for row, _ in visible_rows]
-        selected_uuids = [uuid for _, uuid in visible_rows]
-        list_view.setProperty("selectedIndices", indices)
-        list_view.setProperty("selectedUuids", selected_uuids)
-        list_view.setProperty("currentIndex", indices[-1])
-        list_view.setProperty("currentUuid", selected_uuids[-1])
-        list_view.setProperty("anchorIndex", indices[-1])
-        list_view.setProperty("anchorUuid", selected_uuids[-1])
-        QMetaObject.invokeMethod(
-            list_view,
-            "positionViewAtIndex",
-            Qt.ConnectionType.DirectConnection,
-            Q_ARG("int", indices[-1]),
-            Q_ARG("int", _LIST_VIEW_CONTAIN),
-        )
+        self._set_highlighted(uuids)
         self._highlight_generation += 1
-        asyncio.create_task(
-            self._restore_highlight(self._highlight_generation, previous_state)
-        )
+        asyncio.create_task(self._clear_highlight(self._highlight_generation))
 
-    async def _restore_highlight(
-        self, generation: int, previous_state: list[tuple[str, object]]
-    ) -> None:
+    def _set_highlighted(self, uuids: list[str]) -> None:
+        self._highlighted_uuids = uuids
+        self.highlighted_uuids_changed.emit()
+
+    async def _clear_highlight(self, generation: int) -> None:
         await asyncio.sleep(1.2)
-        if generation != self._highlight_generation:
-            return
-        root = self._qml.rootObject()
-        if root is None:
-            return
-        list_view = root.findChild(QObject, "listView")
-        if list_view is None:
-            return
-        for name, value in previous_state:
-            list_view.setProperty(name, value)
+        if generation == self._highlight_generation:
+            self._set_highlighted([])
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:
@@ -309,7 +285,6 @@ class ModListPanel(QWidget):
         self._model.set_checkable(new - current, True)
         self._model.set_checkable(current - new, False)
         self._model.commitOrder(list(active_uuids))
-        self._highlight_generation += 1
 
     def _on_config_changed(self, cfg: AppConfig) -> None:
         if self._compact_mode != cfg.compact_mod_list:
@@ -324,9 +299,7 @@ class ModListPanel(QWidget):
 
     @Slot(int, int)
     def moveRow(self, source_row: int, target_row: int) -> None:
-        if self._model.active_count > 0 and self.isChecked(source_row):
-            target_row = max(0, min(target_row, self._model.active_count - 1))
-        self._proxy.move_row(source_row, target_row)
+        self._proxy.move_row(source_row, target_row, clamp_to_active=True)
 
     @Slot()
     def dragEnded(self) -> None:
@@ -335,14 +308,12 @@ class ModListPanel(QWidget):
 
     @Slot(list)
     def selectionChanged(self, uuids: list[str]) -> None:
-        self._highlight_generation += 1
         self.selection_changed.emit([uuid for uuid in uuids if uuid])
 
     # ── Private slots ─────────────────────────────────────────
 
     def _on_search_changed(self, text: str) -> None:
         self._proxy.set_search_filter(text)
-        self._highlight_generation += 1
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj is self._qml:

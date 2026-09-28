@@ -204,6 +204,8 @@ Rectangle {
             color: {
                 if (listView.selectedIndices.indexOf(index) >= 0)
                     return Theme.elevate4
+                if (modListPanel && modListPanel.highlightedUuids.indexOf(model.uuid) >= 0)
+                    return Qt.alpha(Theme.primary, 0.25)
                 if (mouseArea.containsMouse && !dragProxy.visible)
                     return Theme.elevate3
                 return "transparent"
@@ -262,6 +264,7 @@ Rectangle {
                         if (modListModel && modListModel.isFiltered)
                             return
                         var point = dragArea.mapToItem(root, mouse.x, mouse.y)
+                        pressRootX = point.x
                         pressRootY = point.y
 
                         var delegatePosition = delegateRect.mapToItem(root, 0, 0)

@@ -78,7 +78,9 @@ class _WidgetContext(QObject):
         self.active_uuids = list(uuids)
 
 
-def _widget_panel(qml_engine: QQmlEngine) -> ModListPanel:
+def _widget_panel(
+    qml_engine: QQmlEngine, active_uuids: list[str] | None = None
+) -> ModListPanel:
     mods = {
         "uuid-a": _mod("Mod A", "mod.a"),
         "uuid-b": _mod("Mod B", "mod.b"),
@@ -86,7 +88,7 @@ def _widget_panel(qml_engine: QQmlEngine) -> ModListPanel:
     }
     ctx = _WidgetContext(cast(dict[str, ListedMod], mods))
     panel = ModListPanel(cast(CoreContext, ctx), qml_engine)
-    panel.load_mods(cast(dict[str, ListedMod], mods), [])
+    panel.load_mods(cast(dict[str, ListedMod], mods), active_uuids or [])
     return panel
 
 
@@ -132,6 +134,7 @@ def _panel(qapp: QApplication) -> ModListPanel:
     )
 
     panel = ModListPanel.__new__(ModListPanel)
+    panel._highlighted_uuids = []
     panel._highlight_generation = 0
     panel._qml = cast(QQuickWidget, SimpleNamespace(rootObject=lambda: None))
     panel._ctx = cast(CoreContext, ctx)
@@ -264,6 +267,57 @@ def test_hovering_drag_handle_does_not_show_drag_proxy(
     assert drag_proxy.property("visible") is False
 
 
+def test_small_jitter_on_drag_handle_does_not_start_drag(
+    qml_engine: QQmlEngine,
+    qtbot: QtBot,
+) -> None:
+    panel = _widget_panel(qml_engine, ["uuid-a", "uuid-b", "uuid-c"])
+    panel.resize(420, 320)
+    panel.show()
+    qtbot.waitUntil(lambda: panel._qml.isVisible())
+    root = panel._qml.rootObject()
+    assert root is not None
+    drag_proxy = root.findChild(QObject, "dragProxy")
+    assert drag_proxy is not None
+
+    QTest.mousePress(
+        panel._qml,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        QPoint(20, 26),
+    )
+    QTest.mouseMove(panel._qml, QPoint(21, 26))
+    visible = drag_proxy.property("visible")
+    QTest.mouseRelease(
+        panel._qml,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        QPoint(21, 26),
+    )
+
+    assert visible is False
+
+
+@pytest.mark.asyncio
+async def test_highlighting_enabled_mod_keeps_user_selection(
+    qml_engine: QQmlEngine,
+) -> None:
+    panel = _widget_panel(qml_engine, ["uuid-a", "uuid-b", "uuid-c"])
+    root = panel._qml.rootObject()
+    assert root is not None
+    list_view = root.findChild(QObject, "listView")
+    assert list_view is not None
+    root.selectRow(0, "uuid-a", 0)  # type: ignore[attr-defined]
+
+    panel._highlight_rows(["uuid-c"])
+    panel.set_search_filter("Mod")
+    panel.set_search_filter("")
+
+    assert panel.property("highlightedUuids") == ["uuid-c"]
+    assert _qml_list_property(list_view, "selectedUuids") == ["uuid-a"]
+    assert list_view.property("currentUuid") == "uuid-a"
+
+
 def test_qml_selection_clears_when_filter_hides_current_row(
     qml_engine: QQmlEngine,
 ) -> None:
@@ -296,7 +350,7 @@ def test_qml_selection_clears_when_filter_hides_current_row(
 def test_qml_selection_follows_uuid_when_selected_row_moves(
     qml_engine: QQmlEngine,
 ) -> None:
-    panel = _widget_panel(qml_engine)
+    panel = _widget_panel(qml_engine, ["uuid-a", "uuid-b", "uuid-c"])
     root = panel._qml.rootObject()
     assert root is not None
     list_view = root.findChild(QObject, "listView")
