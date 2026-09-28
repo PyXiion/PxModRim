@@ -16,6 +16,7 @@ Rectangle {
             objectName: "listView"
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.margins: 12
             Layout.topMargin: 8
             clip: true
             spacing: 2
@@ -119,7 +120,7 @@ Rectangle {
                     Rectangle {
                         visible: (model.count || 0) > 0
                         Layout.preferredWidth: badgeText.contentWidth + 12
-                        Layout.preferredHeight: Theme.fontSizeMd + 6
+                        Layout.preferredHeight: 20
                         radius: Theme.radiusPill
                         color: model.badgeBg || Theme.elevate4
 
