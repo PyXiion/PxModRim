@@ -120,6 +120,7 @@ ALLOWED: dict[str, set[str]] = {
     "ui.plugins": {
         "core",
         "ui.theme",
+        "ui.models",
         "ui.context",
         "ui.components",
         "ui.views",

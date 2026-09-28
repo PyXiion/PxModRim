@@ -494,83 +494,30 @@ Rectangle {
                     active: model.startupImpact > 0
                     visible: active
                     anchors.verticalCenter: parent.verticalCenter
-                    sourceComponent: Rectangle {
-                        height: root.compactMode ? 18 : 20
-                        width: siText.width + 12
-                        radius: Theme.radiusSm
-                        color: model.startupImpactColor
-
-                        Text {
-                            id: siText
-                            anchors.centerIn: parent
-                            text: model.startupImpactText
-                            color: Theme.onAccent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                        }
-
-                        MouseArea {
-                            id: siMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                        }
-
-                        PxToolTip {
-                            text: "Startup impact: adds " + model.startupImpactText + " to game load"
-                            visible: siMouseArea.containsMouse
-                        }
+                    sourceComponent: PxBadge {
+                        compact: root.compactMode
+                        text: model.startupImpactText
+                        textColor: Theme.onAccent
+                        fillColor: model.startupImpactColor
+                        tooltip: "Startup impact: adds " + model.startupImpactText + " to game load"
                     }
                 }
 
-                // Provider pill
-                Rectangle {
-                    id: providerPill
+                PxBadge {
                     visible: !!model.providerLabel
-                    height: root.compactMode ? 18 : 20
-                    width: providerText.width + 12
-                    radius: Theme.radiusSm
-                    color: Theme.elevate3
-                    border.width: 1
-                    border.color: model.providerColor || Theme.border
                     anchors.verticalCenter: parent.verticalCenter
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: parent.radius
-                        color: model.providerColor || "transparent"
-                        opacity: 0.18
-                    }
-
-                    Text {
-                        id: providerText
-                        anchors.centerIn: parent
-                        text: model.providerLabel || ""
-                        color: model.providerColor || Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
-                    }
+                    compact: root.compactMode
+                    outlined: true
+                    text: model.providerLabel || ""
+                    accent: model.providerColor || Theme.border
+                    textColor: model.providerColor || Theme.textMuted
                 }
 
-                // Version pill
-                Rectangle {
+                PxBadge {
                     visible: !!model.modVersion
-                    height: root.compactMode ? 18 : 20
-                    width: vText.width + 12
-                    radius: Theme.radiusSm
-                    color: Theme.primaryBg
                     anchors.verticalCenter: parent.verticalCenter
-
-                    Text {
-                        id: vText
-                        anchors.centerIn: parent
-                        text: model.modVersion || ""
-                        color: Theme.primary
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
-                    }
+                    compact: root.compactMode
+                    text: model.modVersion || ""
                 }
 
                 // Error badge

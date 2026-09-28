@@ -265,40 +265,34 @@ Rectangle {
                     elide: Text.ElideRight
                 }
 
-                Rectangle {
+                PxBadge {
                     visible: !!item.model.hasRule
-                    Layout.preferredWidth: ruleText.implicitWidth + 12
-                    Layout.preferredHeight: 18
-                    radius: Theme.radiusPill
-                    color: Theme.warningBg
-                    Text {
-                        id: ruleText
-                        anchors.centerIn: parent
-                        text: "Auto"
-                        color: Theme.warning
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                    }
+                    text: "Auto"
+                    textColor: Theme.warning
+                    fillColor: Theme.warningBg
+                }
+
+                PxBadge {
+                    visible: item.model.kind === "mod" && !!item.model.providerLabel
+                    outlined: true
+                    text: item.model.providerLabel || ""
+                    accent: item.model.providerColor || Theme.border
+                    textColor: item.model.providerColor || Theme.textMuted
+                }
+
+                PxBadge {
+                    visible: item.model.kind === "mod" && !!item.model.modVersion
+                    text: item.model.modVersion || ""
                 }
 
                 Repeater {
                     model: item.model.kind === "mod" ? (item.model.tags || []) : []
-                    delegate: Rectangle {
+                    delegate: PxBadge {
                         required property var modelData
-                        property color chipColor: modelData.color
-                        Layout.preferredWidth: tagLabel.implicitWidth + 14
-                        Layout.preferredHeight: 18
-                        radius: Theme.radiusPill
-                        color: Qt.rgba(chipColor.r, chipColor.g, chipColor.b, 0.14)
-                        Text {
-                            id: tagLabel
-                            anchors.centerIn: parent
-                            text: modelData.name
-                            color: modelData.color
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.bold: true
-                        }
+                        property color tagColor: modelData.color
+                        text: modelData.name
+                        textColor: tagColor
+                        fillColor: Qt.rgba(tagColor.r, tagColor.g, tagColor.b, 0.14)
                     }
                 }
                 Text {
@@ -324,22 +318,13 @@ Rectangle {
                     tooltip: item.model.warningTooltip || ""
                 }
 
-                Rectangle {
+                PxBadge {
                     visible: item.model.kind !== "mod"
-                    Layout.preferredWidth: countText.implicitWidth + 14
-                    Layout.preferredHeight: 21
-                    radius: Theme.radiusSm
-                    color: Theme.elevate3
-                    Text {
-                        id: countText
-                        anchors.centerIn: parent
-                        text: item.model.filtering
-                              ? item.model.visibleCount + " of " + item.model.totalCount
-                              : item.model.enabledCount + "/" + item.model.totalCount
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                    }
+                    textColor: Theme.textMuted
+                    fillColor: Theme.elevate3
+                    text: item.model.filtering
+                          ? item.model.visibleCount + " of " + item.model.totalCount
+                          : item.model.enabledCount + "/" + item.model.totalCount
                 }
             }
 

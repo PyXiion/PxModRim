@@ -12,7 +12,9 @@ from PySide6.QtCore import (
     Qt,
 )
 
+from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.organizer import ROOT_ID, FolderNode, ModLeaf, Tag
+from pxmodrim.ui.models.mod_list_model import provider_label
 from pxmodrim.ui.theme.palette import PALETTE
 
 if TYPE_CHECKING:
@@ -48,8 +50,10 @@ class TreeNode:
         "key",
         "kind",
         "leaf",
+        "mod_version",
         "parent",
         "provider_id",
+        "provider_label",
         "row",
     )
 
@@ -68,6 +72,8 @@ class TreeNode:
         self.folder = folder
         self.leaf = leaf
         self.provider_id = provider_id
+        self.provider_label = ""
+        self.mod_version = ""
         self.children: list[TreeNode] = []
         self.row = 0
 
@@ -103,11 +109,17 @@ def _build(
         for leaf in leaves:
             mod = mods.get(leaf.uuid)
             provider = mod.provider_id if mod is not None else ""
-            parent.add(
-                TreeNode(
-                    "mod", f"m:{leaf.uuid}", parent, leaf=leaf, provider_id=provider
-                )
+            node = TreeNode(
+                "mod", f"m:{leaf.uuid}", parent, leaf=leaf, provider_id=provider
             )
+            if mod is not None:
+                node.provider_label = provider_label(
+                    provider, str(getattr(mod, "package_id", ""))
+                )
+                node.mod_version = (
+                    mod.mod_version if isinstance(mod, AboutXmlMod) else ""
+                )
+            parent.add(node)
 
     def add_folder(parent: TreeNode, node: FolderNode) -> None:
         item = TreeNode("folder", f"f:{node.folder.id}", parent, folder=node)
@@ -135,6 +147,8 @@ def _copy_payload(dst: TreeNode, src: TreeNode) -> None:
     dst.folder = src.folder
     dst.leaf = src.leaf
     dst.provider_id = src.provider_id
+    dst.provider_label = src.provider_label
+    dst.mod_version = src.mod_version
     for d, s in zip(dst.children, src.children, strict=True):
         _copy_payload(d, s)
 
@@ -161,6 +175,8 @@ class ModTreeModel(QAbstractItemModel):
     HasWarningRole = Qt.ItemDataRole.UserRole + 17
     WarningTooltipRole = Qt.ItemDataRole.UserRole + 18
     TagsRole = Qt.ItemDataRole.UserRole + 19
+    ProviderLabelRole = Qt.ItemDataRole.UserRole + 20
+    ModVersionRole = Qt.ItemDataRole.UserRole + 21
 
     _SELECTION_ROLES = (SelectedRole,)
     _ERROR_ROLES = (HasErrorRole, ErrorTooltipRole, HasWarningRole, WarningTooltipRole)
@@ -259,6 +275,10 @@ class ModTreeModel(QAbstractItemModel):
             return leaf.package_id or ""
         if role == self.CheckStateRole:
             return Qt.CheckState.Checked if leaf.enabled else Qt.CheckState.Unchecked
+        if role == self.ProviderLabelRole:
+            return node.provider_label
+        if role == self.ModVersionRole:
+            return node.mod_version
         if role == self.ProviderIconRole:
             return PROVIDER_ICONS.get(node.provider_id, "folder")
         if role == self.ProviderColorRole:
@@ -292,6 +312,8 @@ class ModTreeModel(QAbstractItemModel):
             self.FilteringRole: QByteArray(b"filtering"),
             self.HasRuleRole: QByteArray(b"hasRule"),
             self.ProviderIconRole: QByteArray(b"providerIcon"),
+            self.ProviderLabelRole: QByteArray(b"providerLabel"),
+            self.ModVersionRole: QByteArray(b"modVersion"),
             self.ProviderColorRole: QByteArray(b"providerColor"),
             self.HasErrorRole: QByteArray(b"hasError"),
             self.ErrorTooltipRole: QByteArray(b"errorTooltip"),
