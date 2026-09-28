@@ -1,5 +1,6 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
+import QtQuick
+import QtQuick.Controls
+import "../components/controls"
 
 Rectangle {
     id: root
@@ -34,7 +35,7 @@ Rectangle {
         property string anchorUuid: ""
         property string currentUuid: ""
 
-        ScrollBar.vertical: ScrollBar {
+        ScrollBar.vertical: PxScrollBar {
             id: scrollBar
             policy: ScrollBar.AsNeeded
             active: true
@@ -59,9 +60,11 @@ Rectangle {
                         id: sectionLabel
                         text: section
                         color: Theme.textDim
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
                         font.letterSpacing: 0.5
+                        font.capitalization: Font.AllUppercase
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
@@ -80,16 +83,14 @@ Rectangle {
         }
     }
 
-    Text {
+    EmptyState {
         id: emptyStateText
         objectName: "emptyStateText"
-        anchors.centerIn: parent
+        anchors.fill: parent
         visible: listView.count === 0
-        text: "No mods to show"
-        color: Theme.textDim
-        font.pixelSize: Theme.fontSizeMd
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
+        iconName: "mods"
+        title: "No mods to show"
+        Accessible.name: title
     }
 
     Timer {
@@ -142,6 +143,7 @@ Rectangle {
                 anchors.centerIn: parent
                 text: dragProxy.modName ? dragProxy.modName.charAt(0).toUpperCase() : "?"
                 color: Theme.elevate0
+                font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.Bold
             }
@@ -154,6 +156,7 @@ Rectangle {
                 width: parent.width
                 text: dragProxy.modName
                 color: Theme.textMain
+                font.family: Theme.fontFamily
                 font.bold: true
                 font.pixelSize: Theme.fontSizeMd
                 elide: Text.ElideRight
@@ -165,7 +168,7 @@ Rectangle {
                 visible: text !== ""
                 color: Theme.textDim
                 font.pixelSize: Theme.fontSizeSm
-                font.family: "monospace"
+                font.family: Theme.fontMono
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
@@ -232,18 +235,23 @@ Rectangle {
                 height: parent.height
                 visible: model.loadIndex > 0
 
-                Text {
+                Image {
                     anchors.centerIn: parent
-                    text: "\u22ee"
-                    color: (modListModel && modListModel.isFiltered) ? Theme.textDim : Theme.textMuted
-                    opacity: (modListModel && modListModel.isFiltered) ? 0.35 : 1.0
-                    font.pixelSize: 20
+                    width: 16
+                    height: 16
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                    opacity: (modListModel && modListModel.isFiltered) ? Theme.disabledOpacity : 1.0
+                    source: "image://icons/grip?color=" + encodeURIComponent(
+                        (modListModel && modListModel.isFiltered) ? Theme.textDim : Theme.textMuted)
                 }
 
-                ToolTip {
-                    text: "Clear search and filters to reorder"
-                    visible: dragArea.containsMouse && Boolean(modListModel && modListModel.isFiltered)
-                    delay: 300
+                Loader {
+                    active: Boolean(modListModel && modListModel.isFiltered)
+                    sourceComponent: PxToolTip {
+                        text: "Clear search and filters to reorder"
+                        visible: dragArea.containsMouse
+                    }
                 }
 
                 MouseArea {
@@ -351,7 +359,7 @@ Rectangle {
                     text: model.loadIndex > 0 ? ("#" + model.loadIndex) : "–"
                     color: model.loadIndex > 0 ? Theme.textMuted : Theme.textDim
                     font.pixelSize: Theme.fontSizeSm
-                    font.family: "monospace"
+                    font.family: Theme.fontMono
                     font.weight: model.loadIndex > 0 ? Font.Medium : Font.Normal
                 }
             }
@@ -361,28 +369,17 @@ Rectangle {
                 width: 32
                 height: parent.height
 
-                Rectangle {
+                PxCheckIndicator {
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
-                    radius: 3
-                    color: model.checkState === Qt.Checked ? Theme.primary : "transparent"
-                    border.color: model.checkState === Qt.Checked ? Theme.primary : Theme.border
-                    border.width: 1.5
-
-                    Text {
-                        anchors.centerIn: parent
-                        visible: model.checkState === Qt.Checked
-                        text: "\u2713"
-                        color: Theme.elevate0
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                    }
+                    checkState: model.checkState
+                    hovered: checkboxArea.containsMouse
                 }
 
                 MouseArea {
+                    id: checkboxArea
                     objectName: "checkboxArea"
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     Accessible.role: Accessible.CheckBox
                     Accessible.name: (
@@ -411,6 +408,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: model.name ? model.name.charAt(0).toUpperCase() : "?"
                     color: Theme.elevate0
+                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeLg
                     font.weight: Font.Bold
                 }
@@ -427,6 +425,7 @@ Rectangle {
                     width: parent.width
                     text: model.name || ""
                     color: Theme.textMain
+                    font.family: Theme.fontFamily
                     font.bold: true
                     font.pixelSize: Theme.fontSizeMd
                     elide: Text.ElideRight
@@ -439,7 +438,7 @@ Rectangle {
                     visible: text !== ""
                     color: Theme.textDim
                     font.pixelSize: Theme.fontSizeSm
-                    font.family: "monospace"
+                    font.family: Theme.fontMono
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -458,6 +457,7 @@ Rectangle {
                     id: compactNameText
                     text: model.name || ""
                     color: Theme.textMain
+                    font.family: Theme.fontFamily
                     font.bold: true
                     font.pixelSize: Theme.fontSizeSm
                     elide: Text.ElideRight
@@ -473,7 +473,7 @@ Rectangle {
                     width: Math.min(implicitWidth, Math.max(0, parent.width - compactNameText.width - 6))
                     color: Theme.textDim
                     font.pixelSize: Theme.fontSizeXs
-                    font.family: "monospace"
+                    font.family: Theme.fontMono
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     anchors.verticalCenter: parent.verticalCenter
@@ -489,35 +489,37 @@ Rectangle {
                 spacing: 6
 
                 // Startup impact pill
-                Rectangle {
-                    visible: model.startupImpact > 0
-                    height: root.compactMode ? 18 : 20
-                    width: siText.width + 12
-                    radius: Theme.radiusSm
-                    color: model.startupImpact < 1.0 ? "#3d8b3d" :
-                           model.startupImpact < 5.0 ? "#c98a1e" : "#b23b3b"
+                Loader {
+                    id: startupImpactLoader
+                    active: model.startupImpact > 0
+                    visible: active
                     anchors.verticalCenter: parent.verticalCenter
+                    sourceComponent: Rectangle {
+                        height: root.compactMode ? 18 : 20
+                        width: siText.width + 12
+                        radius: Theme.radiusSm
+                        color: model.startupImpactColor
 
-                    Text {
-                        id: siText
-                        anchors.centerIn: parent
-                        text: Math.round(model.startupImpact * 1000) + "ms"
-                        color: "white"
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
-                    }
+                        Text {
+                            id: siText
+                            anchors.centerIn: parent
+                            text: model.startupImpactText
+                            color: Theme.onAccent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Font.Bold
+                        }
 
-                    ToolTip {
-                        text: "Startup impact: " + Math.round(model.startupImpact * 1000) + "ms"
-                        visible: siMouseArea.containsMouse
-                        delay: 300
-                    }
+                        MouseArea {
+                            id: siMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                        }
 
-                    MouseArea {
-                        id: siMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.WhatsThisCursor
+                        PxToolTip {
+                            text: "Startup impact: adds " + model.startupImpactText + " to game load"
+                            visible: siMouseArea.containsMouse
+                        }
                     }
                 }
 
@@ -545,6 +547,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: model.providerLabel || ""
                         color: model.providerColor || Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
                     }
@@ -564,72 +567,31 @@ Rectangle {
                         anchors.centerIn: parent
                         text: model.modVersion || ""
                         color: Theme.primary
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
                     }
                 }
 
                 // Error badge
-                Rectangle {
-                    visible: !!model.hasError
-                    height: root.compactMode ? 18 : 20
-                    width: eText.width + 12
-                    radius: Theme.radiusSm
-                    color: Theme.danger
+                Loader {
+                    active: !!model.hasError
+                    visible: active
                     anchors.verticalCenter: parent.verticalCenter
-
-                    Text {
-                        id: eText
-                        anchors.centerIn: parent
-                        text: "\u2716"
-                        color: "white"
-                        font.pixelSize: Theme.fontSizeSm
-                        font.bold: true
-                    }
-
-                    MouseArea {
-                        id: errorHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.WhatsThisCursor
-                    }
-
-                    ToolTip {
-                        text: model.errorTooltip || ""
-                        visible: errorHover.containsMouse
-                        delay: 300
+                    sourceComponent: DiagnosticBadge {
+                        level: "error"
+                        tooltip: model.errorTooltip || ""
                     }
                 }
 
                 // Warning badge
-                Rectangle {
-                    visible: !!model.hasWarning
-                    height: root.compactMode ? 18 : 20
-                    width: wText.width + 12
-                    radius: Theme.radiusSm
-                    color: Theme.warning
+                Loader {
+                    active: !!model.hasWarning
+                    visible: active
                     anchors.verticalCenter: parent.verticalCenter
-
-                    Text {
-                        id: wText
-                        anchors.centerIn: parent
-                        text: "\u26a0"
-                        color: "white"
-                        font.pixelSize: Theme.fontSizeSm
-                        font.bold: true
-                    }
-
-                    MouseArea {
-                        id: warningHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.WhatsThisCursor
-                    }
-
-                    ToolTip {
-                        text: model.warningTooltip || ""
-                        visible: warningHover.containsMouse
-                        delay: 300
+                    sourceComponent: DiagnosticBadge {
+                        level: "warning"
+                        tooltip: model.warningTooltip || ""
                     }
                 }
             }
