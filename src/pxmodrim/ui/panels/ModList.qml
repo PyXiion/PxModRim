@@ -39,6 +39,41 @@ Rectangle {
             policy: ScrollBar.AsNeeded
             active: true
         }
+        section.property: "sectionName"
+        section.criteria: ViewSection.FullString
+        section.delegate: Component {
+            Item {
+                width: listView.width
+                height: section !== "" ? 28 : 0
+                visible: section !== ""
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 16
+                    anchors.right: parent.right
+                    anchors.rightMargin: 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
+
+                    Text {
+                        id: sectionLabel
+                        text: section
+                        color: Theme.textDim
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Font.Bold
+                        font.letterSpacing: 0.5
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - sectionLabel.width - parent.spacing
+                        height: 1
+                        color: Theme.border
+                    }
+                }
+            }
+        }
 
         moveDisplaced: Transition {
             NumberAnimation { properties: "y"; duration: 120; easing.type: Easing.InOutQuad }
@@ -71,10 +106,7 @@ Rectangle {
                 dragProxy.width / 2,
                 dragProxy.height / 2
             )
-            listView.dragTargetIndex = Math.max(
-                0,
-                Math.min(Math.floor(center.y / 54), listView.count - 1)
-            )
+            listView.dragTargetIndex = root.targetIndexForPoint(center.x, center.y)
         }
     }
 
@@ -143,10 +175,16 @@ Rectangle {
     Rectangle {
         visible: dragProxy.visible && listView.dragTargetIndex >= 0
         x: 0
-        y: Math.max(0, Math.min(
-            listView.height - height,
-            listView.dragTargetIndex * 54 - listView.contentY
-        ))
+        y: {
+            var targetItem = listView.itemAtIndex(listView.dragTargetIndex)
+            if (targetItem) {
+                return targetItem.y - listView.contentY
+            }
+            return Math.max(0, Math.min(
+                listView.height - height,
+                listView.dragTargetIndex * 54 - listView.contentY
+            ))
+        }
         width: listView.width
         height: 2
         color: Theme.primary
@@ -172,7 +210,8 @@ Rectangle {
             }
             opacity: listView.dragSourceIndex === index && dragProxy.visible ? 0.0 : 1.0
             Accessible.role: Accessible.ListItem
-            Accessible.name: (model.name || "")
+            Accessible.name: (model.loadIndex > 0 ? "#" + model.loadIndex + ", " : "")
+                + (model.name || "")
                 + (model.packageId ? ", " + model.packageId : "")
             Accessible.selected: listView.selectedIndices.indexOf(index) >= 0
 
@@ -187,7 +226,7 @@ Rectangle {
             Item {
                 id: dragHandle
                 x: 0
-                width: 18
+                width: 16
                 height: parent.height
 
                 Text {
@@ -243,10 +282,7 @@ Rectangle {
                             dragProxy.width / 2,
                             dragProxy.height / 2
                         )
-                        listView.dragTargetIndex = Math.max(
-                            0,
-                            Math.min(Math.floor(center.y / 54), listView.count - 1)
-                        )
+                        listView.dragTargetIndex = root.targetIndexForPoint(center.x, center.y)
 
                         var edgeThreshold = 40
                         var bottomEdge = listView.height - edgeThreshold
@@ -291,7 +327,23 @@ Rectangle {
             }
 
             Item {
-                x: 18
+                id: loadIndexItem
+                x: 16
+                width: 32
+                height: parent.height
+
+                Text {
+                    anchors.centerIn: parent
+                    text: model.loadIndex > 0 ? ("#" + model.loadIndex) : "–"
+                    color: model.loadIndex > 0 ? Theme.textMuted : Theme.textDim
+                    font.pixelSize: Theme.fontSizeSm
+                    font.family: "monospace"
+                    font.weight: model.loadIndex > 0 ? Font.Medium : Font.Normal
+                }
+            }
+
+            Item {
+                x: 48
                 width: 32
                 height: parent.height
 
@@ -336,7 +388,7 @@ Rectangle {
 
             // ── Avatar ──
             Rectangle {
-                x: 50; y: 8; width: 36; height: 36
+                x: 80; y: 8; width: 36; height: 36
                 radius: Theme.radiusSm
                 color: model.providerColor || Theme.elevate3
 
@@ -351,8 +403,8 @@ Rectangle {
 
             // ── Name + Package ID ──
             Column {
-                x: 96; y: 8
-                width: parent.width - badgesRow.width - 108
+                x: 124; y: 8
+                width: parent.width - badgesRow.width - 134
                 spacing: 1
 
                 Text {
@@ -677,5 +729,24 @@ Rectangle {
         }
         listView.anchorIndex = anchorRow
         modListPanel.selectionChanged(uuids)
+    }
+
+    function targetIndexForPoint(x, y) {
+        if (listView.count === 0)
+            return -1
+        var idx = listView.indexAt(x, y)
+        if (idx >= 0)
+            return idx
+        if (y <= 0)
+            return 0
+        if (y >= listView.contentHeight)
+            return listView.count - 1
+        idx = listView.indexAt(x, y + 16)
+        if (idx >= 0)
+            return idx
+        idx = listView.indexAt(x, y - 16)
+        if (idx >= 0)
+            return idx
+        return Math.max(0, Math.min(Math.floor(y / 54), listView.count - 1))
     }
 }

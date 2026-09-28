@@ -128,6 +128,13 @@ class ModListProxyModel(QAbstractListModel):
         source_row = self._source_row_for_uuid.get(self._visible_uuids[index.row()], -1)
         if source_row < 0:
             return None
+        if role == ModListModel.SectionNameRole:
+            item = self._source.get_item(source_row)
+            if item is None or item.checked:
+                return ""
+            if self._has_both_blocks_visible():
+                return f"Inactive ({self._visible_inactive_count()})"
+            return ""
         return self._source.data(self._source.index(source_row, 0), role)
 
     def setData(
@@ -277,3 +284,27 @@ class ModListProxyModel(QAbstractListModel):
         if self._in_proxy_move:
             return
         self._on_source_layout_changed()
+
+    def _has_both_blocks_visible(self) -> bool:
+        has_active = False
+        has_inactive = False
+        for uuid in self._visible_uuids:
+            source_row = self._source_row_for_uuid.get(uuid, -1)
+            item = self._source.get_item(source_row)
+            if item is not None:
+                if item.checked:
+                    has_active = True
+                else:
+                    has_inactive = True
+                if has_active and has_inactive:
+                    return True
+        return False
+
+    def _visible_inactive_count(self) -> int:
+        count = 0
+        for uuid in self._visible_uuids:
+            source_row = self._source_row_for_uuid.get(uuid, -1)
+            item = self._source.get_item(source_row)
+            if item is not None and not item.checked:
+                count += 1
+        return count

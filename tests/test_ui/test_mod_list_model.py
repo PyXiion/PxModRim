@@ -120,6 +120,51 @@ class TestActiveUuids:
         assert active == ["uuid-0", "uuid-2"]
 
 
+class TestLoadIndex:
+    def test_initial_load_indices(self, model: ModListModel) -> None:
+        indices = [
+            model.data(model.index(r, 0), ModListModel.LoadIndexRole)
+            for r in range(model.rowCount())
+        ]
+        assert indices == [1, 2, -1, -1, -1]
+
+    def test_load_index_after_reorder(self, model: ModListModel) -> None:
+        changed_roles: list[list[int]] = []
+        model.dataChanged.connect(lambda _t, _b, roles: changed_roles.append(roles))
+
+        ok = model.move_row(0, 1)
+        assert ok is True
+
+        indices = [
+            model.data(model.index(r, 0), ModListModel.LoadIndexRole)
+            for r in range(model.rowCount())
+        ]
+        assert indices == [1, 2, -1, -1, -1]
+        assert model.data(model.index(0, 0), ModListModel.UuidRole) == "uuid-2"
+        assert model.data(model.index(1, 0), ModListModel.UuidRole) == "uuid-0"
+        assert any(ModListModel.LoadIndexRole in roles for roles in changed_roles)
+
+    def test_load_index_after_toggle(self, model: ModListModel) -> None:
+        changed_roles: list[list[int]] = []
+        model.dataChanged.connect(lambda _t, _b, roles: changed_roles.append(roles))
+
+        idx2 = model.index(2, 0)
+        assert model.data(idx2, ModListModel.LoadIndexRole) == -1
+        model.setData(idx2, Qt.CheckState.Checked, ModListModel.CheckStateRole)
+
+        assert model.data(idx2, ModListModel.LoadIndexRole) == 3
+        assert any(ModListModel.LoadIndexRole in roles for roles in changed_roles)
+
+        changed_roles.clear()
+        idx0 = model.index(0, 0)
+        model.setData(idx0, Qt.CheckState.Unchecked, ModListModel.CheckStateRole)
+
+        assert model.data(idx0, ModListModel.LoadIndexRole) == -1
+        assert model.data(model.index(1, 0), ModListModel.LoadIndexRole) == 1
+        assert model.data(model.index(2, 0), ModListModel.LoadIndexRole) == 2
+        assert any(ModListModel.LoadIndexRole in roles for roles in changed_roles)
+
+
 def test_setting_startup_impact_on_empty_model_emits_no_data_changed(
     qapp: QApplication,
 ) -> None:

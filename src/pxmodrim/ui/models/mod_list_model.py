@@ -25,6 +25,7 @@ class ModItem:
     checked: bool = False
     provider_color: str = "#808080"
     startup_impact_s: float = 0.0
+    load_index: int = -1
 
 
 class ModListModel(QAbstractListModel):
@@ -38,7 +39,9 @@ class ModListModel(QAbstractListModel):
     ErrorTooltipRole = Qt.ItemDataRole.UserRole + 8
     WarningTooltipRole = Qt.ItemDataRole.UserRole + 9
     StartupImpactRole = Qt.ItemDataRole.UserRole + 10
-
+    LoadIndexRole = Qt.ItemDataRole.UserRole + 11
+    IsActiveRole = Qt.ItemDataRole.UserRole + 12
+    SectionNameRole = Qt.ItemDataRole.UserRole + 13
     active_mods_changed = Signal()
 
     def __init__(
@@ -103,6 +106,16 @@ class ModListModel(QAbstractListModel):
                 return diag.warning_tooltip if diag is not None else ""
         if role == self.StartupImpactRole:
             return item.startup_impact_s
+        if role == self.LoadIndexRole:
+            return item.load_index
+        if role == self.IsActiveRole:
+            return item.checked
+        if role == self.SectionNameRole:
+            if item.checked:
+                return ""
+            if self._has_both_blocks():
+                return f"Inactive ({self._inactive_count()})"
+            return ""
         if (
             role == Qt.ItemDataRole.ToolTipRole
             and hasattr(item.mod, "description")
@@ -127,7 +140,20 @@ class ModListModel(QAbstractListModel):
             if item.checked == new_checked:
                 return True
             item.checked = new_checked
-            self.dataChanged.emit(index, index, [self.CheckStateRole])
+            load_changed = self._update_load_indices()
+            all_affected = set(load_changed) | {index.row()}
+            top = self.index(min(all_affected), 0)
+            bottom = self.index(len(self._items) - 1, 0)
+            self.dataChanged.emit(
+                top,
+                bottom,
+                [
+                    self.CheckStateRole,
+                    self.LoadIndexRole,
+                    self.IsActiveRole,
+                    self.SectionNameRole,
+                ],
+            )
             self.active_mods_changed.emit()
             return True
 
@@ -197,6 +223,9 @@ class ModListModel(QAbstractListModel):
             self.ErrorTooltipRole: QByteArray(b"errorTooltip"),
             self.WarningTooltipRole: QByteArray(b"warningTooltip"),
             self.StartupImpactRole: QByteArray(b"startupImpact"),
+            self.LoadIndexRole: QByteArray(b"loadIndex"),
+            self.IsActiveRole: QByteArray(b"isActive"),
+            self.SectionNameRole: QByteArray(b"sectionName"),
             Qt.ItemDataRole.ToolTipRole: QByteArray(b"toolTip"),
         }
 
@@ -217,6 +246,15 @@ class ModListModel(QAbstractListModel):
         item = self._items.pop(source_row)
         self._items.insert(target_row, item)
         self.endMoveRows()
+        changed = self._update_load_indices()
+        if changed:
+            top = self.index(min(changed), 0)
+            bottom = self.index(max(changed), 0)
+            self.dataChanged.emit(
+                top,
+                bottom,
+                [self.LoadIndexRole, self.SectionNameRole],
+            )
         return True
 
     def commitOrder(self, new_ordered_uuids: list[str]) -> None:
@@ -244,6 +282,7 @@ class ModListModel(QAbstractListModel):
         self.layoutAboutToBeChanged.emit()
         persistent_indexes = self.persistentIndexList()
         self._items = new_items
+        self._update_load_indices()
         new_persistent = [
             self.index(new_row_for_old.get(index.row(), -1), 0)
             for index in persistent_indexes
@@ -288,6 +327,7 @@ class ModListModel(QAbstractListModel):
                 for uuid in inactive_uuids
             ]
             self._items = active_items + inactive_items
+            self._update_load_indices()
         finally:
             self.endResetModel()
 
@@ -325,7 +365,40 @@ class ModListModel(QAbstractListModel):
                 changed_rows.append(row)
         if not changed_rows:
             return
-        top = self.index(min(changed_rows), 0)
-        bottom = self.index(max(changed_rows), 0)
-        self.dataChanged.emit(top, bottom, [self.CheckStateRole])
+        load_changed = self._update_load_indices()
+        all_affected = set(changed_rows) | set(load_changed)
+        top = self.index(min(all_affected), 0)
+        bottom = self.index(len(self._items) - 1, 0)
+        self.dataChanged.emit(
+            top,
+            bottom,
+            [
+                self.CheckStateRole,
+                self.LoadIndexRole,
+                self.IsActiveRole,
+                self.SectionNameRole,
+            ],
+        )
         self.active_mods_changed.emit()
+
+    def _update_load_indices(self) -> list[int]:
+        changed: list[int] = []
+        counter = 0
+        for row, item in enumerate(self._items):
+            if item.checked:
+                counter += 1
+                new_idx = counter
+            else:
+                new_idx = -1
+            if item.load_index != new_idx:
+                item.load_index = new_idx
+                changed.append(row)
+        return changed
+
+    def _has_both_blocks(self) -> bool:
+        has_active = any(item.checked for item in self._items)
+        has_inactive = any(not item.checked for item in self._items)
+        return has_active and has_inactive
+
+    def _inactive_count(self) -> int:
+        return sum(1 for item in self._items if not item.checked)
