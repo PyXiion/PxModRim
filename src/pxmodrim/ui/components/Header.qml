@@ -1,6 +1,7 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "controls"
 
 Rectangle {
     id: root
@@ -31,13 +32,15 @@ Rectangle {
             Text {
                 text: "RimWorld Mod Manager"
                 color: Theme.textMuted
-                font.pixelSize: 11
+                font.pixelSize: Theme.fontSizeXs
+                font.family: Theme.fontFamily
             }
 
             Text {
-                text: "v0.1.0"
+                text: "v" + root.controller.appVersion
                 color: Theme.textDim
-                font.pixelSize: 11
+                font.pixelSize: Theme.fontSizeXs
+                font.family: Theme.fontFamily
             }
         }
 
@@ -54,20 +57,24 @@ Rectangle {
                 spacing: 6
                 visible: root.controller.is_frameless
 
-                HeaderButton {
+                PxButton {
+                    variant: "ghost"
                     iconName: "minimize"
+                    ToolTip.text: "Minimize"
                     onClicked: root.controller.minimize()
                 }
 
-                HeaderButton {
+                PxButton {
+                    variant: "ghost"
                     iconName: root.controller.maximized ? "restore" : "maximize"
+                    ToolTip.text: root.controller.maximized ? "Restore" : "Maximize"
                     onClicked: root.controller.maximize()
                 }
 
-                HeaderButton {
+                PxButton {
+                    variant: "danger"
                     iconName: "close"
-                    bgHoverColor: Theme.danger
-                    iconHoverColor: "#ffffff"
+                    ToolTip.text: "Close"
                     onClicked: root.controller.closeWindow()
                 }
             }
@@ -77,27 +84,24 @@ Rectangle {
                 Layout.alignment: Qt.AlignRight
                 spacing: 6
 
-                HeaderButton {
+                PxButton {
                     iconName: "settings"
-                    bgColor: Theme.elevate0
-                    tooltip: "Settings"
+                    ToolTip.text: root.controller.tooltips.settings || "Settings"
                     onClicked: root.controller.openSettings()
                 }
 
-                HeaderButton {
+                PxButton {
                     iconName: "save"
-                    bgColor: Theme.elevate0
-                    iconColor: root.controller.unsavedChanges ? Theme.warning : Theme.textMuted
-                    tooltip: root.controller.unsavedChanges ? "Save unsaved changes (Ctrl+S)" : "Save (Ctrl+S)"
+                    ToolTip.text: root.controller.tooltips.save || "Save"
                     onClicked: root.controller.save()
 
                     Rectangle {
                         visible: root.controller.unsavedChanges
                         width: 8; height: 8
-                        radius: 4
+                        radius: Theme.radiusXs
                         color: Theme.warning
                         border.width: 2
-                        border.color: Theme.elevate0
+                        border.color: Theme.elevate3
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.topMargin: 4
@@ -105,112 +109,59 @@ Rectangle {
                     }
                 }
 
-                HeaderButton {
+                PxButton {
+                    variant: "primary"
                     iconName: "sort"
-                    tooltip: "Auto-sort"
-                    bgColor: Theme.primary
-                    bgHoverColor: Qt.lighter(Theme.primary, 1.15)
-                    iconColor: "#0b0d10"
-                    iconHoverColor: "#0b0d10"
+                    ToolTip.text: root.controller.tooltips.sort || "Auto-sort"
                     onClicked: root.controller.autoSort()
                 }
 
-                HeaderButton {
+                PxButton {
                     iconName: "refresh"
-                    bgColor: Theme.elevate0
-                    tooltip: "Refresh (F5)"
+                    ToolTip.text: root.controller.tooltips.refresh || "Refresh"
                     onClicked: root.controller.refresh()
                 }
 
                 // ── Launch split-button ──
-                Rectangle {
-                    id: launchBtn
-                    height: 32
-                    width: playRow.implicitWidth
-                    radius: Theme.radiusMd
-                    color: launchHover.containsMouse ? Qt.lighter(Theme.success, 1.15) : Theme.success
+                Row {
+                    spacing: 1
 
-                    Row {
-                        id: playRow
-                        height: parent.height
-                        spacing: 0
-
-                        Item {
-                            width: 28; height: parent.height
-                            Image {
-                                anchors.centerIn: parent
-                                source: "image://icons/play?color=" + encodeURIComponent("white")
-                                sourceSize.width: 16; sourceSize.height: 16
-                            }
-                        }
-
-                        Text {
-                            text: "Play"
-                            color: "white"
-                            font.pixelSize: 13
-                            font.weight: Font.Medium
-                            anchors.verticalCenter: parent.verticalCenter
-                            rightPadding: 10
-                        }
-
-                        Rectangle {
-                            width: 1; height: 18
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Qt.rgba(1, 1, 1, 0.2)
-                        }
-
-                        Item {
-                            width: 20; height: parent.height
-                            Image {
-                                anchors.centerIn: parent
-                                source: "image://icons/chevron-down?color=" + encodeURIComponent("white")
-                                sourceSize.width: 12; sourceSize.height: 12
-                            }
-                        }
+                    PxButton {
+                        variant: "success"
+                        iconName: "play"
+                        text: "Play"
+                        ToolTip.text: "Launch game"
+                        onClicked: root.controller.launch()
                     }
 
-                    MouseArea {
-                        id: launchHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: function(mouse) {
-                            if (mouse.x < playRow.implicitWidth - 20) {
-                                root.controller.launch()
-                            } else {
-                                strategyMenu.popup()
-                            }
-                        }
-
-                        ToolTip {
-                            text: "Launch game\nStrategy: " + (root.controller.strategyIndex === 0 ? "Direct executable" : "Steam")
-                            visible: launchHover.containsMouse
-                            delay: 300
-                        }
+                    PxButton {
+                        id: chevronBtn
+                        objectName: "launchStrategyButton"
+                        variant: "success"
+                        iconName: "chevron-down"
+                        ToolTip.text: "Launch strategy"
+                        onClicked: strategyMenu.popup(chevronBtn, 0, chevronBtn.height + 4)
                     }
                 }
-
             }
         }
     }
 
     // ── Dropdown menu (children of root, outside layouts) ──
-    Menu {
+    PxMenu {
         id: strategyMenu
+        objectName: "launchStrategyMenu"
 
-        MenuItem {
-            text: "Direct executable"
-            checkable: true
-            checked: root.controller.strategyIndex === 0
-            onTriggered: root.controller.setStrategy(0)
-        }
+        Repeater {
+            model: root.controller.strategies
 
-        MenuItem {
-            text: "Steam"
-            checkable: true
-            checked: root.controller.strategyIndex === 1
-            onTriggered: root.controller.setStrategy(1)
+            PxMenuItem {
+                required property var modelData
+                text: modelData.label
+                checkable: true
+                checked: root.controller.strategyIndex === modelData.index
+                onTriggered: root.controller.setStrategy(modelData.index)
+            }
         }
     }
 
@@ -232,46 +183,5 @@ Rectangle {
         onDoubleClicked: root.controller.maximize()
 
         cursorShape: root.controller.is_frameless ? Qt.OpenHandCursor : Qt.ArrowCursor
-    }
-
-    // ── Reusable button component ──
-    component HeaderButton: Rectangle {
-        id: btn
-        width: 32; height: 32
-        radius: Theme.radiusMd
-        color: mouseArea.containsMouse ? bgHoverColor : bgColor
-        property string iconName: ""
-        property string tooltip: ""
-        property color bgColor: "transparent"
-        property color bgHoverColor: Theme.elevate3
-        property color iconColor: Theme.textMuted
-        property color iconHoverColor: Theme.textMain
-
-        signal clicked()
-
-        Image {
-            anchors.centerIn: parent
-            source: {
-                if (btn.iconName === "") return ""
-                var color = mouseArea.containsMouse ? btn.iconHoverColor : btn.iconColor
-                return "image://icons/" + btn.iconName + "?color=" + encodeURIComponent(color)
-            }
-            sourceSize.width: 16; sourceSize.height: 16
-            fillMode: Image.PreserveAspectFit
-        }
-
-        MouseArea {
-            id: mouseArea
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: btn.clicked()
-
-            ToolTip {
-                text: btn.tooltip
-                visible: mouseArea.containsMouse && btn.tooltip !== ""
-                delay: 300
-            }
-        }
     }
 }

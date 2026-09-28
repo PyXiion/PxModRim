@@ -1,13 +1,14 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "controls"
 
 Rectangle {
     id: root
     color: Theme.elevate2
 
     property int currentIndex: 0
-    property bool collapsed: root.width < 110
+    property bool collapsed: root.width < Theme.railCollapseWidth
     property var tabModel: railModel
 
     signal tabSelected(int index)
@@ -37,7 +38,7 @@ Rectangle {
                     id: bg
                     anchors.fill: parent
                     anchors.margins: 4
-                    radius: 6
+                    radius: Theme.radiusMd
                     color: delegate.active
                         ? Theme.elevate4
                         : (hoverArea.containsMouse ? Theme.elevate3 : "transparent")
@@ -46,7 +47,7 @@ Rectangle {
                         visible: delegate.active
                         width: 3
                         height: 18
-                        radius: 1.5
+                        radius: Theme.radiusXs
                         color: Theme.primary
                         anchors.left: parent.left
                         anchors.leftMargin: 3
@@ -79,6 +80,7 @@ Rectangle {
                             Layout.fillWidth: true
                             text: modelData.label || ""
                             color: delegate.active ? Theme.primary : Theme.textMuted
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeMd
                             font.weight: delegate.active ? Font.Medium : Font.Normal
                             elide: Text.ElideRight
@@ -107,10 +109,19 @@ Rectangle {
                         id: hoverArea
                         anchors.fill: parent
                         hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
                         onEntered: root.tabHovered(index)
                         onClicked: {
                             root.currentIndex = index
                             root.tabSelected(index)
+                        }
+                    }
+
+                    Loader {
+                        active: root.collapsed && hoverArea.containsMouse
+                        sourceComponent: PxToolTip {
+                            visible: true
+                            text: modelData.label || ""
                         }
                     }
 

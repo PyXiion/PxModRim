@@ -1,6 +1,7 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "../components/controls"
 
 Rectangle {
     id: root
@@ -38,6 +39,7 @@ Rectangle {
                     anchors.verticalCenterOffset: -1
                     text: section
                     color: Theme.textDim
+                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Font.Bold
                     font.letterSpacing: 0.5
@@ -45,10 +47,7 @@ Rectangle {
                 }
             }
 
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
-                width: Theme.scrollbarWidth
-            }
+            ScrollBar.vertical: PxScrollBar {}
 
             onCurrentIndexChanged: {
                 if (currentIndex >= 0)
@@ -69,7 +68,7 @@ Rectangle {
                     visible: listView.currentIndex === index
                     width: 3
                     height: 18
-                    radius: 1.5
+                    radius: Theme.radiusXs
                     color: Theme.primary
                     anchors.left: parent.left
                     anchors.leftMargin: 10
@@ -109,6 +108,7 @@ Rectangle {
                         text: model.label || ""
                         color: listView.currentIndex === index
                             ? Theme.primary : Theme.textMain
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeMd
                         font.weight: listView.currentIndex === index ? Font.Medium : Font.Normal
                         elide: Text.ElideRight
@@ -119,8 +119,8 @@ Rectangle {
                     Rectangle {
                         visible: (model.count || 0) > 0
                         Layout.preferredWidth: badgeText.contentWidth + 12
-                        Layout.preferredHeight: 20
-                        radius: 10
+                        Layout.preferredHeight: Theme.fontSizeMd + 6
+                        radius: Theme.radiusPill
                         color: model.badgeBg || Theme.elevate4
 
                         Text {
@@ -128,6 +128,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: String(model.count || 0)
                             color: model.badgeFg || Theme.textMuted
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Font.Medium
                         }
@@ -138,6 +139,7 @@ Rectangle {
                     id: hoverArea
                     anchors.fill: parent
                     hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
                     onClicked: listView.currentIndex = index
                 }
             }
