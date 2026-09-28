@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-
+## [0.1.0] - 2026-09-28
 ### Added
 - Mod organizer (#37): SQLite-backed folder hierarchy, tags, placement rules, and tree resolver; QML TreeView with nested folders, search, source/status/tag filters, bulk toggles, folder actions, organizational drag-and-drop that leaves load order unchanged, the shared mod-info sidebar, and QML editors for tags and ordered auto-folder rules built on shared themed QML controls (`ui/components/controls`); an on-demand set of standard rules (Official, Frameworks & Libraries, Vanilla Expanded, Combat Extended, Alpha Mods, Performance)
 - Extended keyboard shortcuts (#35): search, mod toggling, fullscreen, view navigation, full metadata rescan, and a Help menu shortcut reference
@@ -43,9 +43,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 - Unused per-mod `community_rules`/`user_rules` and `overall_rules` merge; unused `DownloadRunner` protocol
-
-## [0.1.0] - YYYY-MM-DD
-
-### Added
-
-- Initial release
