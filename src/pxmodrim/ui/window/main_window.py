@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
@@ -33,6 +32,7 @@ from qasync import asyncSlot
 from pxmodrim.core.config import config_dir
 from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.view.sidebar import SidebarEntry
+from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import (
     HeaderController,
     HeaderPanel,
@@ -72,13 +72,6 @@ from pxmodrim.ui.window.menu_bar import MenuBar
 
 _ISSUES_URL = "https://github.com/PyXiion/PxModRim/issues"
 _WINDOW_TITLE = "PxModRim[*]"
-
-
-def _app_version() -> str:
-    try:
-        return version("pxmodrim")
-    except PackageNotFoundError:
-        return "0.1.0"
 
 
 if TYPE_CHECKING:
@@ -155,7 +148,7 @@ class MainWindow(QMainWindow):
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ui_prefs.launch_strategy),
-            app_version=_app_version(),
+            app_version=get_app_version(),
             tooltips={
                 "refresh": ACTIONS[ActionId.REFRESH].tooltip(),
                 "sort": ACTIONS[ActionId.AUTO_SORT].tooltip(),
@@ -308,6 +301,7 @@ class MainWindow(QMainWindow):
         logger.debug("main_window: setting up toast manager and events")
         self._toast_manager = ToastManager(self.centralWidget())
         self._toast_manager.resize_to_parent()
+        self._app_ctx.toasts = self._toast_manager
 
         self._ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message

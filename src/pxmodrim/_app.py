@@ -10,7 +10,7 @@ from types import TracebackType
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 from qasync import QEventLoop
 
 # Qt6 defaults to PassThrough, which causes QtWebEngine to render at
@@ -246,12 +246,12 @@ class App:
 
         if not ctx.config.paths.game:
             logger.info("No game path found, showing settings dialog")
-            result, dialog = await await_dialog(SettingsPanel, ctx)
+            result, dialog = await await_dialog(SettingsPanel, ctx, self.main_window)
             if app_close_event.is_set():
                 await self._app_ctx.shutdown_all()
                 return 0
             new_cfg = dialog.get_config()
-            if result != 1 or not new_cfg.paths.game:
+            if result != QDialog.DialogCode.Accepted or not new_cfg.paths.game:
                 logger.warning("No game path configured, exiting")
                 return 1
             ctx.config_service.save("config.json", new_cfg)

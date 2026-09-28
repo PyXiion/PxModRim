@@ -1,21 +1,50 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, Protocol
+
+from PySide6.QtWidgets import QWidget
 
 from pxmodrim.core.plugin import Plugin, PluginRegistry
 from pxmodrim.ui.ui_prefs import UIPrefs
 
 if TYPE_CHECKING:
+    from PySide6.QtQml import QQmlEngine
+
     from pxmodrim.core.context import CoreContext
 
 
+class Notifier(Protocol):
+    def info(self, message: str, duration: int = ...) -> None: ...
+    def success(self, message: str, duration: int = ...) -> None: ...
+    def warning(self, message: str, duration: int = ...) -> None: ...
+    def error(self, message: str, duration: int = ...) -> None: ...
+
+
+class RailView(QWidget):
+    """Base of widgets registered on the navigation rail."""
+
+    view_id: ClassVar[str]
+    icon_name: ClassVar[str]
+    label: ClassVar[str]
+
+    def __init__(
+        self,
+        ctx: CoreContext,
+        qml_engine: QQmlEngine | None = None,
+        parent: QWidget | None = None,
+        app_ctx: AppContext | None = None,
+    ) -> None:
+        super().__init__(parent)
+
+
 class AppContext:
-    __slots__ = ("_core", "_plugins", "_rail_views", "_ui_prefs")
+    __slots__ = ("_core", "_plugins", "_rail_views", "_toasts", "_ui_prefs")
 
     def __init__(self, core: CoreContext, ui_prefs: UIPrefs | None = None) -> None:
         self._core = core
         self._plugins = PluginRegistry()
-        self._rail_views: list[type] = []
+        self._rail_views: list[type[RailView]] = []
+        self._toasts: Notifier | None = None
         self._ui_prefs = ui_prefs or UIPrefs()
 
     # ── Plugin system (UI layer) ──────────────────────
@@ -29,15 +58,27 @@ class AppContext:
 
     # ── Rail views ────────────────────────────────────
 
-    def add_rail_view(self, view_cls: type, *, position: int | None = None) -> None:
+    def add_rail_view(
+        self, view_cls: type[RailView], *, position: int | None = None
+    ) -> None:
         if position is None:
             self._rail_views.append(view_cls)
         else:
             self._rail_views.insert(position, view_cls)
 
     @property
-    def rail_views(self) -> tuple[type, ...]:
+    def rail_views(self) -> tuple[type[RailView], ...]:
         return tuple(self._rail_views)
+
+    # ── Toasts ────────────────────────────────────────
+
+    @property
+    def toasts(self) -> Notifier | None:
+        return self._toasts
+
+    @toasts.setter
+    def toasts(self, notifier: Notifier | None) -> None:
+        self._toasts = notifier
 
     # ── UI prefs ──────────────────────────────────────
 

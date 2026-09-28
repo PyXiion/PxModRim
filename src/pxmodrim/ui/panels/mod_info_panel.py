@@ -30,6 +30,7 @@ from pxmodrim.ui.components.icon_tab_widget import IconTabWidget
 from pxmodrim.ui.components.icons import pixmap
 from pxmodrim.ui.models.mod_list_model import provider_label
 from pxmodrim.ui.panels.time_analytics_panel import TimeAnalyticsPanel
+from pxmodrim.ui.theme.constants import BANNER_MAX_HEIGHT
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.ui_prefs import UIPrefs
 
@@ -107,7 +108,7 @@ class ModInfoPanel(QWidget):
         layout.setSpacing(0)
 
         # Banner (persistent header, above tabs)
-        self._banner = AspectRatioBanner(self, max_height=260)
+        self._banner = AspectRatioBanner(self, max_height=BANNER_MAX_HEIGHT)
         self._banner.hide()
         layout.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
 

@@ -14,20 +14,11 @@ from PySide6.QtCore import (
 
 from pxmodrim.ui.theme.palette import PALETTE
 
-
-def _qml_color(value: str) -> str:
-    if not value.startswith("rgba("):
-        return value
-    r, g, b, a = (part.strip() for part in value[5:-1].split(","))
-    alpha = round(float(a) * 255)
-    return f"#{alpha:02x}{int(r):02x}{int(g):02x}{int(b):02x}"
-
-
 # (badge_bg, badge_fg, icon_name, icon_color)
 _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
     "all": (PALETTE["ELEVATE_4"], PALETTE["TEXT_MAIN"], "grid", PALETTE["TEXT_DIM"]),
     "active": (
-        PALETTE["SUCCESS_BG"],
+        PALETTE["SUCCESS_BG_QML"],
         PALETTE["SUCCESS"],
         "check-circle",
         PALETTE["SUCCESS"],
@@ -38,9 +29,9 @@ _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
         "ban",
         PALETTE["TEXT_DIM"],
     ),
-    "errors": (PALETTE["DANGER_BG"], PALETTE["DANGER"], "error", PALETTE["DANGER"]),
+    "errors": (PALETTE["DANGER_BG_QML"], PALETTE["DANGER"], "error", PALETTE["DANGER"]),
     "warnings": (
-        PALETTE["WARNING_BG"],
+        PALETTE["WARNING_BG_QML"],
         PALETTE["WARNING"],
         "warning",
         PALETTE["WARNING"],
@@ -144,7 +135,7 @@ def _style_for(entry: object) -> tuple[str, str, str, str]:
             if keyword in label_lower:
                 icon_color = color
                 break
-    return _qml_color(bg), fg, icon_name, icon_color
+    return bg, fg, icon_name, icon_color
 
 
 class SidebarModel(QAbstractListModel):

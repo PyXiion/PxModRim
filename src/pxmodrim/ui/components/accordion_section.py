@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PySide6.QtCore import (
     Property,
-    QEasingCurve,
     QEvent,
     QObject,
     QPropertyAnimation,
@@ -14,6 +13,10 @@ from PySide6.QtGui import QMouseEvent, QShowEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from pxmodrim.ui.components.icons import pixmap
+from pxmodrim.ui.theme.constants import (
+    ACCORDION_ANIMATION_DURATION_MS,
+    ACCORDION_EASING,
+)
 
 QWIDGETSIZE_MAX = 16777215
 
@@ -66,7 +69,7 @@ class AccordionSection(QWidget):
         content: QWidget,
         expanded: bool = False,
         parent: QWidget | None = None,
-        _animation_duration: int = 200,
+        _animation_duration: int = ACCORDION_ANIMATION_DURATION_MS,
     ) -> None:
         super().__init__(parent)
         self._content = content
@@ -100,7 +103,7 @@ class AccordionSection(QWidget):
 
         self._anim = QPropertyAnimation(self, b"contentHeight")
         self._anim.setDuration(_animation_duration)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setEasingCurve(ACCORDION_EASING)
         self._anim.finished.connect(self._on_anim_finished)
 
         content.installEventFilter(self)

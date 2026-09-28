@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QListWidget,
     QMessageBox,
+    QWidget,
 )
 
 from pxmodrim.core.config import AppConfig, ConfigService
@@ -276,6 +277,7 @@ def test_settings_panel_save_preserves_max_snapshots(qapp: QApplication) -> None
 
     cfg = AppConfig(max_snapshots=7)
     ctx = CoreContext(cfg)
-    panel = SettingsPanel(ctx)
+    host = QWidget()
+    panel = SettingsPanel(ctx, host)
     panel._save()
     assert panel.get_config().max_snapshots == 7

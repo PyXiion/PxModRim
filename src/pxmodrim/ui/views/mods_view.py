@@ -13,6 +13,7 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.panels.mod_list_panel import ModListPanel
 from pxmodrim.ui.panels.sidebar_panel import SidebarPanel
+from pxmodrim.ui.theme.constants import SIDEBAR_WIDTH
 from pxmodrim.ui.views.base import BaseViewPanel
 
 
@@ -44,7 +45,7 @@ class ModsViewPanel(BaseViewPanel):
 
         self.sidebar = SidebarPanel(self._ctx, self._qml_engine, content)
         self.sidebar.setObjectName("sidebarPanel")
-        self.sidebar.setFixedWidth(240)
+        self.sidebar.setFixedWidth(SIDEBAR_WIDTH)
         self.sidebar.entry_selected.connect(self.entry_selected)
         h_layout.addWidget(self.sidebar)
 

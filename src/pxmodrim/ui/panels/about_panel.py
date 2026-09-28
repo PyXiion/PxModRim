@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import platform
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
+from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import AppButton
 from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
 
@@ -114,7 +115,7 @@ class AboutPanel(QDialog):
         title_row.addWidget(title)
         title_row.addStretch()
 
-        version_badge = QLabel(f"v{self._get_version()}", hero)
+        version_badge = QLabel(f"v{get_app_version()}", hero)
         version_badge.setObjectName("aboutVersionBadge")
         title_row.addWidget(version_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
         identity.addLayout(title_row)
@@ -304,7 +305,7 @@ class AboutPanel(QDialog):
         )
 
     def _system_information(self) -> str:
-        return "\n".join((f"PxModRim {self._get_version()}", *self._environment()))
+        return "\n".join((f"PxModRim {get_app_version()}", *self._environment()))
 
     @asyncSlot()
     async def _on_upload_clicked(self) -> None:
@@ -313,10 +314,3 @@ class AboutPanel(QDialog):
             await handle_upload_report(self, self._ctx, self._toast_manager)
         finally:
             self._upload_button.setEnabled(True)
-
-    @staticmethod
-    def _get_version() -> str:
-        try:
-            return version("pxmodrim")
-        except PackageNotFoundError:
-            return "0.1.0"
