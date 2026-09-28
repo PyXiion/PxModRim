@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 
 if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
@@ -18,7 +18,7 @@ from pxmodrim.ui.views.base import BaseViewPanel
 
 class ModsViewPanel(BaseViewPanel):
     view_id = "mods"
-    icon_name = "mod_tab"
+    icon_name = "mods"
     label = "Mods"
 
     entry_selected = Signal(object)
@@ -36,19 +36,19 @@ class ModsViewPanel(BaseViewPanel):
         """Initialize mods view with sidebar, mod list, and mod info panels."""
         super().__init__(ctx, qml_engine, parent, app_ctx=app_ctx)
 
-        content = QWidget()
+        content = QWidget(self)
         content.setObjectName("contentArea")
         h_layout = QHBoxLayout(content)
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(0)
 
-        self.sidebar = SidebarPanel(self._ctx, self._qml_engine)
+        self.sidebar = SidebarPanel(self._ctx, self._qml_engine, content)
         self.sidebar.setObjectName("sidebarPanel")
         self.sidebar.setFixedWidth(240)
         self.sidebar.entry_selected.connect(self.entry_selected)
         h_layout.addWidget(self.sidebar)
 
-        self.mod_list = ModListPanel(self._ctx, self._qml_engine)
+        self.mod_list = ModListPanel(self._ctx, self._qml_engine, content)
         self.mod_list.setObjectName("modListPanel")
         self.mod_list.mod_selected.connect(self.mod_selected)
         self.mod_list.active_mods_changed.connect(
@@ -60,7 +60,7 @@ class ModsViewPanel(BaseViewPanel):
         h_layout.addWidget(self.mod_list, stretch=3)
 
         self.mod_info = ModInfoPanel(
-            self._ctx, self._qml_engine, ui_prefs=self._ui_prefs
+            self._ctx, self._qml_engine, ui_prefs=self._ui_prefs, parent=content
         )
         self.mod_info.setObjectName("modInfoPanel")
         self.mod_info.setMinimumWidth(300)
@@ -76,13 +76,6 @@ class ModsViewPanel(BaseViewPanel):
             self.mod_list.set_sidebar_filter(entry.visible_uuids)
 
     def apply_current_sidebar_filter(self) -> None:
-        root = self.sidebar._qml.rootObject()
-        if root is None:
-            return
-        list_view = root.findChild(QObject, "listView")
-        if list_view is None:
-            return
-        selected = list_view.property("currentIndex")
-        entries = self.sidebar._entries
-        if 0 <= selected < len(entries):
-            self.mod_list.set_sidebar_filter(entries[selected].visible_uuids)
+        entry = self.sidebar.current_entry()
+        if entry is not None:
+            self.mod_list.set_sidebar_filter(entry.visible_uuids)

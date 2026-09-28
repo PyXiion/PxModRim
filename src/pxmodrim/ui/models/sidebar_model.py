@@ -10,10 +10,18 @@ from PySide6.QtCore import (
     QObject,
     QPersistentModelIndex,
     Qt,
-    Signal,
 )
 
 from pxmodrim.ui.theme.palette import PALETTE
+
+
+def _qml_color(value: str) -> str:
+    if not value.startswith("rgba("):
+        return value
+    r, g, b, a = (part.strip() for part in value[5:-1].split(","))
+    alpha = round(float(a) * 255)
+    return f"#{alpha:02x}{int(r):02x}{int(g):02x}{int(b):02x}"
+
 
 # (badge_bg, badge_fg, icon_name, icon_color)
 _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
@@ -27,7 +35,7 @@ _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
     "inactive": (
         PALETTE["ELEVATE_4"],
         PALETTE["TEXT_MAIN"],
-        "x-circle",
+        "ban",
         PALETTE["TEXT_DIM"],
     ),
     "errors": (PALETTE["DANGER_BG"], PALETTE["DANGER"], "error", PALETTE["DANGER"]),
@@ -49,11 +57,6 @@ _PROVIDER_ICON_COLORS: dict[str, str] = {
     "steam": PALETTE["SUCCESS"],
     "downloaded": PALETTE["SUCCESS"],
     "local": PALETTE["WARNING"],
-}
-
-# Section headers by position
-_SECTION_MAP: dict[int, str] = {
-    0: "Library",
 }
 
 # Provider icon overrides
@@ -131,6 +134,19 @@ def _icon_for_provider(entry: object) -> str:
     return "folder"
 
 
+def _style_for(entry: object) -> tuple[str, str, str, str]:
+    entry_type = _detect_entry_type(entry)
+    bg, fg, icon_name, icon_color = _ENTRY_TYPES[entry_type]
+    if entry_type == "provider":
+        icon_name = _icon_for_provider(entry)
+        label_lower = getattr(entry, "label", "").lower()
+        for keyword, color in _PROVIDER_ICON_COLORS.items():
+            if keyword in label_lower:
+                icon_color = color
+                break
+    return _qml_color(bg), fg, icon_name, icon_color
+
+
 class SidebarModel(QAbstractListModel):
     LabelRole = Qt.ItemDataRole.UserRole + 1
     CountRole = Qt.ItemDataRole.UserRole + 2
@@ -139,8 +155,6 @@ class SidebarModel(QAbstractListModel):
     IconRole = Qt.ItemDataRole.UserRole + 5
     IconColorRole = Qt.ItemDataRole.UserRole + 6
     SectionRole = Qt.ItemDataRole.UserRole + 7
-
-    entry_selected = Signal(int)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -198,17 +212,7 @@ class SidebarModel(QAbstractListModel):
         self.beginResetModel()
         self._items = []
         for i, e in enumerate(entries):
-            entry_type = _detect_entry_type(e)
-            bg, fg, icon_name, icon_color = _ENTRY_TYPES.get(
-                entry_type, _ENTRY_TYPES["provider"]
-            )
-            if entry_type == "provider":
-                icon_name = _icon_for_provider(e)
-                label_lower = getattr(e, "label", "").lower()
-                if "steam" in label_lower:
-                    icon_color = _PROVIDER_ICON_COLORS.get("steam", icon_color)
-                elif "local" in label_lower:
-                    icon_color = _PROVIDER_ICON_COLORS.get("local", icon_color)
+            bg, fg, icon_name, icon_color = _style_for(e)
             section = _section_for_index(i)
             self._items.append(
                 SidebarItem(
@@ -232,18 +236,7 @@ class SidebarModel(QAbstractListModel):
         changed_roles: set[int] = set()
         for i, entry in enumerate(entries):
             item = self._items[i]
-            entry_type = _detect_entry_type(entry)
-            bg, fg, icon_name, icon_color = _ENTRY_TYPES.get(
-                entry_type, _ENTRY_TYPES["provider"]
-            )
-            if entry_type == "provider":
-                icon_name = _icon_for_provider(entry)
-            if entry_type == "provider":
-                label_lower = getattr(entry, "label", "").lower()
-                if "steam" in label_lower:
-                    icon_color = _PROVIDER_ICON_COLORS.get("steam", icon_color)
-                elif "local" in label_lower:
-                    icon_color = _PROVIDER_ICON_COLORS.get("local", icon_color)
+            bg, fg, icon_name, icon_color = _style_for(entry)
 
             new_label = getattr(entry, "label", "") or ""
             new_count = getattr(entry, "count", 0)

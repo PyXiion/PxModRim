@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
-from PySide6.QtWidgets import QComboBox, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.view.sidebar import SidebarEntry
@@ -20,19 +20,19 @@ _SIDEBAR_QML = _QML_DIR / "Sidebar.qml"
 class SidebarPanel(QWidget):
     entry_selected = Signal(object)  # SidebarEntry
 
-    def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        ctx: CoreContext,
+        qml_engine: QQmlEngine | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        self.preset_combo = QComboBox()
-        self.preset_combo.setObjectName("presetCombo")
-        self.preset_combo.addItem("Default")
-        layout.addWidget(self.preset_combo)
-
         # Model
-        self._model = SidebarModel()
+        self._model = SidebarModel(self)
 
         # QML view
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
@@ -54,6 +54,18 @@ class SidebarPanel(QWidget):
     def set_entries(self, entries: list[SidebarEntry]) -> None:
         self._entries = entries
         self._model.update_entries(entries)
+
+    def current_entry(self) -> SidebarEntry | None:
+        root = self._qml.rootObject()
+        if root is None:
+            return None
+        list_view = root.findChild(QObject, "listView")
+        if list_view is None:
+            return None
+        selected = list_view.property("currentIndex")
+        if 0 <= selected < len(self._entries):
+            return self._entries[selected]
+        return None
 
     # ── Slots called from QML ─────────────────────────────────
 

@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 _WORKSHOP_URL = "https://steamcommunity.com/workshop/browse/?appid=294100"
 
 _QML_DIR = Path(__file__).parent
-_STEAM_WORKSHOP_QML = str(_QML_DIR / "SteamWorkshop.qml")
+_STEAM_WORKSHOP_QML = _QML_DIR / "SteamWorkshop.qml"
 
 _INJECT_JS = (
     resource_files("pxmodrim.ui.plugins.steam_workshop") / "inject.js"
@@ -47,7 +47,7 @@ _INJECTION = f"var CSS_STYLES = {json.dumps(_INJECT_CSS)};\n{_INJECT_JS}"
 
 class SteamWorkshopViewPanel(BaseViewPanel):
     view_id = "steam_workshop"
-    icon_name = "steam_workshop_tab"
+    icon_name = "steam"
     label = "Steam Workshop"
 
     def __init__(
@@ -62,7 +62,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         self._plugin: SteamWorkshopUiPlugin | None = None
         self._initialized = False
 
-        content = QWidget()
+        content = QWidget(self)
         h_layout = QHBoxLayout(content)
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(0)
@@ -125,14 +125,14 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
         self._bridge: PxModRimBridge | None = None
         if self._plugin is not None:
-            self._bridge = PxModRimBridge(self._plugin)
+            self._bridge = PxModRimBridge(self._plugin, self)
 
         qml_ctx = self._qml.rootContext()
         qml_ctx.setContextProperty("steamWorkshopPanel", self)
         qml_ctx.setContextProperty("_bridge", self._bridge)
         qml_ctx.setContextProperty("_injectCode", _INJECTION)
 
-        self._qml.setSource(_STEAM_WORKSHOP_QML)
+        self._qml.setSource(QUrl.fromLocalFile(str(_STEAM_WORKSHOP_QML)))
 
     # ── QML-invokable slots ──────────────────────────────
 

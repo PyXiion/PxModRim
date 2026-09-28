@@ -8,18 +8,21 @@ from PySide6.QtCore import (
     QAbstractListModel,
     QByteArray,
     QModelIndex,
+    QObject,
     QPersistentModelIndex,
     Qt,
     Signal,
 )
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.ui.models.impact import format_duration, impact_color
+from pxmodrim.ui.theme.palette import PALETTE
 
 if TYPE_CHECKING:
     from pxmodrim.core.services.diagnostics_service import DiagnosticsService
 
 
-def _provider_label(provider_id: str, package_id: str = "") -> str:
+def provider_label(provider_id: str, package_id: str = "") -> str:
     pid = provider_id.lower().strip()
     pkg = package_id.lower().strip()
     if pid in {"steam", "downloaded"}:
@@ -48,7 +51,7 @@ class ModItem:
     mod: ListedMod
     uuid: str
     checked: bool = False
-    provider_color: str = "#808080"
+    provider_color: str = PALETTE["TEXT_DIM"]
     startup_impact_s: float = 0.0
     load_index: int = -1
     provider_label: str = ""
@@ -69,6 +72,8 @@ class ModListModel(QAbstractListModel):
     IsActiveRole = Qt.ItemDataRole.UserRole + 12
     SectionNameRole = Qt.ItemDataRole.UserRole + 13
     ProviderLabelRole = Qt.ItemDataRole.UserRole + 14
+    StartupImpactColorRole = Qt.ItemDataRole.UserRole + 15
+    StartupImpactTextRole = Qt.ItemDataRole.UserRole + 16
     active_mods_changed = Signal()
     active_count_changed = Signal()
 
@@ -80,8 +85,9 @@ class ModListModel(QAbstractListModel):
         self,
         provider_colors: dict[str, str],
         diagnostics: DiagnosticsService | None = None,
+        parent: QObject | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(parent)
         self._provider_colors = provider_colors
         self._items: list[ModItem] = []
         self._active_count: int = 0
@@ -139,6 +145,10 @@ class ModListModel(QAbstractListModel):
                 return diag.warning_tooltip if diag is not None else ""
         if role == self.StartupImpactRole:
             return item.startup_impact_s
+        if role == self.StartupImpactColorRole:
+            return impact_color(item.startup_impact_s)
+        if role == self.StartupImpactTextRole:
+            return format_duration(item.startup_impact_s)
         if role == self.LoadIndexRole:
             return item.load_index
         if role == self.IsActiveRole:
@@ -151,7 +161,7 @@ class ModListModel(QAbstractListModel):
             if item.provider_label:
                 return item.provider_label
             pkg = str(getattr(item.mod, "package_id", ""))
-            return _provider_label(item.mod.provider_id, pkg)
+            return provider_label(item.mod.provider_id, pkg)
         if (
             role == Qt.ItemDataRole.ToolTipRole
             and hasattr(item.mod, "description")
@@ -190,7 +200,15 @@ class ModListModel(QAbstractListModel):
 
         top = self.index(0, 0)
         bottom = self.index(len(self._items) - 1, 0)
-        self.dataChanged.emit(top, bottom, [self.StartupImpactRole])
+        self.dataChanged.emit(
+            top,
+            bottom,
+            [
+                self.StartupImpactRole,
+                self.StartupImpactColorRole,
+                self.StartupImpactTextRole,
+            ],
+        )
 
     def _on_diagnostics_summary_changed(self, diags: dict[str, Any]) -> None:
         if not self._items:
@@ -244,6 +262,8 @@ class ModListModel(QAbstractListModel):
             self.IsActiveRole: QByteArray(b"isActive"),
             self.SectionNameRole: QByteArray(b"sectionName"),
             self.ProviderLabelRole: QByteArray(b"providerLabel"),
+            self.StartupImpactColorRole: QByteArray(b"startupImpactColor"),
+            self.StartupImpactTextRole: QByteArray(b"startupImpactText"),
             Qt.ItemDataRole.ToolTipRole: QByteArray(b"toolTip"),
         }
 
@@ -317,8 +337,10 @@ class ModListModel(QAbstractListModel):
             mod=mod,
             uuid=uuid,
             checked=checked,
-            provider_color=self._provider_colors.get(mod.provider_id, "#808080"),
-            provider_label=_provider_label(
+            provider_color=self._provider_colors.get(
+                mod.provider_id, PALETTE["TEXT_DIM"]
+            ),
+            provider_label=provider_label(
                 mod.provider_id, str(getattr(mod, "package_id", ""))
             ),
         )

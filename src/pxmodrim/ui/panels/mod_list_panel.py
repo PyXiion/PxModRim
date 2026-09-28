@@ -15,7 +15,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QAction, QColor, QIcon
+from PySide6.QtGui import QAction, QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import (
@@ -28,7 +28,7 @@ from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import ListedMod
-from pxmodrim.ui.components.icons import svg_str
+from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.components.mod_activation import toggle_mods
 from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
@@ -64,8 +64,13 @@ class ModListPanel(QWidget):
     def highlightedUuids(self) -> list[str]:
         return self._highlighted_uuids
 
-    def __init__(self, ctx: CoreContext, qml_engine: QQmlEngine | None = None) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        ctx: CoreContext,
+        qml_engine: QQmlEngine | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
         self._ctx = ctx
         cfg = getattr(ctx, "config", None)
         self._compact_mode: bool = (
@@ -78,33 +83,20 @@ class ModListPanel(QWidget):
         layout.setSpacing(0)
 
         # Search bar
-        search_container = QWidget()
+        search_container = QWidget(self)
         search_container.setObjectName("searchBox")
         search_container.setFixedHeight(56)
         search_layout = QHBoxLayout(search_container)
         search_layout.setContentsMargins(16, 8, 16, 8)
 
-        self.search_input = QLineEdit()
+        self.search_input = QLineEdit(search_container)
         self.search_input.setObjectName("searchInput")
-        self.search_input.setPlaceholderText("Quick search by name or PackageID...")
+        self.search_input.setPlaceholderText("Search mods, package ID, author…")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._on_search_changed)
 
         # Leading search icon
-        search_icon = QIcon()
-        svg = svg_str("search", PALETTE["TEXT_DIM"])
-        from PySide6.QtGui import QPainter, QPixmap
-        from PySide6.QtSvg import QSvgRenderer
-        from PySide6.QtXml import QDomDocument
-
-        pm = QPixmap(16, 16)
-        pm.fill(Qt.GlobalColor.transparent)
-        p = QPainter(pm)
-        doc = QDomDocument()
-        doc.setContent(svg.encode())
-        QSvgRenderer(doc.toByteArray()).render(p)
-        p.end()
-        search_icon.addPixmap(pm)
+        search_icon = icon("search", 16, PALETTE["TEXT_DIM"])
         search_action = QAction(search_icon, "", self)
         self.search_input.addAction(
             search_action, QLineEdit.ActionPosition.LeadingPosition
@@ -114,8 +106,8 @@ class ModListPanel(QWidget):
         layout.addWidget(search_container)
 
         # Models: source + proxy
-        self._model = ModListModel({}, ctx.diagnostics_service)
-        self._proxy = ModListProxyModel(self._model)
+        self._model = ModListModel({}, ctx.diagnostics_service, self)
+        self._proxy = ModListProxyModel(self._model, self)
         self._model.active_mods_changed.connect(self.active_mods_changed)
 
         # QML view

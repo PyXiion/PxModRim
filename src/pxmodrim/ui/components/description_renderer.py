@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QTextBrowser, QWidget
 
 from pxmodrim.ui.components.unity_rich_text import unity_rich_text_to_html
+from pxmodrim.ui.theme.palette import PALETTE
 
 
 class DescriptionRenderer(QTextBrowser):
@@ -26,25 +27,29 @@ class DescriptionRenderer(QTextBrowser):
         self.document().setDocumentMargin(0)
         self.setMinimumHeight(0)
 
-        self.document().setDefaultStyleSheet("""
+        self.document().setDefaultStyleSheet(
+            """
             body {
-                font-family: "Segoe UI", system-ui, sans-serif;
+                font-family: "Source Sans 3", sans-serif;
                 font-size: 13px;
                 line-height: 1.4;
-                color: #cbd5e1;
+                color: %TEXT%;
                 margin: 0;
                 padding: 0;
             }
 
             a {
-                color: #3b82f6;
+                color: %LINK%;
                 text-decoration: none;
             }
 
             a:hover {
                 text-decoration: underline;
             }
-        """)
+        """.replace("%TEXT%", PALETTE["TEXT_MUTED"]).replace(
+                "%LINK%", PALETTE["PRIMARY"]
+            )
+        )
 
         self.hide()
 

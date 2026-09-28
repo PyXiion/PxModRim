@@ -17,13 +17,18 @@ def _is_published_file_id(value: object) -> bool:
 class PxModRimBridge(QObject):
     result_ready = Signal(str, str)
 
-    def __init__(self, plugin: SteamWorkshopUiPlugin) -> None:
-        super().__init__()
+    def __init__(
+        self, plugin: SteamWorkshopUiPlugin, parent: QObject | None = None
+    ) -> None:
+        super().__init__(parent)
         self._plugin = plugin
+        self._tasks: set[asyncio.Task[None]] = set()
 
     @Slot(str, str, str)
     def call(self, request_id: str, method: str, payload: str) -> None:
-        asyncio.create_task(self._handle(request_id, method, payload))
+        task = asyncio.create_task(self._handle(request_id, method, payload))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _handle(self, request_id: str, method: str, payload: str) -> None:
         try:

@@ -11,32 +11,18 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 from pxmodrim.core.services.startup_impact_service import StartupImpactService
 from pxmodrim.core.services.startup_impact_service.labels import metric_label
 from pxmodrim.core.services.startup_impact_service.models import (
-    IMPACT_HIGH_THRESHOLD_S,
-    IMPACT_WARN_THRESHOLD_S,
     StartupImpactMod,
     StartupImpactReport,
 )
+from pxmodrim.ui.models.impact import format_duration, impact_color
 from pxmodrim.ui.theme.palette import PALETTE
 
 _QML_DIR = Path(__file__).parent
 _TIMING_QML = _QML_DIR / "TimeAnalytics.qml"
 
-_COLOR_BASE = "#6b7280"
+_COLOR_BASE = PALETTE["TEXT_DIM"]
 _COLOR_BASE_GAME = PALETTE["PRIMARY"]
-_COLOR_LOW = PALETTE["SUCCESS"]
-_COLOR_MED = PALETTE["WARNING"]
-_COLOR_HIGH = PALETTE["DANGER"]
 _COLOR_ACCENT = PALETTE["PRIMARY"]
-
-
-def _impact_color(seconds: float) -> str:
-    return (
-        _COLOR_LOW
-        if seconds < IMPACT_WARN_THRESHOLD_S
-        else _COLOR_MED
-        if seconds < IMPACT_HIGH_THRESHOLD_S
-        else _COLOR_HIGH
-    )
 
 
 _COLOR_PRESETS = [
@@ -67,21 +53,14 @@ def _metric_color(index: int) -> str:
     return _COLOR_PRESETS[index % len(_COLOR_PRESETS)]
 
 
-def _fmt(seconds: float) -> str:
-    if seconds < 0.001:
-        return "0ms"
-    if seconds < 1:
-        return f"{round(seconds * 1000)}ms"
-    return f"{seconds:.2f}s"
-
-
 class TimeAnalyticsPanel(QWidget):
     def __init__(
         self,
         sis: StartupImpactService | None = None,
         qml_engine: QQmlEngine | None = None,
+        parent: QWidget | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(parent)
         self._sis = sis
         self._request_token = 0
         layout = QVBoxLayout(self)
@@ -126,33 +105,22 @@ class TimeAnalyticsPanel(QWidget):
 
         segments = self._build_segments(mod, own)
         top5_data = self._build_top5(report, mod, own)
-        metrics_entries, off_thread_entries = self._build_metrics(mod)
         donut_legend = self._build_donut_legend(mod, own, other, base, mod_count)
-
-        base_metrics = self._build_base_metrics(report)
 
         data = {
             "segments": segments,
-            "total_time": _fmt(total),
-            "estimated_total": _fmt(total - own if not is_active else total),
-            "own_impact": _fmt(own),
-            "base_time": _fmt(base),
-            "other_time": _fmt(other),
-            "base_metrics": base_metrics,
-            "has_base_metrics": bool(base_metrics),
-            "metrics": metrics_entries,
-            "off_thread_metrics": off_thread_entries,
-            "has_metrics": bool(metrics_entries or off_thread_entries),
+            "estimated_total": format_duration(total - own if not is_active else total),
+            "own_impact": format_duration(own),
+            "other_time": format_duration(other),
             "donut_bg": base / total if total > 0 else 0,
             "donut_own": own / total if total > 0 else 0,
             "donut_other": other / total if total > 0 else 0,
-            "own_color": _impact_color(own),
+            "own_color": impact_color(own),
             "other_color": _COLOR_BASE,
             "bg_color": _COLOR_BASE_GAME,
             "donut_legend": donut_legend,
             "top5": top5_data,
             "top5_label": "Top 5 slowest mods",
-            "mod_name": mod.mod_name if mod else None,
             "timestamp": report.timestamp or "",
         }
         root_obj.setProperty("sourceData", data)
@@ -165,7 +133,7 @@ class TimeAnalyticsPanel(QWidget):
         return [
             {
                 "label": metric_label(name),
-                "value": _fmt(val_s),
+                "value": format_duration(val_s),
                 "fraction": val_s / denom,
                 "color": _metric_color(i),
             }
@@ -196,55 +164,17 @@ class TimeAnalyticsPanel(QWidget):
         max_impact = max((val for _, _, val in entries), default=1)
         result = []
         for entry, is_cur, val in entries:
-            bar_color = _COLOR_ACCENT if is_cur else _impact_color(entry.total_impact_s)
+            bar_color = _COLOR_ACCENT if is_cur else impact_color(entry.total_impact_s)
             result.append(
                 {
                     "label": entry.mod_name,
-                    "value": _fmt(val),
+                    "value": format_duration(val),
                     "fraction": val / max_impact if max_impact > 0 else 0,
                     "is_current": is_cur,
                     "color": bar_color,
                 }
             )
         return result
-
-    def _build_base_metrics(self, report: StartupImpactReport) -> list[dict]:
-        sorted_m = sorted(report.metrics.items(), key=lambda x: x[1], reverse=True)
-        return [
-            {
-                "label": metric_label(name),
-                "value": _fmt(val_s),
-                "color": _metric_color(i),
-            }
-            for i, (name, val_s) in enumerate(sorted_m)
-        ]
-
-    def _build_metrics(
-        self, mod: StartupImpactMod | None
-    ) -> tuple[list[dict], list[dict]]:
-        if not mod:
-            return [], []
-        sorted_m = sorted(mod.metrics.items(), key=lambda x: x[1], reverse=True)
-        metrics = [
-            {
-                "label": metric_label(name),
-                "value": _fmt(val_s),
-                "color": _metric_color(i),
-            }
-            for i, (name, val_s) in enumerate(sorted_m)
-        ]
-        sorted_ot = sorted(
-            mod.off_thread_metrics.items(), key=lambda x: x[1], reverse=True
-        )
-        off_thread = [
-            {
-                "label": metric_label(name),
-                "value": _fmt(val_s),
-                "color": _metric_color(i),
-            }
-            for i, (name, val_s) in enumerate(sorted_ot)
-        ]
-        return metrics, off_thread
 
     def _build_donut_legend(
         self,
@@ -259,15 +189,15 @@ class TimeAnalyticsPanel(QWidget):
             legend.append(
                 {
                     "label": mod.mod_name if mod else "This mod",
-                    "value": _fmt(own),
-                    "color": _impact_color(own),
+                    "value": format_duration(own),
+                    "color": impact_color(own),
                 }
             )
         if other > 0.001:
             legend.append(
                 {
                     "label": f"Other mods ({mod_count})",
-                    "value": _fmt(other),
+                    "value": format_duration(other),
                     "color": _COLOR_BASE,
                 }
             )
@@ -275,7 +205,7 @@ class TimeAnalyticsPanel(QWidget):
             legend.append(
                 {
                     "label": "Base game",
-                    "value": _fmt(base),
+                    "value": format_duration(base),
                     "color": _COLOR_BASE_GAME,
                 }
             )
