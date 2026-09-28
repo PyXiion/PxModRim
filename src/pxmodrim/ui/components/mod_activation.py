@@ -22,7 +22,7 @@ class DependentModsDialog(QMessageBox):
     def __init__(self, dependents: list[str], parent: QWidget) -> None:
         super().__init__(parent)
         self.setIcon(QMessageBox.Icon.Warning)
-        self.setWindowTitle("Disable dependent mods?")
+        self.setWindowTitle("Disable Dependent Mods")
         self.setText(
             "These active mods depend on the mod you are disabling:\n\n"
             + "\n".join(f"• {dependent}" for dependent in dependents)
@@ -40,7 +40,9 @@ class DependentModsDialog(QMessageBox):
             QMessageBox.StandardButton.Yes, "Disable selected + dependents"
         )
         self.setButtonText(QMessageBox.StandardButton.No, "Disable selected only")
-        self.setButtonText(QMessageBox.StandardButton.Cancel, "Cancel")
+        yes_button = self.button(QMessageBox.StandardButton.Yes)
+        if yes_button is not None:
+            yes_button.setObjectName("primaryAction")
 
 
 async def apply_activation(

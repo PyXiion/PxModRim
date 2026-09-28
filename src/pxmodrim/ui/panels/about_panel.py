@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import platform
-import sys
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QUrl, qVersion
-from PySide6.QtGui import QDesktopServices, QPixmap
+from PySide6.QtGui import QDesktopServices, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -15,6 +14,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -57,14 +57,14 @@ class AboutPanel(QDialog):
         self.setObjectName("aboutPanel")
         self.setWindowTitle("About PxModRim")
         self.setModal(True)
-        self.resize(700, 620)
-        self.setMinimumSize(640, 560)
+        self.resize(700, 740)
+        self.setMinimumSize(640, 620)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 20)
         layout.setSpacing(18)
         layout.addWidget(self._create_hero())
-        layout.addWidget(self._create_project_story())
+        layout.addWidget(self._create_project_story(), 1)
         layout.addWidget(self._create_details())
         self._credits_dialog = self._create_credits_dialog()
         layout.addLayout(self._create_actions())
@@ -81,6 +81,7 @@ class AboutPanel(QDialog):
         footer = QHBoxLayout()
         footer.addStretch()
         close_button = AppButton("Close", self)
+        close_button.setObjectName("primaryAction")
         close_button.clicked.connect(self.reject)
         footer.addWidget(close_button)
         layout.addLayout(footer)
@@ -156,11 +157,21 @@ class AboutPanel(QDialog):
             "RimSort at the time, and things may have changed for the better since "
             "then (I hope so!).<br><br>"
             "<b>— PyXiion</b>",
-            section,
         )
         story.setObjectName("aboutStory")
         story.setWordWrap(True)
-        layout.addWidget(story)
+        story.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        scroll = QScrollArea(section)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(story)
+        scroll.viewport().setAutoFillBackground(False)
+        scroll.viewport().setBackgroundRole(QPalette.ColorRole.NoRole)
+        story.setAutoFillBackground(False)
+        story.setBackgroundRole(QPalette.ColorRole.NoRole)
+        layout.addWidget(scroll, 1)
         return section
 
     def _create_details(self) -> QFrame:
@@ -171,10 +182,7 @@ class AboutPanel(QDialog):
         layout.setHorizontalSpacing(14)
         layout.setVerticalSpacing(8)
 
-        python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
-        environment = (
-            f"Python {python_version}  •  Qt {qVersion()}  •  {platform.system()}"
-        )
+        environment = "  •  ".join(self._environment())
         rows = (
             ("CREATED BY", "PyXiion"),
             ("LICENSE", "LGPL-3.0"),
@@ -188,6 +196,7 @@ class AboutPanel(QDialog):
 
             value = QLabel(value_text, details)
             value.setObjectName("aboutMetaValue")
+            value.setWordWrap(True)
             layout.addWidget(value, row, 1)
 
         layout.setColumnStretch(1, 1)
@@ -198,7 +207,6 @@ class AboutPanel(QDialog):
         actions.setSpacing(8)
 
         github_button = AppButton("GitHub", self)
-        github_button.setObjectName("primaryAction")
         github_button.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl(self._REPOSITORY_URL))
         )
@@ -214,10 +222,11 @@ class AboutPanel(QDialog):
         self._copy_button.clicked.connect(self._copy_system_information)
         actions.addWidget(self._copy_button)
 
-        self._upload_button = AppButton("Upload log & system info…", self)
+        self._upload_button = AppButton("Upload log && system info…", self)
         self._upload_button.clicked.connect(self._on_upload_clicked)
         actions.addWidget(self._upload_button)
-        credits_button = AppButton("Open-source credits…", self)
+
+        credits_button = AppButton("Open-source credits", self)
         credits_button.clicked.connect(self._credits_dialog.open)
         actions.addWidget(credits_button)
         actions.addStretch()
@@ -226,7 +235,7 @@ class AboutPanel(QDialog):
     def _create_credits_dialog(self) -> QDialog:
         dialog = QDialog(self)
         dialog.setObjectName("creditsDialog")
-        dialog.setWindowTitle("Open-source credits")
+        dialog.setWindowTitle("Open-Source Credits")
         dialog.setModal(True)
         dialog.resize(560, 500)
 
@@ -283,21 +292,19 @@ class AboutPanel(QDialog):
 
     def _copy_system_information(self) -> None:
         QApplication.clipboard().setText(self._system_information())
-        self._copy_button.setText("Copied")
+        self._toast_manager.success("System info copied")
+
+    @staticmethod
+    def _environment() -> tuple[str, ...]:
+        return (
+            f"Python {platform.python_version()}",
+            f"PySide6 {version('PySide6')}",
+            f"Qt {qVersion()}",
+            f"{platform.system()} {platform.release()} ({platform.machine()})",
+        )
 
     def _system_information(self) -> str:
-        return "\n".join(
-            (
-                f"PxModRim {self._get_version()}",
-                f"Python {platform.python_version()}",
-                f"PySide6 {version('PySide6')}",
-                f"Qt {qVersion()}",
-                (
-                    f"Operating system: {platform.system()} {platform.release()} "
-                    f"({platform.machine()})"
-                ),
-            )
-        )
+        return "\n".join((f"PxModRim {self._get_version()}", *self._environment()))
 
     @asyncSlot()
     async def _on_upload_clicked(self) -> None:

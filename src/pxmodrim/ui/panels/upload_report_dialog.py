@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -29,13 +30,17 @@ if TYPE_CHECKING:
 _DEFAULT_ENDPOINT = "https://paste.rs/"
 
 
+class UploadChoice(IntEnum):
+    CANCEL = int(QDialog.DialogCode.Rejected)
+    UPLOAD = int(QDialog.DialogCode.Accepted)
+    SAVE_TO_FILE = 2
+
+
 class UploadConfirmDialog(QDialog):
     """Confirmation dialog explaining what will be uploaded and anonymized.
 
-    Finishes with Accepted for upload, SAVE_TO_FILE for saving, Rejected to cancel.
+    Finishes with an UploadChoice value.
     """
-
-    SAVE_TO_FILE = 2
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -48,13 +53,6 @@ class UploadConfirmDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
-        title_label = QLabel("Upload Log & System Diagnostics", self)
-        font = title_label.font()
-        font.setBold(True)
-        font.setPointSize(font.pointSize() + 2)
-        title_label.setFont(font)
-        layout.addWidget(title_label)
-
         description_text = (
             "This action generates and uploads an anonymized diagnostic report "
             "to help diagnose issues.\n\n"
@@ -63,7 +61,7 @@ class UploadConfirmDialog(QDialog):
             "  • System details (OS, architecture, Python, Qt, PySide6)\n"
             "  • RimWorld version and configured directory paths\n"
             "  • Mod collection count and active mod list in load order\n\n"
-            "Privacy & Security:\n"
+            "Privacy & security:\n"
             "  • Your home directory path is replaced with '~'\n"
             "  • Your username in other user-directory paths is replaced "
             "with '<user>'\n\n"
@@ -80,7 +78,9 @@ class UploadConfirmDialog(QDialog):
         button_row.setSpacing(10)
 
         self._save_file_btn = AppButton("Save to file instead…", self)
-        self._save_file_btn.clicked.connect(lambda: self.done(self.SAVE_TO_FILE))
+        self._save_file_btn.clicked.connect(
+            lambda: self.done(UploadChoice.SAVE_TO_FILE)
+        )
         button_row.addWidget(self._save_file_btn)
 
         button_row.addStretch()
@@ -109,13 +109,10 @@ class UploadFailedDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setSpacing(16)
 
-        title_label = QLabel("Failed to Upload Report", self)
-        font = title_label.font()
-        font.setBold(True)
-        font.setPointSize(font.pointSize() + 1)
-        title_label.setFont(font)
+        title_label = QLabel("Couldn't upload the report", self)
+        title_label.setObjectName("dialogTitle")
         layout.addWidget(title_label)
 
         msg_label = QLabel(
@@ -147,7 +144,7 @@ class _SaveReportFileDialog(QFileDialog):
     def __init__(self, parent: QWidget) -> None:
         super().__init__(
             parent,
-            "Save Diagnostic Report",
+            "Save Log & System Info",
             "pxmodrim-report.txt",
             "Text Files (*.txt);;All Files (*)",
         )
@@ -177,12 +174,12 @@ async def handle_upload_report(
 ) -> str | None:
     """Confirm, then upload or save the report; return the uploaded URL if any."""
     choice, _ = await await_dialog(UploadConfirmDialog, parent)
-    if choice not in (QDialog.DialogCode.Accepted, UploadConfirmDialog.SAVE_TO_FILE):
+    if choice == UploadChoice.CANCEL:
         return None
 
     report = await asyncio.to_thread(build_report, ctx)
 
-    if choice == UploadConfirmDialog.SAVE_TO_FILE:
+    if choice == UploadChoice.SAVE_TO_FILE:
         await _save_report_via_file_dialog(parent, report, toast)
         return None
 
@@ -192,7 +189,6 @@ async def handle_upload_report(
     try:
         url = await PasteUploader(endpoint=endpoint).async_upload(report)
     except (ReportUploadError, OSError, RuntimeError) as exc:
-        toast.error(f"Upload failed: {exc}", 5000)
         failed_result, _ = await await_dialog(UploadFailedDialog, str(exc), parent)
         if failed_result == QDialog.DialogCode.Accepted:
             await _save_report_via_file_dialog(parent, report, toast)

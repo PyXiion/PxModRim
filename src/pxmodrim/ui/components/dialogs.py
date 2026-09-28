@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, TypeVar
+from typing import Any
 
 from PySide6.QtWidgets import QDialog
-
-T = TypeVar("T", bound=QDialog)
 
 
 async def await_dialog[T: QDialog](
@@ -13,7 +11,11 @@ async def await_dialog[T: QDialog](
     *args: Any,
     **kwargs: Any,
 ) -> tuple[int, T]:
-    """Show a modal QDialog async and await its result via an asyncio future."""
+    """Show a modal QDialog async and await its result via an asyncio future.
+
+    The dialog is scheduled for deletion on the next loop iteration, so callers
+    must read what they need from it synchronously after the await.
+    """
     dialog = cls(*args, **kwargs)
     dialog.setModal(True)
 
@@ -27,4 +29,5 @@ async def await_dialog[T: QDialog](
     dialog.show()
 
     result_code = await future
+    asyncio.get_running_loop().call_soon(dialog.deleteLater)
     return result_code, dialog
