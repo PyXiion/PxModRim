@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+
 from pxmodrim.core.checker.checker import ModChecker
 from pxmodrim.core.checker.graph import EdgeType
 from pxmodrim.core.checker.issues import (
@@ -156,3 +158,47 @@ class TestModChecker:
         diag = checker.diagnostics_for(a_uuid)
         assert diag is not None and diag.has_warnings
         assert diag.warnings[0].category == "load_order"
+
+    def test_reorder_matches_full_rebuild(self):
+        # reorder() reuses cached results for mods whose indices and load-order
+        # targets did not move; it must still equal a from-scratch rebuild.
+        def make_checkers() -> list[ModIssueChecker]:
+            return [
+                DependencyIssueChecker(),
+                IncompatibilityIssueChecker(),
+                LoadOrderIssueChecker(),
+                CycleIssueChecker(),
+            ]
+
+        rng = random.Random(0)
+        pids = [f"mod.{i}" for i in range(12)]
+        mods_list = [_make_mod(pid) for pid in pids]
+        for mod in mods_list:
+            others = [p for p in pids if p != str(mod.package_id)]
+            mod.about_rules.load_after = CaseInsensitiveSet(rng.sample(others, 2))
+            mod.about_rules.load_before = CaseInsensitiveSet(rng.sample(others, 1))
+        mods = _as_listed(mods_list)
+        order = list(mods)
+
+        incremental = ModChecker(make_checkers(), _settings())
+        incremental.rebuild(mods, order)
+        for _ in range(30):
+            if rng.random() < 0.5:
+                i, j = rng.sample(range(len(order)), 2)
+                order[i], order[j] = order[j], order[i]
+            else:
+                order.insert(
+                    rng.randrange(len(order)), order.pop(rng.randrange(len(order)))
+                )
+            incremental.reorder(order)
+
+            full = ModChecker(make_checkers(), _settings())
+            full.rebuild(mods, order)
+            for uuid in order:
+                got = incremental.diagnostics_for(uuid)
+                want = full.diagnostics_for(uuid)
+                assert got is not None and want is not None
+                assert sorted(map(repr, got.errors)) == sorted(map(repr, want.errors))
+                assert sorted(map(repr, got.warnings)) == sorted(
+                    map(repr, want.warnings)
+                )

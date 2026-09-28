@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Set as AbstractSet
 
 from pxmodrim.core.checker.graph import EdgeType
 from pxmodrim.core.checker.models import CheckContext, ModIssue, PackageId
@@ -11,9 +12,18 @@ class ModIssueChecker(ABC):
     """Abstract base for individual mod-issue checkers."""
 
     category_display_name: str = ""
+    # Whether results depend on load order; order-independent results are
+    # reused when only the order changes.
+    order_dependent: bool = True
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return True
+
+    def affected_by_moves(
+        self, ctx: CheckContext, moved: AbstractSet[PackageId]
+    ) -> AbstractSet[PackageId] | None:
+        """Mods whose results may change when `moved` changed index; None means all."""
+        return None
 
     @abstractmethod
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
@@ -25,6 +35,7 @@ class DependencyIssueChecker(ModIssueChecker):
     """Check for missing or unsatisfied mod dependencies."""
 
     category_display_name = "Missing Dependency"
+    order_dependent = False
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return bool(mod.about_rules.dependencies)
@@ -38,11 +49,10 @@ class DependencyIssueChecker(ModIssueChecker):
         consider_alternatives = ctx.settings.use_alternative_package_ids
 
         for dep_id, dep_mod in mod.about_rules.dependencies.items():
-            satisfied = str(dep_id) in ctx.active_mods
+            satisfied = dep_id in ctx.active_mods
             if not satisfied and consider_alternatives:
                 satisfied = any(
-                    str(alt) in ctx.active_mods
-                    for alt in dep_mod.alternative_package_ids
+                    alt in ctx.active_mods for alt in dep_mod.alternative_package_ids
                 )
 
             if not satisfied:
@@ -72,9 +82,10 @@ class IncompatibilityIssueChecker(ModIssueChecker):
     """Check for mod-to-mod incompatibility declarations (self-declared and reverse)."""
 
     category_display_name = "Incompatibility"
+    order_dependent = False
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
-        pid = PackageId(mod.package_id)
+        pid = _package_id(mod)
         outgoing = ctx.graph.edges_of_type(pid, EdgeType.INCOMPATIBILITY)
         incoming = ctx.graph.incoming_of_type(pid, EdgeType.INCOMPATIBILITY)
         return (
@@ -84,11 +95,11 @@ class IncompatibilityIssueChecker(ModIssueChecker):
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         """Report errors for active incompatible mods without duplicate sources."""
         issues: list[ModIssue] = []
-        pid = PackageId(mod.package_id)
+        pid = _package_id(mod)
 
         # Self-declared incompatibilities
         for incomp in mod.about_rules.incompatible_with:
-            if str(incomp) in ctx.active_mods:
+            if incomp in ctx.active_mods:
                 other = ctx.active_mods.get(PackageId(incomp))
                 name = other.name if other else str(incomp)
                 issues.append(
@@ -134,16 +145,28 @@ class LoadOrderIssueChecker(ModIssueChecker):
     category_display_name = "Load Order"
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
-        pid = PackageId(mod.package_id)
+        pid = _package_id(mod)
         return bool(
             ctx.graph.edges_of_type(pid, EdgeType.LOAD_BEFORE)
             or ctx.graph.edges_of_type(pid, EdgeType.LOAD_AFTER)
         )
 
+    def affected_by_moves(
+        self, ctx: CheckContext, moved: AbstractSet[PackageId]
+    ) -> AbstractSet[PackageId] | None:
+        # Results only read the indices of the mod itself and its edge targets.
+        affected = set(moved)
+        for pid in moved:
+            for edge_type in (EdgeType.LOAD_BEFORE, EdgeType.LOAD_AFTER):
+                affected.update(
+                    edge.source for edge in ctx.graph.incoming_of_type(pid, edge_type)
+                )
+        return affected
+
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         """Report warnings when a load-before or load-after constraint is violated."""
         issues: list[ModIssue] = []
-        pid = PackageId(mod.package_id)
+        pid = _package_id(mod)
         idx = ctx.pid_to_index.get(pid, -1)
         if idx < 0:
             return issues
@@ -196,7 +219,7 @@ class CycleIssueChecker(ModIssueChecker):
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         """Report warnings for each cycle the mod belongs to."""
-        pid = PackageId(mod.package_id)
+        pid = _package_id(mod)
         issues: list[ModIssue] = []
 
         for cycle in ctx.cycles:
@@ -222,6 +245,7 @@ class GameVersionIssueChecker(ModIssueChecker):
     """Check that the mod's supported game versions match the target version."""
 
     category_display_name = "Version Mismatch"
+    order_dependent = False
 
     def should_check(self, mod: AboutXmlMod, ctx: CheckContext) -> bool:
         return bool(mod.supported_versions)
@@ -259,6 +283,7 @@ class ReplacementIssueChecker(ModIssueChecker):
     """Check whether a mod has a known replacement available."""
 
     category_display_name = "Replacement Available"
+    order_dependent = False
 
     def check(self, mod: AboutXmlMod, ctx: CheckContext) -> list[ModIssue]:
         """Report a warning if the mod's published file ID has a replacement."""
@@ -283,3 +308,8 @@ class ReplacementIssueChecker(ModIssueChecker):
                 related_package_ids=(PackageId(replacement.packageid),),
             )
         ]
+
+
+def _package_id(mod: AboutXmlMod) -> PackageId:
+    pid = mod.package_id
+    return pid if type(pid) is PackageId else PackageId(pid)

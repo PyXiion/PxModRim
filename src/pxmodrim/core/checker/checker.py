@@ -9,6 +9,7 @@ from pxmodrim.core.checker.graph import ConstraintGraph
 from pxmodrim.core.checker.models import (
     CheckContext,
     ModDiagnostics,
+    ModIssue,
     PackageId,
 )
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
@@ -28,6 +29,7 @@ class ModChecker:
         "_active_mods",
         "_all_mods",
         "_cached_cycles",
+        "_checker_results",
         "_checkers",
         "_community_rules",
         "_diagnostics",
@@ -65,14 +67,19 @@ class ModChecker:
         self._use_this_instead: Mapping[str, Any] = {}
         self._community_rules: dict[PackageId, CommunityRule] | None = None
         self._cached_cycles: list[list[PackageId]] = []
+        # Per-mod issues from each checker (checker order), reused by reorder()
+        # for order-independent checkers; None when stale.
+        self._checker_results: dict[PackageId, list[list[ModIssue]]] | None = None
 
     # ── Database config ───────────────────────────────────────
 
     def set_no_version_warning(self, pids: set[PackageId]) -> None:
         self._no_version_warning = pids
+        self._checker_results = None
 
     def set_use_this_instead(self, db: Mapping[str, Any]) -> None:
         self._use_this_instead = db
+        self._checker_results = None
 
     def set_community_rules(self, rules: dict[PackageId, CommunityRule] | None) -> None:
         self._community_rules = rules
@@ -105,11 +112,8 @@ class ModChecker:
             self._cached_cycles = self._graph.find_cycles()
         ctx = self._build_context(self._cached_cycles)
 
-        self._diagnostics = {}
-        for pid, mod in self._active_mods.items():
-            with t("check_mod"):
-                diag = self._check_mod(mod, ctx)
-            self._diagnostics[pid] = diag
+        with t("check_mod"):
+            self._check_all(ctx)
 
         self._emit()
 
@@ -141,6 +145,8 @@ class ModChecker:
         self._graph.update_order(self._ordered_pids)
 
         ctx = self._build_context(self._cached_cycles)
+        # Only neighbours are rechecked, so cached results no longer match the order.
+        self._checker_results = None
 
         affected = {pid}
         affected.update(self._graph.neighbors(pid))
@@ -154,19 +160,37 @@ class ModChecker:
 
     def reorder(self, ordered_uuids: list[str]) -> None:
         """Reapply the full active-mod order and regenerate all diagnostics."""
-        self._collect_active(
-            dict(self._all_mods),
-            ordered_uuids,
-        )
+        previous = self._active_mods
+        previous_index = self._graph.pid_to_index
+        self._collect_active(self._all_mods, ordered_uuids)
         self._graph.update_order(self._ordered_pids)
 
         cycles = self._graph.find_cycles()
         ctx = self._build_context(cycles)
 
-        self._diagnostics = {}
-        for pid, mod in self._active_mods.items():
-            diag = self._check_mod(mod, ctx)
-            self._diagnostics[pid] = diag
+        results = self._checker_results
+        if results is None or not _same_mods(previous, self._active_mods):
+            self._check_all(ctx)
+        else:
+            moved = {
+                pid
+                for pid, index in ctx.pid_to_index.items()
+                if previous_index.get(pid) != index
+            }
+            changed: set[PackageId] = set()
+            for i, checker in enumerate(self._checkers):
+                if not checker.order_dependent:
+                    continue
+                affected = checker.affected_by_moves(ctx, moved)
+                for pid, mod in self._active_mods.items():
+                    if affected is not None and pid not in affected:
+                        continue
+                    issues = self._run_checker(checker, mod, ctx)
+                    if issues != results[pid][i]:
+                        results[pid][i] = issues
+                        changed.add(pid)
+            for pid in changed:
+                self._diagnostics[pid] = _compose(results[pid])
 
         self._emit()
 
@@ -218,7 +242,9 @@ class ModChecker:
         for uuid in ordered_uuids:
             mod = mods.get(uuid)
             if isinstance(mod, AboutXmlMod):
-                pid = PackageId(mod.package_id)
+                pid = mod.package_id
+                if type(pid) is not PackageId:
+                    pid = PackageId(pid)
                 self._active_mods[pid] = mod
                 self._uuid_to_pid[uuid] = pid
                 self._ordered_pids.append(pid)
@@ -239,28 +265,37 @@ class ModChecker:
             cycles=cycles,
         )
 
+    def _check_all(self, ctx: CheckContext) -> None:
+        """Run every checker on every active mod, caching per-checker results."""
+        results: dict[PackageId, list[list[ModIssue]]] = {}
+        diagnostics: dict[PackageId, ModDiagnostics] = {}
+        checkers = self._checkers
+        run = self._run_checker
+        for pid, mod in self._active_mods.items():
+            per_checker = [run(c, mod, ctx) for c in checkers]
+            results[pid] = per_checker
+            diagnostics[pid] = _compose(per_checker)
+        self._checker_results = results
+        self._diagnostics = diagnostics
+
     def _check_mod(self, mod: AboutXmlMod, ctx: CheckContext) -> ModDiagnostics:
         """Run all registered checkers against a single mod and collect diagnostics."""
-        errors: list[Any] = []
-        warnings: list[Any] = []
+        return _compose([self._run_checker(c, mod, ctx) for c in self._checkers])
 
-        for checker in self._checkers:
-            if not checker.should_check(mod, ctx):
-                continue
-            try:
-                issues = checker.check(mod, ctx)
-            except Exception:  # noqa: BLE001 - one checker must not abort diagnostics
-                logger.exception(
-                    f"Checker {type(checker).__name__} failed on {mod.package_id}"
-                )
-                continue
-            for issue in issues:
-                if issue.severity == "error":
-                    errors.append(issue)
-                else:
-                    warnings.append(issue)
-
-        return ModDiagnostics(errors=errors, warnings=warnings)
+    @staticmethod
+    def _run_checker(
+        checker: ModIssueChecker, mod: AboutXmlMod, ctx: CheckContext
+    ) -> list[ModIssue]:
+        if not checker.should_check(mod, ctx):
+            return []
+        try:
+            issues = checker.check(mod, ctx)
+        except Exception:  # noqa: BLE001 - one checker must not abort diagnostics
+            logger.exception(
+                f"Checker {type(checker).__name__} failed on {mod.package_id}"
+            )
+            return []
+        return issues if type(issues) is list else list(issues)
 
     def _emit(self) -> None:
         if self._on_diagnostics_changed is not None:
@@ -270,3 +305,19 @@ class ModChecker:
                 if diag and (diag.has_errors or diag.has_warnings):
                     uuid_diag[uuid] = diag
             self._on_diagnostics_changed(uuid_diag)
+
+
+def _compose(per_checker: list[list[ModIssue]]) -> ModDiagnostics:
+    issues = [issue for checker_issues in per_checker for issue in checker_issues]
+    if not issues:
+        return ModDiagnostics([], [])
+    return ModDiagnostics(
+        [issue for issue in issues if issue.severity == "error"],
+        [issue for issue in issues if issue.severity != "error"],
+    )
+
+
+def _same_mods(
+    a: dict[PackageId, AboutXmlMod], b: dict[PackageId, AboutXmlMod]
+) -> bool:
+    return a.keys() == b.keys() and all(b[pid] is mod for pid, mod in a.items())

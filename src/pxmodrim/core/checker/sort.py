@@ -122,8 +122,8 @@ def _build_load_first(
         return set()
     return {
         pid
-        for pid, rule in community_rules.items()
-        if pid in all_pids and rule.load_first
+        for pid in all_pids
+        if (rule := community_rules.get(pid)) is not None and rule.load_first
     }
 
 
@@ -137,8 +137,8 @@ def _build_load_last(
         return set()
     return {
         pid
-        for pid, rule in community_rules.items()
-        if pid in all_pids and rule.load_last
+        for pid in all_pids
+        if (rule := community_rules.get(pid)) is not None and rule.load_last
     }
 
 

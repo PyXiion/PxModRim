@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import operator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
     from pxmodrim.core.checker.graph import ConstraintGraph
     from pxmodrim.core.config import ConfigService
     from pxmodrim.core.context import CoreContext
-    from pxmodrim.core.models.metadata.structures import AboutXmlMod
+    from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
 
 class DiagnosticsService:
@@ -54,7 +55,9 @@ class DiagnosticsService:
         "_ctx",
         "_last_active_uuids",
         "_last_summary",
+        "_last_summary_sources",
         "_no_version_warning_service",
+        "_sidebar_base",
         "_use_this_instead_service",
         "diagnostics_summary_changed",
         "sidebar_entries_changed",
@@ -75,6 +78,10 @@ class DiagnosticsService:
         self._community_rules: dict[PackageId, CommunityRule] | None = None
         self._last_active_uuids: list[str] = []
         self._last_summary: dict[str, ModDiagnosticsView] = {}
+        # Diagnostics each summary view was built from; reorders keep most
+        # diagnostics objects, so their views can be reused.
+        self._last_summary_sources: dict[str, ModDiagnostics] = {}
+        self._sidebar_base: _SidebarBase | None = None
         self._checker = ModChecker(
             checkers=[
                 DependencyIssueChecker(),
@@ -208,19 +215,14 @@ class DiagnosticsService:
         return views
 
     @staticmethod
-    def _to_view(
-        diagnostics: dict[str, ModDiagnostics],
-    ) -> dict[str, ModDiagnosticsView]:
-        """Convert diagnostics dict to a serialisable view dict for the UI."""
-        result: dict[str, ModDiagnosticsView] = {}
-        for uuid, diag in diagnostics.items():
-            result[uuid] = ModDiagnosticsView(
-                has_errors=diag.has_errors,
-                has_warnings=diag.has_warnings,
-                error_tooltip=diag.error_tooltip,
-                warning_tooltip=diag.warning_tooltip,
-            )
-        return result
+    def _to_view(diag: ModDiagnostics) -> ModDiagnosticsView:
+        """Convert diagnostics to a serialisable view for the UI."""
+        return ModDiagnosticsView(
+            has_errors=diag.has_errors,
+            has_warnings=diag.has_warnings,
+            error_tooltip=diag.error_tooltip,
+            warning_tooltip=diag.warning_tooltip,
+        )
 
     # ── Checker callback ───────────────────────────────────────
 
@@ -228,7 +230,16 @@ class DiagnosticsService:
         self, diagnostics: dict[str, ModDiagnostics]
     ) -> None:
         """Callback from checker; emit updated summary, status, and sidebar signals."""
-        self._last_summary = self._to_view(diagnostics)
+        previous_views = self._last_summary
+        previous_sources = self._last_summary_sources
+        summary: dict[str, ModDiagnosticsView] = {}
+        for uuid, diag in diagnostics.items():
+            if previous_sources.get(uuid) is diag:
+                summary[uuid] = previous_views[uuid]
+            else:
+                summary[uuid] = self._to_view(diag)
+        self._last_summary = summary
+        self._last_summary_sources = diagnostics
         self.diagnostics_summary_changed.emit(self._last_summary)
         self.status_message_changed.emit(self._format_status())
         self.sidebar_entries_changed.emit(self._build_sidebar_entries())
@@ -261,46 +272,69 @@ class DiagnosticsService:
         active = self._last_active_uuids
         diagnostics = self._checker.active_mod_diagnostics()
 
-        by_provider: dict[str, list[str]] = {}
-        errors: list[str] = []
-        warnings: list[str] = []
-        for u, m in mods.items():
-            by_provider.setdefault(m.provider_id, []).append(u)
-            if not m.valid:
-                errors.append(u)
-            diag = diagnostics.get(u)
-            if diag:
-                if diag.has_errors:
-                    errors.append(u)
-                if diag.has_warnings:
-                    warnings.append(u)
+        base = self._sidebar_base
+        if base is None or not base.matches(mods):
+            base = self._sidebar_base = _SidebarBase(mods)
+
+        errors = set(base.invalid)
+        warnings: set[str] = set()
+        for u, diag in diagnostics.items():
+            if u not in mods:
+                continue
+            if diag.has_errors:
+                errors.add(u)
+            if diag.has_warnings:
+                warnings.add(u)
 
         entries: list[SidebarEntry] = [
             AllModsEntry(),
             ActiveModsEntry(),
         ]
-        all_uuids = set(mods.keys())
-        for pid in sorted(by_provider):
+        for pid, uuids in base.by_provider:
             entries.append(
-                ProviderModsEntry(
-                    pid,
-                    PROVIDER_LABELS.get(pid, pid),
-                    set(by_provider[pid]),
-                )
+                ProviderModsEntry(pid, PROVIDER_LABELS.get(pid, pid), set(uuids))
             )
         entries.append(InactiveModsEntry())
         entries.append(ErrorModsEntry())
         entries.append(WarningModsEntry())
 
-        entries[0].visible_uuids = all_uuids
+        entries[0].visible_uuids = set(base.all_uuids)
         entries[0].refresh_count()
         entries[1].visible_uuids = set(active)
         entries[1].refresh_count()
-        entries[-3].visible_uuids = all_uuids - set(active)
+        entries[-3].visible_uuids = entries[0].visible_uuids - entries[1].visible_uuids
         entries[-3].refresh_count()
-        entries[-2].visible_uuids = set(errors)
+        entries[-2].visible_uuids = errors
         entries[-2].refresh_count()
-        entries[-1].visible_uuids = set(warnings)
+        entries[-1].visible_uuids = warnings
         entries[-1].refresh_count()
 
         return entries
+
+
+class _SidebarBase:
+    """Diagnostics-independent sidebar partitions, reused until the mods change."""
+
+    __slots__ = ("all_uuids", "by_provider", "invalid", "mods")
+
+    def __init__(self, mods: dict[str, ListedMod]) -> None:
+        self.mods = mods
+        by_provider: dict[str, set[str]] = {}
+        invalid: set[str] = set()
+        for u, m in mods.items():
+            by_provider.setdefault(m.provider_id, set()).add(u)
+            if not m.valid:
+                invalid.add(u)
+        self.by_provider = sorted(by_provider.items(), key=lambda item: item[0])
+        self.invalid = frozenset(invalid)
+        self.all_uuids = frozenset(mods)
+
+    def matches(self, mods: dict[str, ListedMod]) -> bool:
+        # Callers pass copies of one dict, so identical iteration order is the
+        # common case; any difference just forces a (correct) recompute.
+        cached = self.mods
+        return (
+            len(cached) == len(mods)
+            and all(map(operator.is_, cached.values(), mods.values()))
+            and all(map(operator.eq, cached, mods))
+        )

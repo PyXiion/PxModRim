@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from collections.abc import Set as AbstractSet
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
@@ -31,33 +31,12 @@ class EdgeOrigin(IntEnum):
     COMMUNITY_RULES = auto()
 
 
-class ConstraintEdge:
-    __slots__ = ("origin", "source", "target", "type")
-
-    def __init__(
-        self,
-        source: PackageId,
-        target: PackageId,
-        type: EdgeType,
-        origin: EdgeOrigin,
-    ) -> None:
-        self.source = source
-        self.target = target
-        self.type = type
-        self.origin = origin
-
-    def __hash__(self) -> int:
-        return hash((self.source, self.target, self.type, self.origin))
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ConstraintEdge):
-            return NotImplemented
-        return (
-            self.source == other.source
-            and self.target == other.target
-            and self.type == other.type
-            and self.origin == other.origin
-        )
+class ConstraintEdge(NamedTuple):
+    # A NamedTuple keeps hashing/equality in C; graph builds create thousands.
+    source: PackageId
+    target: PackageId
+    type: EdgeType
+    origin: EdgeOrigin
 
     def __repr__(self) -> str:
         return (
@@ -66,53 +45,72 @@ class ConstraintEdge:
         )
 
 
+# Bypasses NamedTuple's Python-level __new__ on the build hot path.
+_new_edge = tuple.__new__
+_EdgesByType = dict[EdgeType, set[ConstraintEdge]]
+_NO_EDGES: frozenset[ConstraintEdge] = frozenset()
+_NO_TYPED: dict[EdgeType, set[ConstraintEdge]] = {}
+_CYCLE_TYPES = (EdgeType.DEPENDENCY, EdgeType.LOAD_AFTER)
+
+
 class ConstraintGraph:
     """Directed graph modelling mod dependencies, load order, incompatibilities."""
 
-    __slots__ = ("_incoming", "_ordered_pids", "_outgoing", "_pid_to_index")
+    __slots__ = (
+        "_cycle_components",
+        "_incoming",
+        "_nodes",
+        "_ordered_pids",
+        "_outgoing",
+        "_pid_to_index",
+    )
 
     def __init__(self) -> None:
-        self._outgoing: dict[PackageId, set[ConstraintEdge]] = {}
-        self._incoming: dict[PackageId, set[ConstraintEdge]] = {}
+        # Edges are partitioned by type so per-type queries need no filtering.
+        self._outgoing: dict[PackageId, _EdgesByType] = {}
+        self._incoming: dict[PackageId, _EdgesByType] = {}
+        self._nodes: dict[PackageId, None] = {}
         self._pid_to_index: dict[PackageId, int] = {}
         self._ordered_pids: list[PackageId] = []
+        # Cycle membership depends only on edges, so it survives reorders.
+        self._cycle_components: list[list[PackageId]] | None = None
 
     # ── Query ─────────────────────────────────────────────────
 
     @property
     def nodes(self) -> AbstractSet[PackageId]:
-        return self._outgoing.keys()
+        return self._nodes.keys()
 
     def has_node(self, pid: PackageId) -> bool:
-        return pid in self._outgoing
+        return pid in self._nodes
 
     def outgoing(self, pid: PackageId) -> frozenset[ConstraintEdge]:
-        return frozenset(self._outgoing.get(pid, set()))
+        by_type = self._outgoing.get(pid)
+        return frozenset().union(*by_type.values()) if by_type else _NO_EDGES
 
     def incoming(self, pid: PackageId) -> frozenset[ConstraintEdge]:
-        return frozenset(self._incoming.get(pid, set()))
+        by_type = self._incoming.get(pid)
+        return frozenset().union(*by_type.values()) if by_type else _NO_EDGES
 
     def neighbors(self, pid: PackageId) -> frozenset[PackageId]:
         nbrs: set[PackageId] = set()
-        for edge in self._outgoing.get(pid, set()):
-            nbrs.add(edge.target)
-        for edge in self._incoming.get(pid, set()):
-            nbrs.add(edge.source)
+        for edges in self._outgoing.get(pid, _NO_TYPED).values():
+            nbrs.update(edge.target for edge in edges)
+        for edges in self._incoming.get(pid, _NO_TYPED).values():
+            nbrs.update(edge.source for edge in edges)
         return frozenset(nbrs)
 
     def edges_of_type(
         self, pid: PackageId, edge_type: EdgeType
-    ) -> frozenset[ConstraintEdge]:
-        return frozenset(
-            e for e in self._outgoing.get(pid, set()) if e.type == edge_type
-        )
+    ) -> AbstractSet[ConstraintEdge]:
+        """Read-only view of outgoing edges of one type; callers must not mutate."""
+        return self._outgoing.get(pid, _NO_TYPED).get(edge_type, _NO_EDGES)
 
     def incoming_of_type(
         self, pid: PackageId, edge_type: EdgeType
-    ) -> frozenset[ConstraintEdge]:
-        return frozenset(
-            e for e in self._incoming.get(pid, set()) if e.type == edge_type
-        )
+    ) -> AbstractSet[ConstraintEdge]:
+        """Read-only view of incoming edges of one type; callers must not mutate."""
+        return self._incoming.get(pid, _NO_TYPED).get(edge_type, _NO_EDGES)
 
     def index_of(self, pid: PackageId) -> int:
         return self._pid_to_index.get(pid, -1)
@@ -134,14 +132,14 @@ class ConstraintGraph:
         community_rules: dict[PackageId, CommunityRule] | None = None,
     ) -> None:
         """Build constraint graph from active mods, order, settings, community rules."""
-        self._outgoing.clear()
-        self._incoming.clear()
+        self._outgoing = {}
+        self._incoming = {}
+        self._cycle_components = None
         self._ordered_pids = list(ordered_pids)
         self._pid_to_index = {pid: i for i, pid in enumerate(ordered_pids)}
 
         # Pre-populate nodes so empty mods are tracked
-        for pid in ordered_pids:
-            self._ensure_node(pid)
+        self._nodes = dict.fromkeys(ordered_pids)
 
         alt_map = (
             _build_alt_map(active_mods) if settings.use_alternative_package_ids else {}
@@ -174,6 +172,7 @@ class ConstraintGraph:
         community_rules: dict[PackageId, CommunityRule] | None = None,
     ) -> None:
         """Insert a single mod into the graph at a given index and add its edges."""
+        self._cycle_components = None
         self._ensure_node(pid)
         self._ordered_pids.insert(index, pid)
         self._rebuild_index()
@@ -196,8 +195,14 @@ class ConstraintGraph:
 
     def remove_mod(self, pid: PackageId) -> None:
         """Remove a mod and all its incident edges from the graph."""
-        self._remove_outgoing(pid)
-        self._remove_incoming(pid)
+        self._cycle_components = None
+        for edges in self._outgoing.pop(pid, _NO_TYPED).values():
+            for edge in edges:
+                self._incoming[edge.target][edge.type].discard(edge)
+        for edges in self._incoming.pop(pid, _NO_TYPED).values():
+            for edge in edges:
+                self._outgoing[edge.source][edge.type].discard(edge)
+        self._nodes.pop(pid, None)
         self._pid_to_index.pop(pid, None)
         self._ordered_pids = [p for p in self._ordered_pids if p != pid]
         self._rebuild_index()
@@ -211,20 +216,35 @@ class ConstraintGraph:
 
     def find_cycles(self) -> list[list[PackageId]]:
         """Return strongly connected components that contain dependency cycles."""
-        adjacency: dict[PackageId, set[PackageId]] = {
-            pid: {
-                edge.target
-                for edge in edges
-                if edge.type in (EdgeType.DEPENDENCY, EdgeType.LOAD_AFTER)
-            }
-            for pid, edges in self._outgoing.items()
-        }
+        if self._cycle_components is None:
+            self._cycle_components = self._find_cycle_components()
+        index = self._pid_to_index
+        missing = len(index)
+        return [
+            sorted(component, key=lambda member: index.get(member, missing))
+            for component in self._cycle_components
+        ]
+
+    def _find_cycle_components(self) -> list[list[PackageId]]:
+        # Nodes without dependency/load-after edges are trivial SCCs that can
+        # never be part of a cycle, so they are left out of the search.
+        adjacency: dict[PackageId, list[PackageId]] = {}
+        for pid, by_type in self._outgoing.items():
+            targets: set[PackageId] = set()
+            for edge_type in _CYCLE_TYPES:
+                edges = by_type.get(edge_type)
+                if edges:
+                    targets.update(edge.target for edge in edges)
+            if targets:
+                adjacency[pid] = list(targets)
+        for neighbors in adjacency.values():
+            neighbors[:] = [t for t in neighbors if t in adjacency]
 
         indices: dict[PackageId, int] = {}
         lowlinks: dict[PackageId, int] = {}
         active_stack: list[PackageId] = []
         on_stack: set[PackageId] = set()
-        cycles: list[list[PackageId]] = []
+        components: list[list[PackageId]] = []
         next_index = 0
 
         for root, root_neighbors in adjacency.items():
@@ -242,9 +262,8 @@ class ConstraintGraph:
 
             while dfs_stack:
                 pid, neighbors = dfs_stack[-1]
-                try:
-                    neighbor = next(neighbors)
-                except StopIteration:
+                neighbor = next(neighbors, None)
+                if neighbor is None:
                     dfs_stack.pop()
                     if lowlinks[pid] == indices[pid]:
                         component: list[PackageId] = []
@@ -255,12 +274,7 @@ class ConstraintGraph:
                             if member == pid:
                                 break
                         if len(component) > 1 or pid in adjacency[pid]:
-                            component.sort(
-                                key=lambda member: self._pid_to_index.get(
-                                    member, len(self._pid_to_index)
-                                )
-                            )
-                            cycles.append(component)
+                            components.append(component)
                     if dfs_stack:
                         parent = dfs_stack[-1][0]
                         lowlinks[parent] = min(lowlinks[parent], lowlinks[pid])
@@ -273,39 +287,52 @@ class ConstraintGraph:
                     active_stack.append(neighbor)
                     on_stack.add(neighbor)
                     dfs_stack.append((neighbor, iter(adjacency[neighbor])))
-                elif neighbor in on_stack:
-                    lowlinks[pid] = min(lowlinks[pid], indices[neighbor])
+                elif neighbor in on_stack and indices[neighbor] < lowlinks[pid]:
+                    lowlinks[pid] = indices[neighbor]
 
-        return cycles
+        return components
 
     # ── Private helpers ────────────────────────────────────────
 
     def _ensure_node(self, pid: PackageId) -> None:
-        self._outgoing.setdefault(pid, set())
-        self._incoming.setdefault(pid, set())
+        if pid not in self._nodes:
+            self._nodes[pid] = None
 
-    def _add_edge(
+    def _add_edges(
         self,
         source: PackageId,
-        target: PackageId,
+        targets: Iterable[PackageId],
         type: EdgeType,
         origin: EdgeOrigin,
+        alt_map: dict[PackageId, PackageId] | None,
     ) -> None:
-        self._ensure_node(source)
-        self._ensure_node(target)
-        edge = ConstraintEdge(source=source, target=target, type=type, origin=origin)
-        self._outgoing[source].add(edge)
-        self._incoming[target].add(edge)
-
-    def _remove_outgoing(self, pid: PackageId) -> None:
-        for edge in list(self._outgoing.get(pid, set())):
-            self._incoming[edge.target].discard(edge)
-        self._outgoing.pop(pid, None)
-
-    def _remove_incoming(self, pid: PackageId) -> None:
-        for edge in list(self._incoming.get(pid, set())):
-            self._outgoing[edge.source].discard(edge)
-        self._incoming.pop(pid, None)
+        # Hot path of build(): one call per rule set rather than per edge.
+        nodes = self._nodes
+        incoming = self._incoming
+        out_edges: set[ConstraintEdge] | None = None
+        for target in targets:
+            if alt_map:
+                target = alt_map.get(target, target)
+            if out_edges is None:
+                if source not in nodes:
+                    nodes[source] = None
+                by_type = self._outgoing.get(source)
+                if by_type is None:
+                    by_type = self._outgoing[source] = {}
+                out_edges = by_type.get(type)
+                if out_edges is None:
+                    out_edges = by_type[type] = set()
+            if target not in nodes:
+                nodes[target] = None
+            edge = _new_edge(ConstraintEdge, (source, target, type, origin))
+            out_edges.add(edge)
+            in_by_type = incoming.get(target)
+            if in_by_type is None:
+                incoming[target] = {type: {edge}}
+            elif (in_edges := in_by_type.get(type)) is None:
+                in_by_type[type] = {edge}
+            else:
+                in_edges.add(edge)
 
     def _add_rules(
         self,
@@ -315,10 +342,15 @@ class ConstraintGraph:
         alt_map: dict[PackageId, PackageId],
     ) -> None:
         for dep_id, dep_mod in rules.dependencies.items():
-            pid_resolved = alt_map.get(dep_id, dep_id)
-            self._add_edge(pid, pid_resolved, EdgeType.DEPENDENCY, origin)
-            for alt in dep_mod.alternative_package_ids:
-                self._add_edge(pid, alt, EdgeType.ALTERNATIVE, origin)
+            self._add_edges(pid, (dep_id,), EdgeType.DEPENDENCY, origin, alt_map)
+            if dep_mod.alternative_package_ids:
+                self._add_edges(
+                    pid,
+                    dep_mod.alternative_package_ids,
+                    EdgeType.ALTERNATIVE,
+                    origin,
+                    None,
+                )
 
         self._add_load_rules(
             pid,
@@ -338,17 +370,14 @@ class ConstraintGraph:
         origin: EdgeOrigin,
         alt_map: dict[PackageId, PackageId],
     ) -> None:
-        for target in load_after:
-            resolved = alt_map.get(target, target)
-            self._add_edge(pid, resolved, EdgeType.LOAD_AFTER, origin)
-
-        for target in load_before:
-            resolved = alt_map.get(target, target)
-            self._add_edge(pid, resolved, EdgeType.LOAD_BEFORE, origin)
-
-        for target in incompatible_with:
-            resolved = alt_map.get(target, target)
-            self._add_edge(pid, resolved, EdgeType.INCOMPATIBILITY, origin)
+        if load_after:
+            self._add_edges(pid, load_after, EdgeType.LOAD_AFTER, origin, alt_map)
+        if load_before:
+            self._add_edges(pid, load_before, EdgeType.LOAD_BEFORE, origin, alt_map)
+        if incompatible_with:
+            self._add_edges(
+                pid, incompatible_with, EdgeType.INCOMPATIBILITY, origin, alt_map
+            )
 
     def _rebuild_index(self) -> None:
         self._pid_to_index = {pid: i for i, pid in enumerate(self._ordered_pids)}
