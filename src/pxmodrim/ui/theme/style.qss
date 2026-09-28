@@ -193,6 +193,12 @@ QTableWidget::item,
 QTableView::item {
     padding: 4px 8px;
 }
+QListWidget::item:disabled,
+QListView::item:disabled,
+QTreeWidget::item:disabled,
+QTreeView::item:disabled {
+    color: $TEXT_DIM;
+}
 QListWidget::item,
 QListView::item,
 QTreeWidget::item,
@@ -284,6 +290,16 @@ QScrollBar::sub-line:horizontal {
 QScrollBar::add-page:horizontal,
 QScrollBar::sub-page:horizontal {
     background: none;
+}
+
+/* ── Dialog / Organizer labels ── */
+QLabel#dialogTitle {
+    font-size: 15px;
+    font-weight: 600;
+}
+QLabel#organizerStatus {
+    color: $TEXT_DIM;
+    padding: 5px 12px;
 }
 
 /* ── Info Panel ── */
