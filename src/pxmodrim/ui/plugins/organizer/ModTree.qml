@@ -295,16 +295,6 @@ Rectangle {
                         fillColor: Qt.rgba(tagColor.r, tagColor.g, tagColor.b, 0.14)
                     }
                 }
-                Text {
-                    visible: item.model.kind === "mod" && !!item.model.packageId
-                    text: item.model.packageId || ""
-                    Layout.maximumWidth: Math.max(80, item.width * 0.30)
-                    color: Theme.textDim
-                    font.pixelSize: Theme.fontSizeSm
-                    font.family: Theme.fontMono
-                    horizontalAlignment: Text.AlignRight
-                    elide: Text.ElideLeft
-                }
 
                 DiagnosticBadge {
                     visible: !!item.model.hasError
