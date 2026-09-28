@@ -24,6 +24,8 @@ class ModListProxyModel(QAbstractListModel):
         self._source_row_for_uuid: dict[str, int] = {}
         self._proxy_row_by_uuid: dict[str, int] = {}
         self._in_proxy_move = False
+        self._visible_active_count: int = 0
+        self._visible_inactive_count: int = 0
 
         self._source.dataChanged.connect(self._on_source_data_changed)
         self._source.layoutChanged.connect(self._on_source_layout_changed)
@@ -44,6 +46,7 @@ class ModListProxyModel(QAbstractListModel):
         self._proxy_row_by_uuid = {
             uuid: row for row, uuid in enumerate(self._visible_uuids)
         }
+        self._update_visible_counts()
 
     def _rebuild_source_mapping(self) -> None:
         self._source_row_for_uuid = {
@@ -132,8 +135,8 @@ class ModListProxyModel(QAbstractListModel):
             item = self._source.get_item(source_row)
             if item is None or item.checked:
                 return ""
-            if self._has_both_blocks_visible():
-                return f"Inactive ({self._visible_inactive_count()})"
+            if self._visible_active_count > 0 and self._visible_inactive_count > 0:
+                return f"Inactive ({self._visible_inactive_count})"
             return ""
         return self._source.data(self._source.index(source_row, 0), role)
 
@@ -233,6 +236,12 @@ class ModListProxyModel(QAbstractListModel):
     def _on_source_data_changed(
         self, top_left: QModelIndex, bottom_right: QModelIndex, roles: list[int]
     ) -> None:
+        if (
+            not roles
+            or ModListModel.CheckStateRole in roles
+            or ModListModel.IsActiveRole in roles
+        ):
+            self._update_visible_counts()
         first = top_left.row()
         last = bottom_right.row()
         proxy_rows: list[int] = []
@@ -285,26 +294,24 @@ class ModListProxyModel(QAbstractListModel):
             return
         self._on_source_layout_changed()
 
-    def _has_both_blocks_visible(self) -> bool:
-        has_active = False
-        has_inactive = False
+    def _update_visible_counts(self) -> None:
+        active = 0
+        inactive = 0
         for uuid in self._visible_uuids:
             source_row = self._source_row_for_uuid.get(uuid, -1)
             item = self._source.get_item(source_row)
             if item is not None:
                 if item.checked:
-                    has_active = True
+                    active += 1
                 else:
-                    has_inactive = True
-                if has_active and has_inactive:
-                    return True
-        return False
+                    inactive += 1
+        self._visible_active_count = active
+        self._visible_inactive_count = inactive
 
-    def _visible_inactive_count(self) -> int:
-        count = 0
-        for uuid in self._visible_uuids:
-            source_row = self._source_row_for_uuid.get(uuid, -1)
-            item = self._source.get_item(source_row)
-            if item is not None and not item.checked:
-                count += 1
-        return count
+    @property
+    def visible_active_count(self) -> int:
+        return self._visible_active_count
+
+    @property
+    def visible_inactive_count(self) -> int:
+        return self._visible_inactive_count

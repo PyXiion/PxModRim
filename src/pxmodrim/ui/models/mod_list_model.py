@@ -52,6 +52,8 @@ class ModListModel(QAbstractListModel):
         super().__init__()
         self._provider_colors = provider_colors
         self._items: list[ModItem] = []
+        self._active_count: int = 0
+        self._inactive_count: int = 0
         self._diag = diagnostics
         if diagnostics is not None:
             diagnostics.diagnostics_summary_changed.connect(
@@ -113,8 +115,8 @@ class ModListModel(QAbstractListModel):
         if role == self.SectionNameRole:
             if item.checked:
                 return ""
-            if self._has_both_blocks():
-                return f"Inactive ({self._inactive_count()})"
+            if self._active_count > 0 and self._inactive_count > 0:
+                return f"Inactive ({self._inactive_count})"
             return ""
         if (
             role == Qt.ItemDataRole.ToolTipRole
@@ -393,12 +395,14 @@ class ModListModel(QAbstractListModel):
             if item.load_index != new_idx:
                 item.load_index = new_idx
                 changed.append(row)
+        self._active_count = counter
+        self._inactive_count = len(self._items) - counter
         return changed
 
-    def _has_both_blocks(self) -> bool:
-        has_active = any(item.checked for item in self._items)
-        has_inactive = any(not item.checked for item in self._items)
-        return has_active and has_inactive
+    @property
+    def active_count(self) -> int:
+        return self._active_count
 
-    def _inactive_count(self) -> int:
-        return sum(1 for item in self._items if not item.checked)
+    @property
+    def inactive_count(self) -> int:
+        return self._inactive_count
