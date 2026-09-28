@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from typing import Literal
 
 import msgspec
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 from pxmodrim.core.models.view.sidebar import PROVIDER_LABELS
-from pxmodrim.core.organizer.models import ROOT_ID, Folder, OrganizerState, Rule
+from pxmodrim.core.organizer.models import (
+    ROOT_ID,
+    Folder,
+    OrganizerState,
+    Rule,
+    RuleSpec,
+)
 
 Placement = Literal["manual", "rule", "none"]
 CheckState = Literal["on", "off", "partial"]
@@ -103,7 +109,7 @@ def mod_author(mod: ListedMod) -> str:
     return ""
 
 
-def _rule_matcher(rule: Rule) -> Callable[[str], bool]:
+def _rule_matcher(rule: Rule | RuleSpec) -> Callable[[str], bool]:
     pattern = rule.pattern.casefold()
     if rule.op == "prefix":
         return lambda value: value.startswith(pattern)
@@ -147,6 +153,46 @@ def folder_for(
     state: OrganizerState, package_id: str | None, name: str, author: str
 ) -> tuple[int, Placement]:
     return _Resolver(state).resolve(package_id, name, author)
+
+
+def preview_rule_matches(
+    state: OrganizerState, mods: Mapping[str, ListedMod], specs: Sequence[RuleSpec]
+) -> tuple[list[int], int]:
+    """First-match counts for a draft and currently ungrouped mods it would assign."""
+    current = _Resolver(state)
+    candidates = [
+        (spec.field, _rule_matcher(spec))
+        if spec.pattern.strip()
+        and spec.folder_id in state.folders
+        and spec.folder_id != ROOT_ID
+        else None
+        for spec in specs
+    ]
+    counts = [0] * len(specs)
+    assignable = 0
+    for mod in mods.values():
+        pid = mod_package_id(mod)
+        if pid is None:
+            continue
+        author = mod_author(mod)
+        values = {
+            "package_id": pid.casefold(),
+            "name": mod.name.casefold(),
+            "author": author.casefold(),
+        }
+        for index, candidate in enumerate(candidates):
+            if candidate is None:
+                continue
+            field, matches = candidate
+            if matches(values[field]):
+                counts[index] += 1
+                if (
+                    pid.lower() not in state.placements
+                    and current.resolve(pid, mod.name, author)[0] == ROOT_ID
+                ):
+                    assignable += 1
+                break
+    return counts, assignable
 
 
 def _matches_query(leaf: ModLeaf, provider_id: str, query: TreeQuery) -> bool:

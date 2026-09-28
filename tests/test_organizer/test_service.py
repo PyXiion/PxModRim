@@ -62,6 +62,25 @@ def changes(svc: OrganizerService) -> _Counter:
     return counter
 
 
+async def test_bulk_folder_expansion_persists(svc: OrganizerService) -> None:
+    parent = await svc.create_folder("Parent")
+    child = await svc.create_folder("Child", parent.id)
+    other = await svc.create_folder("Other")
+
+    await svc.set_all_collapsed(True)
+    persisted = await svc._db.load()
+    assert all(
+        persisted.folders[folder.id].collapsed for folder in (parent, child, other)
+    )
+
+    await svc.set_collapsed(child.id, False)
+    await svc.set_all_collapsed(False)
+    persisted = await svc._db.load()
+    assert all(
+        not persisted.folders[folder.id].collapsed for folder in (parent, child, other)
+    )
+
+
 async def test_depth_limit(svc: OrganizerService, changes: _Counter) -> None:
     a = await svc.create_folder("A")
     b = await svc.create_folder("B", a.id)
@@ -363,27 +382,20 @@ def _standard_rows() -> list[tuple[str, str, str, str]]:
 async def test_add_standard_rules_fresh_and_idempotent(
     svc: OrganizerService, changes: _Counter
 ) -> None:
-    assert await svc.add_standard_rules() == 13
+    total = len(STANDARD_RULES)
+    names = {r.folder for r in STANDARD_RULES}
+    assert await svc.add_standard_rules() == total
     assert changes.count == 1
     assert _rule_rows(svc) == _standard_rows()
     top = [f for f in svc.state.folders.values() if f.parent_id == ROOT_ID]
-    assert sorted(f.name for f in top) == sorted(
-        {
-            "Official",
-            "Frameworks & Libraries",
-            "Vanilla Expanded",
-            "Combat Extended",
-            "Alpha Mods",
-            "Performance",
-        }
-    )
-    assert len(svc.state.folders) == 7
-    assert [r.position for r in svc.state.rules] == list(range(13))
+    assert sorted(f.name for f in top) == sorted(names)
+    assert len(svc.state.folders) == len(names) + 1
+    assert [r.position for r in svc.state.rules] == list(range(total))
 
     assert await svc.add_standard_rules() == 0
     assert changes.count == 1
-    assert len(svc.state.rules) == 13
-    assert len(svc.state.folders) == 7
+    assert len(svc.state.rules) == total
+    assert len(svc.state.folders) == len(names) + 1
 
 
 async def test_add_standard_rules_reuses_folder_and_keeps_user_rules(
@@ -399,7 +411,7 @@ async def test_add_standard_rules_reuses_folder_and_keeps_user_rules(
     )
     changes.count = 0
 
-    assert await svc.add_standard_rules() == 12
+    assert await svc.add_standard_rules() == len(STANDARD_RULES) - 1
     assert changes.count == 1
     names = [f.name for f in svc.state.folders.values()]
     assert "Official" not in names
@@ -431,5 +443,28 @@ async def test_standard_rules_resolve_mods(svc: OrganizerService) -> None:
     assert folder("brrainz.harmony", "Harmony") == "Frameworks & Libraries"
     assert folder("ceteam.combatextended", "Combat Extended") == "Combat Extended"
     assert folder("sarg.alphagenes") == "Alpha Mods"
-    assert folder("someone.perf", "Performance Fish") == "Performance"
+    assert folder("bs.performance", "Performance Fish") == "Performance"
+    assert folder("oskarpotocki.vanillafactionsexpanded.core") == (
+        "Frameworks & Libraries"
+    )
+    assert folder("vanillaracesexpanded.sanguophage") == "Vanilla Expanded"
+    assert folder("dubwise.dubsperformanceanalyzer.steam") == "Performance"
+    assert folder("dubwise.rimatomics") == "Dubs Mods"
+    assert folder("brrainz.achtung", "Achtung!") == "Quality of Life"
+    assert folder("brrainz.jobsofopportunity") == "Root"
+    assert folder("smartkar.athena.framework", "Athena Framework") == "Root"
+    assert folder("someone.perf", "Performance Tweaks") == "Root"
     assert folder("someone.other", "Other") == "Root"
+
+
+async def test_standard_package_id_rules_are_not_shadowed(
+    svc: OrganizerService,
+) -> None:
+    await svc.add_standard_rules()
+    state = svc.state
+    for rule in STANDARD_RULES:
+        if rule.field != "package_id":
+            continue
+        probe = rule.pattern if rule.op == "equals" else rule.pattern + "x"
+        folder_id, _ = folder_for(state, probe, "Mod", "")
+        assert state.folders[folder_id].name == rule.folder, rule.pattern

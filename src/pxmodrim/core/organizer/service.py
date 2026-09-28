@@ -207,6 +207,12 @@ class OrganizerService(Plugin):
         await self._db.set_collapsed(folder_id, collapsed)
         await self._commit()
 
+    async def set_all_collapsed(self, collapsed: bool) -> None:
+        if all(folder.collapsed == collapsed for folder in self.state.folders.values()):
+            return
+        await self._db.set_all_collapsed(collapsed)
+        await self._commit()
+
     async def delete_folder(self, folder_id: int) -> None:
         self._non_root(folder_id)
         await self._db.delete_folder(folder_id)

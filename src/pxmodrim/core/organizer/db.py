@@ -298,6 +298,18 @@ class OrganizerDb:
                 await conn.rollback()
                 raise
 
+    async def set_all_collapsed(self, collapsed: bool) -> None:
+        async with self._lock:
+            conn = await self._get_conn()
+            try:
+                await conn.execute(
+                    "UPDATE folders SET collapsed = ?", (1 if collapsed else 0,)
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
+
     async def delete_folder(self, folder_id: int) -> None:
         if folder_id == ROOT_ID:
             raise OrganizerError("The root folder cannot be deleted.")

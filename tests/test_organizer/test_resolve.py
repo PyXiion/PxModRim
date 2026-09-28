@@ -12,6 +12,7 @@ from pxmodrim.core.organizer.models import (
     Rule,
     RuleField,
     RuleOp,
+    RuleSpec,
     Tag,
 )
 from pxmodrim.core.organizer.resolve import (
@@ -20,6 +21,7 @@ from pxmodrim.core.organizer.resolve import (
     TreeQuery,
     build_tree,
     folder_for,
+    preview_rule_matches,
     tree_filters,
 )
 
@@ -73,6 +75,30 @@ def _mod(
 
 def _find(root: FolderNode, folder_id: int) -> FolderNode:
     return next(n for n in root.walk() if n.folder.id == folder_id)
+
+
+def test_rule_preview_first_match_and_current_ungrouped() -> None:
+    state = _state(
+        folders=[Folder(2, ROOT_ID, "A"), Folder(3, ROOT_ID, "B")],
+        placements={"manual.mod": 3, "root.mod": ROOT_ID},
+        rules=[("package_id", "prefix", "old.", 2)],
+    )
+    mods = {
+        "a": _mod("a", "Core Alpha", "new.alpha", "Author"),
+        "b": _mod("b", "Core Beta", "old.beta", "Other"),
+        "c": _mod("c", "Core Manual", "manual.mod", "Author"),
+        "d": _mod("d", "Core Ungrouped", "root.mod", "Author"),
+        "e": _mod("e", "Core No ID"),
+    }
+    draft = [
+        RuleSpec("author", "equals", "author", 3),
+        RuleSpec("name", "contains", "core", 2),
+    ]
+    assert preview_rule_matches(state, mods, draft) == ([3, 1], 1)
+    assert preview_rule_matches(state, mods, draft[::-1]) == ([4, 0], 1)
+    assert preview_rule_matches(
+        state, mods, [RuleSpec("name", "contains", "   ", 2), *draft]
+    ) == ([0, 3, 1], 1)
 
 
 class TestFolderFor:
