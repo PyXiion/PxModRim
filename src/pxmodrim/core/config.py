@@ -66,6 +66,7 @@ class AppConfig(msgspec.Struct):
     )
     max_snapshots: int = 10
     compact_mod_list: bool = False
+    log_upload_endpoint: str = "https://paste.rs/"
 
 
 def _migrate_json(data: dict[str, Any], current: int) -> None:

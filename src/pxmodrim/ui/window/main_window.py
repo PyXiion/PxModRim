@@ -49,6 +49,7 @@ from pxmodrim.ui.panels.restore_snapshot_dialog import (
     RestoreSnapshotDialog,
 )
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
+from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
 from pxmodrim.ui.theme.qml_theme import Theme
 from pxmodrim.ui.window.menu_bar import MenuBar
 
@@ -119,6 +120,7 @@ class MainWindow(QMainWindow):
         self._menu_bar.about_requested.connect(self._show_about)
         self._menu_bar.restore_snapshot_requested.connect(self._restore_snapshot)
         self._menu_bar.shortcuts_requested.connect(self._show_shortcuts)
+        self._menu_bar.upload_logs_requested.connect(self._upload_log_and_system_info)
         self._setup_shortcuts()
 
     def _setup_shortcuts(self) -> None:
@@ -364,7 +366,11 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _show_about(self) -> None:
-        await await_dialog(AboutPanel, self)
+        await await_dialog(AboutPanel, self, ctx=self._ctx)
+
+    @asyncSlot()
+    async def _upload_log_and_system_info(self) -> None:
+        await handle_upload_report(self, self._ctx, self._toast_manager)
 
     @asyncSlot()
     async def _restore_snapshot(self) -> None:

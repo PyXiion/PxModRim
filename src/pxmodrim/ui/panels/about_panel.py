@@ -4,6 +4,7 @@ import platform
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files as resource_files
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QUrl, qVersion
 from PySide6.QtGui import QDesktopServices, QPixmap
@@ -18,7 +19,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from qasync import asyncSlot
 
+from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
+
+if TYPE_CHECKING:
+    from pxmodrim.core.context import CoreContext
 from pxmodrim.ui.components import AppButton
 
 
@@ -37,8 +43,11 @@ class AboutPanel(QDialog):
         ("ttimer", "MIT"),
     )
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, parent: QWidget | None = None, ctx: CoreContext | None = None
+    ) -> None:
         super().__init__(parent)
+        self._ctx = ctx
         self.setObjectName("aboutPanel")
         self.setWindowTitle("About PxModRim")
         self.setModal(True)
@@ -199,6 +208,9 @@ class AboutPanel(QDialog):
         self._copy_button.clicked.connect(self._copy_system_information)
         actions.addWidget(self._copy_button)
 
+        self._upload_button = AppButton("Upload log & system info…", self)
+        self._upload_button.clicked.connect(self._on_upload_clicked)
+        actions.addWidget(self._upload_button)
         credits_button = AppButton("Open-source credits…", self)
         credits_button.clicked.connect(self._credits_dialog.open)
         actions.addWidget(credits_button)
@@ -280,6 +292,21 @@ class AboutPanel(QDialog):
                 ),
             )
         )
+
+    @asyncSlot()
+    async def _on_upload_clicked(self) -> None:
+        ctx = self._ctx
+        if ctx is None:
+            parent = self.parent()
+            if parent is not None:
+                ctx = getattr(parent, "_ctx", None)
+        if ctx is None:
+            return
+        self._upload_button.setEnabled(False)
+        try:
+            await handle_upload_report(self, ctx)
+        finally:
+            self._upload_button.setEnabled(True)
 
     @staticmethod
     def _get_version() -> str:

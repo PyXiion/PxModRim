@@ -67,7 +67,9 @@ def _exception_hook(
             None,
             "PxModRim - Crash",
             f"An unexpected error occurred:\n\n"
-            f"{exc_type.__name__}: {exc_value}\n\nDetails have been logged.",
+            f"{exc_type.__name__}: {exc_value}\n\n"
+            "Details have been logged.\n"
+            "You can upload diagnostics and logs via Help > Upload Log & System Info.",
         )
 
 

@@ -12,6 +12,7 @@ class MenuBar(QMenuBar):
     about_requested = Signal()
     restore_snapshot_requested = Signal()
     shortcuts_requested = Signal()
+    upload_logs_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -36,6 +37,10 @@ class MenuBar(QMenuBar):
         report_action = QAction("Report &Issue", self)
         report_action.triggered.connect(self._open_report)
         help_menu.addAction(report_action)
+
+        upload_action = QAction("&Upload Log && System Info\u2026", self)
+        upload_action.triggered.connect(self.upload_logs_requested.emit)
+        help_menu.addAction(upload_action)
 
         logs_action = QAction("Open &Logs Folder", self)
         logs_action.triggered.connect(self._open_logs_folder)
