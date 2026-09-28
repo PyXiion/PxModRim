@@ -7,6 +7,7 @@ from typing import cast
 import pytest
 from PySide6.QtCore import QCoreApplication, QObject, QPoint, Qt, Signal
 from PySide6.QtQml import QQmlEngine
+from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
@@ -131,6 +132,8 @@ def _panel(qapp: QApplication) -> ModListPanel:
     )
 
     panel = ModListPanel.__new__(ModListPanel)
+    panel._highlight_generation = 0
+    panel._qml = cast(QQuickWidget, SimpleNamespace(rootObject=lambda: None))
     panel._ctx = cast(CoreContext, ctx)
     panel._model = ModListModel({})
     panel._proxy = ModListProxyModel(panel._model)
@@ -200,7 +203,7 @@ async def test_cancel_keeps_selected_mod_and_dependents_active(
 
 
 @pytest.mark.asyncio
-async def test_reenabled_mod_is_appended_after_active_mods(
+async def test_reenabled_mod_is_placed_between_dependency_and_dependent(
     qapp: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     panel = _panel(qapp)
@@ -216,8 +219,8 @@ async def test_reenabled_mod_is_appended_after_active_mods(
 
     await panel._toggle_rows([panel.rowForUuid("uuid-b")])
 
-    assert panel.active_uuids() == ["uuid-a", "uuid-c", "uuid-b"]
-    assert panel._ctx.active_uuids == ["uuid-a", "uuid-c", "uuid-b"]
+    assert panel.active_uuids() == ["uuid-a", "uuid-b", "uuid-c"]
+    assert panel._ctx.active_uuids == ["uuid-a", "uuid-b", "uuid-c"]
 
 
 def test_hovering_drag_handle_does_not_show_drag_proxy(
