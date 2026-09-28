@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import getpass
+import json
 import platform
+import re
 import urllib.error
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version
@@ -23,7 +25,7 @@ def get_app_version() -> str:
     try:
         return version("pxmodrim")
     except PackageNotFoundError:
-        return "0.1.0"
+        return "unknown"
 
 
 def redact(
@@ -52,15 +54,44 @@ def redact(
         if back_slash != home_str:
             text = text.replace(back_slash, "~")
 
-    # Redact username everywhere
-    if username:
-        text = text.replace(username, "<user>")
-
+    # Redact username if at least 3 chars using word-boundary regex
+    if username and len(username) >= 3:
+        pattern = re.compile(rf"(?<![\w]){re.escape(username)}(?![\w])", re.IGNORECASE)
+        text = pattern.sub("<user>", text)
     return text
 
 
+def _format_size(size_bytes: int) -> str:
+    """Format byte count into human-readable B, KiB, or MiB."""
+    if size_bytes >= 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MiB"
+    if size_bytes >= 1024:
+        return f"{size_bytes / 1024:.1f} KiB"
+    return f"{size_bytes} B"
+
+
+def _parse_log_text(raw_text: str) -> str:
+    """Extract plain text lines from log, unpacking loguru JSON lines if present."""
+    plain_lines: list[str] = []
+    for line in raw_text.splitlines():
+        trimmed = line.strip()
+        if trimmed.startswith("{") and trimmed.endswith("}"):
+            try:
+                data = json.loads(trimmed)
+                if isinstance(data, dict) and "text" in data:
+                    plain_lines.append(str(data["text"]).rstrip("\r\n"))
+                    continue
+            except (json.JSONDecodeError, ValueError):
+                pass
+        plain_lines.append(line)
+    result = "\n".join(plain_lines)
+    if raw_text.endswith("\n") and result:
+        result += "\n"
+    return result
+
+
 def read_log_tail(log_path: Path | None = None, max_bytes: int = MAX_LOG_BYTES) -> str:
-    """Read up to max_bytes from the end of the log file."""
+    """Read up to max_bytes from the end of the log file, converted to plain text."""
     path = log_path or (config_dir() / "logs" / "pxmodrim.log")
     if not path.is_file():
         return "<no log file found>"
@@ -74,19 +105,37 @@ def read_log_tail(log_path: Path | None = None, max_bytes: int = MAX_LOG_BYTES) 
         return "<empty log file>"
 
     try:
+        read_window = max(max_bytes * 5, 10 * 1024 * 1024)
         with path.open("rb") as f:
-            if size <= max_bytes:
-                data = f.read()
-                return data.decode("utf-8", errors="replace")
+            if size <= read_window:
+                raw_bytes = f.read()
+            else:
+                f.seek(size - read_window)
+                raw_bytes = f.read(read_window)
+                nl = raw_bytes.find(b"\n")
+                if nl != -1:
+                    raw_bytes = raw_bytes[nl + 1 :]
 
-            f.seek(size - max_bytes)
-            data = f.read(max_bytes)
-            text = data.decode("utf-8", errors="replace")
-            first_newline = text.find("\n")
-            if first_newline != -1:
-                text = text[first_newline + 1 :]
-            mb = max_bytes // (1024 * 1024)
-            return f"[... log truncated to last ~{mb} MB ...]\n" + text
+        raw_text = raw_bytes.decode("utf-8", errors="replace")
+        plain_text = _parse_log_text(raw_text)
+        encoded = plain_text.encode("utf-8")
+        total_bytes = len(encoded)
+
+        if total_bytes <= max_bytes:
+            return plain_text
+
+        tail_bytes = encoded[-max_bytes:]
+        tail_text = tail_bytes.decode("utf-8", errors="replace")
+        first_newline = tail_text.find("\n")
+        if first_newline != -1:
+            tail_text = tail_text[first_newline + 1 :]
+
+        kept_bytes = len(tail_text.encode("utf-8"))
+        marker = (
+            f"[... truncated, showing last {_format_size(kept_bytes)} "
+            f"of {_format_size(total_bytes)} ...]\n"
+        )
+        return marker + tail_text
     except OSError as exc:
         return f"<error reading log file: {exc}>"
 

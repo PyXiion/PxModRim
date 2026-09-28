@@ -41,6 +41,20 @@ class TestRedact:
         result = redact(raw, home_dir="/home/other", username="other")
         assert result == raw
 
+    def test_skips_short_username_but_redacts_home_path(self) -> None:
+        raw = "User ed checked /home/ed/.config/ed_log.txt and ed went to bed"
+        result = redact(raw, home_dir="/home/ed", username="ed")
+        assert result == "User ed checked ~/.config/ed_log.txt and ed went to bed"
+
+    def test_redacts_username_word_boundary_preserves_substrings(self) -> None:
+        raw = "Admin admin logged in to administrator panel with admin and ADMIN"
+        result = redact(raw, home_dir="/home/admin", username="admin")
+        expected = (
+            "<user> <user> logged in to administrator panel with <user> and <user>"
+        )
+        assert result == expected
+        assert "administrator" in result
+
 
 class TestReadLogTail:
     def test_missing_file_returns_notice(self, tmp_path: Path) -> None:
@@ -61,6 +75,23 @@ class TestReadLogTail:
         content = read_log_tail(log_file)
         assert content == text
 
+    def test_parses_loguru_serialized_json_lines(self, tmp_path: Path) -> None:
+        log_file = tmp_path / "json.log"
+        raw_json = (
+            '{"text": "2026-09-28 | INFO | Loaded mods\\n", "record": {"id": 1}}\n'
+            "Plain log line\n"
+            '{"text": "2026-09-28 | INFO | Ready\\n", "record": {"id": 2}}\n'
+        )
+        log_file.write_text(raw_json, encoding="utf-8")
+        content = read_log_tail(log_file)
+        expected = (
+            "2026-09-28 | INFO | Loaded mods\n"
+            "Plain log line\n"
+            "2026-09-28 | INFO | Ready\n"
+        )
+        assert content == expected
+        assert '{"text"' not in content
+
     def test_truncates_large_file_and_adds_banner(self, tmp_path: Path) -> None:
         log_file = tmp_path / "large.log"
         lines = [
@@ -70,9 +101,19 @@ class TestReadLogTail:
 
         # Cap to 200 bytes
         content = read_log_tail(log_file, max_bytes=200)
-        assert "[... log truncated to last ~0 MB ...]" in content
+        assert "[... truncated, showing last " in content
+        assert " of " in content
         assert "Log record number 0199" in content
         assert "Log record number 0001" not in content
+
+
+def test_get_app_version_fallback_unknown() -> None:
+    from importlib.metadata import PackageNotFoundError
+
+    with patch(
+        "pxmodrim.core.support.report.version", side_effect=PackageNotFoundError
+    ):
+        assert get_app_version() == "unknown"
 
 
 class MockContext:

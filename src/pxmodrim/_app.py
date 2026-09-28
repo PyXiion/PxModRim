@@ -93,7 +93,7 @@ def _configure_file_logging() -> int:
         level=os.environ.get("LOGURU_LEVEL", "INFO"),
         rotation="10 MB",
         retention=5,
-        serialize=True,
+        serialize=False,
         format="{time} | {level} | pid={process.id} | {module}:{line} | {message}",
     )
 
