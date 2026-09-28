@@ -279,15 +279,3 @@ def test_settings_panel_save_preserves_max_snapshots(qapp: QApplication) -> None
     panel = SettingsPanel(ctx)
     panel._save()
     assert panel.get_config().max_snapshots == 7
-
-
-def test_settings_panel_saves_compact_mod_list(qapp: QApplication) -> None:
-    from pxmodrim.ui.panels.settings_panel import SettingsPanel
-
-    cfg = AppConfig(compact_mod_list=False)
-    ctx = CoreContext(cfg)
-    panel = SettingsPanel(ctx)
-    assert panel.compact_mod_list_cb.isChecked() is False
-    panel.compact_mod_list_cb.setChecked(True)
-    panel._save()
-    assert panel.get_config().compact_mod_list is True

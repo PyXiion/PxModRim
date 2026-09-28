@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from pxmodrim.core.config import AppConfig
 from pxmodrim.core.events import Event
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.plugin import PluginRegistry
 from pxmodrim.core.structures import CollectionStats
 
 if TYPE_CHECKING:
-    from pxmodrim.core.config import AppConfig, ConfigService, PathConfig
+    from pxmodrim.core.config import ConfigService, PathConfig
     from pxmodrim.core.mod_service import ModService
     from pxmodrim.core.plugin import Plugin
     from pxmodrim.core.providers.base import BaseModProvider
@@ -71,7 +72,7 @@ class CoreContext:
         self._pool: ThreadPoolExecutor | None = None
         self._plugins = PluginRegistry()
         self._active_state_changed = Event[tuple[str, ...]]()
-        self._config_changed = Event()
+        self._config_changed = Event[AppConfig]()
 
     def load(self, mods: dict[str, ListedMod], active_uuids: list[str]) -> None:
         """Replace all mods and active UUIDs, taking ownership of the data."""
