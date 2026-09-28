@@ -15,6 +15,7 @@ class MetaChip(QWidget):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("metaChip")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setSizePolicy(
             QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed
         )
@@ -23,11 +24,11 @@ class MetaChip(QWidget):
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(2)
 
-        self._label_widget = QLabel(label)
+        self._label_widget = QLabel(label, self)
         self._label_widget.setObjectName("metaChipLabel")
         layout.addWidget(self._label_widget)
 
-        self._value_widget = QLabel(value)
+        self._value_widget = QLabel(value or "—", self)
         self._value_widget.setObjectName("metaChipValue")
         self._value_widget.setWordWrap(True)
         self._value_widget.setTextInteractionFlags(
@@ -50,7 +51,7 @@ class MetaChipRow(QWidget):
         layout.setSpacing(8)
 
         for i, (key, label) in enumerate(fields.items()):
-            chip = MetaChip(label, "—")
+            chip = MetaChip(label, "—", self)
             self._chips[key] = chip
             layout.addWidget(chip, i // 2, i % 2)
 

@@ -9,6 +9,7 @@ from PySide6.QtQuick import QQuickImageProvider
 from PySide6.QtSvg import QSvgRenderer
 
 from pxmodrim.ui.components.icons import svg_str
+from pxmodrim.ui.theme.palette import PALETTE
 
 
 class SvgIconProvider(QQuickImageProvider):
@@ -20,7 +21,7 @@ class SvgIconProvider(QQuickImageProvider):
     def requestPixmap(self, id: str, _size: QSize, requested_size: QSize) -> QPixmap:
         parts = id.split("?", 1)
         icon_name = parts[0]
-        color = "#949ba4"
+        color = PALETTE["TEXT_MUTED"]
         if len(parts) > 1:
             for param in parts[1].split("&"):
                 if param.startswith("color="):

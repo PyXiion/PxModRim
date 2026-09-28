@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -20,16 +19,17 @@ if TYPE_CHECKING:
         "restore",
         "chevron",
         "chevron-left",
+        "chevron-down",
         "folder",
         "tag",
         "steam",
         "local",
         "git",
+        "grid",
         "home",
-        "mod_tab",
-        "steam_workshop_tab",
+        "mods",
         "check-circle",
-        "x-circle",
+        "ban",
         "info",
         "toast-success",
         "toast-warning",
@@ -37,15 +37,15 @@ if TYPE_CHECKING:
         "empty",
         "play",
         "link",
-        "chevron-down",
         "clock",
-        "alert-triangle",
         "trash",
     ]
 
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtXml import QDomDocument
+
+from pxmodrim.ui.theme.palette import PALETTE
 
 # Each icon is an SVG path data string.
 # stroke svg uses 24x24 viewBox, stroke-width 2, stroke="currentColor"
@@ -235,7 +235,7 @@ _ICONS: dict[str, str] = {
         '<polyline points="9 22 9 12 15 12 15 22"/>'
         "</svg>"
     ),
-    "mod_tab": (
+    "mods": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
         '<rect x="3" y="4" width="18" height="4" rx="1"/>'
@@ -249,11 +249,11 @@ _ICONS: dict[str, str] = {
     "check-circle": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
-        '<polyline points="9 11 12 14 22 4"/>'
-        '<path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>'
+        '<circle cx="12" cy="12" r="10"/>'
+        '<polyline points="8 12 11 15 16 9"/>'
         "</svg>"
     ),
-    "x-circle": (
+    "ban": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
         '<circle cx="12" cy="12" r="10"/>'
@@ -325,15 +325,6 @@ _ICONS: dict[str, str] = {
         '<polyline points="12 6 12 12 16 14"/>'
         "</svg>"
     ),
-    "alert-triangle": (
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
-        ' stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3'
-        'L13.71 3.86a2 2 0 00-3.42 0z"/>'
-        '<line x1="12" y1="9" x2="12" y2="13"/>'
-        '<line x1="12" y1="17" x2="12.01" y2="17"/>'
-        "</svg>"
-    ),
     "trash": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
@@ -345,7 +336,6 @@ _ICONS: dict[str, str] = {
         "</svg>"
     ),
 }
-_ICONS["steam_workshop_tab"] = _ICONS["steam"]
 
 
 def _color_to_hex(color: str | QColor) -> str:
@@ -364,7 +354,7 @@ def svg_str(name: str, color: str = "currentColor") -> str:
 def pixmap(
     name: str,
     size: int = 16,
-    color: str | QColor = "#f2f3f5",
+    color: str | QColor = PALETTE["TEXT_MUTED"],
 ) -> QPixmap:
     hex_color = _color_to_hex(color)
     svg = svg_str(name, hex_color)
@@ -386,13 +376,7 @@ def pixmap(
 def icon(
     name: str,
     size: int = 16,
-    color: str | QColor = "#f2f3f5",
+    color: str | QColor = PALETTE["TEXT_MUTED"],
 ) -> QIcon:
     pm = pixmap(name, size, color)
     return QIcon(pm)
-
-
-def qml_source(name: str, color: str = "#f2f3f5") -> str:
-    svg = svg_str(name, color)
-    encoded = base64.b64encode(svg.encode("utf-8")).decode("utf-8")
-    return f"data:image/svg+xml;base64,{encoded}"

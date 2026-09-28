@@ -10,7 +10,6 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -26,8 +25,10 @@ from pxmodrim.ui.components import (
     MetaChipRow,
     generate_preview,
 )
+from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.icon_tab_widget import IconTabWidget
-from pxmodrim.ui.components.icons import icon, pixmap
+from pxmodrim.ui.components.icons import pixmap
+from pxmodrim.ui.models.mod_list_model import provider_label
 from pxmodrim.ui.panels.time_analytics_panel import TimeAnalyticsPanel
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.ui_prefs import UIPrefs
@@ -63,8 +64,8 @@ class IssueRow(QWidget):
         layout.setSpacing(8)
 
         icon_name = "error" if issue.is_error else "warning"
-        color = "#ed4245" if issue.is_error else "#f9a825"
-        icon_label = QLabel()
+        color = PALETTE["DANGER"] if issue.is_error else PALETTE["WARNING"]
+        icon_label = QLabel(self)
         icon_label.setPixmap(pixmap(icon_name, 16, color))
         icon_label.setFixedSize(16, 16)
         layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
@@ -73,14 +74,14 @@ class IssueRow(QWidget):
         content.setContentsMargins(0, 0, 0, 0)
         content.setSpacing(2)
 
-        cat_label = QLabel(issue.category_display_name)
+        cat_label = QLabel(issue.category_display_name, self)
         cat_label.setStyleSheet(f"color: {color}; font-weight: bold;")
         content.addWidget(cat_label)
 
         if issue.detail:
-            detail_label = QLabel(issue.detail)
+            detail_label = QLabel(issue.detail, self)
             detail_label.setWordWrap(True)
-            detail_label.setStyleSheet("color: #949ba4;")
+            detail_label.setStyleSheet(f"color: {PALETTE['TEXT_MUTED']};")
             content.addWidget(detail_label)
 
         layout.addLayout(content, 1)
@@ -92,8 +93,9 @@ class ModInfoPanel(QWidget):
         ctx: CoreContext,
         qml_engine: QQmlEngine | None = None,
         ui_prefs: UIPrefs | None = None,
+        parent: QWidget | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(parent)
         self._ctx = ctx
         self._ui_prefs = ui_prefs or UIPrefs()
         self._mod: ListedMod | None = None
@@ -110,13 +112,13 @@ class ModInfoPanel(QWidget):
         layout.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
 
         # Placeholder (shown when no mod is selected)
-        self._placeholder = QLabel("Select a mod to view details")
+        self._placeholder = QLabel("Select a mod to view details", self)
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setObjectName("placeholder")
         layout.addWidget(self._placeholder, 0, Qt.AlignmentFlag.AlignTop)
 
         # ── Tab widget ──────────────────────────────────────────────────────────
-        self._tabs = IconTabWidget(orientation="horizontal")
+        self._tabs = IconTabWidget(self)
         self._tabs.hide()
         layout.addWidget(self._tabs, 1)
 
@@ -126,18 +128,18 @@ class ModInfoPanel(QWidget):
 
     def _setup_info_tab(self) -> None:
         # ── Info tab ────────────────────────────────────────────────────────────
-        self._info_tab = QWidget()
+        self._info_tab = QWidget(self)
         info_layout = QVBoxLayout(self._info_tab)
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(0)
 
-        info_scroll = QScrollArea()
+        info_scroll = QScrollArea(self._info_tab)
         info_scroll.setWidgetResizable(True)
         info_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         info_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         info_scroll.viewport().setAutoFillBackground(False)
 
-        info_content = QWidget()
+        info_content = QWidget(info_scroll)
         ic_layout = QVBoxLayout(info_content)
         ic_layout.setContentsMargins(0, 0, 0, 0)
         ic_layout.setSpacing(0)
@@ -146,51 +148,21 @@ class ModInfoPanel(QWidget):
         info_layout.addWidget(info_scroll, 1)
 
         # Open mod folder / URL buttons
-        self._btn_container = QWidget()
+        self._btn_container = QWidget(info_content)
         self._btn_container.setObjectName("infoButtonContainer")
         btn_layout = QHBoxLayout(self._btn_container)
         btn_layout.setContentsMargins(16, 8, 16, 8)
 
-        self._open_folder_btn = QPushButton()
-        self._open_folder_btn.setIcon(icon("folder", 16, "#949ba4"))
-        self._open_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._open_folder_btn.setToolTip("Open mod folder")
+        self._open_folder_btn = IconButton(
+            "folder", "Open mod folder", size=32, parent=self._btn_container
+        )
         self._open_folder_btn.clicked.connect(self._on_open_folder)
-        self._open_folder_btn.setStyleSheet(f"""
-            QPushButton {{
-                min-width: 32px; max-width: 32px;
-                min-height: 32px; max-height: 32px;
-                background-color: {PALETTE["ELEVATE_3"]};
-                border: 1px solid {PALETTE["BORDER"]};
-                border-radius: 6px;
-                padding: 0;
-            }}
-            QPushButton:hover {{
-                background-color: {PALETTE["ELEVATE_4"]};
-                border-color: {PALETTE["ELEVATE_4"]};
-            }}
-        """)
         btn_layout.addWidget(self._open_folder_btn)
 
-        self._open_url_btn = QPushButton()
-        self._open_url_btn.setIcon(icon("link", 16, "#949ba4"))
-        self._open_url_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._open_url_btn.setToolTip("Open mod URL")
+        self._open_url_btn = IconButton(
+            "link", "Open mod URL", size=32, parent=self._btn_container
+        )
         self._open_url_btn.clicked.connect(self._on_open_url)
-        self._open_url_btn.setStyleSheet(f"""
-            QPushButton {{
-                min-width: 32px; max-width: 32px;
-                min-height: 32px; max-height: 32px;
-                background-color: {PALETTE["ELEVATE_3"]};
-                border: 1px solid {PALETTE["BORDER"]};
-                border-radius: 6px;
-                padding: 0;
-            }}
-            QPushButton:hover {{
-                background-color: {PALETTE["ELEVATE_4"]};
-                border-color: {PALETTE["ELEVATE_4"]};
-            }}
-        """)
         btn_layout.addWidget(self._open_url_btn)
         btn_layout.addStretch()
 
@@ -204,23 +176,25 @@ class ModInfoPanel(QWidget):
                 "author": "Author",
                 "version": "Version",
                 "source": "Source",
-            }
+            },
+            info_content,
         )
         ic_layout.addWidget(self._meta_chips, 0, Qt.AlignmentFlag.AlignTop)
 
         # Description accordion
-        self._desc_renderer = DescriptionRenderer()
+        self._desc_renderer = DescriptionRenderer(info_content)
         self._desc_section = AccordionSection(
             "Description",
             self._desc_renderer,
             expanded=self._ui_prefs.desc_expanded,
+            parent=info_content,
         )
         self._desc_section.toggled.connect(self._on_desc_toggled)
         self._desc_section.hide()
         ic_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
 
         # Dependencies accordion
-        self._deps_label = QLabel("None")
+        self._deps_label = QLabel("None", info_content)
         self._deps_label.setWordWrap(True)
         self._deps_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
@@ -229,6 +203,7 @@ class ModInfoPanel(QWidget):
             "Dependencies",
             self._deps_label,
             expanded=self._ui_prefs.deps_expanded,
+            parent=info_content,
         )
         self._deps_section.toggled.connect(self._on_deps_toggled)
         self._deps_section.hide()
@@ -239,12 +214,12 @@ class ModInfoPanel(QWidget):
 
     def _setup_issues_tab(self) -> None:
         # ── Issues tab ──────────────────────────────────────────────────────────
-        self._issues_tab = QWidget()
+        self._issues_tab = QWidget(self)
         issues_layout = QVBoxLayout(self._issues_tab)
         issues_layout.setContentsMargins(0, 0, 0, 0)
         issues_layout.setSpacing(0)
 
-        issues_scroll = QScrollArea()
+        issues_scroll = QScrollArea(self._issues_tab)
         issues_scroll.setWidgetResizable(True)
         issues_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
@@ -252,12 +227,12 @@ class ModInfoPanel(QWidget):
         issues_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         issues_scroll.viewport().setAutoFillBackground(False)
 
-        self._issues_content = QWidget()
+        self._issues_content = QWidget(issues_scroll)
         self._issues_content_layout = QVBoxLayout(self._issues_content)
         self._issues_content_layout.setContentsMargins(16, 8, 16, 8)
         self._issues_content_layout.setSpacing(0)
 
-        self._no_issues_label = QLabel("No issues detected")
+        self._no_issues_label = QLabel("No issues detected", self._issues_content)
         self._no_issues_label.setObjectName("issuesLabel")
         self._no_issues_label.setWordWrap(True)
         self._no_issues_label.setTextInteractionFlags(
@@ -270,14 +245,14 @@ class ModInfoPanel(QWidget):
         issues_layout.addWidget(issues_scroll, 1)
 
         self._current_issues: list[ModIssueView] = []
-        self._tabs.addTab(self._issues_tab, "alert-triangle", "Issues")
+        self._tabs.addTab(self._issues_tab, "warning", "Issues")
 
     def _setup_time_analytics_tab(self, qml_engine: QQmlEngine | None) -> None:
         # ── Time analytics tab ──────────────────────────────────────────────────
         self._time_panel = TimeAnalyticsPanel(
-            self._ctx.mod_service.startup_impact, qml_engine
+            self._ctx.mod_service.startup_impact, qml_engine, self
         )
-        self._tabs.addTab(self._time_panel, "clock", "Time analytics")
+        self._tabs.addTab(self._time_panel, "clock", "Startup impact")
 
     def show_mod(self, mod: ListedMod) -> None:
         if self._preview_task and not self._preview_task.done():
@@ -307,7 +282,7 @@ class ModInfoPanel(QWidget):
 
         if isinstance(mod, AboutXmlMod) and bool(mod.url):
             self._open_url_btn.setVisible(True)
-            self._open_url_btn.setToolTip(f"Open URL: {mod.url}")
+            self._open_url_btn.setToolTip(f"Open mod URL: {mod.url}")
         else:
             self._open_url_btn.setVisible(False)
 
@@ -321,7 +296,8 @@ class ModInfoPanel(QWidget):
                     "package_id": str(mod.package_id),
                     "author": ", ".join(mod.authors) if mod.authors else "—",
                     "version": mod.mod_version or "—",
-                    "source": mod.provider_id or "—",
+                    "source": provider_label(mod.provider_id, str(mod.package_id))
+                    or "—",
                 }
             )
         else:
@@ -371,7 +347,7 @@ class ModInfoPanel(QWidget):
 
         self._no_issues_label.hide()
         for issue in issues:
-            issues_layout.addWidget(IssueRow(issue))
+            issues_layout.addWidget(IssueRow(issue, self._issues_content))
         issues_layout.addStretch()
 
     def _on_open_folder(self) -> None:

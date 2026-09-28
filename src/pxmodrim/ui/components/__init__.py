@@ -9,10 +9,9 @@ from .header_controller import HeaderController
 from .header_panel import HeaderPanel
 from .icon_button import IconButton
 from .icon_tab_widget import IconTabWidget
-from .icons import icon, pixmap, qml_source, svg_str
+from .icons import icon, pixmap, svg_str
 from .procedural_preview import generate_preview
 from .progress_dialog import ProgressDialog
-from .responsive_meta_grid import ResponsiveMetaGrid
 from .svg_provider import SvgIconProvider, create_qml_engine
 from .toast import Toast, ToastManager
 from .view_rail_panel import ViewRailPanel
@@ -29,7 +28,6 @@ __all__ = [
     "MetaChip",
     "MetaChipRow",
     "ProgressDialog",
-    "ResponsiveMetaGrid",
     "SvgIconProvider",
     "Toast",
     "ToastManager",
@@ -38,6 +36,5 @@ __all__ = [
     "generate_preview",
     "icon",
     "pixmap",
-    "qml_source",
     "svg_str",
 ]

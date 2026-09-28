@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal, Slot
+from PySide6.QtCore import QUrl, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -44,7 +44,7 @@ class DownloadSidebar(QWidget):
         qml_ctx = self._qml.rootContext()
         qml_ctx.setContextProperty("downloadSidebar", self)
         qml_ctx.setContextProperty("downloadQueueModel", self._model)
-        self._qml.setSource(str(_DL_SIDEBAR_QML))
+        self._qml.setSource(QUrl.fromLocalFile(str(_DL_SIDEBAR_QML)))
 
         layout.addWidget(self._qml)
 

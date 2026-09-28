@@ -425,7 +425,7 @@ def test_organizer_filter_model_sections_icons_and_fallbacks(
     # IconRole checks
     assert [
         model.data(model.index(i), OrganizerFilterModel.IconRole) for i in range(6)
-    ] == ["grid", "check-circle", "x-circle", "steam", "tag", "tag"]
+    ] == ["grid", "check-circle", "ban", "steam", "tag", "tag"]
 
     # Key and Display role checks
     assert model.data(model.index(4), OrganizerFilterModel.KeyRole) == "tag:1"

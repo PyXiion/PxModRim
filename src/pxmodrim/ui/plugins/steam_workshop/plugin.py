@@ -65,6 +65,7 @@ class SteamWorkshopUiPlugin(Plugin):
         self.clear_checked_requested = Event()
         self.active_refresh_requested = Event()
 
+        self._background_tasks: set[asyncio.Task[object]] = set()
         self._core: CoreContext | None = None
         self._app_ctx: AppContext | None = None
 
@@ -177,7 +178,7 @@ class SteamWorkshopUiPlugin(Plugin):
             logger.debug("[steam] download requested with empty queue")
             return
         if self._core is None or not self._core.config.paths.local:
-            self._svc.status_message_changed.emit("Local mods path is not configured.")
+            self._svc.status_message_changed.emit("Local mods path is not configured")
             return
         logger.debug("[steam] download requested: {}", ids)
 
@@ -265,7 +266,9 @@ class SteamWorkshopUiPlugin(Plugin):
             SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
         )
         if self._core is not None and result.succeeded:
-            asyncio.create_task(self._core.mod_service.discover())
+            task = asyncio.create_task(self._core.mod_service.discover())
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
     # ── Internal helpers ─────────────────────────────────
 

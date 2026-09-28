@@ -13,6 +13,8 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QMouseEvent, QShowEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from pxmodrim.ui.components.icons import pixmap
+
 QWIDGETSIZE_MAX = 16777215
 
 
@@ -28,10 +30,11 @@ class _AccordionHeader(QWidget):
         layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(8)
 
-        self._chevron = QLabel("\u25b6")
+        self._chevron = QLabel(self)
         self._chevron.setObjectName("accordionChevron")
         self._chevron.setFixedWidth(16)
         self._chevron.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.set_expanded(False)
 
         self._title = QLabel(title)
         self._title.setObjectName("accordionTitle")
@@ -51,7 +54,7 @@ class _AccordionHeader(QWidget):
         return self._title.text()
 
     def set_expanded(self, expanded: bool) -> None:
-        self._chevron.setText("\u25bc" if expanded else "\u25b6")
+        self._chevron.setPixmap(pixmap("chevron-down" if expanded else "chevron", 14))
 
 
 class AccordionSection(QWidget):
@@ -73,11 +76,12 @@ class AccordionSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._header = _AccordionHeader(title)
+        self._header = _AccordionHeader(title, self)
+        self._header.set_expanded(expanded)
         self._header.clicked.connect(self.toggle)
         layout.addWidget(self._header)
 
-        self._content_wrapper = QWidget()
+        self._content_wrapper = QWidget(self)
         self._content_wrapper.setObjectName("accordionContent")
         cw_layout = QVBoxLayout(self._content_wrapper)
         cw_layout.setContentsMargins(20, 0, 20, 0)
