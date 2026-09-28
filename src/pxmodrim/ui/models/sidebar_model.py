@@ -189,7 +189,6 @@ class SidebarModel(QAbstractListModel):
 
     def roleNames(self) -> dict[int, QByteArray]:
         return {
-            Qt.ItemDataRole.DisplayRole: QByteArray(b"label"),
             self.LabelRole: QByteArray(b"label"),
             self.CountRole: QByteArray(b"count"),
             self.BadgeBgRole: QByteArray(b"badgeBg"),

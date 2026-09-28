@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
+from pxmodrim.core.constants import LaunchStrategy
+
+_STRATEGY_LABELS = {
+    LaunchStrategy.DIRECT: "Direct executable",
+    LaunchStrategy.STEAM: "Steam",
+}
+
 
 class HeaderController(QObject):
     refresh_requested = Signal()
@@ -39,6 +46,10 @@ class HeaderController(QObject):
 
     appVersion = Property(str, lambda self: self._app_version, constant=True)
     tooltips = Property(dict, lambda self: self._tooltips, constant=True)
+
+    @Property("QVariantList", constant=True)  # type: ignore[operator]
+    def strategies(self) -> list[dict[str, object]]:
+        return [{"index": int(s), "label": _STRATEGY_LABELS[s]} for s in LaunchStrategy]
 
     def set_maximized(self, value: bool) -> None:
         if self._maximized != value:

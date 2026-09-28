@@ -34,7 +34,11 @@ Button {
 
     HoverHandler { cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor }
 
-    readonly property color foreground: isSolid ? Theme.onAccent
+    // Optional override for the icon/text colour (e.g. warning-tinted Save).
+    property color iconColor: "transparent"
+
+    readonly property color foreground: iconColor.a > 0 ? iconColor
+        : isSolid ? Theme.onAccent
         : isDanger && hovered ? Theme.onAccent
         : isDanger ? Theme.danger
         : hovered ? Theme.textMain
