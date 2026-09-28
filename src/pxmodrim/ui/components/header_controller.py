@@ -49,9 +49,7 @@ class HeaderController(QObject):
 
     @Property("QVariantList", constant=True)  # type: ignore[operator]
     def strategies(self) -> list[dict[str, object]]:
-        return [
-            {"index": int(s), "label": _STRATEGY_LABELS[s]} for s in LaunchStrategy
-        ]
+        return [{"index": int(s), "label": _STRATEGY_LABELS[s]} for s in LaunchStrategy]
 
     def set_maximized(self, value: bool) -> None:
         if self._maximized != value:

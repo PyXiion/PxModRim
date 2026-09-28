@@ -92,6 +92,7 @@ Rectangle {
 
                 PxButton {
                     iconName: "save"
+                    iconColor: root.controller.unsavedChanges ? Theme.warning : "transparent"
                     ToolTip.text: root.controller.tooltips.save || "Save"
                     onClicked: root.controller.save()
 
