@@ -8,7 +8,7 @@ Rectangle {
     ListView {
         id: filters
         anchors.fill: parent
-        anchors.margins: 10
+        anchors.margins: 12
         anchors.topMargin: 8
         clip: true
         spacing: 2

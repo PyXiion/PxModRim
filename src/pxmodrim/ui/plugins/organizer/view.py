@@ -40,6 +40,7 @@ from pxmodrim.core.organizer import (
     RuleOp,
     RuleSpec,
 )
+from pxmodrim.core.organizer.resolve import preview_rule_matches
 from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
@@ -67,6 +68,7 @@ class OrganizerViewPanel(BaseViewPanel):
     tagCreated = Signal()
     tagUpdated = Signal(int)
     rulesSaved = Signal()
+    rulePreviewReady = Signal(int, "QVariantMap")  # pyright: ignore[reportArgumentType]
 
     def __init__(
         self,
@@ -93,7 +95,7 @@ class OrganizerViewPanel(BaseViewPanel):
 
         self._sidebar = QQuickWidget(qml_engine, content)  # pyright: ignore[reportCallIssue, reportArgumentType]
         self._sidebar.setObjectName("organizerSidebar")
-        self._sidebar.setFixedWidth(220)
+        self._sidebar.setFixedWidth(240)
         self._sidebar.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self._sidebar.setClearColor(QColor(PALETTE["ELEVATE_2"]))
         sidebar_ctx = self._sidebar.rootContext()
@@ -110,12 +112,11 @@ class OrganizerViewPanel(BaseViewPanel):
         main_layout.setSpacing(0)
         toolbar = QWidget(main)
         toolbar.setObjectName("searchBox")
-        toolbar.setFixedHeight(56)
+        toolbar.setFixedHeight(52)
         toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(16, 8, 16, 8)
+        toolbar_layout.setContentsMargins(12, 8, 12, 8)
         self.search_input = QLineEdit(toolbar)
-        self.search_input.setObjectName("searchInput")
-        self.search_input.setPlaceholderText("Search by name, package ID, or author...")
+        self.search_input.setPlaceholderText("Search mods, package ID, author…")
         self.search_input.setClearButtonEnabled(True)
         toolbar_layout.addWidget(self.search_input, 1)
         create = QPushButton("New folder", toolbar)
@@ -123,12 +124,18 @@ class OrganizerViewPanel(BaseViewPanel):
         create.setCursor(Qt.CursorShape.PointingHandCursor)
         create.clicked.connect(self.newFolder)
         toolbar_layout.addWidget(create)
-        self.tags_button = AppButton("Tags", toolbar)
-        self.tags_button.clicked.connect(self.openTags)
-        toolbar_layout.addWidget(self.tags_button)
         self.rules_button = AppButton("Auto-rules", toolbar)
         self.rules_button.clicked.connect(self.openRules)
         toolbar_layout.addWidget(self.rules_button)
+        for label, method in (
+            ("Expand all", "expandAll"),
+            ("Collapse all", "collapseAll"),
+        ):
+            button = AppButton(label, toolbar)
+            button.clicked.connect(
+                lambda _checked=False, name=method: self._tree_command(name)
+            )
+            toolbar_layout.addWidget(button)
         main_layout.addWidget(toolbar)
 
         self._qml = QQuickWidget(qml_engine, main)  # pyright: ignore[reportCallIssue, reportArgumentType]
@@ -139,12 +146,42 @@ class OrganizerViewPanel(BaseViewPanel):
         qml_ctx.setContextProperty("organizerPanel", self)
         qml_ctx.setContextProperty("modTreeModel", self.model)
         self._qml.setSource(QUrl.fromLocalFile(str(_QML_DIR / "ModTree.qml")))
-        main_layout.addWidget(self._qml, 1)
-        hint = QLabel("Load order is not affected", main)
-        hint.setStyleSheet(f"color: {PALETTE['TEXT_DIM']}; padding: 5px 16px;")
+        hint = QWidget(main)
+        hint.setObjectName("organizerHint")
+        hint_layout = QHBoxLayout(hint)
+        hint_layout.setContentsMargins(12, 5, 12, 5)
+        hint_label = QLabel(
+            "Folders and tags are for browsing only. "
+            "Edit load order in Mods; checkboxes enable or disable the same mods.",
+            hint,
+        )
+        hint_label.setWordWrap(True)
+        hint_layout.addWidget(hint_label, 1)
+        dismiss = AppButton("✕", hint)
+        dismiss.clicked.connect(hint.hide)
+        hint_layout.addWidget(dismiss)
         main_layout.addWidget(hint)
+        main_layout.addWidget(self._qml, 1)
+        self._selection_bar = QWidget(main)
+        bar_layout = QHBoxLayout(self._selection_bar)
+        bar_layout.setContentsMargins(12, 6, 12, 6)
+        self._selection_label = QLabel(self._selection_bar)
+        bar_layout.addWidget(self._selection_label)
+        for label, action in (
+            ("Enable", "enable"),
+            ("Disable", "disable"),
+            ("Move to…", "move"),
+            ("Tags…", "tags"),
+            ("Create folder from selection", "create"),
+        ):
+            button = AppButton(label, self._selection_bar)
+            button.clicked.connect(
+                lambda _checked=False, name=action: self.selectionAction(name)
+            )
+            bar_layout.addWidget(button)
+        self._selection_bar.hide()
+        main_layout.addWidget(self._selection_bar)
         row.addWidget(main, 3)
-
         self.mod_info = ModInfoPanel(
             self._ctx, self._qml_engine, ui_prefs=self._ui_prefs
         )
@@ -153,6 +190,10 @@ class OrganizerViewPanel(BaseViewPanel):
         row.addWidget(self.mod_info, 2)
         self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
         self._root.addWidget(content, 1)
+        self._status = QLabel(self)
+        self._status.setObjectName("organizerStatus")
+        self._status.setStyleSheet(f"color: {PALETTE['TEXT_DIM']}; padding: 5px 12px;")
+        self._root.addWidget(self._status)
 
         self._menu = QMenu(self)
         self._menu.setToolTipsVisible(True)
@@ -181,6 +222,9 @@ class OrganizerViewPanel(BaseViewPanel):
         super().showEvent(event)  # type: ignore[arg-type]
         if self._dirty:
             self._rebuild()
+        root = self._qml.rootObject()
+        if root is not None:
+            QMetaObject.invokeMethod(root, "refreshRules")
 
     def _clear_selection_anchor(self) -> None:
         self._selection_anchor = QModelIndex()
@@ -188,6 +232,9 @@ class OrganizerViewPanel(BaseViewPanel):
     def _sync_info(self, force: bool = False) -> None:
         selected = self.model.selected_nodes()
         self.editorChanged.emit()
+        mod_count = sum(node.kind == "mod" for node in selected)
+        self._selection_label.setText(f"{mod_count} selected")
+        self._selection_bar.setVisible(mod_count > 1)
         node = selected[0] if len(selected) == 1 else None
         uuid = node.leaf.uuid if node is not None and node.leaf is not None else None
         if uuid == self._selected_uuid and not force:
@@ -216,11 +263,20 @@ class OrganizerViewPanel(BaseViewPanel):
         self._dirty = False
         self.filters.update(self._service.tree_filters())
         query = self.filters.for_key(self._filter_key).query(self._search_text)
+        tree = self._service.tree(query)
         self.model.set_tree(
-            self._service.tree(query),
+            tree,
             self._ctx.all_mods,
             self._ctx.mod_service.provider_colors,
             not query.is_empty,
+            self._service.state.tags,
+        )
+        full_tree = tree if query.is_empty else self._service.tree()
+        self._status.setText(
+            f"{len(self._ctx.all_mods)} mods    "
+            f"{len(self._ctx.active_uuids)} active    "
+            f"{len(self._service.state.folders) - 1} folders    "
+            f"{len(full_tree.mods)} ungrouped"
         )
         self._sync_info(force=True)
         self.readyChanged.emit()
@@ -236,6 +292,27 @@ class OrganizerViewPanel(BaseViewPanel):
         if key != self._filter_key:
             self._filter_key = key
             self._invalidate()
+
+    @asyncSlot(str)
+    async def selectionAction(self, action: str) -> None:
+        nodes = [node for node in self.model.selected_nodes() if node.leaf is not None]
+        if not nodes:
+            return
+        if action == "tags":
+            self.openTags()
+        elif action in ("move", "create"):
+            pids = self._selected_package_ids()
+            if pids:
+                if action == "move":
+                    await self._move_mods(pids)
+                else:
+                    await self._new_folder_from(pids)
+        elif action in ("enable", "disable"):
+            uuids = [node.leaf.uuid for node in nodes if node.leaf is not None]
+            if action == "enable":
+                await self._enable_many(uuids)
+            else:
+                await self._disable_many(uuids)
 
     def _selected_package_ids(self) -> list[str]:
         return list(
@@ -309,13 +386,43 @@ class OrganizerViewPanel(BaseViewPanel):
             )
         ]
 
+    @Slot("QVariantList", int)
+    def requestRulePreview(
+        self, rows: list[dict[str, str | int]], revision: int
+    ) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._calculate_rule_preview(rows, revision))
+
+    async def _calculate_rule_preview(
+        self, rows: list[dict[str, str | int]], revision: int
+    ) -> None:
+        specs = [
+            RuleSpec(
+                cast(RuleField, row["field"]),
+                cast(RuleOp, row["op"]),
+                str(row["pattern"]),
+                int(row["folder_id"]),
+            )
+            for row in rows
+        ]
+        counts, assignable = await asyncio.to_thread(
+            preview_rule_matches, self._service.state, self._ctx.all_mods, specs
+        )
+        self.rulePreviewReady.emit(
+            revision, {"counts": counts, "assignable": assignable}
+        )
+
     @Property(str, notify=editorChanged)
     def editorError(self) -> str:
         return self._editor_error
 
     def _set_editor_error(self, message: str = "") -> None:
-        self._editor_error = message
-        self.editorChanged.emit()
+        if message != self._editor_error:
+            self._editor_error = message
+            self.editorChanged.emit()
 
     @Slot()
     def openTags(self) -> None:
@@ -422,6 +529,15 @@ class OrganizerViewPanel(BaseViewPanel):
             self.model.select((index,))
         self._selection_anchor = index
         self._sync_info()
+
+    def _tree_command(self, method: str) -> None:
+        root = self._qml.rootObject()
+        if root is not None:
+            QMetaObject.invokeMethod(root, method)
+
+    @asyncSlot(bool)
+    async def persistAllCollapsed(self, collapsed: bool) -> None:
+        await self._service.set_all_collapsed(collapsed)
 
     @asyncSlot(QModelIndex, bool)
     async def persistCollapsed(self, index: QModelIndex, collapsed: bool) -> None:

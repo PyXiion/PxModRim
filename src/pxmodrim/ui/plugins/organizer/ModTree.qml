@@ -8,11 +8,25 @@ Rectangle {
     clip: true
 
     property int anchorRow: -1
+    property int focusedRow: -1
     property int dropRow: -1
     property var dropTarget: null
 
     function openTags() { tagEditor.open() }
     function openRules() { ruleEditor.open() }
+    function refreshRules() { ruleEditor.schedulePreview() }
+
+    function expandAll() {
+        tree.expandRecursively()
+        organizerPanel.persistAllCollapsed(false)
+    }
+
+    function collapseAll() {
+        tree.collapseRecursively()
+        root.anchorRow = -1
+        root.focusedRow = -1
+        organizerPanel.persistAllCollapsed(true)
+    }
 
     function restoreExpansion() {
         var indexes = organizerPanel.expandedIndexes()
@@ -33,6 +47,7 @@ Rectangle {
         } else {
             root.anchorRow = row
         }
+        root.focusedRow = row
         organizerPanel.selectRow(index, modifiers, range)
         tree.forceActiveFocus()
     }
@@ -48,11 +63,25 @@ Rectangle {
         }
     }
 
+    function navigateRow(row, modifiers) {
+        if (row < 0 || row >= tree.rows)
+            return
+        clickRow(tree.index(row, 0), row, modifiers)
+        tree.positionViewAtRow(row, TableView.Contain)
+    }
+
+    function activeRow() {
+        if (root.focusedRow >= 0 && root.focusedRow < tree.rows)
+            return root.focusedRow
+        return -1
+    }
+
     Connections {
         target: modTreeModel
         function onModelReset() {
             root.anchorRow = -1
             Qt.callLater(root.restoreExpansion)
+            root.focusedRow = -1
         }
     }
 
@@ -70,6 +99,33 @@ Rectangle {
         reuseItems: false
         focus: true
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        Keys.onPressed: function(event) {
+            var row = root.activeRow()
+            if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
+                root.navigateRow(row < 0 ? 0 : row + (event.key === Qt.Key_Down ? 1 : -1), event.modifiers)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Right && row >= 0) {
+                if (!tree.isExpanded(row))
+                    root.toggleRow(tree.index(row, 0), row)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Left && row >= 0) {
+                if (tree.isExpanded(row)) {
+                    root.toggleRow(tree.index(row, 0), row)
+                } else {
+                    var depth = tree.depth(row)
+                    for (var parentRow = row - 1; parentRow >= 0; --parentRow) {
+                        if (tree.depth(parentRow) < depth) {
+                            root.navigateRow(parentRow, Qt.NoModifier)
+                            break
+                        }
+                    }
+                }
+                event.accepted = true
+            } else if (event.key === Qt.Key_Space && row >= 0) {
+                organizerPanel.toggleCheck(tree.index(row, 0))
+                event.accepted = true
+            }
+        }
 
         delegate: Rectangle {
             id: item
@@ -81,11 +137,11 @@ Rectangle {
             required property var model
 
             implicitWidth: tree.width
-            implicitHeight: 42
-            radius: Theme.radiusMd
+            implicitHeight: item.model.kind === "mod" ? 30 : 32
+            radius: Theme.radiusSm
             color: root.dropRow === item.row
                 ? Theme.primaryBg
-                : (item.model.selected ? Theme.elevate4
+                : (item.model.selected ? Theme.primaryBg
                 : (rowMouse.containsMouse ? Theme.elevate3 : "transparent"))
             border.width: root.dropRow === item.row ? 1 : 0
             border.color: Theme.primary
@@ -93,21 +149,31 @@ Rectangle {
             Accessible.name: item.model.name || ""
             Accessible.selected: !!item.model.selected
 
+            Repeater {
+                model: item.depth
+                delegate: Rectangle {
+                    required property int index
+                    x: 12 + index * 20
+                    width: 1
+                    height: item.height
+                    color: Theme.border
+                }
+            }
+
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 8 + item.depth * 22
-                anchors.rightMargin: 14
-                spacing: 8
-
+                anchors.leftMargin: 4 + item.depth * 20
+                anchors.rightMargin: 10
+                spacing: 7
                 Item {
                     Layout.preferredWidth: 18
-                    Layout.preferredHeight: 30
+                    Layout.preferredHeight: 28
                     Image {
                         anchors.centerIn: parent
                         visible: item.hasChildren
                         source: "image://icons/chevron?color=" + encodeURIComponent(Theme.textDim)
-                        sourceSize.width: 14
-                        sourceSize.height: 14
+                        sourceSize.width: 13
+                        sourceSize.height: 13
                         rotation: item.expanded ? 90 : 0
                     }
                     MouseArea {
@@ -120,14 +186,15 @@ Rectangle {
 
                 Item {
                     Layout.preferredWidth: 20
-                    Layout.preferredHeight: 32
+                    Layout.preferredHeight: 28
                     Rectangle {
                         anchors.centerIn: parent
                         width: 16
                         height: 16
                         radius: 3
-                        color: item.model.checkState === Qt.Checked ? Theme.primary : "transparent"
-                        border.color: item.model.checkState === Qt.Unchecked ? Theme.border : Theme.primary
+                        color: item.model.checkState === Qt.Checked ? Theme.primary
+                               : item.model.checkState === Qt.PartiallyChecked ? Theme.primaryBg : Theme.elevate3
+                        border.color: item.model.checkState === Qt.Unchecked ? Theme.textDim : Theme.primary
                         border.width: 1.5
                         Text {
                             anchors.centerIn: parent
@@ -150,41 +217,63 @@ Rectangle {
                 }
 
                 Image {
-                    Layout.preferredWidth: 17
-                    Layout.preferredHeight: 17
+                    Layout.preferredWidth: 16
+                    Layout.preferredHeight: 16
                     source: "image://icons/"
                             + (item.model.kind === "mod" ? (item.model.providerIcon || "folder") : "folder")
                             + "?color=" + encodeURIComponent(
-                                item.model.kind === "mod" ? (item.model.providerColor || Theme.textDim) : Theme.textMuted)
-                    sourceSize.width: 17
-                    sourceSize.height: 17
+                                item.model.kind === "mod" ? (item.model.providerColor || Theme.textDim)
+                                : item.model.kind === "ungrouped" ? Theme.textDim : Theme.primary)
+                    sourceSize.width: 16
+                    sourceSize.height: 16
                     fillMode: Image.PreserveAspectFit
                 }
 
                 Text {
                     text: item.model.name || ""
                     Layout.fillWidth: true
-                    color: item.model.kind === "ungrouped" ? Theme.textMuted : Theme.textMain
+                    color: item.model.kind === "ungrouped" || (item.model.kind === "mod" && item.model.checkState !== Qt.Checked)
+                           ? Theme.textMuted : Theme.textMain
                     font.pixelSize: Theme.fontSizeMd
                     font.bold: item.model.kind !== "mod"
+                    font.italic: item.model.kind === "ungrouped"
                     elide: Text.ElideRight
                 }
 
                 Rectangle {
                     visible: !!item.model.hasRule
                     Layout.preferredWidth: ruleText.implicitWidth + 12
-                    Layout.preferredHeight: 19
-                    radius: Theme.radiusSm
-                    color: Theme.primaryBg
+                    Layout.preferredHeight: 18
+                    radius: 9
+                    color: Theme.warningBg
                     Text {
                         id: ruleText
                         anchors.centerIn: parent
-                        text: "rule"
-                        color: Theme.primary
+                        text: "auto"
+                        color: Theme.warning
                         font.pixelSize: Theme.fontSizeXs
                     }
                 }
 
+                Repeater {
+                    model: item.model.kind === "mod" ? (item.model.tags || []) : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        property color chipColor: modelData.color
+                        Layout.preferredWidth: tagLabel.implicitWidth + 14
+                        Layout.preferredHeight: 18
+                        radius: 9
+                        color: Qt.rgba(chipColor.r, chipColor.g, chipColor.b, 0.14)
+                        Text {
+                            id: tagLabel
+                            anchors.centerIn: parent
+                            text: modelData.name
+                            color: modelData.color
+                            font.pixelSize: Theme.fontSizeXs
+                            font.bold: true
+                        }
+                    }
+                }
                 Text {
                     visible: item.model.kind === "mod" && !!item.model.packageId
                     text: item.model.packageId || ""
@@ -326,8 +415,13 @@ Rectangle {
 
     Text {
         anchors.centerIn: parent
+        width: parent.width - 48
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
         visible: organizerPanel && (!organizerPanel.ready || tree.rows === 0)
-        text: organizerPanel && organizerPanel.ready ? "No mods to show" : "Loading organizer..."
+        text: organizerPanel && organizerPanel.ready
+              ? "No mods match this filter"
+              : "Loading organizer..."
         color: Theme.textDim
         font.pixelSize: Theme.fontSizeMd
     }

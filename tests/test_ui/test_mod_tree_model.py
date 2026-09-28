@@ -24,11 +24,13 @@ from pxmodrim.core.models.metadata.structures import (
 from pxmodrim.core.models.view.diagnostics import ModDiagnosticsView
 from pxmodrim.core.organizer import ROOT_ID, OrganizerDb, OrganizerService, TreeFilter
 from pxmodrim.ui.components import create_qml_engine
+from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.plugins.organizer.filter_model import OrganizerFilterModel
 from pxmodrim.ui.plugins.organizer.tree_model import ModTreeModel
 from pxmodrim.ui.plugins.organizer.view import OrganizerViewPanel
 from pxmodrim.ui.theme.qml_theme import Theme
+from pxmodrim.ui.views.mods_view import ModsViewPanel
 
 
 @pytest.fixture(scope="module")
@@ -274,6 +276,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
     parent = QWidget()
     view = OrganizerViewPanel(ctx, engine, parent, AppContext(ctx))
     parent.resize(1400, 850)
+    view.setGeometry(parent.rect())
     parent.show()
     view.show()
     view._rebuild()
@@ -282,8 +285,11 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         assert root is not None
         tags = root.findChild(QObject, "organizerTagEditor")
         assert tags is not None
-        tag_button = view.tags_button
-        QTest.mouseClick(tag_button, Qt.MouseButton.LeftButton)
+        selected = view.model.index_for_key("m:example")
+        assert selected.isValid()
+        view.model.select((selected,))
+        view._sync_info()
+        await view.selectionAction("tags")
         qtbot.waitUntil(lambda: tags.property("visible"))
         name = tags.findChild(QQuickItem, "organizerNewTagName")
         color = tags.findChild(QQuickItem, "organizerNewTagColor")
@@ -313,6 +319,8 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         assert first.isValid() and second.isValid()
         view.model.select((first,))
         view._sync_info()
+        await asyncio.sleep(0.03)
+        QTest.qWait(10)
         repeater = tags.findChild(QQuickItem, "organizerTagRepeater")
         assert repeater is not None
         repeater_parent = repeater.parentItem()
@@ -328,6 +336,8 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
 
         view.model.select((first, second))
         view._sync_info()
+        await asyncio.sleep(0.03)
+        QTest.qWait(10)
         assert assignment.property("checkState") == Qt.CheckState.PartiallyChecked
         _click_quick(view._qml, assignment)
         await asyncio.sleep(0.03)
@@ -439,3 +449,49 @@ def test_organizer_filter_model_sections_icons_and_fallbacks(
     model.update(renamed_entries)
     label = model.data(model.index(4), Qt.ItemDataRole.DisplayRole)
     assert label == "Medieval Overhaul"
+
+
+@pytest.mark.asyncio
+async def test_organizer_sidebar_geometry_matches_mods_after_dismissing_hint(
+    tmp_path: Path, qapp: QApplication
+) -> None:
+    ctx = CoreContext.create(AppConfig(), ConfigService(tmp_path))
+    ctx.load({}, [])
+    service = OrganizerService(ctx, OrganizerDb(tmp_path / "organizer.db"))
+    ctx.register_plugin(service)
+    await service.init(ctx)
+    engine = create_qml_engine()
+    engine.rootContext().setContextProperty("Theme", Theme(engine))
+    parent = QWidget()
+    parent.resize(1300, 780)
+    organizer = OrganizerViewPanel(ctx, engine, parent, AppContext(ctx))
+    mods = ModsViewPanel(ctx, engine, parent, AppContext(ctx))
+    organizer.setGeometry(parent.rect())
+    mods.setGeometry(parent.rect())
+    parent.show()
+    organizer.show()
+    mods.show()
+    try:
+        QTest.qWait(10)
+        assert organizer._sidebar.width() == mods.sidebar.width()
+        assert (
+            organizer._sidebar.rootObject().childItems()[0].width()
+            == mods.sidebar._qml.width()
+        )
+        assert organizer.mod_info.width() == mods.mod_info.width()
+
+        mods.hide()
+        hint = organizer.findChild(QWidget, "organizerHint")
+        assert hint is not None
+        dismiss = hint.findChild(AppButton)
+        assert dismiss is not None
+        width = organizer.mod_info.width()
+        dismiss.click()
+        QTest.qWait(10)
+        assert not hint.isVisible()
+        assert organizer.mod_info.width() == width
+    finally:
+        organizer.close()
+        mods.close()
+        parent.deleteLater()
+        await service.shutdown()

@@ -12,7 +12,7 @@ from PySide6.QtCore import (
     Qt,
 )
 
-from pxmodrim.core.organizer import ROOT_ID, FolderNode, ModLeaf
+from pxmodrim.core.organizer import ROOT_ID, FolderNode, ModLeaf, Tag
 from pxmodrim.ui.theme.palette import PALETTE
 
 if TYPE_CHECKING:
@@ -160,6 +160,7 @@ class ModTreeModel(QAbstractItemModel):
     SelectedRole = Qt.ItemDataRole.UserRole + 16
     HasWarningRole = Qt.ItemDataRole.UserRole + 17
     WarningTooltipRole = Qt.ItemDataRole.UserRole + 18
+    TagsRole = Qt.ItemDataRole.UserRole + 19
 
     _SELECTION_ROLES = (SelectedRole,)
     _ERROR_ROLES = (HasErrorRole, ErrorTooltipRole, HasWarningRole, WarningTooltipRole)
@@ -174,6 +175,7 @@ class ModTreeModel(QAbstractItemModel):
         self._root = TreeNode("root", "", None)
         self._filtering = False
         self._provider_colors: Mapping[str, str] = {}
+        self._tag_rows: dict[str, list[dict[str, str]]] = {}
         self._selected: set[str] = set()
 
     def _node(self, index: AnyIndex | None) -> TreeNode:
@@ -263,6 +265,8 @@ class ModTreeModel(QAbstractItemModel):
             return self._provider_colors.get(node.provider_id, PALETTE["TEXT_DIM"])
         if role == self.CanPlaceRole:
             return leaf.package_id is not None
+        if role == self.TagsRole:
+            return self._tag_rows.get(leaf.package_id or "", [])
         if role in self._ERROR_ROLES:
             summary = self._summary_for(leaf.uuid) if leaf.enabled else None
             if role == self.HasErrorRole:
@@ -295,6 +299,7 @@ class ModTreeModel(QAbstractItemModel):
             self.WarningTooltipRole: QByteArray(b"warningTooltip"),
             self.CanPlaceRole: QByteArray(b"canPlace"),
             self.SelectedRole: QByteArray(b"selected"),
+            self.TagsRole: QByteArray(b"tags"),
         }
 
     @property
@@ -307,6 +312,7 @@ class ModTreeModel(QAbstractItemModel):
         mods: Mapping[str, ListedMod],
         provider_colors: Mapping[str, str],
         filtering: bool,
+        tags: Mapping[int, Tag] | None = None,
     ) -> None:
         """Swap in a freshly built tree.
 
@@ -315,6 +321,16 @@ class ModTreeModel(QAbstractItemModel):
         """
         fresh = _build(root, mods, filtering)
         self._provider_colors = provider_colors
+        tag_map = tags if tags is not None else {}
+        self._tag_rows = {
+            leaf.package_id: [
+                {"name": tag_map[tag_id].name, "color": tag_map[tag_id].color}
+                for tag_id in sorted(leaf.tag_ids)
+                if tag_id in tag_map
+            ]
+            for leaf in root.all_mods()
+            if leaf.package_id and leaf.tag_ids
+        }
         if self._filtering == filtering and _same_shape(self._root, fresh):
             _copy_payload(self._root, fresh)
             self._emit_all_changed(self._root)

@@ -37,8 +37,8 @@ async def _until(condition: Callable[[], bool], timeout: float = 3.0) -> None:
     deadline = loop.time() + timeout
     while not condition():
         assert loop.time() < deadline, "condition not met before timeout"
-        QCoreApplication.processEvents()
-        await asyncio.sleep(0.01)
+        QTest.qWait(10)
+        await asyncio.sleep(0)
 
 
 def _click(widget: QWidget, item: QQuickItem) -> None:
@@ -100,6 +100,13 @@ def _patterns(dialog: QObject) -> list[str]:
     ]
 
 
+def _hits(dialog: QObject, index: int) -> str:
+    rows = _rows(dialog)
+    if len(rows) <= index:
+        return ""
+    return str(_control(rows[index], "organizerRuleHits").property("text"))
+
+
 @pytest.mark.asyncio
 async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
     tmp_path: Path, qapp: QApplication
@@ -126,7 +133,9 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
     engine.rootContext().setContextProperty("Theme", Theme(engine))
     parent = QWidget()
     view = OrganizerViewPanel(ctx, engine, parent, AppContext(ctx))
-    view.resize(920, 700)
+    parent.resize(920, 700)
+    view.setGeometry(parent.rect())
+    view.show()
     parent.show()
     # Earlier tests may leave another top-level active; key input needs ours.
     parent.activateWindow()
@@ -160,6 +169,10 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         _click(qml, add)
         (row,) = await _laid_out_rows(dialog, 1)
         _type(qml, _control(row, "organizerRulePattern"), "example")
+        assignable = dialog.findChild(QQuickItem, "organizerRuleAssignable")
+        assert assignable is not None
+        await _until(lambda: "1 mod matches first here" in _hits(dialog, 0))
+        assert "1 currently ungrouped mod would" in str(assignable.property("text"))
         await save_and_close()
 
         persisted = await db.load()
@@ -173,6 +186,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         _click(qml, add)
         _, new_row = await _laid_out_rows(dialog, 2)
         _type(qml, _control(new_row, "organizerRulePattern"), "example.mod")
+        new_row = (await _laid_out_rows(dialog, 2))[1]
         operator_box = _control(new_row, "organizerRuleOperator")
         _click(qml, operator_box)
         await _until(lambda: bool(operator_box.property("down")))
@@ -180,6 +194,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         QTest.keyClick(qml, Qt.Key.Key_Down)
         QTest.keyClick(qml, Qt.Key.Key_Return)
         await _until(lambda: operator_box.property("currentValue") == "equals")
+        new_row = (await _laid_out_rows(dialog, 2))[1]
         folder_box = _control(new_row, "organizerRuleFolder")
         _click(qml, folder_box)
         await _until(lambda: bool(folder_box.property("down")))
@@ -189,6 +204,7 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
 
         _click(qml, _control(new_row, "organizerRuleUp"))
         await _until(lambda: _patterns(dialog) == ["example.mod", "example"])
+        await _until(lambda: "1 mod matches first here" in _hits(dialog, 0))
         await _laid_out_rows(dialog, 2)
         await save_and_close()
 
@@ -242,7 +258,9 @@ async def test_rule_editor_adds_standard_rules_only_from_clean_draft(
     engine.rootContext().setContextProperty("Theme", Theme(engine))
     parent = QWidget()
     view = OrganizerViewPanel(ctx, engine, parent, AppContext(ctx))
-    view.resize(920, 700)
+    parent.resize(920, 700)
+    view.setGeometry(parent.rect())
+    view.show()
     parent.show()
     parent.activateWindow()
     assert QTest.qWaitForWindowActive(parent)
@@ -262,7 +280,7 @@ async def test_rule_editor_adds_standard_rules_only_from_clean_draft(
 
         _click(qml, standard)
         rows = await _laid_out_rows(dialog, len(STANDARD_RULES))
-        assert len(rows) == 13
+        assert len(rows) == len(STANDARD_RULES)
         assert _patterns(dialog) == [rule.pattern for rule in STANDARD_RULES]
         assert dialog.property("visible")
         assert dialog.property("errorMessage") == ""

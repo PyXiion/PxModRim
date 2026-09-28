@@ -5,10 +5,15 @@ All notable changes to PxModRim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- Organizer is the first view; its left navigation and right mod-info sidebar match Mods in width. Its search, folder actions, selection controls, and tree layout follow the #37 mockup while retaining the existing mod-info sidebar.
+- Auto-folder rules show first-match and newly assignable mod counts without blocking the editor; folder expansion controls persist their state.
+- Standard auto-folder rules come from popular Workshop collections: exact About.xml package ids for libraries, performance and quality-of-life mods, family prefixes for Vanilla Expanded (including Races/Quests/Storytellers), Alpha, Combat Extended and Dubs. Loose `framework`/`performance` name matching is removed to avoid false positives.
+
 
 ## [0.1.0] - 2026-09-28
 ### Added
-- Mod organizer (#37): SQLite-backed folder hierarchy, tags, placement rules, and tree resolver; QML TreeView with nested folders, search, source/status/tag filters, bulk toggles, folder actions, organizational drag-and-drop that leaves load order unchanged, the shared mod-info sidebar, and QML editors for tags and ordered auto-folder rules built on shared themed QML controls (`ui/components/controls`); an on-demand set of standard rules (Official, Frameworks & Libraries, Vanilla Expanded, Combat Extended, Alpha Mods, Performance)
+- Mod organizer (#37): SQLite-backed folder hierarchy, tags, placement rules, and tree resolver; QML TreeView with nested folders, search, source/status/tag filters, bulk toggles, folder actions, organizational drag-and-drop that leaves load order unchanged, the shared mod-info sidebar, and QML editors for tags and ordered auto-folder rules built on shared themed QML controls (`ui/components/controls`); an on-demand set of standard rules (Official, Frameworks & Libraries, Performance, Quality of Life, Vanilla Expanded, Alpha Mods, Combat Extended, Dubs Mods)
 - Extended keyboard shortcuts (#35): search, mod toggling, fullscreen, view navigation, full metadata rescan, and a Help menu shortcut reference
 - Mod list snapshots and rollback (#24): automatic timestamped backups of `ModsConfig.xml` before save and on launch, configurable retention, and a restore snapshot dialog in the File menu
 - Persistent mod metadata cache (#29): SQLite-backed cache keyed by mod path and mtime to avoid re-parsing `About.xml` across launches, with automatic invalidation and corruption recovery

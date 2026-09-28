@@ -6,8 +6,8 @@ import "../../components/controls"
 PxDialog {
     id: root
     objectName: "organizerRuleEditor"
-    width: Math.min(540, parent ? parent.width - 24 : 380)
-    height: Math.min(540, parent ? parent.height - 24 : 480)
+    width: Math.min(900, parent ? parent.width - 24 : 760)
+    height: Math.min(660, parent ? parent.height - 24 : 540)
     title: "Auto-Folder Rules"
 
     property var ruleRows: []
@@ -30,7 +30,28 @@ PxDialog {
     ]
 
     readonly property bool hasFolders: ruleFolders.length > 0
+    property var preview: ({ counts: [], assignable: 0 })
+    property int previewRevision: 0
+    property bool previewPending: false
 
+    function schedulePreview() {
+        if (!visible || loadingDraft || !organizerPanel || !organizerPanel.visible || !organizerPanel.ready)
+            return
+        previewRevision++
+        previewPending = true
+        previewTimer.restart()
+    }
+
+    Timer {
+        id: previewTimer
+        interval: 100
+        onTriggered: {
+            if (root.visible && organizerPanel && organizerPanel.visible && organizerPanel.ready)
+                organizerPanel.requestRulePreview(root.draftRules(), root.previewRevision)
+        }
+    }
+
+    property bool loadingDraft: false
     property int draftRevision: 0
     property var loadedRows: []
     readonly property bool draftDirty: {
@@ -77,14 +98,15 @@ PxDialog {
 
     ListModel {
         id: draftModel
-        onDataChanged: root.draftRevision++
-        onRowsInserted: root.draftRevision++
-        onRowsRemoved: root.draftRevision++
-        onRowsMoved: root.draftRevision++
-        onModelReset: root.draftRevision++
+        onDataChanged: { if (!root.loadingDraft) root.draftRevision++ }
+        onRowsInserted: { if (!root.loadingDraft) root.draftRevision++ }
+        onRowsRemoved: { if (!root.loadingDraft) root.draftRevision++ }
+        onRowsMoved: { if (!root.loadingDraft) root.draftRevision++ }
+        onModelReset: { if (!root.loadingDraft) root.draftRevision++ }
     }
 
     function loadDraft() {
+        loadingDraft = true
         draftModel.clear()
         for (var i = 0; i < ruleRows.length; ++i) {
             var r = ruleRows[i]
@@ -96,12 +118,18 @@ PxDialog {
             })
         }
         loadedRows = ruleRows
+        loadingDraft = false
+        draftRevision++
     }
 
     onRuleRowsChanged: {
-        if (visible && draftMatches(loadedRows) && !draftMatches(ruleRows))
+        if (!visible && !draftMatches(ruleRows))
             loadDraft()
+        else if (visible && draftMatches(loadedRows) && !draftMatches(ruleRows))
+            loadDraft()
+        schedulePreview()
     }
+    onDraftRevisionChanged: schedulePreview()
 
     function addRule() {
         if (!hasFolders)
@@ -129,7 +157,7 @@ PxDialog {
             draftModel.move(index, index + 1, 1)
     }
 
-    function submitRules() {
+    function draftRules() {
         var rules = []
         for (var i = 0; i < draftModel.count; ++i) {
             var row = draftModel.get(i)
@@ -140,23 +168,38 @@ PxDialog {
                 folder_id: parseInt(row.folder_id, 10)
             })
         }
-        root.saveRequested(rules)
+        return rules
     }
 
-    function cancelDraft() {
-        loadDraft()
-        root.close()
+    function submitRules() {
+        root.saveRequested(draftRules())
     }
+
 
     Connections {
         target: organizerPanel
         function onRulesSaved() {
             root.close()
         }
+        function onRulePreviewReady(revision, result) {
+            if (root.visible && revision === root.previewRevision) {
+                root.preview = result
+                root.previewPending = false
+            }
+        }
     }
 
-    onAboutToShow: loadDraft()
-    onRejected: cancelDraft()
+    onAboutToShow: {
+        if (!draftMatches(ruleRows))
+            loadDraft()
+    }
+    onOpened: schedulePreview()
+    onClosed: {
+        previewTimer.stop()
+        previewRevision++
+        previewPending = false
+    }
+    onRejected: root.close()
 
     contentItem: ColumnLayout {
         anchors.margins: 12
@@ -164,7 +207,7 @@ PxDialog {
 
         Text {
             Layout.fillWidth: true
-            text: "Rules match mods to folders in order from top to bottom."
+            text: "Evaluated top to bottom: first match wins. Rules choose folders only for mods without a manual placement. Moving a mod manually always takes priority; saving updates rule-based folders immediately."
             color: Theme.textMuted
             font.pixelSize: Theme.fontSizeSm
             wrapMode: Text.WordWrap
@@ -198,9 +241,7 @@ PxDialog {
                 font.pixelSize: Theme.fontSizeSm
             }
 
-            Item {
-                Layout.fillWidth: true
-            }
+            Item { Layout.fillWidth: true }
 
             Text {
                 text: draftModel.count === 1 ? "1 rule" : draftModel.count + " rules"
@@ -260,7 +301,7 @@ PxDialog {
                         required property int folder_id
 
                         Layout.fillWidth: true
-                        implicitHeight: rowCol.implicitHeight + 14
+                        implicitHeight: rowCol.implicitHeight + 12
                         color: Theme.elevate1
                         border.color: Theme.border
                         border.width: 1
@@ -270,16 +311,23 @@ PxDialog {
                             id: rowCol
                             anchors.fill: parent
                             anchors.margins: 6
-                            spacing: 4
+                            spacing: 3
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 4
+                                spacing: 5
+
+                                Text {
+                                    text: String(rowItem.index + 1)
+                                    color: Theme.textDim
+                                    font.pixelSize: Theme.fontSizeSm
+                                    Layout.preferredWidth: 16
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
 
                                 PxComboBox {
                                     objectName: "organizerRuleField"
-                                    Layout.fillWidth: true
-                                    Layout.minimumWidth: 70
+                                    Layout.preferredWidth: 76
                                     model: root.fieldOptions
                                     textRole: "text"
                                     valueRole: "value"
@@ -289,8 +337,7 @@ PxDialog {
 
                                 PxComboBox {
                                     objectName: "organizerRuleOperator"
-                                    Layout.fillWidth: true
-                                    Layout.minimumWidth: 65
+                                    Layout.preferredWidth: 72
                                     model: root.opOptions
                                     textRole: "text"
                                     valueRole: "value"
@@ -298,28 +345,35 @@ PxDialog {
                                     onActivated: draftModel.setProperty(rowItem.index, "op", currentValue)
                                 }
 
+                                PxTextField {
+                                    objectName: "organizerRulePattern"
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 60
+                                    text: rowItem.pattern
+                                    placeholderText: "Pattern..."
+                                    onTextEdited: draftModel.setProperty(rowItem.index, "pattern", text)
+                                }
+
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.leftMargin: 24
+                                spacing: 5
+                                Text {
+                                    text: "→"
+                                    color: Theme.textMuted
+                                }
+
                                 PxComboBox {
                                     objectName: "organizerRuleFolder"
-                                    Layout.fillWidth: true
-                                    Layout.minimumWidth: 80
+                                    Layout.preferredWidth: 120
+                                    Layout.minimumWidth: 90
                                     model: root.ruleFolders
                                     textRole: "name"
                                     valueRole: "id"
                                     currentIndex: root.findFolderIndex(rowItem.folder_id)
                                     onActivated: draftModel.setProperty(rowItem.index, "folder_id", currentValue)
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-
-                                PxTextField {
-                                    objectName: "organizerRulePattern"
-                                    Layout.fillWidth: true
-                                    text: rowItem.pattern
-                                    placeholderText: "Pattern..."
-                                    onTextEdited: draftModel.setProperty(rowItem.index, "pattern", text)
                                 }
 
                                 PxButton {
@@ -327,8 +381,8 @@ PxDialog {
                                     variant: "ghost"
                                     iconName: "chevron-down"
                                     iconRotation: 180
-                                    Layout.preferredWidth: 32
-                                    Layout.preferredHeight: 32
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 30
                                     ToolTip.text: "Move rule up"
                                     enabled: rowItem.index > 0
                                     onClicked: root.moveUp(rowItem.index)
@@ -338,8 +392,8 @@ PxDialog {
                                     objectName: "organizerRuleDown"
                                     variant: "ghost"
                                     iconName: "chevron-down"
-                                    Layout.preferredWidth: 32
-                                    Layout.preferredHeight: 32
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 30
                                     ToolTip.text: "Move rule down"
                                     enabled: rowItem.index < draftModel.count - 1
                                     onClicked: root.moveDown(rowItem.index)
@@ -349,11 +403,24 @@ PxDialog {
                                     objectName: "organizerRuleRemove"
                                     variant: "danger"
                                     iconName: "trash"
-                                    Layout.preferredWidth: 32
-                                    Layout.preferredHeight: 32
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 30
                                     ToolTip.text: "Remove rule"
                                     onClicked: root.removeRule(rowItem.index)
                                 }
+                            }
+
+                            Text {
+                                objectName: "organizerRuleHits"
+                                Layout.leftMargin: 24
+                                text: {
+                                    if (root.previewPending)
+                                        return "Updating matches…"
+                                    var hits = root.preview.counts[rowItem.index] || 0
+                                    return hits + (hits === 1 ? " mod matches first here" : " mods match first here")
+                                }
+                                color: Theme.textDim
+                                font.pixelSize: Theme.fontSizeSm
                             }
                         }
                     }
@@ -361,6 +428,16 @@ PxDialog {
             }
         }
 
+        Text {
+            objectName: "organizerRuleAssignable"
+            Layout.fillWidth: true
+            text: root.previewPending ? "Updating matches…" :
+                root.preview.assignable + " currently ungrouped "
+                + (root.preview.assignable === 1 ? "mod would" : "mods would")
+                + " be assigned by these rules"
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSizeSm
+        }
         Text {
             Layout.alignment: Qt.AlignHCenter
             visible: draftModel.count === 0
