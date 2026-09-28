@@ -40,7 +40,7 @@ QMenuBar {
     border-bottom: 1px solid $BORDER;
     padding: 2px 4px;
     color: $TEXT_MUTED;
-    font-size: 12px;
+    font-size: 13px;
 }
 QMenuBar::item {
     padding: 4px 10px;
@@ -78,7 +78,7 @@ QPushButton {
     border: 1px solid $BORDER;
     border-radius: 6px;
     color: $TEXT_MAIN;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
 }
 QPushButton#appBtn,
@@ -114,18 +114,6 @@ QDialogButtonBox QPushButton {
     min-height: 18px;
     min-width: 64px;
 }
-QMessageBox QPushButton:default,
-QDialogButtonBox QPushButton:default {
-    background-color: $PRIMARY;
-    border-color: $PRIMARY;
-    color: $ELEVATE_0;
-    font-weight: 600;
-}
-QMessageBox QPushButton:default:hover,
-QDialogButtonBox QPushButton:default:hover {
-    background-color: $PRIMARY_HOVER;
-    border-color: $PRIMARY_HOVER;
-}
 
 /* ── Line Edit ── */
 QLineEdit {
@@ -134,7 +122,7 @@ QLineEdit {
     border-radius: 6px;
     color: $TEXT_MAIN;
     padding: 7px 10px;
-    font-size: 12px;
+    font-size: 13px;
     selection-background-color: $PRIMARY;
 }
 QLineEdit:focus {
@@ -152,7 +140,7 @@ QComboBox {
     border-radius: 6px;
     color: $TEXT_MAIN;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 13px;
     min-width: 80px;
 }
 QComboBox:hover {
@@ -182,6 +170,74 @@ QComboBox QAbstractItemView {
     color: $TEXT_MAIN;
     outline: none;
     padding: 4px;
+}
+
+/* ── Item Views ── */
+QTableWidget,
+QTableView,
+QListWidget,
+QListView,
+QTreeWidget,
+QTreeView {
+    background-color: $ELEVATE_0;
+    alternate-background-color: $ELEVATE_1;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    gridline-color: $BORDER;
+    selection-background-color: $PRIMARY;
+    selection-color: $ELEVATE_0;
+    outline: none;
+}
+QTableWidget::item,
+QTableView::item {
+    padding: 4px 8px;
+}
+QListWidget::item:disabled,
+QListView::item:disabled,
+QTreeWidget::item:disabled,
+QTreeView::item:disabled {
+    color: $TEXT_DIM;
+}
+QListWidget::item,
+QListView::item,
+QTreeWidget::item,
+QTreeView::item {
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+QListWidget::item:hover,
+QListView::item:hover,
+QTreeWidget::item:hover,
+QTreeView::item:hover {
+    background-color: $ELEVATE_3;
+}
+QTableWidget::item:selected,
+QTableView::item:selected,
+QListWidget::item:selected,
+QListView::item:selected,
+QTreeWidget::item:selected,
+QTreeView::item:selected {
+    background-color: $PRIMARY;
+    color: $ELEVATE_0;
+}
+QHeaderView {
+    background-color: $ELEVATE_2;
+}
+QHeaderView::section {
+    background-color: $ELEVATE_2;
+    color: $TEXT_DIM;
+    border: none;
+    border-bottom: 1px solid $BORDER;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+QTableCornerButton::section {
+    background-color: $ELEVATE_2;
+    border: none;
 }
 
 /* ── Scroll Area ── */
@@ -234,6 +290,16 @@ QScrollBar::sub-line:horizontal {
 QScrollBar::add-page:horizontal,
 QScrollBar::sub-page:horizontal {
     background: none;
+}
+
+/* ── Dialog / Organizer labels ── */
+QLabel#dialogTitle {
+    font-size: 15px;
+    font-weight: 600;
+}
+QLabel#organizerStatus {
+    color: $TEXT_DIM;
+    padding: 5px 12px;
 }
 
 /* ── Info Panel ── */
@@ -378,7 +444,7 @@ QGroupBox::title {
 /* ── Check Box ── */
 QCheckBox {
     color: $TEXT_MAIN;
-    font-size: 12px;
+    font-size: 13px;
     spacing: 8px;
 }
 QCheckBox::indicator {
@@ -386,7 +452,10 @@ QCheckBox::indicator {
     height: 16px;
     border: 1.5px solid $BORDER;
     border-radius: 3px;
-    background: $ELEVATE_3;
+    background: transparent;
+}
+QCheckBox::indicator:hover {
+    border-color: $TEXT_DIM;
 }
 QCheckBox::indicator:checked {
     background: $PRIMARY;
@@ -487,6 +556,18 @@ QProgressBar {
 QProgressBar::chunk {
     background: $PRIMARY;
     border-radius: 3px;
+}
+QProgressBar#thinProgress {
+    border: none;
+    border-radius: 2px;
+    background: $ELEVATE_3;
+    height: 4px;
+    max-height: 4px;
+    min-height: 4px;
+    text-align: left;
+}
+QProgressBar#thinProgress::chunk {
+    border-radius: 2px;
 }
 
 /* ── About Dialog ── */

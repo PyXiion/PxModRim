@@ -5,6 +5,20 @@ from string import Template
 
 from PySide6.QtGui import QColor
 
+
+def _tint(r: int, g: int, b: int, alpha: float) -> tuple[str, str]:
+    """(QSS rgba() string, QML #AARRGGBB string) for one translucent color."""
+    qml = f"#{round(alpha * 255):02x}{r:02x}{g:02x}{b:02x}"
+    return f"rgba({r},{g},{b},{alpha})", qml
+
+
+_PRIMARY_BG = _tint(102, 192, 244, 0.1)
+_SUCCESS_BG = _tint(59, 165, 93, 0.15)
+_WARNING_BG = _tint(249, 168, 37, 0.15)
+_DANGER_BG = _tint(237, 66, 69, 0.15)
+
+# *_BG entries are rgba() for QSS only; QML rejects rgba() strings (renders opaque
+# black), so QML consumers must use the *_BG_QML entries.
 PALETTE: dict[str, str] = {
     "ELEVATE_0": "#0b0d10",
     "ELEVATE_1": "#121418",
@@ -16,38 +30,29 @@ PALETTE: dict[str, str] = {
     "TEXT_MAIN": "#f2f3f5",
     "TEXT_MUTED": "#949ba4",
     "TEXT_DIM": "#6c737f",
+    "TEXT_ON_ACCENT": "#0b0d10",
+    "NEUTRAL": "#6b7280",
     "PRIMARY": "#66c0f4",
     "PRIMARY_HOVER": "#4aa8d8",
-    "PRIMARY_BG": "rgba(102,192,244,0.1)",
+    "PRIMARY_BG": _PRIMARY_BG[0],
+    "PRIMARY_BG_QML": _PRIMARY_BG[1],
     "SUCCESS": "#3ba55d",
-    "SUCCESS_BG": "rgba(59,165,93,0.15)",
+    "SUCCESS_HOVER": "#2f8a4c",
+    "SUCCESS_BG": _SUCCESS_BG[0],
+    "SUCCESS_BG_QML": _SUCCESS_BG[1],
     "WARNING": "#f9a825",
-    "WARNING_BG": "rgba(249,168,37,0.15)",
+    "WARNING_BG": _WARNING_BG[0],
+    "WARNING_BG_QML": _WARNING_BG[1],
     "DANGER": "#ed4245",
-    "DANGER_BG": "rgba(237,66,69,0.15)",
-    "ELEVATE_0_RGB": "11,13,16",
-    "ELEVATE_2_RGB": "26,29,33",
+    "DANGER_HOVER": "#d1383b",
+    "DANGER_BG": _DANGER_BG[0],
+    "DANGER_BG_QML": _DANGER_BG[1],
 }
 
 # QColor variants for QPainter delegates
-MAIN_BG_Q = QColor(11, 13, 16)
-PANEL_BG_Q = QColor(26, 29, 33)
-ITEM_HOVER_Q = QColor(34, 38, 43)
-ITEM_ACTIVE_Q = QColor(44, 48, 54)
-BORDER_Q = QColor(47, 51, 58)
-TEXT_MAIN_Q = QColor(242, 243, 245)
-TEXT_MUTED_Q = QColor(148, 155, 164)
-TEXT_DIM_Q = QColor(108, 115, 127)
-PRIMARY_Q = QColor(102, 192, 244)
-SUCCESS_Q = QColor(59, 165, 93)
-WARNING_Q = QColor(249, 168, 37)
-DANGER_Q = QColor(237, 66, 69)
-TAG_BG_Q = QColor(34, 38, 43)
-DESC_TEXT_Q = QColor(148, 155, 164)
-DEP_BG_Q = QColor(34, 38, 43)
-CHECKBOX_BORDER_Q = QColor(47, 51, 58)
-CHECKBOX_FILL_Q = QColor(34, 38, 43)
-CHECKBOX_CHECK_Q = QColor(102, 192, 244)
+PANEL_BG_Q = QColor(PALETTE["ELEVATE_2"])
+TEXT_MAIN_Q = QColor(PALETTE["TEXT_MAIN"])
+TEXT_MUTED_Q = QColor(PALETTE["TEXT_MUTED"])
 
 
 def get_stylesheet() -> str:

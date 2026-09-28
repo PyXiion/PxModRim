@@ -19,14 +19,14 @@ TextField {
     placeholderTextColor: Theme.textDim
     selectionColor: Theme.primary
     selectedTextColor: Theme.elevate0
-    font.family: monospace ? "monospace" : Theme.fontFamily
+    font.family: monospace ? Theme.fontMono : Theme.fontFamily
     font.pixelSize: Theme.fontSizeMd
 
     background: Rectangle {
         implicitWidth: 120
         implicitHeight: 32
         radius: Theme.radiusMd
-        opacity: control.enabled ? 1 : 0.45
+        opacity: control.enabled ? 1 : Theme.disabledOpacity
         color: control.readOnly ? "transparent" : Theme.elevate0
         border.width: 1
         border.color: control.invalid ? Theme.danger

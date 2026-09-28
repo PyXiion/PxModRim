@@ -14,7 +14,7 @@ Dialog {
     font.family: Theme.fontFamily
     font.pixelSize: Theme.fontSizeMd
 
-    Overlay.modal: Rectangle { color: Qt.rgba(0, 0, 0, 0.55) }
+    Overlay.modal: Rectangle { color: Theme.overlay }
 
     background: Rectangle {
         color: Theme.elevate2
