@@ -63,13 +63,13 @@ async def test_legacy_app_config_migrates_with_backup(
             community_rules_file="/legacy/rules",
             no_version_warning_file="/legacy/no-warning",
             use_this_instead_file="/legacy/use-instead",
-            steamcmd_prefix="/legacy/steamcmd",
         )
     )
     service.save("config.json", expected)
     path = tmp_path / "config.json"
     legacy = json.loads(path.read_text())
     legacy.pop("schema_version")
+    legacy["paths"]["steamcmd_prefix"] = "/legacy/steamcmd"
     path.write_text(json.dumps(legacy), encoding="utf-8")
     before = path.read_bytes()
     monkeypatch.setattr(config_module, "time", lambda: 1_700_000_000)
@@ -90,12 +90,12 @@ async def test_legacy_ui_prefs_migrates_with_backup(
         deps_expanded=False,
         desc_expanded=True,
         launch_strategy=LaunchStrategy.STEAM,
-        validate_downloads=True,
     )
     service.save("ui_prefs.json", expected)
     path = tmp_path / "ui_prefs.json"
     legacy = json.loads(path.read_text())
     legacy.pop("schema_version")
+    legacy["validate_downloads"] = True
     path.write_text(json.dumps(legacy), encoding="utf-8")
     before = path.read_bytes()
     monkeypatch.setattr(config_module, "time", lambda: 1_700_000_000)
@@ -128,7 +128,7 @@ def test_managed_saves_stamp_schema_version_and_round_trips_values(
 ) -> None:
     service = ConfigService(tmp_path)
     expected_config = AppConfig(paths=PathConfig(game="/game", local="/mods"))
-    expected_prefs = UIPrefs(desc_expanded=True, validate_downloads=True)
+    expected_prefs = UIPrefs(desc_expanded=True, launch_strategy=LaunchStrategy.STEAM)
     service.save("config.json", expected_config)
     service.save("ui_prefs.json", expected_prefs)
 

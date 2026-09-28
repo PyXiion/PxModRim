@@ -10,6 +10,7 @@ dependencies = [
     "lxml>=6.1.1",
     "msgspec>=0.21.1",
     "pyside6>=6.11.1",
+    "pxsteamdl>=0.1.0",
     "qasync>=0.28.0",
     "toposort>=1.10",
     "ttimer>=0.0.2",
@@ -37,6 +38,9 @@ environments = [
     "sys_platform == 'win32'",
     "sys_platform == 'darwin'",
 ]
+
+[tool.uv.sources]
+pxsteamdl = { git = "https://github.com/PyXiion/PxSteamDL" }
 
 [tool.ruff]
 line-length = 88

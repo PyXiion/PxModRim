@@ -43,4 +43,3 @@ Full agent guide lives in [`AGENTS.md`](./AGENTS.md) — read it too, it has mor
 
 - `core/loading.py`'s `LoadingState` QObject is planned to move to `ui/progress.py`; three files still import from `core/loading`.
 - `core/models/view/` holds view models that may move to `ui/`.
-- Config UI has an `if` branch for the SteamCMD plugin, planned to become a real plugin.

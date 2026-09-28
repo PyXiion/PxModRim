@@ -47,7 +47,7 @@ _ENTRY_TYPES: dict[str, tuple[str, str, str, str]] = {
 
 _PROVIDER_ICON_COLORS: dict[str, str] = {
     "steam": PALETTE["SUCCESS"],
-    "steam_cmd": PALETTE["SUCCESS"],
+    "downloaded": PALETTE["SUCCESS"],
     "local": PALETTE["WARNING"],
 }
 
@@ -59,7 +59,7 @@ _SECTION_MAP: dict[int, str] = {
 # Provider icon overrides
 _PROVIDER_ICONS: dict[str, str] = {
     "steam": "steam",
-    "steam_cmd": "steam",
+    "downloaded": "steam",
     "local": "folder",
     "core": "grid",
     "git": "git",

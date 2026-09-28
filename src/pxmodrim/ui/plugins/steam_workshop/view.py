@@ -26,7 +26,7 @@ if TYPE_CHECKING:
         ItemStatus,
         ProgressInfo,
         SidebarSync,
-        SteamCmdUiPlugin,
+        SteamWorkshopUiPlugin,
     )
 
 _WORKSHOP_URL = "https://steamcommunity.com/workshop/browse/?appid=294100"
@@ -59,7 +59,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
     ) -> None:
         super().__init__(ctx, qml_engine, parent, app_ctx=app_ctx)
 
-        self._plugin: SteamCmdUiPlugin | None = None
+        self._plugin: SteamWorkshopUiPlugin | None = None
         self._initialized = False
 
         content = QWidget()
@@ -101,7 +101,7 @@ class SteamWorkshopViewPanel(BaseViewPanel):
         self._initialized = True
 
         self._plugin = cast(
-            "SteamCmdUiPlugin | None",
+            "SteamWorkshopUiPlugin | None",
             self._app_ctx.plugins.get("steamworkshop") if self._app_ctx else None,
         )
         if self._plugin is not None:
@@ -183,18 +183,20 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
     def _on_progress_updated(self, info: ProgressInfo) -> None:
         self._download_sidebar.set_progress(
-            info.total, info.completed, info.downloading_id
+            info.total, info.completed, info.bytes_done, info.bytes_total
         )
 
     def _on_item_status_changed(self, status: ItemStatus) -> None:
-        self._download_sidebar.update_status(status.mod_id, status.status)
+        self._download_sidebar.update_status(
+            status.mod_id, status.status, status.bytes_done, status.bytes_total
+        )
 
     # ── Sidebar signal handler ───────────────────────────
 
     @asyncSlot()
     async def _on_download_requested(self) -> None:
         if self._plugin is not None:
-            await self._plugin.request_download(self, self._ui_prefs.validate_downloads)
+            await self._plugin.request_download()
 
     # ── Lifecycle ────────────────────────────────────────
 

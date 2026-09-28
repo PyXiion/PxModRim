@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 PROVIDER_LABELS: dict[str, str] = {
     "local": "Local",
     "steam": "Steam Workshop",
-    "steam_cmd": "Steam Workshop",
+    "downloaded": "Steam Workshop",
     "core": "System / Core",
 }
 

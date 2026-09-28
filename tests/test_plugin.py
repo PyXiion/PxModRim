@@ -104,8 +104,8 @@ class TestParseDisabledPlugins:
             assert _parse_disabled_plugins() == set()
 
     def test_single(self) -> None:
-        with patch.dict(os.environ, {"PX_DISABLED_PLUGINS": "steamcmd"}):
-            assert _parse_disabled_plugins() == {"steamcmd"}
+        with patch.dict(os.environ, {"PX_DISABLED_PLUGINS": "workshop_download"}):
+            assert _parse_disabled_plugins() == {"workshop_download"}
 
     def test_multiple(self) -> None:
         with patch.dict(os.environ, {"PX_DISABLED_PLUGINS": "a, b, c"}):
@@ -118,9 +118,9 @@ class TestParseDisabledPlugins:
     def test_whitespace_around_names(self) -> None:
         with patch.dict(
             os.environ,
-            {"PX_DISABLED_PLUGINS": "  steamcmd , steamworkshop  "},
+            {"PX_DISABLED_PLUGINS": "  workshop_download , steamworkshop  "},
         ):
-            assert _parse_disabled_plugins() == {"steamcmd", "steamworkshop"}
+            assert _parse_disabled_plugins() == {"workshop_download", "steamworkshop"}
 
     def test_not_set(self) -> None:
         with patch.dict(os.environ, {"PX_DISABLED_PLUGINS": ""}):

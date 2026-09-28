@@ -60,8 +60,8 @@ class LocalModProvider(BaseModProvider):
         return discovered
 
 
-class SteamCmdModProvider(BaseModProvider):
-    provider_id = "steam_cmd"
+class DownloadedModProvider(BaseModProvider):
+    provider_id = "downloaded"
     color = "#3498db"
 
     def __init__(
@@ -81,9 +81,9 @@ class SteamCmdModProvider(BaseModProvider):
     ) -> dict[str, ListedMod]:
         tm = timer or Timer()
         if not self._path.exists():
-            logger.debug("SteamCmdModProvider path does not exist: {}", self._path)
+            logger.debug("DownloadedModProvider path does not exist: {}", self._path)
             return {}
-        logger.debug("SteamCmdModProvider scanning: {}", self._path)
+        logger.debug("DownloadedModProvider scanning: {}", self._path)
         with tm("scan_dir"):
             dirs = await asyncio.to_thread(scan_mod_directory, self._path)
         filtered_dirs = await asyncio.to_thread(
@@ -100,9 +100,9 @@ class SteamCmdModProvider(BaseModProvider):
             metadata_cache=metadata_cache,
             force_reparse=force_reparse,
         )
-        logger.info("SteamCmdModProvider discovered {} mods", len(discovered))
+        logger.info("DownloadedModProvider discovered {} mods", len(discovered))
         return discovered
 
 
-class SteamWorkshopModProvider(SteamCmdModProvider):
+class SteamWorkshopModProvider(DownloadedModProvider):
     provider_id = "steam"

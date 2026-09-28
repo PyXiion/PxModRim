@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal, Slot
 
 if TYPE_CHECKING:
-    from pxmodrim.ui.plugins.steam_workshop.plugin import SteamCmdUiPlugin
+    from pxmodrim.ui.plugins.steam_workshop.plugin import SteamWorkshopUiPlugin
 
 
 def _is_published_file_id(value: object) -> bool:
@@ -17,7 +17,7 @@ def _is_published_file_id(value: object) -> bool:
 class PxModRimBridge(QObject):
     result_ready = Signal(str, str)
 
-    def __init__(self, plugin: SteamCmdUiPlugin) -> None:
+    def __init__(self, plugin: SteamWorkshopUiPlugin) -> None:
         super().__init__()
         self._plugin = plugin
 

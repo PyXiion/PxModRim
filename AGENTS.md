@@ -9,6 +9,7 @@
 ## Environment
 **uv**, **Python 3.12.\*** only, **PySide6 >=6.11 + qasync**.
 Task runner is **just** (`just` to list). CI uses `uv sync --locked --dev`.
+`pxsteamdl` (Workshop downloader) is a hard dependency built from source: needs CMake >= 3.24 and a C++20 compiler (GCC, Clang, or MSVC); external dependencies are vendored via CPM.
 
 ## Entrypoint
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)
@@ -87,7 +88,6 @@ C# RimWorld mod submodules (see `companion-mods/AGENTS.md`):
 ## Stale / needs attention
 - `core/loading.py` -- `LoadingState` QObject, planned move to `ui/progress.py`. Three files still import from `core/loading`.
 - `core/models/view/` -- view models living in `core/`; potential future move to `ui/`.
-- Config UI has an `if` for SteamCMD plugin. Planned to become plugin system.
 
 ## For AI PRs
 PR description starts with: "Greetings, PyXiion! The silicon-based contributor is here."

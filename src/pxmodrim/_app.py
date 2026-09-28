@@ -179,15 +179,17 @@ class App:
 
         disabled = _parse_disabled_plugins()
 
-        if "steamcmd" not in disabled:
-            from pxmodrim.core.services.steam_cmd_service import SteamCmdService
+        if "workshop_download" not in disabled:
+            from pxmodrim.core.services.workshop_download_service import (
+                WorkshopDownloadService,
+            )
 
-            self._ctx.register_plugin(SteamCmdService())
+            self._ctx.register_plugin(WorkshopDownloadService())
 
         if "steamworkshop" not in disabled:
-            from pxmodrim.ui.plugins import SteamCmdUiPlugin
+            from pxmodrim.ui.plugins import SteamWorkshopUiPlugin
 
-            self._app_ctx.register_plugin(SteamCmdUiPlugin())
+            self._app_ctx.register_plugin(SteamWorkshopUiPlugin())
 
         self._app_ctx.setup_all()
         self.main_window = MainWindow(self._app_ctx)

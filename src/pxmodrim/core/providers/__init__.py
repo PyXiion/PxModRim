@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from pxmodrim.core.providers.base import BaseModProvider
 from pxmodrim.core.providers.core import CoreModProvider
 from pxmodrim.core.providers.local import (
+    DownloadedModProvider,
     LocalModProvider,
-    SteamCmdModProvider,
     SteamWorkshopModProvider,
 )
 
@@ -25,7 +25,7 @@ def create_providers(
         providers.append(CoreModProvider(Path(paths.game)))
     if paths.local:
         providers.append(LocalModProvider(Path(paths.local), pool=pool))
-        providers.append(SteamCmdModProvider(Path(paths.local), pool=pool))
+        providers.append(DownloadedModProvider(Path(paths.local), pool=pool))
     if paths.workshop:
         providers.append(SteamWorkshopModProvider(Path(paths.workshop), pool=pool))
     return providers
@@ -34,8 +34,8 @@ def create_providers(
 __all__ = [
     "BaseModProvider",
     "CoreModProvider",
+    "DownloadedModProvider",
     "LocalModProvider",
-    "SteamCmdModProvider",
     "SteamWorkshopModProvider",
     "create_providers",
 ]

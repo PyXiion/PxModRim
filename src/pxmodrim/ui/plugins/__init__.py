@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from pxmodrim.ui.plugins.steam_workshop import SteamCmdUiPlugin
+from pxmodrim.ui.plugins.steam_workshop import SteamWorkshopUiPlugin
 
-__all__ = ["SteamCmdUiPlugin"]
+__all__ = ["SteamWorkshopUiPlugin"]

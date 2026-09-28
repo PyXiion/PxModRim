@@ -26,7 +26,7 @@ UNGROUPED_KEY = "ungrouped"
 
 PROVIDER_ICONS: dict[str, str] = {
     "steam": "steam",
-    "steam_cmd": "steam",
+    "downloaded": "steam",
     "local": "folder",
     "core": "grid",
     "git": "git",

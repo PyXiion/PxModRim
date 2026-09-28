@@ -84,7 +84,7 @@ see [`ROADMAP.md`](./ROADMAP.md).
 - [x] Save active mod list to `ModsConfig.xml`
 - [x] Game launching (Steam, standalone, with optional wrappers)
 - [x] Steam Workshop integration (browse, subscribe, update)
-- [x] SteamCMD support for downloading mods without the Steam client
+- [x] Downloading Workshop mods without the Steam client (via [PxSteamDL](https://github.com/PyXiion/PxSteamDL), whose backend supports Linux, macOS, and Windows)
 - [ ] Launch presets (mods/configs/etc)
 - [ ] Player log viewer with filtering and colorization
 - [ ] File search across all installed mods (maybe?)

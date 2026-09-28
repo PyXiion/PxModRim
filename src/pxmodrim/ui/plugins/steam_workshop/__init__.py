@@ -4,7 +4,7 @@ from pxmodrim.ui.plugins.steam_workshop.plugin import (
     ItemStatus,
     ProgressInfo,
     SidebarSync,
-    SteamCmdUiPlugin,
+    SteamWorkshopUiPlugin,
 )
 from pxmodrim.ui.plugins.steam_workshop.view import SteamWorkshopViewPanel
 
@@ -12,6 +12,6 @@ __all__ = [
     "ItemStatus",
     "ProgressInfo",
     "SidebarSync",
-    "SteamCmdUiPlugin",
+    "SteamWorkshopUiPlugin",
     "SteamWorkshopViewPanel",
 ]

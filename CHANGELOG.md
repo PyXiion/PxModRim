@@ -23,11 +23,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Backup before migration (`config.json.bak.{timestamp}`)
 - Managed `config.json` and `ui_prefs.json` use a top-level `schema_version` marker (currently `1`); unversioned files are migrated with a timestamped backup.
 
+### Changed
+- Workshop downloads use the [PxSteamDL](https://github.com/PyXiion/PxSteamDL) library instead of SteamCMD: anonymous login in about a second, parallel incremental downloads straight into the local mods folder with SHA-1 verification, and per-mod byte progress in the download queue. The SteamCMD installer, its settings section, the workshop symlink and the "validate downloads" preference are removed; old `steamcmd_prefix`/`validate_downloads` config keys are ignored
+- Updated the PxSteamDL source dependency to its cross-platform Linux, macOS, and Windows implementation.
+
 ### Fixed
 - macOS packaging preserves the `entrypoint` binary alongside its `PxModRim` runtime directory and records the correct `CFBundleExecutable`
 - All six official Core/DLC mods (Core, Royalty, Ideology, Biotech, Anomaly, Odyssey) now show their names instead of "Unknown Mod Name"; stale metadata-cache entries are reparsed after upgrade
-- SteamCMD downloads accept only numeric Workshop IDs (prevents runscript command injection); queued/downloading rows can no longer be removed mid-batch
-- SteamCMD worker rewritten on asyncio subprocesses (no `QThread`); cancellation terminates and reaps the process
+- Workshop downloads accept only numeric Workshop IDs; queued/downloading rows can no longer be removed mid-batch
 - Mod description links restricted to HTTP(S); oversized `<size>`/`<indent>` values no longer crash rendering
 - Saving `ModsConfig.xml` preserves unknown elements and attributes
 - Startup no longer crashes on config failure cleanup, and closing the window during startup shuts down cleanly

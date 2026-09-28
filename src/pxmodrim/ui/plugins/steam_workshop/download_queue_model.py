@@ -19,38 +19,43 @@ class DownloadQueueModel(QAbstractListModel):
     _TitleRole = Qt.ItemDataRole.UserRole + 2
     _DisplayRole = Qt.ItemDataRole.UserRole + 3
     _StatusRole = Qt.ItemDataRole.UserRole + 4
+    _ProgressRole = Qt.ItemDataRole.UserRole + 5
 
-    progress_total_changed = Signal(int)
-    progress_completed_changed = Signal(int)
-    downloading_id_changed = Signal(str)
+    progress_changed = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
         """Initialize the download queue model with empty state."""
         super().__init__(parent)
-        self._items: list[dict[str, str]] = []
+        self._items: list[dict[str, Any]] = []
         self._progress_total = 0
         self._progress_completed = 0
-        self._downloading_id = ""
+        self._bytes_done = 0
+        self._bytes_total = 0
 
-    @Property(int, notify=progress_total_changed)
+    @Property(int, notify=progress_changed)
     def progress_total(self) -> int:
         return self._progress_total
 
-    @Property(int, notify=progress_completed_changed)
+    @Property(int, notify=progress_changed)
     def progress_completed(self) -> int:
         return self._progress_completed
 
-    @Property(str, notify=downloading_id_changed)
-    def downloading_id(self) -> str:
-        return self._downloading_id
+    @Property(float, notify=progress_changed)
+    def bytes_done(self) -> float:
+        return float(self._bytes_done)
 
-    def set_progress(self, total: int, completed: int, downloading_id: str) -> None:
+    @Property(float, notify=progress_changed)
+    def bytes_total(self) -> float:
+        return float(self._bytes_total)
+
+    def set_progress(
+        self, total: int, completed: int, bytes_done: int = 0, bytes_total: int = 0
+    ) -> None:
         self._progress_total = total
         self._progress_completed = completed
-        self._downloading_id = downloading_id
-        self.progress_total_changed.emit(total)
-        self.progress_completed_changed.emit(completed)
-        self.downloading_id_changed.emit(downloading_id)
+        self._bytes_done = bytes_done
+        self._bytes_total = bytes_total
+        self.progress_changed.emit()
 
     def rowCount(
         self,
@@ -74,6 +79,8 @@ class DownloadQueueModel(QAbstractListModel):
             return item["display"]
         if role == self._StatusRole:
             return item["status"]
+        if role == self._ProgressRole:
+            return item["progress"]
         return None
 
     def roleNames(self) -> dict[int, QByteArray]:
@@ -82,6 +89,7 @@ class DownloadQueueModel(QAbstractListModel):
             self._TitleRole: QByteArray(b"title"),
             self._DisplayRole: QByteArray(b"display"),
             self._StatusRole: QByteArray(b"status"),
+            self._ProgressRole: QByteArray(b"progress"),
         }
 
     def sync_from(
@@ -97,18 +105,22 @@ class DownloadQueueModel(QAbstractListModel):
                 "title": t or mid,
                 "display": f"{t} ({mid})" if t else mid,
                 "status": statuses.get(mid, ""),
+                "progress": 0.0,
             }
             for mid, t in checked_ids.items()
         ]
         self.endResetModel()
-        self.set_progress(0, 0, "")
+        self.set_progress(0, 0)
 
-    def update_status(self, mod_id: str, status: str) -> None:
+    def update_status(
+        self, mod_id: str, status: str, bytes_done: int = 0, bytes_total: int = 0
+    ) -> None:
         for row, item in enumerate(self._items):
             if item["id"] == mod_id:
                 item["status"] = status
+                item["progress"] = bytes_done / bytes_total if bytes_total else 0.0
                 idx = self.index(row)
-                self.dataChanged.emit(idx, idx, [self._StatusRole])
+                self.dataChanged.emit(idx, idx, [self._StatusRole, self._ProgressRole])
                 return
 
     @property

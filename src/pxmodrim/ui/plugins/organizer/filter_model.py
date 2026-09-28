@@ -14,7 +14,12 @@ from PySide6.QtCore import (
 from pxmodrim.core.organizer import TreeFilter
 
 _ICONS = {"all": "grid", "active": "check-circle", "inactive": "x-circle"}
-_PROVIDER_ICONS = {"steam": "steam", "steam_cmd": "steam", "core": "grid", "git": "git"}
+_PROVIDER_ICONS = {
+    "steam": "steam",
+    "downloaded": "steam",
+    "core": "grid",
+    "git": "git",
+}
 _TAG_ICON = "tag"
 
 

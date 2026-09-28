@@ -214,6 +214,7 @@ dependencies = [
     { name = "loguru" },
     { name = "lxml" },
     { name = "msgspec" },
+    { name = "pxsteamdl" },
     { name = "pyside6" },
     { name = "qasync" },
     { name = "toposort" },
@@ -239,6 +240,7 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "lxml", specifier = ">=6.1.1" },
     { name = "msgspec", specifier = ">=0.21.1" },
+    { name = "pxsteamdl", git = "https://github.com/PyXiion/PxSteamDL" },
     { name = "pyside6", specifier = ">=6.11.1" },
     { name = "qasync", specifier = ">=0.28.0" },
     { name = "toposort", specifier = ">=1.10" },
@@ -256,6 +258,11 @@ dev = [
     { name = "pytest-xvfb", specifier = ">=3.1.1" },
     { name = "ruff", specifier = ">=0.16.0" },
 ]
+
+[[package]]
+name = "pxsteamdl"
+version = "0.1.0"
+source = { git = "https://github.com/PyXiion/PxSteamDL#407d2deefbd27763872198369e2a393d3786f372" }
 
 [[package]]
 name = "pydeps"

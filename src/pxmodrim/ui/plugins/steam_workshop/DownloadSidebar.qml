@@ -13,7 +13,12 @@ Rectangle {
     // checks at each call site.
     readonly property int queueTotal: downloadQueueModel ? downloadQueueModel.progress_total : 0
     readonly property int queueCompleted: downloadQueueModel ? downloadQueueModel.progress_completed : 0
-    readonly property string queueDownloadingId: downloadQueueModel ? downloadQueueModel.downloading_id : ""
+    readonly property real queueBytesDone: downloadQueueModel ? downloadQueueModel.bytes_done : 0
+    readonly property real queueBytesTotal: downloadQueueModel ? downloadQueueModel.bytes_total : 0
+
+    function formatMegabytes(bytes) {
+        return (bytes / 1048576).toFixed(1)
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -36,6 +41,10 @@ Rectangle {
 
             Text {
                 text: "Downloading " + root.queueCompleted + "/" + root.queueTotal
+                    + (root.queueBytesTotal > 0
+                        ? " \u00B7 " + root.formatMegabytes(root.queueBytesDone)
+                          + " / " + root.formatMegabytes(root.queueBytesTotal) + " MB"
+                        : "")
                 color: Theme.textDim
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -43,8 +52,8 @@ Rectangle {
             ProgressBar {
                 id: progressBar
                 from: 0
-                to: Math.max(root.queueTotal, 1)
-                value: root.queueCompleted
+                to: root.queueBytesTotal > 0 ? root.queueBytesTotal : Math.max(root.queueTotal, 1)
+                value: root.queueBytesTotal > 0 ? root.queueBytesDone : root.queueCompleted
                 Layout.fillWidth: true
                 height: 6
                 contentItem: Rectangle {
@@ -93,7 +102,7 @@ Rectangle {
                     width: listView.width
                     height: 28
                     radius: Theme.radiusMd
-                    color: model.id === root.queueDownloadingId
+                    color: model.status === "downloading"
                         ? Theme.elevate3 : removeArea.containsMouse
                         ? Theme.elevate3 : "transparent"
 
@@ -133,12 +142,12 @@ Rectangle {
 
                     Rectangle {
                         anchors.left: parent.left
-                        anchors.right: parent.right
                         anchors.bottom: parent.bottom
+                        width: parent.width * model.progress
                         height: 2
                         radius: 1
                         color: Theme.primary
-                        visible: model.id === root.queueDownloadingId
+                        visible: model.status === "downloading"
                         opacity: 0.5
                     }
 

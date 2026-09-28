@@ -77,9 +77,11 @@ class DownloadSidebar(QWidget):
         self._model.sync_from(checked_ids, statuses)
 
     def set_progress(
-        self, total: int, completed: int, downloading_id: str = ""
+        self, total: int, completed: int, bytes_done: int = 0, bytes_total: int = 0
     ) -> None:
-        self._model.set_progress(total, completed, downloading_id)
+        self._model.set_progress(total, completed, bytes_done, bytes_total)
 
-    def update_status(self, mod_id: str, status: str) -> None:
-        self._model.update_status(mod_id, status)
+    def update_status(
+        self, mod_id: str, status: str, bytes_done: int = 0, bytes_total: int = 0
+    ) -> None:
+        self._model.update_status(mod_id, status, bytes_done, bytes_total)

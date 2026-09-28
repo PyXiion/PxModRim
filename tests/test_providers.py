@@ -37,7 +37,7 @@ async def test_workshop_path_has_distinct_provider_and_local_roots(
 
     assert len(providers_by_id) == len(providers)
     assert providers_by_id["local"]._path == local_path
-    assert providers_by_id["steam_cmd"]._path == local_path
+    assert providers_by_id["downloaded"]._path == local_path
 
     workshop_provider = providers_by_id["steam"]
     assert isinstance(workshop_provider, SteamWorkshopModProvider)

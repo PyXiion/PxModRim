@@ -12,7 +12,7 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
 from pxmodrim.core.providers import base as base_module
-from pxmodrim.core.providers.local import LocalModProvider, SteamCmdModProvider
+from pxmodrim.core.providers.local import DownloadedModProvider, LocalModProvider
 from pxmodrim.core.services.metadata_cache import (
     MetadataCache,
     normalize_path,
@@ -296,7 +296,7 @@ async def test_corrupt_cache_recovers_safely(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_provider_distinctions_preserved(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
-    steam_root = tmp_path / "steam_cmd"
+    steam_root = tmp_path / "downloaded"
 
     local_mod = _create_mod(local_root / "LocalMod", ABOUT_XML_V1)
     steam_mod = _create_mod(steam_root / "SteamMod", ABOUT_XML_TWO, pfid="123456")
@@ -305,7 +305,7 @@ async def test_provider_distinctions_preserved(tmp_path: Path) -> None:
     cache = MetadataCache(db_path)
 
     local_prov = LocalModProvider(local_root, metadata_cache=cache)
-    steam_prov = SteamCmdModProvider(steam_root, metadata_cache=cache)
+    steam_prov = DownloadedModProvider(steam_root, metadata_cache=cache)
 
     try:
         # Initial cold discovery
@@ -315,7 +315,7 @@ async def test_provider_distinctions_preserved(tmp_path: Path) -> None:
         assert len(local_mods) == 1
         assert len(steam_mods) == 1
         assert local_mods[str(local_mod)].provider_id == "local"
-        assert steam_mods[str(steam_mod)].provider_id == "steam_cmd"
+        assert steam_mods[str(steam_mod)].provider_id == "downloaded"
 
         # Second warm discovery
         local_mods_warm = await local_prov.discover("1.5")
@@ -324,7 +324,7 @@ async def test_provider_distinctions_preserved(tmp_path: Path) -> None:
         assert len(local_mods_warm) == 1
         assert len(steam_mods_warm) == 1
         assert local_mods_warm[str(local_mod)].provider_id == "local"
-        assert steam_mods_warm[str(steam_mod)].provider_id == "steam_cmd"
+        assert steam_mods_warm[str(steam_mod)].provider_id == "downloaded"
     finally:
         await cache.close()
 

@@ -55,7 +55,6 @@ class PathConfig(msgspec.Struct):
     community_rules_file: str = ""
     no_version_warning_file: str = ""
     use_this_instead_file: str = ""
-    steamcmd_prefix: str = ""
 
 
 class AppConfig(msgspec.Struct):

@@ -6,22 +6,17 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 
 import httpx
 from loguru import logger
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 from pxmodrim.core.events import Event
-from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.plugin import Plugin
-from pxmodrim.core.services.steam_cmd_service import SymlinkConflictError
-from pxmodrim.ui.components.dialogs import await_dialog
-from pxmodrim.ui.components.progress_dialog import ProgressDialog
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
-    from pxmodrim.core.services.steam_cmd_service import (
-        SteamCmdItemStatus,
-        SteamCmdProgress,
-        SteamCmdResult,
-        SteamCmdService,
+    from pxmodrim.core.services.workshop_download_service import (
+        DownloadItemStatus,
+        DownloadProgress,
+        DownloadResult,
+        WorkshopDownloadService,
     )
     from pxmodrim.ui.context import AppContext
 
@@ -34,17 +29,20 @@ class SidebarSync(NamedTuple):
 class ProgressInfo(NamedTuple):
     total: int
     completed: int
-    downloading_id: str
+    bytes_done: int
+    bytes_total: int
 
 
 class ItemStatus(NamedTuple):
     mod_id: str
     status: str
+    bytes_done: int = 0
+    bytes_total: int = 0
 
 
-class SteamCmdUiPlugin(Plugin):
+class SteamWorkshopUiPlugin(Plugin):
     name = "steamworkshop"
-    dependencies = ["steamcmd"]
+    dependencies = ["workshop_download"]
 
     badges_refresh_requested: Event[list[str]]
     sidebar_sync_requested: Event[SidebarSync]
@@ -55,7 +53,7 @@ class SteamCmdUiPlugin(Plugin):
     clear_checked_requested: Event[None]
     active_refresh_requested: Event[list[str]]
 
-    _svc: SteamCmdService
+    _svc: WorkshopDownloadService
 
     def __init__(self) -> None:
         self.badges_refresh_requested = Event()
@@ -74,23 +72,24 @@ class SteamCmdUiPlugin(Plugin):
         self._active_ids: set[str] = set()
         self._checked_ids: dict[str, str] = {}
         self._download_statuses: dict[str, str] = {}
-        self._current_downloading_id: str = ""
 
     # ── Plugin lifecycle ─────────────────────────────────
 
     def setup(self, ctx: AppContext) -> None:  # type: ignore[override]
         self._core = ctx.core
         self._app_ctx = ctx
-        self._svc = cast("SteamCmdService", ctx.core.plugins.get("steamcmd"))
+        self._svc = cast(
+            "WorkshopDownloadService", ctx.core.plugins.get("workshop_download")
+        )
         from pxmodrim.ui.plugins.steam_workshop.view import SteamWorkshopViewPanel
 
         ctx.add_rail_view(SteamWorkshopViewPanel)
 
         ctx.core.mod_service.mods_changed.connect(self._on_mods_changed)
         ctx.core.active_state_changed.connect(self._on_active_state_changed)
-        self._svc.download_progress.connect(self._on_steam_progress)
-        self._svc.download_item_status_changed.connect(self._on_steam_item_status)
-        self._svc.download_finished.connect(self._on_steam_finished)
+        self._svc.download_progress.connect(self._on_download_progress)
+        self._svc.download_item_status_changed.connect(self._on_item_status)
+        self._svc.download_finished.connect(self._on_download_finished)
 
     async def init(self, ctx: AppContext) -> None:
         self._refresh_cached_ids()
@@ -99,11 +98,9 @@ class SteamCmdUiPlugin(Plugin):
         if self._core is None:
             return
         with contextlib.suppress(ValueError):
-            self._svc.download_progress.disconnect(self._on_steam_progress)
-            self._svc.download_item_status_changed.disconnect(
-                self._on_steam_item_status
-            )
-            self._svc.download_finished.disconnect(self._on_steam_finished)
+            self._svc.download_progress.disconnect(self._on_download_progress)
+            self._svc.download_item_status_changed.disconnect(self._on_item_status)
+            self._svc.download_finished.disconnect(self._on_download_finished)
             self._core.mod_service.mods_changed.disconnect(self._on_mods_changed)
             self._core.active_state_changed.disconnect(
                 self._on_active_state_changed
@@ -174,103 +171,30 @@ class SteamCmdUiPlugin(Plugin):
 
     # ── Sidebar callbacks (called by view) ───────────────
 
-    async def request_download(self, parent_widget: QWidget, validate: bool) -> None:
+    async def request_download(self) -> None:
         ids = list(self._checked_ids.keys())
         if not ids:
             logger.debug("[steam] download requested with empty queue")
             return
-        logger.debug("[steam] download requested: %s", ids)
+        if self._core is None or not self._core.config.paths.local:
+            self._svc.status_message_changed.emit("Local mods path is not configured.")
+            return
+        logger.debug("[steam] download requested: {}", ids)
 
         self.download_busy_changed.emit(True)
-        queued_ids: list[str] = []
         try:
-            if not await self._ensure_steamcmd(parent_widget):
-                return
-            if not await self._ensure_symlink(parent_widget):
-                return
-
             for mod_id in ids:
                 self._download_statuses[mod_id] = "queued"
-                queued_ids.append(mod_id)
             self.sidebar_sync_requested.emit(
                 SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
             )
-            await self._svc.download_mods(
-                ids,
-                validate=validate,
-                titles=dict(self._checked_ids),
-            )
+            await self._svc.download_mods(ids)
         finally:
-            statuses_changed = False
-            for mod_id in queued_ids:
-                if self._download_statuses.get(mod_id) == "queued":
-                    self._download_statuses.pop(mod_id, None)
-                    statuses_changed = True
-            if statuses_changed:
-                self.sidebar_sync_requested.emit(
-                    SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
-                )
             self.download_busy_changed.emit(False)
 
     def stop_download(self) -> None:
         logger.info("[steam] download stop requested")
         self._svc.cancel()
-        self._current_downloading_id = ""
-        self.progress_updated.emit(ProgressInfo(0, 0, ""))
-
-    # ── UI helpers (moved from SteamCmdSetupPlugin) ──────
-
-    async def _ensure_steamcmd(self, parent: QWidget) -> bool:
-        if self._svc.is_installed():
-            return True
-
-        prefix = self._core.config.paths.steamcmd_prefix if self._core else ""
-        if not prefix:
-            folder = QFileDialog.getExistingDirectory(
-                parent, "Select SteamCMD install folder"
-            )
-            if not folder:
-                return False
-            prefix = folder
-
-        async with ProgressDialog(LoadingState(), parent) as dialog:
-            loading = dialog.loading
-            return await self._svc.ensure_installed(prefix, loading_state=loading)
-
-    async def _ensure_symlink(self, parent: QWidget) -> bool:
-        local = self._core.config.paths.local if self._core else ""
-        if not local:
-            self._svc.status_message_changed.emit("Local mods path is not configured.")
-            return False
-
-        try:
-            await self._svc.ensure_symlink(local, forced=False)
-            return True
-        except OSError:
-            await await_dialog(
-                QMessageBox,
-                QMessageBox.Icon.Critical,
-                "Symlink Error",
-                "Failed to create SteamCMD symlink. Check permissions or disk space.",
-                QMessageBox.StandardButton.Ok,
-                parent,
-            )
-            return False
-        except SymlinkConflictError as exc:
-            result, _ = await await_dialog(
-                QMessageBox,
-                QMessageBox.Icon.Warning,
-                "Overwrite existing folder?",
-                str(exc),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                parent,
-            )
-            if result != QMessageBox.StandardButton.Yes:
-                self._svc.status_message_changed.emit("Download cancelled by user.")
-                return False
-
-            await self._svc.ensure_symlink(local, forced=True)
-            return True
 
     def remove_item(self, mod_id: str) -> None:
         logger.debug("[steam] download item removed: %s", mod_id)
@@ -308,24 +232,25 @@ class SteamCmdUiPlugin(Plugin):
         self.badges_refresh_requested.emit(list(self._installed_ids))
         self.active_refresh_requested.emit(list(self._active_ids))
 
-    def _on_steam_progress(self, progress: SteamCmdProgress) -> None:
+    def _on_download_progress(self, progress: DownloadProgress) -> None:
         self.progress_updated.emit(
             ProgressInfo(
                 progress.total,
                 progress.completed,
-                self._current_downloading_id,
+                progress.bytes_done,
+                progress.bytes_total,
             )
         )
 
-    def _on_steam_item_status(self, item: SteamCmdItemStatus) -> None:
-        if item.status == "downloading":
-            self._current_downloading_id = item.mod_id
+    def _on_item_status(self, item: DownloadItemStatus) -> None:
         self._download_statuses[item.mod_id] = item.status
-        self.item_status_changed.emit(ItemStatus(item.mod_id, item.status))
+        self.item_status_changed.emit(
+            ItemStatus(item.mod_id, item.status, item.bytes_done, item.bytes_total)
+        )
 
-    def _on_steam_finished(self, result: SteamCmdResult) -> None:
+    def _on_download_finished(self, result: DownloadResult) -> None:
         logger.info(
-            "[steam] download finished: %d ok, %d failed",
+            "[steam] download finished: {} ok, {} failed",
             len(result.succeeded),
             len(result.failed),
         )
@@ -335,12 +260,11 @@ class SteamCmdUiPlugin(Plugin):
         for mod_id, status in tuple(self._download_statuses.items()):
             if status in {"queued", "downloading"}:
                 self._download_statuses.pop(mod_id)
-        self._current_downloading_id = ""
-        self.progress_updated.emit(ProgressInfo(0, 0, ""))
+        self.progress_updated.emit(ProgressInfo(0, 0, 0, 0))
         self.sidebar_sync_requested.emit(
             SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
         )
-        if self._core is not None:
+        if self._core is not None and result.succeeded:
             asyncio.create_task(self._core.mod_service.discover())
 
     # ── Internal helpers ─────────────────────────────────
