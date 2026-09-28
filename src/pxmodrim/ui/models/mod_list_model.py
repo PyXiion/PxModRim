@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import (
+    Property,
     QAbstractListModel,
     QByteArray,
     QModelIndex,
@@ -43,6 +44,11 @@ class ModListModel(QAbstractListModel):
     IsActiveRole = Qt.ItemDataRole.UserRole + 12
     SectionNameRole = Qt.ItemDataRole.UserRole + 13
     active_mods_changed = Signal()
+    active_count_changed = Signal()
+
+    @Property(int, notify=active_count_changed)
+    def activeCount(self) -> int:
+        return self._active_count
 
     def __init__(
         self,
@@ -234,10 +240,18 @@ class ModListModel(QAbstractListModel):
     def update_provider_colors(self, provider_colors: dict[str, str]) -> None:
         self._provider_colors = provider_colors
 
-    def move_row(self, source_row: int, target_row: int) -> bool:
-        if source_row == target_row:
-            return False
+    def move_row(
+        self, source_row: int, target_row: int, *, clamp_to_active: bool = False
+    ) -> bool:
         if not (0 <= source_row < len(self._items)):
+            return False
+        if clamp_to_active:
+            if not self._items[source_row].checked:
+                return False
+            if self._active_count <= 0:
+                return False
+            target_row = max(0, min(target_row, self._active_count - 1))
+        if source_row == target_row:
             return False
         if not (0 <= target_row < len(self._items)):
             return False
@@ -258,6 +272,9 @@ class ModListModel(QAbstractListModel):
                 [self.LoadIndexRole, self.SectionNameRole],
             )
         return True
+
+    def clamped_move(self, source_row: int, target_row: int) -> bool:
+        return self.move_row(source_row, target_row, clamp_to_active=True)
 
     def commitOrder(self, new_ordered_uuids: list[str]) -> None:
         if not new_ordered_uuids:
@@ -395,8 +412,11 @@ class ModListModel(QAbstractListModel):
             if item.load_index != new_idx:
                 item.load_index = new_idx
                 changed.append(row)
+        old_active = self._active_count
         self._active_count = counter
         self._inactive_count = len(self._items) - counter
+        if old_active != self._active_count:
+            self.active_count_changed.emit()
         return changed
 
     @property

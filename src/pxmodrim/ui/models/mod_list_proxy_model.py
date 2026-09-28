@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import (
+    Property,
     QAbstractListModel,
     QByteArray,
     QModelIndex,
     QPersistentModelIndex,
     Qt,
+    Signal,
 )
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod
@@ -15,6 +17,21 @@ from pxmodrim.ui.models.mod_list_model import ModListModel
 
 
 class ModListProxyModel(QAbstractListModel):
+    is_filtered_changed = Signal()
+    active_count_changed = Signal()
+
+    @property
+    def is_filtered(self) -> bool:
+        return bool(self._search_text) or self._sidebar_uuids is not None
+
+    @Property(bool, notify=is_filtered_changed)
+    def isFiltered(self) -> bool:
+        return self.is_filtered
+
+    @Property(int, notify=active_count_changed)
+    def activeCount(self) -> int:
+        return self._visible_active_count
+
     def __init__(self, source_model: ModListModel, parent: Any = None) -> None:
         super().__init__(parent)
         self._source = source_model
@@ -77,14 +94,20 @@ class ModListProxyModel(QAbstractListModel):
         text = search_text.strip().casefold()
         if self._search_text == text:
             return
+        old_filtered = self.is_filtered
         self._search_text = text
         self._apply_filter_change()
+        if self.is_filtered != old_filtered:
+            self.is_filtered_changed.emit()
 
     def set_sidebar_filter(self, uuids: set[str] | None) -> None:
         if self._sidebar_uuids == uuids:
             return
+        old_filtered = self.is_filtered
         self._sidebar_uuids = uuids
         self._apply_filter_change()
+        if self.is_filtered != old_filtered:
+            self.is_filtered_changed.emit()
 
     def _apply_filter_change(self) -> None:
         self._layout_rebuild()
@@ -193,7 +216,22 @@ class ModListProxyModel(QAbstractListModel):
             return QModelIndex()
         return self.index(proxy_row, 0)
 
-    def move_row(self, proxy_source: int, proxy_target: int) -> bool:
+    def move_row(
+        self, proxy_source: int, proxy_target: int, *, clamp_to_active: bool = False
+    ) -> bool:
+        if clamp_to_active:
+            if self.is_filtered:
+                return False
+            if not (0 <= proxy_source < len(self._visible_uuids)):
+                return False
+            source_uuid = self._visible_uuids[proxy_source]
+            source_source_row = self._source_row_for_uuid.get(source_uuid, -1)
+            item = self._source.get_item(source_source_row)
+            if item is None or not item.checked:
+                return False
+            if self._visible_active_count <= 0:
+                return False
+            proxy_target = max(0, min(proxy_target, self._visible_active_count - 1))
         if proxy_source == proxy_target:
             return False
         if not (0 <= proxy_source < len(self._visible_uuids)):
@@ -226,12 +264,17 @@ class ModListProxyModel(QAbstractListModel):
             self._proxy_row_by_uuid = {
                 uuid: row for row, uuid in enumerate(self._visible_uuids)
             }
-            self._source.move_row(source_source_row, source_target_row)
+            self._source.move_row(
+                source_source_row, source_target_row, clamp_to_active=clamp_to_active
+            )
             self._rebuild_source_mapping()
             self.endMoveRows()
         finally:
             self._in_proxy_move = False
         return True
+
+    def clamped_move(self, proxy_source: int, proxy_target: int) -> bool:
+        return self.move_row(proxy_source, proxy_target, clamp_to_active=True)
 
     def _on_source_data_changed(
         self, top_left: QModelIndex, bottom_right: QModelIndex, roles: list[int]
@@ -305,8 +348,11 @@ class ModListProxyModel(QAbstractListModel):
                     active += 1
                 else:
                     inactive += 1
+        changed = self._visible_active_count != active
         self._visible_active_count = active
         self._visible_inactive_count = inactive
+        if changed:
+            self.active_count_changed.emit()
 
     @property
     def visible_active_count(self) -> int:

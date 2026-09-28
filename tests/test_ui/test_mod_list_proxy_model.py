@@ -213,3 +213,67 @@ class TestMapToSource:
         assert kept.row() == 0
         assert kept.data(ModListModel.UuidRole) == "uuid-1"
         assert not filtered.isValid()
+
+
+class TestIsFiltered:
+    def test_transitions_on_search_filter(self, proxy: ModListProxyModel) -> None:
+        transitions: list[bool] = []
+        proxy.is_filtered_changed.connect(
+            lambda: transitions.append(bool(proxy.property("isFiltered")))
+        )
+
+        assert proxy.property("isFiltered") is False
+        assert proxy.is_filtered is False
+
+        proxy.set_search_filter("mod")
+        assert proxy.property("isFiltered") is True
+        assert proxy.is_filtered is True
+        assert transitions == [True]
+
+        proxy.set_search_filter("")
+        assert proxy.property("isFiltered") is False
+        assert proxy.is_filtered is False
+        assert transitions == [True, False]
+
+    def test_transitions_on_sidebar_filter(self, proxy: ModListProxyModel) -> None:
+        transitions: list[bool] = []
+        proxy.is_filtered_changed.connect(
+            lambda: transitions.append(bool(proxy.property("isFiltered")))
+        )
+
+        assert proxy.property("isFiltered") is False
+
+        proxy.set_sidebar_filter({"uuid-0"})
+        assert proxy.property("isFiltered") is True
+        assert transitions == [True]
+
+        proxy.set_sidebar_filter(None)
+        assert proxy.property("isFiltered") is False
+        assert transitions == [True, False]
+
+
+class TestClampedMove:
+    def test_clamped_move_clamps_target_to_active_block(
+        self, proxy: ModListProxyModel
+    ) -> None:
+        assert proxy.activeCount == 2
+        ok = proxy.move_row(0, 4, clamp_to_active=True)
+        assert ok is True
+        assert proxy.data(proxy.index(0, 0), ModListModel.UuidRole) == "uuid-2"
+        assert proxy.data(proxy.index(1, 0), ModListModel.UuidRole) == "uuid-0"
+        assert proxy.data(proxy.index(2, 0), ModListModel.UuidRole) == "uuid-1"
+        assert proxy.mapToSource(proxy.index(0, 0)).row() == 0
+        assert proxy.mapToSource(proxy.index(1, 0)).row() == 1
+        assert proxy.mapToSource(proxy.index(2, 0)).row() == 2
+
+    def test_clamped_move_rejects_inactive_source(
+        self, proxy: ModListProxyModel
+    ) -> None:
+        ok = proxy.move_row(2, 0, clamp_to_active=True)
+        assert ok is False
+
+    def test_clamped_move_rejects_when_filtered(self, proxy: ModListProxyModel) -> None:
+        proxy.set_search_filter("mod")
+        assert proxy.isFiltered is True
+        ok = proxy.move_row(0, 1, clamp_to_active=True)
+        assert ok is False

@@ -215,6 +215,8 @@ class ModListPanel(QWidget):
 
     @Slot(int, int)
     def moveRow(self, source_row: int, target_row: int) -> None:
+        if self._model.active_count > 0 and self.isChecked(source_row):
+            target_row = max(0, min(target_row, self._model.active_count - 1))
         self._proxy.move_row(source_row, target_row)
 
     @Slot()

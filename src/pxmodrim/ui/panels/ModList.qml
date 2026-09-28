@@ -173,7 +173,7 @@ Rectangle {
     }
 
     Rectangle {
-        visible: dragProxy.visible && listView.dragTargetIndex >= 0
+        visible: dragProxy.visible && listView.dragTargetIndex >= 0 && (modListModel ? listView.dragTargetIndex < modListModel.activeCount : true)
         x: 0
         y: {
             var targetItem = listView.itemAtIndex(listView.dragTargetIndex)
@@ -190,7 +190,6 @@ Rectangle {
         color: Theme.primary
         z: 999
     }
-
     // ── Delegate ──
     Component {
         id: dragDelegate
@@ -226,14 +225,22 @@ Rectangle {
             Item {
                 id: dragHandle
                 x: 0
-                width: 16
+                width: 24
                 height: parent.height
+                visible: model.loadIndex > 0
 
                 Text {
                     anchors.centerIn: parent
                     text: "\u22ee"
-                    color: Theme.textDim
+                    color: (modListModel && modListModel.isFiltered) ? Theme.textDim : Theme.textMuted
+                    opacity: (modListModel && modListModel.isFiltered) ? 0.35 : 1.0
                     font.pixelSize: 20
+                }
+
+                ToolTip {
+                    text: "Clear search and filters to reorder"
+                    visible: dragArea.containsMouse && Boolean(modListModel && modListModel.isFiltered)
+                    delay: 300
                 }
 
                 MouseArea {
@@ -242,15 +249,18 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
                     preventStealing: true
-                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    cursorShape: (modListModel && modListModel.isFiltered)
+                        ? Qt.ArrowCursor
+                        : (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
 
                     property real pressRootX: 0
                     property real pressRootY: 0
 
                     onPressed: (mouse) => {
                         root.selectRow(index, model.uuid, mouse.modifiers)
+                        if (modListModel && modListModel.isFiltered)
+                            return
                         var point = dragArea.mapToItem(root, mouse.x, mouse.y)
-                        pressRootX = point.x
                         pressRootY = point.y
 
                         var delegatePosition = delegateRect.mapToItem(root, 0, 0)
@@ -328,7 +338,7 @@ Rectangle {
 
             Item {
                 id: loadIndexItem
-                x: 16
+                x: 24
                 width: 32
                 height: parent.height
 
@@ -343,7 +353,7 @@ Rectangle {
             }
 
             Item {
-                x: 48
+                x: 56
                 width: 32
                 height: parent.height
 
@@ -388,7 +398,7 @@ Rectangle {
 
             // ── Avatar ──
             Rectangle {
-                x: 80; y: 8; width: 36; height: 36
+                x: 88; y: 8; width: 36; height: 36
                 radius: Theme.radiusSm
                 color: model.providerColor || Theme.elevate3
 
@@ -403,8 +413,8 @@ Rectangle {
 
             // ── Name + Package ID ──
             Column {
-                x: 124; y: 8
-                width: parent.width - badgesRow.width - 134
+                x: 132; y: 8
+                width: parent.width - badgesRow.width - 142
                 spacing: 1
 
                 Text {
@@ -732,21 +742,22 @@ Rectangle {
     }
 
     function targetIndexForPoint(x, y) {
-        if (listView.count === 0)
+        if (listView.count === 0 || !modListModel || modListModel.activeCount <= 0)
             return -1
+        var maxActiveTarget = modListModel.activeCount - 1
         var idx = listView.indexAt(x, y)
         if (idx >= 0)
-            return idx
+            return Math.max(0, Math.min(idx, maxActiveTarget))
         if (y <= 0)
             return 0
         if (y >= listView.contentHeight)
-            return listView.count - 1
+            return maxActiveTarget
         idx = listView.indexAt(x, y + 16)
         if (idx >= 0)
-            return idx
+            return Math.max(0, Math.min(idx, maxActiveTarget))
         idx = listView.indexAt(x, y - 16)
         if (idx >= 0)
-            return idx
-        return Math.max(0, Math.min(Math.floor(y / 54), listView.count - 1))
+            return Math.max(0, Math.min(idx, maxActiveTarget))
+        return Math.max(0, Math.min(Math.floor(y / 54), maxActiveTarget))
     }
 }
