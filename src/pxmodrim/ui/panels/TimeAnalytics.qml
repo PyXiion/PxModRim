@@ -1,6 +1,7 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "../components/controls"
 
 Rectangle {
     id: root
@@ -18,30 +19,12 @@ Rectangle {
         spacing: 20
 
         // ── Empty state ──
-        Rectangle {
+        EmptyState {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: !hasData
-            color: "transparent"
-
-            Column {
-                anchors.centerIn: parent
-                spacing: 12
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "⏱"
-                    font.pixelSize: 48
-                    color: Theme.textDim
-                    opacity: 0.5
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "No timing data available"
-                    color: Theme.textDim
-                    font.pixelSize: Theme.fontSizeMd
-                }
-            }
+            iconName: "clock"
+            title: "No startup impact data"
         }
 
         // ── Content ──
@@ -53,7 +36,7 @@ Rectangle {
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
 
             ColumnLayout {
                 id: contentCol
@@ -68,14 +51,16 @@ Rectangle {
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        text: "Estimated load time"
+                        text: "Estimated startup impact"
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.textDim
                     }
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         text: hasData ? sourceData.estimated_total : ""
-                        font.pixelSize: 22
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXl
                         font.weight: Font.Bold
                         color: Theme.textMain
                     }
@@ -89,11 +74,13 @@ Rectangle {
                     spacing: 8
 
                     Text {
-                        text: "METRICS"
+                        text: "Metrics"
+                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
-                        color: Theme.textMuted
+                        color: Theme.textDim
                         font.letterSpacing: 0.5
+                        font.capitalization: Font.AllUppercase
                     }
 
                     Rectangle {
@@ -121,15 +108,16 @@ Rectangle {
                                     Text {
                                         anchors.centerIn: parent
                                         text: modelData.label
+                                        font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeSm
                                         font.weight: Font.Bold
-                                        color: "white"
+                                        color: Theme.onAccent
                                         visible: parent.width >= implicitWidth
                                     }
 
                                     Rectangle {
                                         anchors.fill: parent
-                                        color: "white"
+                                        color: Theme.onAccent
                                         opacity: segRect.hoverAmount * 0.15
                                     }
 
@@ -156,10 +144,10 @@ Rectangle {
                                         easing.type: Easing.InOutQuad
                                     }
 
-                                    ToolTip {
+                                    PxToolTip {
                                         id: segTip
                                         text: modelData.label + ": " + modelData.value
-                                        visible: false; delay: 0
+                                        visible: false
                                     }
                                 }
                             }
@@ -179,11 +167,13 @@ Rectangle {
                         Layout.fillWidth: true
 
                         Text {
-                            text: "COMPARISON VIEW"
+                            text: "Comparison view"
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Font.Bold
-                            color: Theme.textMuted
+                            color: Theme.textDim
                             font.letterSpacing: 0.5
+                            font.capitalization: Font.AllUppercase
                         }
 
                         Item { Layout.fillWidth: true }
@@ -191,32 +181,18 @@ Rectangle {
                         RowLayout {
                             spacing: 4
 
-                            Rectangle {
-                                width: 28; height: 28; radius: Theme.radiusSm
-                                color: root.showDonut ? Theme.elevate3 : "transparent"
-                                border.color: Theme.border; border.width: 1
-                                Text {
-                                    anchors.centerIn: parent; text: "◉"; font.pixelSize: 16
-                                    color: root.showDonut ? Theme.primary : Theme.textMuted
-                                }
-                                MouseArea {
-                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.showDonut = true
-                                }
+                            PxButton {
+                                variant: root.showDonut ? "secondary" : "ghost"
+                                iconName: "donut"
+                                ToolTip.text: "Donut chart"
+                                onClicked: root.showDonut = true
                             }
 
-                            Rectangle {
-                                width: 28; height: 28; radius: Theme.radiusSm
-                                color: !root.showDonut ? Theme.elevate3 : "transparent"
-                                border.color: Theme.border; border.width: 1
-                                Text {
-                                    anchors.centerIn: parent; text: "▮"; font.pixelSize: 16
-                                    color: !root.showDonut ? Theme.primary : Theme.textMuted
-                                }
-                                MouseArea {
-                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.showDonut = false
-                                }
+                            PxButton {
+                                variant: root.showDonut ? "ghost" : "secondary"
+                                iconName: "bars"
+                                ToolTip.text: "Bar chart"
+                                onClicked: root.showDonut = false
                             }
                         }
                     }
@@ -261,7 +237,7 @@ Rectangle {
                                         var a1 = bg * 2 * Math.PI
                                         ctx.beginPath()
                                         ctx.arc(cx, cy, r, start, start + a1)
-                                        ctx.strokeStyle = hasData ? sourceData.bg_color : "#6b7280"
+                                        ctx.strokeStyle = hasData ? sourceData.bg_color : Theme.neutral
                                         ctx.stroke()
                                         start += a1
                                     }
@@ -269,7 +245,7 @@ Rectangle {
                                         var a2 = own * 2 * Math.PI
                                         ctx.beginPath()
                                         ctx.arc(cx, cy, r, start, start + a2)
-                                        ctx.strokeStyle = hasData ? sourceData.own_color : "#5cb85c"
+                                        ctx.strokeStyle = hasData ? sourceData.own_color : Theme.success
                                         ctx.stroke()
                                         start += a2
                                     }
@@ -277,7 +253,7 @@ Rectangle {
                                         var a3 = oth * 2 * Math.PI
                                         ctx.beginPath()
                                         ctx.arc(cx, cy, r, start, start + a3)
-                                        ctx.strokeStyle = hasData ? sourceData.other_color : "#6b7280"
+                                        ctx.strokeStyle = hasData ? sourceData.other_color : Theme.neutral
                                         ctx.stroke()
                                     }
                                 }
@@ -289,13 +265,14 @@ Rectangle {
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: hasData ? sourceData.own_impact : ""
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXl
                                     font.weight: Font.Bold
                                     color: hasData ? sourceData.own_color : Theme.textMain
                                 }
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "Time for this mod"; font.pixelSize: 9
+                                    text: "Startup impact"; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textDim
                                 }
                                 Rectangle {
@@ -305,13 +282,14 @@ Rectangle {
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: hasData ? sourceData.other_time : ""
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeSm
                                     font.weight: Font.Bold
                                     color: Theme.textMuted
                                 }
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "Without this mod"; font.pixelSize: 9
+                                    text: "Other mods"; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textDim
                                 }
                             }
@@ -326,9 +304,9 @@ Rectangle {
 
                                 delegate: RowLayout {
                                     Layout.fillWidth: true; spacing: 8
-                                    Rectangle { width: 14; height: 14; radius: 2; color: modelData.color }
-                                    Text { Layout.fillWidth: true; text: modelData.label; font.pixelSize: Theme.fontSizeMd; color: Theme.textMain; elide: Text.ElideRight }
-                                    Text { text: modelData.value; font.pixelSize: Theme.fontSizeMd; font.weight: Font.Bold; color: Theme.textMain; font.family: "monospace" }
+                                    Rectangle { width: 14; height: 14; radius: Theme.radiusXs; color: modelData.color }
+                                    Text { Layout.fillWidth: true; text: modelData.label; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeMd; color: Theme.textMain; elide: Text.ElideRight }
+                                    Text { text: modelData.value; font.pixelSize: Theme.fontSizeMd; font.weight: Font.Bold; color: Theme.textMain; font.family: Theme.fontMono }
                                 }
                             }
                         }
@@ -371,6 +349,7 @@ Rectangle {
                                                 anchors.bottomMargin: 4
                                                 anchors.horizontalCenter: parent.horizontalCenter
                                                 text: modelData.value
+                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSizeXs
                                                 font.weight: Font.Bold; color: Theme.textMain
                                             }
@@ -380,6 +359,7 @@ Rectangle {
                                     Text {
                                         Layout.fillWidth: true
                                         text: modelData.label
+                                        font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         color: modelData.is_current ? Theme.primary : Theme.textMuted
                                         horizontalAlignment: Text.AlignHCenter
@@ -392,6 +372,7 @@ Rectangle {
 
                         Text {
                             text: hasData ? sourceData.top5_label : ""
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textDim
                             horizontalAlignment: Text.AlignHCenter
@@ -413,6 +394,7 @@ Rectangle {
 
                         Text {
                             text: hasData && sourceData.timestamp ? "Generated: " + sourceData.timestamp : ""
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textDim
                             visible: hasData && sourceData.timestamp ? true : false
