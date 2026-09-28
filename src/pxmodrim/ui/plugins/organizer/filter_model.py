@@ -13,7 +13,7 @@ from PySide6.QtCore import (
 
 from pxmodrim.core.organizer import TreeFilter
 
-_ICONS = {"all": "grid", "active": "check-circle", "inactive": "x-circle"}
+_ICONS = {"all": "grid", "active": "check-circle", "inactive": "ban"}
 _PROVIDER_ICONS = {
     "steam": "steam",
     "downloaded": "steam",
