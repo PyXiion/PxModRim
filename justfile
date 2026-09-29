@@ -11,10 +11,10 @@ run: build-js dev-setup
     LOGURU_LEVEL=DEBUG uv run python -m pxmodrim
 
 test: build-js dev-setup
-    uv run pytest {{pytest_opts}} -s
+    QT_QPA_PLATFORM=offscreen uv run pytest {{pytest_opts}} -s
 
 test-verbose: build-js dev-setup
-    uv run pytest {{pytest_opts}} -v --tb=short -s
+    QT_QPA_PLATFORM=offscreen uv run pytest {{pytest_opts}} -v --tb=short -s
 
 pyright:
     uv run python -m pyright -p pyproject.toml src/ tests/
