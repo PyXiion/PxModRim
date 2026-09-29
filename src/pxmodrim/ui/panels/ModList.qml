@@ -226,14 +226,17 @@ Rectangle {
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: (mouse) => {
-                    if (mouse.button === Qt.RightButton) {
-                        if (listView.selectedUuids.indexOf(model.uuid) < 0)
-                            root.selectRow(index, model.uuid, Qt.NoModifier)
-                        modListPanel.showContextMenu(listView.selectedUuids)
+                onPressed: (mouse) => {
+                    if (mouse.button !== Qt.RightButton)
                         return
-                    }
-                    root.selectRow(index, model.uuid, mouse.modifiers)
+                    // Wayland only grants popup input grabs for a press serial; opening on release leaves the menu dead.
+                    if (listView.selectedUuids.indexOf(model.uuid) < 0)
+                        root.selectRow(index, model.uuid, Qt.NoModifier)
+                    modListPanel.showContextMenu(listView.selectedUuids)
+                }
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.LeftButton)
+                        root.selectRow(index, model.uuid, mouse.modifiers)
                 }
             }
 
