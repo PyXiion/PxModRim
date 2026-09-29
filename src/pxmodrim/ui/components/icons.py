@@ -41,7 +41,8 @@ if TYPE_CHECKING:
         "grip",
     ]
 
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QRectF
+from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtXml import QDomDocument
 
@@ -364,16 +365,22 @@ def pixmap(
 ) -> QPixmap:
     hex_color = _color_to_hex(color)
     svg = svg_str(name, hex_color)
-    pm = QPixmap(size, size)
+    # Rasterise at >=2x so small icons stay crisp even on 1x screens.
+    screen = QGuiApplication.primaryScreen()
+    scale = max(2.0, screen.devicePixelRatio() if screen else 1.0)
+    pm = QPixmap(round(size * scale), round(size * scale))
+    pm.setDevicePixelRatio(scale)
     pm.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pm)
     try:
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setRenderHints(
+            QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform
+        )
         svg_bytes = svg.encode("utf-8")
         doc = QDomDocument()
         if doc.setContent(svg_bytes):
             renderer = QSvgRenderer(doc.toByteArray())
-            renderer.render(painter)
+            renderer.render(painter, QRectF(0, 0, size, size))
     finally:
         painter.end()
     return pm
