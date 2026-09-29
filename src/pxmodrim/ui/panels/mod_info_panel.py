@@ -217,7 +217,7 @@ class ModInfoPanel(QWidget):
                 fallback = await asyncio.to_thread(generate_preview, mod_name, w, h)
                 if self._current_mod_id == mod_id:
                     self._banner.setShowOverlay(True)
-                    self._banner.setPixmap(fallback)
+                    self._banner.setPixmap(QPixmap.fromImage(fallback))
         except asyncio.CancelledError:
             pass
 
