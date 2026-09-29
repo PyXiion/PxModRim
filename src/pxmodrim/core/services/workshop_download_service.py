@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import functools
 import re
+import time
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from os import PathLike
 from pathlib import Path
@@ -25,6 +26,7 @@ PARALLEL_ITEMS = 2
 THREADS_PER_ITEM = 4
 
 _CANCELLED = "cancelled"
+_PROGRESS_LOG_INTERVAL_S = 15.0
 _MAX_PUBLISHED_FILE_ID = 2**64 - 1
 _PUBLISHED_FILE_ID_RE = re.compile(r"[0-9]+")
 
@@ -82,10 +84,21 @@ class DownloadResult(msgspec.Struct):
 
 
 class _Batch:
-    __slots__ = ("bytes", "failed", "succeeded", "total")
+    __slots__ = (
+        "bytes",
+        "failed",
+        "last_logged",
+        "seen",
+        "started",
+        "succeeded",
+        "total",
+    )
 
     def __init__(self, total: int) -> None:
         self.total = total
+        self.started = time.monotonic()
+        self.last_logged = self.started
+        self.seen = 0
         self.bytes: dict[str, tuple[int, int]] = {}
         self.succeeded: list[str] = []
         self.failed: list[str] = []
@@ -180,7 +193,12 @@ class WorkshopDownloadService(Plugin):
         token = pxsteamdl.CancelToken()
         self._token = token
         self.busy_changed.emit(True)
-        logger.info("[workshop] downloading {} items into {}", len(ids), root)
+        logger.info(
+            "[workshop] downloading {} items into {} (first ids: {})",
+            len(ids),
+            root,
+            ids[:5],
+        )
         try:
             await self._run(ids, root, batch, token)
         finally:
@@ -188,9 +206,11 @@ class WorkshopDownloadService(Plugin):
             self.busy_changed.emit(False)
             result = DownloadResult(succeeded=batch.succeeded, failed=batch.failed)
             logger.info(
-                "[workshop] finished: {} ok, {} failed",
+                "[workshop] finished in {:.1f}s: {} ok, {} failed{}",
+                time.monotonic() - batch.started,
                 len(result.succeeded),
                 len(result.failed),
+                f" (failed ids: {result.failed[:20]})" if result.failed else "",
             )
             self.download_finished.emit(result)
         return result
@@ -228,7 +248,12 @@ class WorkshopDownloadService(Plugin):
     ) -> None:
         try:
             await asyncio.to_thread(root.mkdir, parents=True, exist_ok=True)
+            login_started = time.monotonic()
             client = await self._ensure_client()
+            logger.debug(
+                "[workshop] steam session ready in {:.1f}s",
+                time.monotonic() - login_started,
+            )
         except (RuntimeError, OSError) as exc:
             message = (
                 f"Steam login failed: {exc}"
@@ -241,6 +266,12 @@ class WorkshopDownloadService(Plugin):
                 self._finish_item(batch, pid, error=message)
             return
 
+        logger.debug(
+            "[workshop] client.download start: {} items, {} parallel x {} threads",
+            len(ids),
+            PARALLEL_ITEMS,
+            THREADS_PER_ITEM,
+        )
         loop = asyncio.get_running_loop()
 
         def on_progress(p: pxsteamdl.Progress) -> None:
@@ -293,7 +324,28 @@ class WorkshopDownloadService(Plugin):
     def _on_progress(self, batch: _Batch, pid: str, done: int, total: int) -> None:
         if pid in batch.succeeded or pid in batch.failed:
             return
+        if pid not in batch.bytes:
+            batch.seen += 1
+            logger.debug(
+                "[workshop] {} first progress: {}/{} bytes (item {} of {})",
+                pid,
+                done,
+                total,
+                batch.seen,
+                batch.total,
+            )
         batch.bytes[pid] = (done, total)
+        now = time.monotonic()
+        if now - batch.last_logged >= _PROGRESS_LOG_INTERVAL_S:
+            batch.last_logged = now
+            progress = batch.progress()
+            logger.info(
+                "[workshop] progress: {}/{} items, {:.1f} MB, {:.0f}s elapsed",
+                progress.completed,
+                progress.total,
+                progress.bytes_done / 2**20,
+                now - batch.started,
+            )
         self.download_item_status_changed.emit(
             DownloadItemStatus(
                 mod_id=pid, status="downloading", bytes_done=done, bytes_total=total

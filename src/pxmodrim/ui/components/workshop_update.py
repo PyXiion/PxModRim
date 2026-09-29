@@ -32,7 +32,9 @@ async def update_workshop_mods(ctx: CoreContext, uuids: Iterable[str]) -> None:
     svc = workshop_service(ctx)
     ids = updatable_ids(ctx, uuids)
     if svc is None or not ids:
+        logger.debug("[workshop] update requested but nothing is updatable")
         return
+    logger.info("[workshop] update requested for {} mods", len(ids))
     try:
         await svc.download_mods(ids)
     except (RuntimeError, ValueError) as exc:

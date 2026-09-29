@@ -509,6 +509,7 @@ class MainWindow(QMainWindow):
         if not ids:
             self._toast_manager.info("No workshop mods to update")
             return
+        logger.info("[workshop] update-all requested for {} mods", len(ids))
         self._toast_manager.info(f"Updating {len(ids)} workshop mods\u2026")
         try:
             await workshop.download_mods(ids)
