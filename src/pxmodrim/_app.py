@@ -152,6 +152,7 @@ class App:
         palette.setColor(
             QPalette.ColorRole.HighlightedText, QColor(PALETTE["ELEVATE_0"])
         )
+        palette.setColor(QPalette.ColorRole.Link, QColor(PALETTE["PRIMARY"]))
         palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(PALETTE["ELEVATE_2"]))
         palette.setColor(QPalette.ColorRole.ToolTipText, QColor(PALETTE["TEXT_MAIN"]))
         self.qt_app.setPalette(palette)

@@ -39,7 +39,7 @@ class UpdateDialog(QDialog):
         layout = QVBoxLayout(self)
 
         title = QLabel(f"PxModRim {release.tag} is available", self)
-        title.setObjectName("dialogTitle")
+        title.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
         layout.addWidget(QLabel(f"You are running {current_version}.", self))
 
