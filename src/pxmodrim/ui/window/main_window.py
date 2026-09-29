@@ -20,9 +20,12 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
+    QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QSplitter,
     QStackedWidget,
     QVBoxLayout,
@@ -35,6 +38,7 @@ from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.core.services.update_service import UpdateCheckError, UpdateService
 from pxmodrim.core.services.workshop_download_service import (
+    DownloadProgress,
     DownloadResult,
     workshop_service,
 )
@@ -262,6 +266,27 @@ class MainWindow(QMainWindow):
     def _open_logs_folder() -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(config_dir() / "logs")))
 
+    def _build_workshop_bar(self) -> QWidget:
+        bar = QWidget()
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(12, 4, 12, 4)
+        self._workshop_label = QLabel(bar)
+        layout.addWidget(self._workshop_label)
+        self._workshop_progress = QProgressBar(bar)
+        self._workshop_progress.setObjectName("thinProgress")
+        self._workshop_progress.setTextVisible(False)
+        self._workshop_progress.setFixedHeight(4)
+        layout.addWidget(self._workshop_progress, 1)
+        bar.hide()
+        return bar
+
+    def _on_workshop_progress(self, progress: DownloadProgress) -> None:
+        self._workshop_progress.setRange(0, max(progress.total, 1))
+        self._workshop_progress.setValue(progress.completed)
+        self._workshop_label.setText(
+            f"Updating workshop mods: {progress.completed} / {progress.total}"
+        )
+
     def _setup_content_and_views(self) -> None:
         logger.debug("main_window: setting up content and views")
         rail_views = self._app_ctx.rail_views
@@ -319,6 +344,8 @@ class MainWindow(QMainWindow):
             self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
 
         outer_layout.addWidget(self._splitter, stretch=1)
+        self._workshop_bar = self._build_workshop_bar()
+        outer_layout.addWidget(self._workshop_bar)
         self.setCentralWidget(outer)
 
     def _setup_toast_and_events(self) -> None:
@@ -332,6 +359,7 @@ class MainWindow(QMainWindow):
         )
         if self._workshop is not None:
             self._workshop.busy_changed.connect(self._on_workshop_busy)
+            self._workshop.download_progress.connect(self._on_workshop_progress)
             self._workshop.download_finished.connect(
                 self._on_workshop_download_finished
             )
@@ -489,6 +517,10 @@ class MainWindow(QMainWindow):
     def _on_workshop_busy(self, busy: bool) -> None:
         self._header_controller.set_workshop_busy(busy)
         self._actions[ActionId.UPDATE_WORKSHOP].setEnabled(not busy)
+        if busy:
+            self._workshop_progress.setRange(0, 0)
+            self._workshop_label.setText("Updating workshop mods…")
+        self._workshop_bar.setVisible(busy)
 
     def _on_workshop_download_finished(self, result: DownloadResult) -> None:
         ok, failed = len(result.succeeded), len(result.failed)
