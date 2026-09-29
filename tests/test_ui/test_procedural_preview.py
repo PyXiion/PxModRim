@@ -14,6 +14,7 @@ from pxmodrim.ui.components.procedural_preview import initials
         ("RimworldTweaks", "RT"),
         ("Combat", "CO"),
         ("[AV]", "AV"),
+        ("[AV] Framework", "AF"),
         ("The Lord of Rings", "LR"),
         ("Русский перевод", "РП"),
         ("---", "--"),

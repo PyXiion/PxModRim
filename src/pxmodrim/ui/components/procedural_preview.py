@@ -37,6 +37,11 @@ def initials(title: str) -> str:
     if not meaningful:
         return title.strip()[:2].upper() or "?"
     if len(meaningful) == 1:
+        # "[AV] Framework": a lone word borrows the tag's letter instead of
+        # its own second one, which reads as random.
+        tag = _WORD_RE.search(" ".join(_TAG_RE.findall(title)))
+        if tag and source is stripped:
+            return (tag.group()[0] + meaningful[0][0]).upper()
         return meaningful[0][:2].upper()
     return (meaningful[0][0] + meaningful[1][0]).upper()
 
