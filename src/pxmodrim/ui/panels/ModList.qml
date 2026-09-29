@@ -646,6 +646,11 @@ Rectangle {
         modListPanel.modSelected(uuid)
     }
 
+    function revealRow(index, uuid) {
+        selectRow(index, uuid, 0)
+        listView.positionViewAtIndex(index, ListView.Center)
+    }
+
     function navigate(extend, direction) {
         var newIndex = listView.currentIndex + direction
         if (newIndex < 0 || newIndex >= listView.count)

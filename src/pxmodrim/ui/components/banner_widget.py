@@ -11,12 +11,17 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 
-from pxmodrim.ui.theme.constants import BANNER_MAX_HEIGHT, BANNER_OVERLAY_HEIGHT
+from pxmodrim.ui.theme.constants import (
+    BANNER_ASPECT_H,
+    BANNER_ASPECT_W,
+    BANNER_MAX_HEIGHT,
+    BANNER_OVERLAY_HEIGHT,
+)
 from pxmodrim.ui.theme.palette import PANEL_BG_Q, TEXT_MAIN_Q, TEXT_MUTED_Q
 
 
 class AspectRatioBanner(QWidget):
-    """Banner that scales pixmap to width, preserves aspect ratio, clamps max height."""
+    """Fixed 16:9 banner (capped at max height) that crops the pixmap to fill it."""
 
     def __init__(
         self, parent: QWidget | None = None, max_height: int = BANNER_MAX_HEIGHT
@@ -45,15 +50,10 @@ class AspectRatioBanner(QWidget):
             self._scaled_pixmap = None
             return
 
-        target_w = self.width()
-        ratio = self._pixmap.height() / self._pixmap.width()
-        target_h = int(target_w * ratio)
-        target_h = min(target_h, self._max_height)
-
         self._scaled_pixmap = self._pixmap.scaled(
-            target_w,
-            target_h,
-            Qt.AspectRatioMode.KeepAspectRatio,
+            self.width(),
+            self.heightForWidth(self.width()),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
 
@@ -69,8 +69,15 @@ class AspectRatioBanner(QWidget):
         self._show_overlay = show
         self.update()
 
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return min(width * BANNER_ASPECT_H // BANNER_ASPECT_W, self._max_height)
+
     def sizeHint(self) -> QSize:
-        return QSize(self.width() or 300, self._max_height)
+        width = self.width() or 300
+        return QSize(width, self.heightForWidth(width))
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -81,8 +88,9 @@ class AspectRatioBanner(QWidget):
         if not self._scaled_pixmap or self._scaled_pixmap.isNull():
             painter.fillRect(self.rect(), PANEL_BG_Q)
         else:
+            x = (self.width() - self._scaled_pixmap.width()) // 2
             y = (self.height() - self._scaled_pixmap.height()) // 2
-            painter.drawPixmap(0, y, self._scaled_pixmap)
+            painter.drawPixmap(x, y, self._scaled_pixmap)
 
         # Gradient overlay at bottom (only when no actual preview image)
         if self._title and self._show_overlay:

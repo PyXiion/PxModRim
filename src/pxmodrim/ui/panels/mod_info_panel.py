@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QMetaObject, Qt, QUrl
+from PySide6.QtCore import QMetaObject, Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QGuiApplication, QImage, QPixmap
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -49,6 +49,8 @@ def _find_preview(mod_path: Path | None) -> Path | None:
 
 
 class ModInfoPanel(QWidget):
+    mod_requested = Signal(str)
+
     def __init__(
         self,
         ctx: CoreContext,
@@ -91,6 +93,7 @@ class ModInfoPanel(QWidget):
             root.setProperty("descExpanded", self._ui_prefs.desc_expanded)
             root.openFolder.connect(self._on_open_folder)
             root.openUrl.connect(self._on_open_url)
+            root.selectMod.connect(self.mod_requested)
             root.copyText.connect(self._on_copy_text)
             root.openStartupDetails.connect(self._on_open_startup_details)
             root.descToggled.connect(self._on_desc_toggled)
@@ -174,7 +177,7 @@ class ModInfoPanel(QWidget):
             # No usable preview — show fallback with overlay
             if self._current_mod_id == mod_id:
                 w = self._banner.width() or 300
-                h = self._banner.sizeHint().height()
+                h = self._banner.heightForWidth(w)
                 fallback = await asyncio.to_thread(generate_preview, mod_name, w, h)
                 if self._current_mod_id == mod_id:
                     self._banner.setShowOverlay(True)

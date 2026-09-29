@@ -217,6 +217,7 @@ class OrganizerViewPanel(BaseViewPanel):
         self.mod_info.setMinimumWidth(300)
         row.addWidget(self.mod_info, 2)
         self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
+        self.mod_info.mod_requested.connect(self._reveal_mod)
         self._root.addWidget(content, 1)
         self._status = QLabel(self)
         self._status.setObjectName("organizerStatus")
@@ -273,6 +274,11 @@ class OrganizerViewPanel(BaseViewPanel):
         self._rules_dialog.move(
             host_geometry.center() - self._rules_dialog.rect().center()
         )
+
+    def _reveal_mod(self, uuid: str) -> None:
+        index = self.model.index_for_uuid(uuid)
+        if index.isValid():
+            self.selectSingle(index)
 
     def _clear_selection_anchor(self) -> None:
         self._selection_anchor = QModelIndex()

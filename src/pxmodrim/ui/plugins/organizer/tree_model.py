@@ -391,6 +391,12 @@ class ModTreeModel(QAbstractItemModel):
                 return self._index_of(node)
         return QModelIndex()
 
+    def index_for_uuid(self, uuid: str) -> QModelIndex:
+        for node in self._root.walk():
+            if node.kind == "mod" and node.leaf is not None and node.leaf.uuid == uuid:
+                return self._index_of(node)
+        return QModelIndex()
+
     def expanded_indexes(self, parent: AnyIndex | None = None) -> list[QModelIndex]:
         """Containers under *parent* the view should expand, parents first.
 

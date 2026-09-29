@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import (
     Q_ARG,
@@ -172,6 +172,15 @@ class ModListPanel(QWidget):
     @Slot(str)
     def modSelected(self, uuid: str) -> None:
         self.mod_selected.emit(uuid)
+
+    def select_uuid(self, uuid: str) -> bool:
+        """Select and scroll to a mod; False if it is hidden by a filter."""
+        row = self.rowForUuid(uuid)
+        root: Any = self._qml.rootObject()
+        if row < 0 or root is None:
+            return False
+        root.revealRow(row, uuid)
+        return True
 
     @Slot()
     def clearSelection(self) -> None:

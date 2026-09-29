@@ -297,6 +297,7 @@ class MainWindow(QMainWindow):
             self.mod_info = self._mods_view.mod_info
             self._mods_view.entry_selected.connect(self._on_entry_selected)
             self._mods_view.mod_selected.connect(self._on_mod_selected)
+            self.mod_info.mod_requested.connect(self._on_mod_requested)
             self._selection = ModSelectionPresenter(self._ctx, self.mod_info)
 
         outer_layout.addWidget(self._splitter, stretch=1)
@@ -560,6 +561,12 @@ class MainWindow(QMainWindow):
             logger.info("Launch strategy changed to {}", new_strategy.name)
             self._ui_prefs.launch_strategy = new_strategy
             save_ui_prefs(self._ui_prefs, self._ctx.config_service)
+
+    @asyncSlot(str)
+    async def _on_mod_requested(self, uuid: str) -> None:
+        # Filtered-out mods can't be highlighted in the list; still show their info.
+        if not self.mod_list.select_uuid(uuid):
+            await self._on_mod_selected(uuid)
 
     @asyncSlot()
     async def _on_mod_selected(self, uuid: str) -> None:

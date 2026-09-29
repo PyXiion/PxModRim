@@ -100,7 +100,13 @@ def _needs(
             state = "active"
         else:
             state = "inactive"
-        result.append({"name": dep.name or str(dep.package_id), "state": state})
+        result.append(
+            {
+                "name": dep.name or str(dep.package_id),
+                "state": state,
+                "uuid": found.uuid if found is not None else "",
+            }
+        )
     return result
 
 
@@ -115,10 +121,10 @@ def _conflicts(
     return sorted(names, key=str.lower)
 
 
-def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> list[str]:
+def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> list[dict[str, str]]:
     pid = str(mod.package_id).lower()
-    names = [
-        m.name
+    found = [
+        m
         for m in ctx.all_mods.values()
         if isinstance(m, AboutXmlMod)
         and m.uuid != mod.uuid
@@ -128,8 +134,8 @@ def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> list[str]:
             for d in m.about_rules.dependencies.values()
         )
     ]
-    names.sort(key=str.lower)
-    return names
+    found.sort(key=lambda m: m.name.lower())
+    return [{"name": m.name, "uuid": m.uuid} for m in found]
 
 
 def _version_support(mod: ListedMod, target: str) -> dict[str, Any]:
@@ -166,7 +172,7 @@ def build_mod_info(
     is_about = isinstance(mod, AboutXmlMod)
 
     needs: list[dict[str, str]] = []
-    needed_by: list[str] = []
+    needed_by: list[dict[str, str]] = []
     conflicts: list[str] = []
     if isinstance(mod, AboutXmlMod):
         index = _pid_index(ctx)

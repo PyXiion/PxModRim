@@ -16,6 +16,7 @@ Rectangle {
 
     signal openFolder()
     signal openUrl()
+    signal selectMod(string uuid)
     signal copyText(string text)
     signal openStartupDetails()
     signal descToggled(bool expanded)
@@ -66,6 +67,28 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: 12
             spacing: 8
+        }
+    }
+
+    // Badge that jumps to another mod when it has a uuid.
+    component ModBadge: PxBadge {
+        property string uuid: ""
+        readonly property bool linked: uuid.length > 0
+
+        HoverHandler {
+            id: badgeHover
+            enabled: parent.linked
+            cursorShape: Qt.PointingHandCursor
+        }
+        TapHandler {
+            enabled: parent.linked
+            onTapped: root.selectMod(parent.uuid)
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: Theme.textMain
+            opacity: badgeHover.hovered ? 0.12 : 0
         }
     }
 
@@ -189,11 +212,12 @@ Rectangle {
 
                     Repeater {
                         model: root.hasInfo ? root.info.needs : []
-                        delegate: PxBadge {
+                        delegate: ModBadge {
+                            uuid: modelData.uuid
                             text: root.stateMark(modelData.state) + modelData.name
                             textColor: root.stateColor(modelData.state)
                             fillColor: root.stateBg(modelData.state)
-                            tooltip: root.stateHint(modelData.state)
+                            tooltip: root.stateHint(modelData.state) + (modelData.uuid.length > 0 ? " \u2014 click to open" : "")
                         }
                     }
                 }
@@ -230,8 +254,10 @@ Rectangle {
 
                     Repeater {
                         model: !root.hasInfo ? [] : root.neededExpanded ? root.info.neededBy : root.info.neededBy.slice(0, 6)
-                        delegate: PxBadge {
-                            text: modelData
+                        delegate: ModBadge {
+                            uuid: modelData.uuid
+                            text: modelData.name
+                            tooltip: "Click to open"
                             textColor: Theme.textMuted
                             fillColor: Theme.elevate4
                         }
