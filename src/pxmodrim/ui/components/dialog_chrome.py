@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtGui import QEnterEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -19,6 +19,37 @@ from pxmodrim.ui.theme.palette import PALETTE
 _TITLE_BAR_HEIGHT = 36
 _BORDER = 1
 _GRIP_SIZE = 16
+_CLOSE_SIZE = 26
+
+
+class _CloseButton(QPushButton):
+    """Soft-red close button that fills solid on hover, like the main window's."""
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setObjectName("dialogCloseBtn")
+        self.setFixedSize(_CLOSE_SIZE, _CLOSE_SIZE)
+        # A global QPushButton min-height would otherwise beat setFixedSize.
+        inner = _CLOSE_SIZE - 2  # the 1px QSS border sits outside the content box
+        self.setStyleSheet(
+            f"min-width: {inner}px; max-width: {inner}px;"
+            f" min-height: {inner}px; max-height: {inner}px;"
+        )
+        self.setToolTip("Close")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._set_icon_color(PALETTE["DANGER"])
+
+    def _set_icon_color(self, color: str) -> None:
+        self.setIcon(icon("close", 12, color))
+
+    def enterEvent(self, event: QEnterEvent) -> None:
+        self._set_icon_color(PALETTE["TEXT_ON_ACCENT"])
+        super().enterEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        self._set_icon_color(PALETTE["DANGER"])
+        super().leaveEvent(event)
 
 
 class _TitleBar(QWidget):
@@ -36,13 +67,7 @@ class _TitleBar(QWidget):
         dialog.windowTitleChanged.connect(self._title.setText)
 
         if closable:
-            close_btn = QPushButton(self)
-            close_btn.setObjectName("dialogCloseBtn")
-            close_btn.setIcon(icon("close", 12, PALETTE["TEXT_MUTED"]))
-            close_btn.setFixedSize(26, 26)
-            close_btn.setToolTip("Close")
-            close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            close_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            close_btn = _CloseButton(self)
             close_btn.clicked.connect(dialog.reject)
             layout.addWidget(close_btn)
 

@@ -498,15 +498,14 @@ QLabel#dialogTitleText {
     font-size: 13px;
 }
 QPushButton#dialogCloseBtn {
-    background: transparent;
-    border: none;
+    background-color: $DANGER_BG;
+    border: 1px solid $DANGER_BG;
     border-radius: 6px;
     padding: 0;
-    min-height: 0;
-    min-width: 0;
 }
 QPushButton#dialogCloseBtn:hover {
-    background-color: $DANGER_BG;
+    background-color: $DANGER;
+    border-color: $DANGER;
 }
 
 /* ── Icon Buttons ── */
