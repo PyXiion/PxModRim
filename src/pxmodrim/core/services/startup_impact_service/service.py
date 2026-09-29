@@ -79,7 +79,9 @@ class StartupImpactService:
     async def estimated_total(self, active_pids: list[str]) -> float:
         dbp = db.db_path(self._ctx.config_service.config_dir)
         bg = await self._db.get_average(dbp, BASE_GAME_PID)
-        totals = await self._db.get_totals_for(dbp, active_pids)
+        totals = await self._db.get_totals_for(
+            dbp, [normalize_package_id(p) for p in active_pids]
+        )
         mod_sum = sum(on + off for on, off in totals.values())
         return bg + mod_sum
 
@@ -107,7 +109,7 @@ class StartupImpactService:
         """
         return await self._db.get_latest_with_averages(
             db.db_path(self._ctx.config_service.config_dir),
-            active_pids,
+            [normalize_package_id(p) for p in active_pids],
             normalize_package_id(selected_pid) if selected_pid else None,
         )
 

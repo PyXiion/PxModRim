@@ -120,3 +120,13 @@ def test_phases_toggle_base_game_contribution() -> None:
 )
 def test_format_duration(seconds: float, text: str) -> None:
     assert format_duration(seconds) == text
+
+
+def test_tooltip_sums_metrics_sharing_a_label() -> None:
+    from pxmodrim.core.services.startup_impact_service.phases import Phase
+    from pxmodrim.ui.panels.startup_impact_data import _metrics_by_phase
+
+    grouped = _metrics_by_phase(
+        {"ApplyPatches|Foo -> a": 1.0, "ApplyPatches|Foo -> b": 2.0}
+    )
+    assert list(grouped[Phase.PATCHES].values()) == [3.0]

@@ -249,3 +249,13 @@ async def test_invalid_ids_do_not_toggle_busy(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         await svc.download_mods(["12a"])
     assert busy == []
+
+
+def test_progress_counts_items_whose_bytes_are_complete() -> None:
+    from pxmodrim.core.services.workshop_download_service import _Batch
+
+    batch = _Batch(3)
+    batch.bytes = {"1": (10, 10), "2": (5, 10), "3": (0, 0)}
+    assert batch.progress().completed == 1
+    batch.succeeded.append("1")
+    assert batch.progress().completed == 1

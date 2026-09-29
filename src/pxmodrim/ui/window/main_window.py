@@ -285,6 +285,7 @@ class MainWindow(QMainWindow):
         self._workshop_progress.setValue(progress.completed)
         self._workshop_label.setText(
             f"Updating workshop mods: {progress.completed} / {progress.total}"
+            f" · {progress.bytes_done / 2**20:.0f} MB"
         )
 
     def _setup_content_and_views(self) -> None:

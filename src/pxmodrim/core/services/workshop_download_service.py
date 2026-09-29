@@ -91,9 +91,15 @@ class _Batch:
         self.failed: list[str] = []
 
     def progress(self) -> DownloadProgress:
+        # pxsteamdl returns results only after the whole batch, so an item that
+        # reports all its bytes is counted as done before its Result arrives.
+        finished = set(self.succeeded) | set(self.failed)
+        finished.update(
+            pid for pid, (done, total) in self.bytes.items() if total and done >= total
+        )
         return DownloadProgress(
             total=self.total,
-            completed=len(self.succeeded) + len(self.failed),
+            completed=len(finished),
             bytes_done=sum(done for done, _ in self.bytes.values()),
             bytes_total=sum(total for _, total in self.bytes.values()),
         )
