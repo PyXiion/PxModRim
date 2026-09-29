@@ -19,6 +19,7 @@ Rectangle {
             workshop: workshop.text.trim(),
             config: configFolder.text.trim(),
             compact: compact.checked,
+            autoUpdateHours: autoUpdate.currentValue,
             useAltIds: useAltIds.checked,
             checkMissing: checkMissing.checked,
             useCommunity: useCommunity.checked
@@ -194,6 +195,45 @@ Rectangle {
                             id: compact
                             text: "Compact mod list"
                             checked: root.initial.compact
+                        }
+                    }
+
+                    Group {
+                        title: "Steam Workshop"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Auto-update mods"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxComboBox {
+                                id: autoUpdate
+                                Layout.preferredWidth: 180
+                                Accessible.name: "Auto-update Workshop mods"
+                                textRole: "text"
+                                valueRole: "value"
+                                model: [
+                                    { text: "Off", value: 0 },
+                                    { text: "Every 6 hours", value: 6 },
+                                    { text: "Every 12 hours", value: 12 },
+                                    { text: "Daily", value: 24 },
+                                    { text: "Every 3 days", value: 72 },
+                                    { text: "Weekly", value: 168 }
+                                ]
+                                Component.onCompleted: currentIndex = Math.max(0, indexOfValue(root.initial.autoUpdateHours))
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Re-syncs mods downloaded by PxModRim while the app is running."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
                         }
                     }
                 }

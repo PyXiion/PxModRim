@@ -27,6 +27,9 @@ THREADS_PER_ITEM = 4
 
 _CANCELLED = "cancelled"
 _PROGRESS_LOG_INTERVAL_S = 15.0
+_SYNC_FILE = "workshop_sync.json"
+AUTO_STARTUP_DELAY_S = 45.0
+AUTO_CHECK_INTERVAL_S = 600.0
 _MAX_PUBLISHED_FILE_ID = 2**64 - 1
 _PUBLISHED_FILE_ID_RE = re.compile(r"[0-9]+")
 
@@ -85,6 +88,12 @@ class DownloadResult(msgspec.Struct):
     changed: list[str] = msgspec.field(default_factory=list)
 
 
+class WorkshopSyncState(msgspec.Struct):
+    """When each Workshop item was last synced with Steam (unix seconds)."""
+
+    synced: dict[str, float] = msgspec.field(default_factory=dict)
+
+
 class _Batch:
     __slots__ = (
         "bytes",
@@ -137,10 +146,12 @@ class WorkshopDownloadService(Plugin):
 
     __slots__ = (
         "_active_ids",
+        "_auto_task",
         "_client",
         "_client_factory",
         "_ctx",
         "_running",
+        "_sync",
         "_token",
         "busy_changed",
         "download_finished",
@@ -161,14 +172,24 @@ class WorkshopDownloadService(Plugin):
         self._client: WorkshopClient | None = None
         self._token: pxsteamdl.CancelToken | None = None
         self._active_ids: frozenset[str] = frozenset()
+        self._sync = WorkshopSyncState()
+        self._auto_task: asyncio.Task[None] | None = None
         self._running: asyncio.Future[list[pxsteamdl.Result]] | None = None
 
     def setup(self, ctx: CoreContext) -> None:
         self._ctx = ctx
 
-    async def init(self, ctx: CoreContext) -> None: ...
+    async def init(self, ctx: CoreContext) -> None:
+        self._sync = await asyncio.to_thread(
+            ctx.config_service.load, _SYNC_FILE, WorkshopSyncState
+        )
+        self._auto_task = asyncio.create_task(self._auto_update_loop())
 
     async def shutdown(self) -> None:
+        if self._auto_task is not None:
+            self._auto_task.cancel()
+            await asyncio.wait([self._auto_task])
+            self._auto_task = None
         self.cancel()
         running = self._running
         if running is not None:
@@ -230,6 +251,7 @@ class WorkshopDownloadService(Plugin):
                 len(result.failed),
                 f" (failed ids: {result.failed[:20]})" if result.failed else "",
             )
+            self._record_synced(result.succeeded)
             self.download_finished.emit(result)
         return result
 
@@ -242,6 +264,47 @@ class WorkshopDownloadService(Plugin):
             return None
         pfid = mod.published_file_id
         return pfid if pfid == path.name else None
+
+    def last_synced(self, pid: str | None) -> float | None:
+        return self._sync.synced.get(pid) if pid else None
+
+    def stale_ids(self, max_age_s: float, now: float | None = None) -> list[str]:
+        """Updatable ids never synced or synced over *max_age_s* ago, oldest first."""
+        cutoff = (time.time() if now is None else now) - max_age_s
+        synced = self._sync.synced
+        stale = [pid for pid in self.updatable_ids() if synced.get(pid, 0.0) < cutoff]
+        return sorted(stale, key=lambda pid: synced.get(pid, 0.0))
+
+    def _record_synced(self, ids: list[str]) -> None:
+        if not ids or self._ctx is None:
+            return
+        now = time.time()
+        self._sync.synced.update(dict.fromkeys(ids, now))
+        try:
+            self._ctx.config_service.save(_SYNC_FILE, self._sync)
+        except OSError as exc:
+            logger.warning("[workshop] cannot save sync times: {}", exc)
+
+    async def _auto_update_loop(self) -> None:
+        await asyncio.sleep(AUTO_STARTUP_DELAY_S)
+        while True:
+            await self._auto_update_once()
+            await asyncio.sleep(AUTO_CHECK_INTERVAL_S)
+
+    async def _auto_update_once(self) -> None:
+        if self._ctx is None or self.is_downloading:
+            return
+        hours = self._ctx.config.workshop_auto_update_hours
+        if hours <= 0:
+            return
+        ids = self.stale_ids(hours * 3600)
+        if not ids:
+            return
+        logger.info("[workshop] auto-update: {} mods older than {}h", len(ids), hours)
+        try:
+            await self.download_mods(ids)
+        except (RuntimeError, ValueError) as exc:
+            logger.warning("[workshop] auto-update not started: {}", exc)
 
     def updatable_ids(self, mods: Iterable[ListedMod] | None = None) -> list[str]:
         """Updatable ids among *mods* (all loaded mods by default), deduplicated."""

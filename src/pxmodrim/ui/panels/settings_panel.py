@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import msgspec
 from PySide6.QtCore import Property, QObject, Qt, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
@@ -61,6 +62,7 @@ class _SettingsBackend(QObject):
             "workshop": cfg.paths.workshop,
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
+            "autoUpdateHours": cfg.workshop_auto_update_hours,
             "useAltIds": cfg.sort.use_alternative_package_ids,
             "checkMissing": cfg.sort.check_missing_dependencies,
             "useCommunity": cfg.sort.use_community_rules,
@@ -204,7 +206,8 @@ class SettingsPanel(QDialog):
         layout.addWidget(self._qml)
 
     def _save(self, values: dict[str, Any]) -> None:
-        self._config = AppConfig(
+        self._config = msgspec.structs.replace(
+            self._config,
             paths=PathConfig(
                 game=values["game"].strip(),
                 local=values["local"].strip(),
@@ -216,8 +219,8 @@ class SettingsPanel(QDialog):
                 check_missing_dependencies=bool(values["checkMissing"]),
                 use_community_rules=bool(values["useCommunity"]),
             ),
-            max_snapshots=self._config.max_snapshots,
             compact_mod_list=bool(values["compact"]),
+            workshop_auto_update_hours=int(values["autoUpdateHours"]),
         )
         self.accept()
 

@@ -17,6 +17,7 @@ from pxmodrim.core.services.workshop_download_service import (
     DownloadItemStatus,
     DownloadResult,
     WorkshopDownloadService,
+    WorkshopSyncState,
 )
 
 
@@ -284,3 +285,36 @@ def test_batch_changed_ignores_zero_byte_items() -> None:
     batch.succeeded = ["1", "2"]
     batch.bytes = {"1": (0, 0), "2": (5, 5)}
     assert batch.changed() == ["2"]
+
+
+async def test_success_records_sync_time_and_persists(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path, FakeClient(errors={222: "gone"}))
+    await svc.download_mods(["111", "222"])
+    assert svc.last_synced("111") is not None
+    assert svc.last_synced("222") is None
+    reloaded = ConfigService(tmp_path).load("workshop_sync.json", WorkshopSyncState)
+    assert set(reloaded.synced) == {"111"}
+
+
+def test_stale_ids_never_synced_first_then_oldest(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path)
+    mods = [_mod_at(tmp_path / "Mods" / n, n) for n in ("1", "2", "3", "4")]
+    _load(svc, mods)
+    svc._sync.synced.update({"1": 1000.0, "2": 9000.0, "3": 500.0})
+    assert svc.stale_ids(3600, now=10000.0) == ["4", "3", "1"]
+
+
+async def test_auto_update_only_syncs_stale_mods_when_enabled(tmp_path: Path) -> None:
+    client = FakeClient()
+    svc, _ = _service(tmp_path, client)
+    assert svc._ctx is not None
+    _load(svc, [_mod_at(tmp_path / "Mods" / "1", "1")])
+    await svc._auto_update_once()
+    assert svc.last_synced("1") is None
+
+    svc._ctx.config.workshop_auto_update_hours = 6
+    await svc._auto_update_once()
+    assert svc.last_synced("1") is not None
+    synced = svc.last_synced("1")
+    await svc._auto_update_once()
+    assert svc.last_synced("1") == synced

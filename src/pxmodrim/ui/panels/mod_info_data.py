@@ -218,7 +218,7 @@ def _version_support(mod: ListedMod, target: str) -> dict[str, Any]:
     return {"known": True, "ok": target in mod.supported_versions, "target": target}
 
 
-def _details(mod: ListedMod) -> list[dict[str, Any]]:
+def _details(mod: ListedMod, last_synced: float | None = None) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if isinstance(mod, AboutXmlMod):
         if mod.authors:
@@ -230,6 +230,8 @@ def _details(mod: ListedMod) -> list[dict[str, Any]]:
             rows.append({"label": "Source", "value": source})
         if mod.mtime > 0:
             rows.append({"label": "Updated", "value": format_age(mod.mtime)})
+        if last_synced:
+            rows.append({"label": "Last synced", "value": format_age(last_synced)})
         rows.append({"label": "Package ID", "value": str(mod.package_id), "copy": True})
     if mod.mod_path is not None:
         rows.append({"label": "Path", "value": str(mod.mod_path), "copy": True})
@@ -284,7 +286,9 @@ def build_mod_info(
         )
         if mod.description
         else "",
-        "details": _details(mod),
+        "details": _details(
+            mod, svc.last_synced(mod.published_file_id) if svc is not None else None
+        ),
         "canOpenFolder": mod.mod_path is not None and mod.mod_path.exists(),
         "canUpdateWorkshop": svc is not None and svc.updatable_id(mod) is not None,
         "url": mod.url if isinstance(mod, AboutXmlMod) else "",
