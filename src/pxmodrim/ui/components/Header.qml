@@ -164,6 +164,7 @@ Rectangle {
             Layout.fillHeight: true
 
             ColumnLayout {
+                id: downloadsProgress
                 visible: root.controller.downloadsBusy && root.controller.downloadsProgressShown
                 anchors.centerIn: parent
                 width: Math.min(parent.width, 360)
@@ -186,15 +187,16 @@ Rectangle {
                     value: root.controller.downloadsValue
                     indeterminate: root.controller.downloadsTotal <= 0
                 }
+            }
 
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.controller.openDownloads()
-                    ToolTip.text: "Open Downloads"
-                    ToolTip.visible: containsMouse
-                    hoverEnabled: true
-                }
+            MouseArea {
+                anchors.fill: downloadsProgress
+                visible: downloadsProgress.visible
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.controller.openDownloads()
+                ToolTip.text: "Open Downloads"
+                ToolTip.visible: containsMouse
+                hoverEnabled: true
             }
         }
 

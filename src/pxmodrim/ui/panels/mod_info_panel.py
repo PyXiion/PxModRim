@@ -174,8 +174,8 @@ class ModInfoPanel(QWidget):
         self._sync_updating()
 
     def _sync_updating(self) -> None:
-        pid = self._mod.published_file_id if self._mod is not None else None
-        updating = pid is not None and pid in self._downloads.active_ids
+        mod_id = self._downloads.updatable_id(self._mod) if self._mod else None
+        updating = mod_id is not None and mod_id in self._downloads.active_ids
         self._set_qml("updatingThis", updating)
 
     @asyncSlot()

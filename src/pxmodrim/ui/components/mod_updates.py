@@ -52,7 +52,10 @@ def update_state(ctx: CoreContext, uuids: Iterable[str]) -> UpdateState:
 
 def add_update_action(
     menu: QMenu, ctx: CoreContext, uuids: Iterable[str], handler: Callable[[], object]
-) -> QAction:
+) -> QAction | None:
+    """Add an Update entry to *menu*; skipped when no download source exists."""
+    if not download_manager(ctx).available:
+        return None
     state = update_state(ctx, uuids)
     action = menu.addAction(state.label, handler)
     action.setEnabled(state.enabled)

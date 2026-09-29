@@ -119,3 +119,12 @@ async def test_busy_reflects_any_downloader_and_cancel_stops_the_rest() -> None:
 
     assert github.calls == []
     assert busy == [True, False]
+
+
+def test_names_are_keyed_by_source_id_not_workshop_id(tmp_path) -> None:
+    manager = DownloadManager()
+    manager.register(FakeGithub())
+    mod = _mod(tmp_path, "g1")
+    object.__setattr__(mod, "name", "Git Mod")
+
+    assert manager.names_by_id([mod, _mod(tmp_path, "s1")]) == {"g1": "Git Mod"}

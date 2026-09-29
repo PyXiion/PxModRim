@@ -95,6 +95,14 @@ class DownloadManager(Plugin):
             ids.update(dict.fromkeys(downloader.updatable_ids(mods)))
         return list(ids)
 
+    def names_by_id(self, mods: Iterable[ListedMod]) -> dict[str, str]:
+        """Display names of installed *mods*, keyed by their source id."""
+        return {
+            mod_id: mod.name
+            for mod in mods
+            if (mod_id := self.updatable_id(mod)) is not None
+        }
+
     def last_synced(self, mod: ListedMod) -> float | None:
         source = self.source_of(mod)
         return None if source is None else source.last_synced(mod)

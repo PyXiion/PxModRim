@@ -526,7 +526,7 @@ class MainWindow(QMainWindow):
             return
         summary = f"{changed} updated, {ok - changed} unchanged"
         if failed:
-            by_id = {m.published_file_id: m.name for m in self._ctx.all_mods.values()}
+            by_id = download_manager(self._ctx).names_by_id(self._ctx.all_mods.values())
             shown = ", ".join(by_id.get(pid, pid) for pid in result.failed[:3])
             more = "…" if failed > 3 else ""
             self._toast_manager.warning(f"{summary}, {failed} failed: {shown}{more}")

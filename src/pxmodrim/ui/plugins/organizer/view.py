@@ -304,6 +304,7 @@ class OrganizerViewPanel(BaseViewPanel):
         state = update_state(
             self._ctx, [n.leaf.uuid for n in selected if n.kind == "mod" and n.leaf]
         )
+        self._update_button.setVisible(download_manager(self._ctx).available)
         self._update_button.setText(state.label)
         self._update_button.setEnabled(state.enabled)
         self._update_button.setToolTip(state.tooltip)

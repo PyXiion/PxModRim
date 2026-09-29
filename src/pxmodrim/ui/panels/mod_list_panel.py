@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
+from pxmodrim.core.downloads import download_manager
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.components.mod_activation import toggle_mods
@@ -279,6 +280,8 @@ class ModListPanel(QWidget):
 
     @Slot("QVariantList")
     def showContextMenu(self, uuids: list[str]) -> None:
+        if not download_manager(self._ctx).available:
+            return
         menu = QMenu(self)
         menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         menu.setToolTipsVisible(True)

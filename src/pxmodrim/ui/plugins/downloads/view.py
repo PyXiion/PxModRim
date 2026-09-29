@@ -60,12 +60,7 @@ class DownloadsViewPanel(BaseViewPanel):
         self._downloads.busy_changed.connect(self.model.set_busy)
 
     def _on_batch_started(self, ids: list[str]) -> None:
-        titles = {
-            m.published_file_id: m.name
-            for m in self._ctx.all_mods.values()
-            if m.published_file_id
-        }
-        self.model.begin(ids, titles)
+        self.model.begin(ids, self._downloads.names_by_id(self._ctx.all_mods.values()))
 
     def _on_finished(self, result: DownloadResult) -> None:
         self.model.finish(result)
