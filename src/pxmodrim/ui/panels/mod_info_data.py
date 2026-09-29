@@ -14,6 +14,12 @@ if TYPE_CHECKING:
 
 _URL_RE = re.compile(r"https?://[^\s<>\"]+")
 _IMG_RE = re.compile(r"\[img\](https?://[^\s\[<\"]+)\[/img\]", re.IGNORECASE)
+_URL_TAG_RE = re.compile(
+    r"\[url=(https?://[^\]\s\"<]+)\](.*?)\[/url\]", re.IGNORECASE | re.DOTALL
+)
+_BARE_URL_TAG_RE = re.compile(r"\[url\](https?://[^\[\s\"<]+)\[/url\]", re.IGNORECASE)
+_FORMAT_TAGS = {"b": "b", "i": "i", "u": "u", "s": "s", "strike": "s"}
+_FORMAT_RE = re.compile(r"\[(/?)(" + "|".join(_FORMAT_TAGS) + r")\]", re.IGNORECASE)
 # Replaced by the QML page with the description's pixel width.
 IMG_WIDTH_TOKEN = "__IMG_WIDTH__"
 _TAG_RE = re.compile(r"(<[^>]+>)")
@@ -31,6 +37,15 @@ def bbcode_images(html_text: str) -> str:
     """Turn Steam-style [img]url[/img] into width-constrained <img> tags."""
     return _IMG_RE.sub(
         lambda m: f'<img src="{m.group(1)}" width="{IMG_WIDTH_TOKEN}">', html_text
+    )
+
+
+def bbcode_markup(html_text: str) -> str:
+    """Convert Steam-style [url], [b], [i], [u] and [s] tags to HTML."""
+    html_text = _URL_TAG_RE.sub(r'<a href="\1">\2</a>', html_text)
+    html_text = _BARE_URL_TAG_RE.sub(r'<a href="\1">\1</a>', html_text)
+    return _FORMAT_RE.sub(
+        lambda m: f"<{m.group(1)}{_FORMAT_TAGS[m.group(2).lower()]}>", html_text
     )
 
 
@@ -210,7 +225,9 @@ def build_mod_info(
         "needs": needs,
         "conflicts": conflicts,
         "neededBy": needed_by,
-        "description": autolink(bbcode_images(unity_rich_text_to_html(mod.description)))
+        "description": autolink(
+            bbcode_markup(bbcode_images(unity_rich_text_to_html(mod.description)))
+        )
         if mod.description
         else "",
         "details": _details(mod),
