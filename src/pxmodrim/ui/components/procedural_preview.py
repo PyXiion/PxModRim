@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from functools import lru_cache
 
 from PySide6.QtCore import QPointF, QRectF, Qt
@@ -16,6 +17,28 @@ def _seedrand(seed: str) -> float:
 
 def _hsl(h: float, s: float, lum: float) -> QColor:
     return QColor.fromHslF(h % 1.0, max(0.0, min(1.0, s)), max(0.0, min(1.0, lum)))
+
+
+_TAG_RE = re.compile(r"[\[(][^\])]*[\])]")
+_WORD_RE = re.compile(r"[^\W_]+")
+_CAMEL_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+|[^\W\d_a-zA-Z]+")
+_STOP_WORDS = frozenset({"a", "an", "and", "for", "of", "the", "to", "in", "on"})
+
+
+def initials(title: str) -> str:
+    """Two-letter monogram: skips [TAGS] and punctuation, splits CamelCase."""
+    stripped = _TAG_RE.sub(" ", title)
+    # A title that is only tags ("[AV]") falls back to its contents.
+    source = stripped if _WORD_RE.search(stripped) else title
+    words: list[str] = []
+    for chunk in _WORD_RE.findall(source):
+        words.extend(_CAMEL_RE.findall(chunk) or [chunk])
+    meaningful = [w for w in words if w.lower() not in _STOP_WORDS] or words
+    if not meaningful:
+        return title.strip()[:2].upper() or "?"
+    if len(meaningful) == 1:
+        return meaningful[0][:2].upper()
+    return (meaningful[0][0] + meaningful[1][0]).upper()
 
 
 def _blob(
@@ -57,7 +80,7 @@ def generate_preview(title: str, width: int, height: int) -> QPixmap:
         painter, width * (0.85 - jitter_x), height * (0.9 - jitter_y), span * 0.55, cool
     )
 
-    initials = "".join(w[0] for w in title.split()[:2]).upper() or title[:2].upper()
+    monogram = initials(title)
     font = painter.font()
     font.setBold(True)
     font.setWeight(font.Weight.ExtraBold)
@@ -67,7 +90,7 @@ def generate_preview(title: str, width: int, height: int) -> QPixmap:
     painter.setPen(QColor(255, 255, 255, 210))
     visible = max(height - BANNER_OVERLAY_HEIGHT, height // 2)
     painter.drawText(
-        QRectF(0, 0, width, visible), Qt.AlignmentFlag.AlignCenter, initials
+        QRectF(0, 0, width, visible), Qt.AlignmentFlag.AlignCenter, monogram
     )
 
     painter.end()
