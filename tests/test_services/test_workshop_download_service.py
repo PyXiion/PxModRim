@@ -12,6 +12,7 @@ import pytest
 
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
+from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.services.workshop_download_service import (
     DownloadItemStatus,
     DownloadResult,
@@ -198,3 +199,53 @@ async def test_second_download_while_running_is_rejected(tmp_path: Path) -> None
 
     gate.set()
     assert (await first).succeeded == ["111"]
+
+
+def _mod_at(path: Path, pfid: str | None = None) -> ListedMod:
+    if pfid is not None:
+        (path / "About").mkdir(parents=True)
+        (path / "About" / "PublishedFileId.txt").write_text(pfid)
+    else:
+        path.mkdir(parents=True)
+    return ListedMod(_mod_path=path)
+
+
+def _load(svc: WorkshopDownloadService, mods: list[ListedMod]) -> None:
+    assert svc._ctx is not None
+    svc._ctx.load({m.uuid: m for m in mods}, [])
+
+
+def test_updatable_id_only_for_downloads_in_local_mods(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path)
+    mods = [
+        _mod_at(tmp_path / "Mods" / "111", "111"),
+        _mod_at(tmp_path / "Mods" / "Renamed", "222"),
+        _mod_at(tmp_path / "Mods" / "333"),
+        _mod_at(tmp_path / "Workshop" / "444", "444"),
+    ]
+    _load(svc, mods)
+    assert [svc.updatable_id(m) for m in mods] == ["111", None, "333", None]
+    assert svc.updatable_ids() == ["111", "333"]
+
+
+def test_updatable_id_none_without_local_path(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path, local=False)
+    assert svc.updatable_id(_mod_at(tmp_path / "Mods" / "111", "111")) is None
+
+
+async def test_busy_changed_brackets_download(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path, FakeClient())
+    events: list[object] = []
+    svc.busy_changed.connect(lambda busy: events.append(("busy", busy)))
+    svc.download_finished.connect(lambda _r: events.append("finished"))
+    await svc.download_mods(["111"])
+    assert events == [("busy", True), ("busy", False), "finished"]
+
+
+async def test_invalid_ids_do_not_toggle_busy(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path, FakeClient())
+    busy: list[bool] = []
+    svc.busy_changed.connect(busy.append)
+    with pytest.raises(ValueError):
+        await svc.download_mods(["12a"])
+    assert busy == []

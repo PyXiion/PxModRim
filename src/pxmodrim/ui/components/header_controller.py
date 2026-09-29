@@ -22,6 +22,8 @@ class HeaderController(QObject):
     close_requested = Signal()
     drag_started = Signal()
     unsaved_changes_changed = Signal()
+    update_workshop_requested = Signal()
+    workshop_busy_changed = Signal()
 
     def __init__(
         self,
@@ -30,6 +32,7 @@ class HeaderController(QObject):
         initial_strategy: int = 0,
         app_version: str = "",
         tooltips: dict[str, str] | None = None,
+        workshop_available: bool = False,
     ) -> None:
         super().__init__(parent)
         self._is_frameless = is_frameless
@@ -38,6 +41,8 @@ class HeaderController(QObject):
         self._unsaved_changes = False
         self._app_version = app_version
         self._tooltips = tooltips or {}
+        self._workshop_available = workshop_available
+        self._workshop_busy = False
 
     def is_frameless_getter(self) -> bool:
         return self._is_frameless
@@ -46,6 +51,9 @@ class HeaderController(QObject):
 
     appVersion = Property(str, lambda self: self._app_version, constant=True)
     tooltips = Property(dict, lambda self: self._tooltips, constant=True)
+    workshopAvailable = Property(
+        bool, lambda self: self._workshop_available, constant=True
+    )
 
     @Property("QVariantList", constant=True)  # type: ignore[operator]
     def strategies(self) -> list[dict[str, object]]:
@@ -68,6 +76,10 @@ class HeaderController(QObject):
     @Slot()
     def autoSort(self) -> None:
         self.sort_requested.emit()
+
+    @Slot()
+    def updateWorkshop(self) -> None:
+        self.update_workshop_requested.emit()
 
     @Slot()
     def save(self) -> None:
@@ -124,4 +136,17 @@ class HeaderController(QObject):
         _get_unsaved_changes,
         set_unsaved_changes,
         notify=unsaved_changes_changed,
+    )
+
+    @Slot(bool)
+    def set_workshop_busy(self, value: bool) -> None:
+        if self._workshop_busy != value:
+            self._workshop_busy = value
+            self.workshop_busy_changed.emit()
+
+    workshopBusy = Property(
+        bool,
+        lambda self: self._workshop_busy,
+        set_workshop_busy,
+        notify=workshop_busy_changed,
     )

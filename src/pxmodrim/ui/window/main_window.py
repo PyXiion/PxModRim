@@ -34,6 +34,10 @@ from pxmodrim.core.config import config_dir
 from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.core.services.update_service import UpdateCheckError, UpdateService
+from pxmodrim.core.services.workshop_download_service import (
+    DownloadResult,
+    workshop_service,
+)
 from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import (
     HeaderController,
@@ -154,6 +158,8 @@ class MainWindow(QMainWindow):
 
     def _setup_header_and_shortcuts(self) -> None:
         logger.debug("main_window: setting up header and shortcuts")
+        self._workshop = workshop_service(self._ctx)
+        self._workshop_refresh: asyncio.Task[int] | None = None
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ui_prefs.launch_strategy),
@@ -163,7 +169,9 @@ class MainWindow(QMainWindow):
                 "sort": ACTIONS[ActionId.AUTO_SORT].tooltip(),
                 "save": ACTIONS[ActionId.SAVE].tooltip(),
                 "settings": ACTIONS[ActionId.SETTINGS].tooltip(),
+                "update_workshop": ACTIONS[ActionId.UPDATE_WORKSHOP].tooltip(),
             },
+            workshop_available=self._workshop is not None,
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
@@ -175,6 +183,9 @@ class MainWindow(QMainWindow):
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
+        self._header_controller.update_workshop_requested.connect(
+            self._update_workshop_mods
+        )
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
 
@@ -186,6 +197,7 @@ class MainWindow(QMainWindow):
             ActionId.QUIT: self.close,
             ActionId.REFRESH: self._refresh_mods,
             ActionId.FULL_RESCAN: self._full_rescan,
+            ActionId.UPDATE_WORKSHOP: self._update_workshop_mods,
             ActionId.AUTO_SORT: self._auto_sort,
             ActionId.FOCUS_SEARCH: self._focus_search,
             ActionId.NEXT_VIEW: lambda: self._cycle_view(1),
@@ -200,6 +212,7 @@ class MainWindow(QMainWindow):
         }
         for action_id, handler in handlers.items():
             self._actions[action_id].triggered.connect(handler)
+        self._actions[ActionId.UPDATE_WORKSHOP].setEnabled(self._workshop is not None)
 
         for index, key in enumerate(VIEW_SWITCH_KEYS):
             switch = QAction(self)
@@ -317,6 +330,12 @@ class MainWindow(QMainWindow):
         self._ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message
         )
+        if self._workshop is not None:
+            self._workshop.busy_changed.connect(self._on_workshop_busy)
+            self._workshop.download_finished.connect(
+                self._on_workshop_download_finished
+            )
+            self._workshop.status_message_changed.connect(self._on_status_message)
 
         self.installEventFilter(self)
 
@@ -451,6 +470,38 @@ class MainWindow(QMainWindow):
 
     def _on_status_message(self, message: str) -> None:
         self._toast_manager.info(message)
+
+    @asyncSlot()
+    async def _update_workshop_mods(self) -> None:
+        workshop = self._workshop
+        if workshop is None:
+            return
+        ids = workshop.updatable_ids()
+        if not ids:
+            self._toast_manager.info("No workshop mods to update")
+            return
+        self._toast_manager.info(f"Updating {len(ids)} workshop mods\u2026")
+        try:
+            await workshop.download_mods(ids)
+        except (RuntimeError, ValueError) as exc:
+            self._toast_manager.error(str(exc))
+
+    def _on_workshop_busy(self, busy: bool) -> None:
+        self._header_controller.set_workshop_busy(busy)
+        self._actions[ActionId.UPDATE_WORKSHOP].setEnabled(not busy)
+
+    def _on_workshop_download_finished(self, result: DownloadResult) -> None:
+        ok, failed = len(result.succeeded), len(result.failed)
+        if failed:
+            self._toast_manager.warning(
+                f"Workshop download finished: {ok} succeeded, {failed} failed"
+            )
+        elif ok:
+            self._toast_manager.success(f"Workshop download finished: {ok} succeeded")
+        else:
+            self._toast_manager.info("Workshop download cancelled")
+        if ok:
+            self._workshop_refresh = asyncio.ensure_future(self._app_ctx.refresh_mods())
 
     @asyncSlot()
     async def _open_settings(self) -> None:

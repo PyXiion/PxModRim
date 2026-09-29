@@ -18,6 +18,7 @@ from pxmodrim.core.plugin import Plugin
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
+    from pxmodrim.core.models.metadata.structures import ListedMod
 
 # PxSteamDL runs one shared pool of parallel_items * threads_per_item workers.
 PARALLEL_ITEMS = 2
@@ -107,6 +108,7 @@ class WorkshopDownloadService(Plugin):
     download_progress: Event[DownloadProgress]
     download_item_status_changed: Event[DownloadItemStatus]
     download_finished: Event[DownloadResult]
+    busy_changed: Event[bool]
 
     __slots__ = (
         "_client",
@@ -114,6 +116,7 @@ class WorkshopDownloadService(Plugin):
         "_ctx",
         "_running",
         "_token",
+        "busy_changed",
         "download_finished",
         "download_item_status_changed",
         "download_progress",
@@ -125,6 +128,7 @@ class WorkshopDownloadService(Plugin):
         self.download_progress = Event()
         self.download_item_status_changed = Event()
         self.download_finished = Event()
+        self.busy_changed = Event()
 
         self._ctx: CoreContext | None = None
         self._client_factory: ClientFactory = client_factory or _login
@@ -168,11 +172,13 @@ class WorkshopDownloadService(Plugin):
         batch = _Batch(len(ids))
         token = pxsteamdl.CancelToken()
         self._token = token
+        self.busy_changed.emit(True)
         logger.info("[workshop] downloading {} items into {}", len(ids), root)
         try:
             await self._run(ids, root, batch, token)
         finally:
             self._token = None
+            self.busy_changed.emit(False)
             result = DownloadResult(succeeded=batch.succeeded, failed=batch.failed)
             logger.info(
                 "[workshop] finished: {} ok, {} failed",
@@ -181,6 +187,25 @@ class WorkshopDownloadService(Plugin):
             )
             self.download_finished.emit(result)
         return result
+
+    def updatable_id(self, mod: ListedMod) -> str | None:
+        """Workshop id of *mod* if it is a PxModRim download in ``paths.local``."""
+        if self._ctx is None or not self._ctx.config.paths.local:
+            return None
+        path = mod.mod_path
+        if path is None or path.parent != Path(self._ctx.config.paths.local):
+            return None
+        pfid = mod.published_file_id
+        return pfid if pfid == path.name else None
+
+    def updatable_ids(self) -> list[str]:
+        if self._ctx is None:
+            return []
+        return [
+            pid
+            for m in self._ctx.all_mods.values()
+            if (pid := self.updatable_id(m)) is not None
+        ]
 
     def cancel(self) -> None:
         token = self._token
@@ -284,3 +309,8 @@ class WorkshopDownloadService(Plugin):
             )
         self.download_item_status_changed.emit(status)
         self.download_progress.emit(batch.progress())
+
+
+def workshop_service(ctx: CoreContext) -> WorkshopDownloadService | None:
+    svc = ctx.plugins.get(WorkshopDownloadService.name)
+    return svc if isinstance(svc, WorkshopDownloadService) else None

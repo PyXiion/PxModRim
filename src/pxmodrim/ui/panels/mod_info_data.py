@@ -5,6 +5,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.services.workshop_download_service import workshop_service
 from pxmodrim.ui.components.unity_rich_text import unity_rich_text_to_html
 from pxmodrim.ui.models.mod_list_model import provider_label
 
@@ -253,6 +254,7 @@ def build_mod_info(
         conflicts = _conflicts(mod, index, active)
         needed_by = _needed_by(mod, ctx)
 
+    svc = workshop_service(ctx)
     return {
         "name": mod.name,
         "author": ", ".join(mod.authors) if isinstance(mod, AboutXmlMod) else "",
@@ -284,5 +286,6 @@ def build_mod_info(
         else "",
         "details": _details(mod),
         "canOpenFolder": mod.mod_path is not None and mod.mod_path.exists(),
+        "canUpdateWorkshop": svc is not None and svc.updatable_id(mod) is not None,
         "url": mod.url if isinstance(mod, AboutXmlMod) else "",
     }

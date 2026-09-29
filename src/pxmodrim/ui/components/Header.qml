@@ -237,6 +237,14 @@ Rectangle {
                     onClicked: root.controller.refresh()
                 }
 
+                PxButton {
+                    visible: root.controller.workshopAvailable
+                    enabled: !root.controller.workshopBusy
+                    iconName: "download"
+                    ToolTip.text: root.controller.workshopBusy ? "Workshop download in progress" : (root.controller.tooltips.update_workshop || "Update workshop mods")
+                    onClicked: root.controller.updateWorkshop()
+                }
+
                 // ── Launch split-button ──
                 Row {
                     spacing: 1

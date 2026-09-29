@@ -11,6 +11,7 @@ from pxmodrim.core.models.metadata.structures import (
     ListedMod,
 )
 from pxmodrim.core.models.view.diagnostics import ModIssueView
+from pxmodrim.core.plugin import PluginRegistry
 from pxmodrim.ui.components.unity_rich_text import unity_rich_text_to_html
 from pxmodrim.ui.panels.mod_info_data import (
     IMG_WIDTH_TOKEN,
@@ -61,6 +62,7 @@ def make_ctx(mods: list[ListedMod], active: list[str]) -> Any:
         SimpleNamespace(
             all_mods={m.uuid: m for m in mods},
             active_uuids=active,
+            plugins=PluginRegistry(),
             target_version="1.5",
         ),
     )

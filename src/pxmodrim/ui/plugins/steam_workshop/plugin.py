@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 from typing import TYPE_CHECKING, NamedTuple, cast
 
@@ -65,7 +64,6 @@ class SteamWorkshopUiPlugin(Plugin):
         self.clear_checked_requested = Event()
         self.active_refresh_requested = Event()
 
-        self._background_tasks: set[asyncio.Task[object]] = set()
         self._core: CoreContext | None = None
         self._app_ctx: AppContext | None = None
 
@@ -265,10 +263,6 @@ class SteamWorkshopUiPlugin(Plugin):
         self.sidebar_sync_requested.emit(
             SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
         )
-        if self._core is not None and result.succeeded:
-            task = asyncio.create_task(self._core.mod_service.discover())
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
 
     # ── Internal helpers ─────────────────────────────────
 

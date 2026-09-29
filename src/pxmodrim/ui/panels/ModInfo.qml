@@ -13,10 +13,12 @@ Rectangle {
     property var startup: null
     readonly property bool startupKnown: startup !== null && startup !== undefined
     property bool descExpanded: false
+    property bool workshopBusy: false
     property bool neededExpanded: false
 
     signal openFolder()
     signal openUrl()
+    signal updateWorkshop()
     signal selectMod(string uuid)
     signal copyText(string text)
     signal openStartupDetails()
@@ -491,6 +493,17 @@ Rectangle {
                         iconName: "link"
                         ToolTip.text: root.hasInfo ? "Open mod URL: " + root.info.url : "Open mod URL"
                         onClicked: root.openUrl()
+                    }
+
+                    PxButton {
+                        visible: root.hasInfo && root.info.canUpdateWorkshop
+                        enabled: !root.workshopBusy
+                        implicitHeight: 24
+                        implicitWidth: 24
+                        variant: "ghost"
+                        iconName: "download"
+                        ToolTip.text: root.workshopBusy ? "Workshop download in progress" : "Update from Steam Workshop"
+                        onClicked: root.updateWorkshop()
                     }
                 }
 

@@ -197,9 +197,9 @@ def _phase_rows(
 
 
 def _metrics_by_phase(metrics: dict[str, float]) -> dict[Phase, dict[str, float]]:
-    grouped: dict[Phase, dict[str, float]] = defaultdict(dict)
+    grouped: dict[Phase, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for key, seconds in metrics.items():
-        grouped[metric_phase(key)][metric_label(key)] = seconds
+        grouped[metric_phase(key)][metric_label(key)] += seconds
     return grouped
 
 

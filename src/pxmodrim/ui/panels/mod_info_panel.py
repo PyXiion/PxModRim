@@ -17,6 +17,7 @@ from qasync import asyncSlot
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 from pxmodrim.core.services.startup_impact_service.labels import metric_label
+from pxmodrim.core.services.workshop_download_service import workshop_service
 from pxmodrim.ui.components import AspectRatioBanner, generate_preview
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.models.impact import format_duration, impact_color
@@ -101,6 +102,8 @@ class ModInfoPanel(QWidget):
         self._qml.hide()
         layout.addWidget(self._qml, 1)
 
+        self._workshop = workshop_service(ctx)
+
         root: Any = self._qml.rootObject()
         if root is None:
             logger.warning("ModInfo QML failed to load: {}", _QML)
@@ -112,6 +115,10 @@ class ModInfoPanel(QWidget):
         root.copyText.connect(self._on_copy_text)
         root.openStartupDetails.connect(self._on_open_startup_details)
         root.descToggled.connect(self._on_desc_toggled)
+        root.updateWorkshop.connect(self._on_update_workshop)
+        if self._workshop is not None:
+            root.setProperty("workshopBusy", self._workshop.is_downloading)
+            self._workshop.busy_changed.connect(self._on_workshop_busy)
 
     def _set_qml(self, name: str, value: object) -> None:
         root = self._qml.rootObject()
@@ -161,6 +168,21 @@ class ModInfoPanel(QWidget):
         if description != self._description:
             self._description = description
             self._set_qml("description", description)
+
+    def _on_workshop_busy(self, busy: bool) -> None:
+        self._set_qml("workshopBusy", busy)
+
+    @asyncSlot()
+    async def _on_update_workshop(self) -> None:
+        if self._workshop is None or self._mod is None:
+            return
+        pid = self._workshop.updatable_id(self._mod)
+        if pid is None:
+            return
+        try:
+            await self._workshop.download_mods([pid])
+        except (RuntimeError, ValueError) as exc:
+            logger.warning("[workshop] update of {} not started: {}", pid, exc)
 
     def _on_open_folder(self) -> None:
         if self._mod is not None and self._mod.mod_path is not None:

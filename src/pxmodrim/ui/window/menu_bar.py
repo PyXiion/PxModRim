@@ -20,7 +20,13 @@ MENU_LAYOUT: tuple[tuple[str, tuple[ActionId | None, ...]], ...] = (
     ),
     (
         "&Mods",
-        (ActionId.REFRESH, ActionId.FULL_RESCAN, ActionId.AUTO_SORT),
+        (
+            ActionId.REFRESH,
+            ActionId.FULL_RESCAN,
+            ActionId.AUTO_SORT,
+            None,
+            ActionId.UPDATE_WORKSHOP,
+        ),
     ),
     (
         "&View",
