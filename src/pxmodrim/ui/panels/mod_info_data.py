@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.models.view.diagnostics import ModIssueView
 
-_URL_RE = re.compile(r"https?://[^\s<>\"]+")
-_IMG_RE = re.compile(r"\[img\](https?://[^\s\[<\"]+)\[/img\]", re.IGNORECASE)
+_URL_RE = re.compile(r"https?://(?:(?!&(?:quot|lt|gt|#x27|#39);)[^\s<>\"])+")
+_IMG_RE = re.compile(r"\[img\]((https?)://[^\s\[<\"]+)\[/img\]", re.IGNORECASE)
 _URL_TAG_RE = re.compile(
     r"\[url=(https?://[^\]\s\"<]+)\](.*?)\[/url\]", re.IGNORECASE | re.DOTALL
 )
@@ -48,10 +48,6 @@ _BLOCK_AFTER = r"(?:/h[1-3]|/?ul|/?ol|/?table|/?tr|/?blockquote|/?pre)"
 # Line breaks the text converter emits around block tags would add blank lines.
 _BR_BEFORE_BLOCK_RE = re.compile(r"(?:<br>\s*)+(?=</?" + _BLOCK + r"\b)")
 _BR_AFTER_BLOCK_RE = re.compile(r"(<" + _BLOCK_AFTER + r">)(?:<br>\s*)+")
-_URL_TAG_RE = re.compile(
-    r"\[url=(https?://[^\]\s\"<]+)\](.*?)\[/url\]", re.IGNORECASE | re.DOTALL
-)
-_BARE_URL_TAG_RE = re.compile(r"\[url\](https?://[^\[\s\"<]+)\[/url\]", re.IGNORECASE)
 # Replaced by the QML page with the description's pixel width.
 IMG_WIDTH_TOKEN = "__IMG_WIDTH__"
 _TAG_RE = re.compile(r"(<[^>]+>)")
@@ -66,10 +62,18 @@ _UNITS = (
 
 
 def bbcode_images(html_text: str) -> str:
-    """Turn Steam-style [img]url[/img] into width-constrained <img> tags."""
-    return _IMG_RE.sub(
-        lambda m: f'<img src="{m.group(1)}" width="{IMG_WIDTH_TOKEN}">', html_text
-    )
+    """Turn Steam-style [img]url[/img] into width-constrained <img> tags.
+
+    Only https images are loaded; plain-http ones become a link instead.
+    """
+
+    def image(m: re.Match[str]) -> str:
+        url = m.group(1)
+        if m.group(2).lower() == "https":
+            return f'<img src="{url}" width="{IMG_WIDTH_TOKEN}">'
+        return f'<a href="{url}">{url}</a>'
+
+    return _IMG_RE.sub(image, html_text)
 
 
 def restore_entities(html_text: str) -> str:
