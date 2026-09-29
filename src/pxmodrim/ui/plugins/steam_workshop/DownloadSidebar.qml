@@ -8,19 +8,6 @@ Rectangle {
     color: Theme.elevate2
     property bool downloadEnabled: true
 
-    // downloadQueueModel is a context property; it can transiently be null
-    // while the underlying model is being torn down. Every read of it below
-    // goes through these guarded aliases instead of scattering `?.`/ternary
-    // checks at each call site.
-    readonly property int queueTotal: downloadQueueModel ? downloadQueueModel.progress_total : 0
-    readonly property int queueCompleted: downloadQueueModel ? downloadQueueModel.progress_completed : 0
-    readonly property real queueBytesDone: downloadQueueModel ? downloadQueueModel.bytes_done : 0
-    readonly property real queueBytesTotal: downloadQueueModel ? downloadQueueModel.bytes_total : 0
-
-    function formatMegabytes(bytes) {
-        return (bytes / 1048576).toFixed(1)
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
@@ -34,32 +21,6 @@ Rectangle {
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.Bold
             Layout.bottomMargin: 8
-        }
-
-        ColumnLayout {
-            visible: root.queueTotal > 0
-            Layout.bottomMargin: 8
-            spacing: 4
-
-            Text {
-                text: "Downloading " + root.queueCompleted + "/" + root.queueTotal
-                    + (root.queueBytesTotal > 0
-                        ? " \u00B7 " + root.formatMegabytes(root.queueBytesDone)
-                          + " / " + root.formatMegabytes(root.queueBytesTotal) + " MB"
-                        : "")
-                color: Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeXs
-            }
-
-            PxProgressBar {
-                id: progressBar
-                from: 0
-                to: root.queueBytesTotal > 0 ? root.queueBytesTotal : Math.max(root.queueTotal, 1)
-                value: root.queueBytesTotal > 0 ? root.queueBytesDone : root.queueCompleted
-                thickness: 6
-                Layout.fillWidth: true
-            }
         }
 
         Item {

@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
     from pxmodrim.ui.plugins.steam_workshop.plugin import (
         ItemStatus,
-        ProgressInfo,
         SidebarSync,
         SteamWorkshopUiPlugin,
     )
@@ -115,7 +114,6 @@ class SteamWorkshopViewPanel(BaseViewPanel):
             self._plugin.badges_refresh_requested.connect(self._push_badges_to_js)
             self._plugin.active_refresh_requested.connect(self._push_active_to_js)
             self._plugin.sidebar_sync_requested.connect(self._on_sidebar_sync)
-            self._plugin.progress_updated.connect(self._on_progress_updated)
             self._plugin.item_status_changed.connect(self._on_item_status_changed)
             self._plugin.download_busy_changed.connect(
                 lambda busy: self._download_sidebar.set_download_enabled(not busy)
@@ -180,11 +178,6 @@ class SteamWorkshopViewPanel(BaseViewPanel):
 
     def _on_sidebar_sync(self, sync: SidebarSync) -> None:
         self._download_sidebar.sync_from(sync.checked_ids, sync.statuses)
-
-    def _on_progress_updated(self, info: ProgressInfo) -> None:
-        self._download_sidebar.set_progress(
-            info.total, info.completed, info.bytes_done, info.bytes_total
-        )
 
     def _on_item_status_changed(self, status: ItemStatus) -> None:
         self._download_sidebar.update_status(

@@ -194,6 +194,10 @@ class App:
 
             self._ctx.register_plugin(WorkshopDownloadService())
 
+            from pxmodrim.ui.plugins.downloads import DownloadsUiPlugin
+
+            self._app_ctx.register_plugin(DownloadsUiPlugin())
+
         if "steamworkshop" not in disabled:
             from pxmodrim.ui.plugins import SteamWorkshopUiPlugin
 

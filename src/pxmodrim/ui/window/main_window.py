@@ -188,6 +188,10 @@ class MainWindow(QMainWindow):
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
+        self._header_controller.downloads_requested.connect(
+            lambda: self._show_view("downloads")
+        )
+        self._app_ctx.set_navigator(self._show_view)
         self._header_controller.update_workshop_requested.connect(
             self._update_workshop_mods
         )
@@ -239,6 +243,12 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
+
+    def _show_view(self, view_id: str) -> None:
+        for index, view in enumerate(self._views):
+            if view.view_id == view_id:
+                self._select_view(index)
+                return
 
     def _select_view(self, index: int) -> None:
         if 0 <= index < self._stack.count():

@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.services.workshop_download_service import (
         DownloadItemStatus,
-        DownloadProgress,
         DownloadResult,
         WorkshopDownloadService,
     )
@@ -23,13 +22,6 @@ if TYPE_CHECKING:
 class SidebarSync(NamedTuple):
     checked_ids: dict[str, str]
     statuses: dict[str, str]
-
-
-class ProgressInfo(NamedTuple):
-    total: int
-    completed: int
-    bytes_done: int
-    bytes_total: int
 
 
 class ItemStatus(NamedTuple):
@@ -45,7 +37,6 @@ class SteamWorkshopUiPlugin(Plugin):
 
     badges_refresh_requested: Event[list[str]]
     sidebar_sync_requested: Event[SidebarSync]
-    progress_updated: Event[ProgressInfo]
     item_status_changed: Event[ItemStatus]
     download_busy_changed: Event[bool]
     uncheck_mod_requested: Event[str]
@@ -57,7 +48,6 @@ class SteamWorkshopUiPlugin(Plugin):
     def __init__(self) -> None:
         self.badges_refresh_requested = Event()
         self.sidebar_sync_requested = Event()
-        self.progress_updated = Event()
         self.item_status_changed = Event()
         self.download_busy_changed = Event()
         self.uncheck_mod_requested = Event()
@@ -89,7 +79,6 @@ class SteamWorkshopUiPlugin(Plugin):
 
         ctx.core.mod_service.mods_changed.connect(self._on_mods_changed)
         ctx.core.active_state_changed.connect(self._on_active_state_changed)
-        self._svc.download_progress.connect(self._on_download_progress)
         self._svc.download_item_status_changed.connect(self._on_item_status)
         self._svc.download_finished.connect(self._on_download_finished)
         self._svc.busy_changed.connect(self.download_busy_changed.emit)
@@ -101,7 +90,6 @@ class SteamWorkshopUiPlugin(Plugin):
         if self._core is None:
             return
         with contextlib.suppress(ValueError):
-            self._svc.download_progress.disconnect(self._on_download_progress)
             self._svc.download_item_status_changed.disconnect(self._on_item_status)
             self._svc.download_finished.disconnect(self._on_download_finished)
             self._svc.busy_changed.disconnect(self.download_busy_changed.emit)
@@ -189,6 +177,8 @@ class SteamWorkshopUiPlugin(Plugin):
         logger.debug("[steam] download requested: {}", ids)
 
         self._own_download = True
+        if self._app_ctx is not None:
+            self._app_ctx.navigate("downloads")
         try:
             for mod_id in ids:
                 self._download_statuses[mod_id] = "queued"
@@ -239,18 +229,6 @@ class SteamWorkshopUiPlugin(Plugin):
         self.badges_refresh_requested.emit(list(self._installed_ids))
         self.active_refresh_requested.emit(list(self._active_ids))
 
-    def _on_download_progress(self, progress: DownloadProgress) -> None:
-        if not self._own_download:
-            return
-        self.progress_updated.emit(
-            ProgressInfo(
-                progress.total,
-                progress.completed,
-                progress.bytes_done,
-                progress.bytes_total,
-            )
-        )
-
     def _on_item_status(self, item: DownloadItemStatus) -> None:
         if not self._own_download:
             return
@@ -273,7 +251,6 @@ class SteamWorkshopUiPlugin(Plugin):
         for mod_id, status in tuple(self._download_statuses.items()):
             if status in {"queued", "downloading"}:
                 self._download_statuses.pop(mod_id)
-        self.progress_updated.emit(ProgressInfo(0, 0, 0, 0))
         self.sidebar_sync_requested.emit(
             SidebarSync(dict(self._checked_ids), dict(self._download_statuses))
         )

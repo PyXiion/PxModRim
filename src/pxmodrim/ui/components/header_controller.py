@@ -25,6 +25,7 @@ class HeaderController(QObject):
     update_workshop_requested = Signal()
     workshop_busy_changed = Signal()
     workshop_progress_changed = Signal()
+    downloads_requested = Signal()
 
     def __init__(
         self,
@@ -80,6 +81,10 @@ class HeaderController(QObject):
     @Slot()
     def autoSort(self) -> None:
         self.sort_requested.emit()
+
+    @Slot()
+    def openDownloads(self) -> None:
+        self.downloads_requested.emit()
 
     @Slot()
     def updateWorkshop(self) -> None:

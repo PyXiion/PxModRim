@@ -3,14 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import (
-    Property,
     QAbstractListModel,
     QByteArray,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
     Qt,
-    Signal,
 )
 
 
@@ -21,41 +19,9 @@ class DownloadQueueModel(QAbstractListModel):
     _StatusRole = Qt.ItemDataRole.UserRole + 4
     _ProgressRole = Qt.ItemDataRole.UserRole + 5
 
-    progress_changed = Signal()
-
     def __init__(self, parent: QObject | None = None) -> None:
-        """Initialize the download queue model with empty state."""
         super().__init__(parent)
         self._items: list[dict[str, Any]] = []
-        self._progress_total = 0
-        self._progress_completed = 0
-        self._bytes_done = 0
-        self._bytes_total = 0
-
-    @Property(int, notify=progress_changed)
-    def progress_total(self) -> int:
-        return self._progress_total
-
-    @Property(int, notify=progress_changed)
-    def progress_completed(self) -> int:
-        return self._progress_completed
-
-    @Property(float, notify=progress_changed)
-    def bytes_done(self) -> float:
-        return float(self._bytes_done)
-
-    @Property(float, notify=progress_changed)
-    def bytes_total(self) -> float:
-        return float(self._bytes_total)
-
-    def set_progress(
-        self, total: int, completed: int, bytes_done: int = 0, bytes_total: int = 0
-    ) -> None:
-        self._progress_total = total
-        self._progress_completed = completed
-        self._bytes_done = bytes_done
-        self._bytes_total = bytes_total
-        self.progress_changed.emit()
 
     def rowCount(
         self,
@@ -110,7 +76,6 @@ class DownloadQueueModel(QAbstractListModel):
             for mid, t in checked_ids.items()
         ]
         self.endResetModel()
-        self.set_progress(0, 0)
 
     def update_status(
         self, mod_id: str, status: str, bytes_done: int = 0, bytes_total: int = 0

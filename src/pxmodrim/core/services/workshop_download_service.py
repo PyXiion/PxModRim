@@ -27,6 +27,7 @@ THREADS_PER_ITEM = 4
 
 _CANCELLED = "cancelled"
 _PROGRESS_LOG_INTERVAL_S = 15.0
+_PROGRESS_EMIT_INTERVAL_S = 0.1
 _SYNC_FILE = "workshop_sync.json"
 AUTO_STARTUP_DELAY_S = 45.0
 AUTO_CHECK_INTERVAL_S = 600.0
@@ -98,6 +99,7 @@ class _Batch:
     __slots__ = (
         "bytes",
         "failed",
+        "last_emitted",
         "last_logged",
         "seen",
         "started",
@@ -109,6 +111,7 @@ class _Batch:
         self.total = total
         self.started = time.monotonic()
         self.last_logged = self.started
+        self.last_emitted = 0.0
         self.seen = 0
         self.bytes: dict[str, tuple[int, int]] = {}
         self.succeeded: list[str] = []
@@ -143,6 +146,7 @@ class WorkshopDownloadService(Plugin):
     download_item_status_changed: Event[DownloadItemStatus]
     download_finished: Event[DownloadResult]
     busy_changed: Event[bool]
+    batch_started: Event[list[str]]
 
     __slots__ = (
         "_active_ids",
@@ -153,6 +157,7 @@ class WorkshopDownloadService(Plugin):
         "_running",
         "_sync",
         "_token",
+        "batch_started",
         "busy_changed",
         "download_finished",
         "download_item_status_changed",
@@ -166,6 +171,7 @@ class WorkshopDownloadService(Plugin):
         self.download_item_status_changed = Event()
         self.download_finished = Event()
         self.busy_changed = Event()
+        self.batch_started = Event()
 
         self._ctx: CoreContext | None = None
         self._client_factory: ClientFactory = client_factory or _login
@@ -227,6 +233,7 @@ class WorkshopDownloadService(Plugin):
         self._token = token
         self._active_ids = frozenset(ids)
         self.busy_changed.emit(True)
+        self.batch_started.emit(list(ids))
         logger.info(
             "[workshop] downloading {} items into {} (first ids: {})",
             len(ids),
@@ -417,6 +424,10 @@ class WorkshopDownloadService(Plugin):
             )
         batch.bytes[pid] = (done, total)
         now = time.monotonic()
+        # pxsteamdl reports per network chunk (thousands/s); UI needs far less.
+        if done >= total or now - batch.last_emitted >= _PROGRESS_EMIT_INTERVAL_S:
+            batch.last_emitted = now
+            self._emit_item_progress(batch, pid, done, total)
         if now - batch.last_logged >= _PROGRESS_LOG_INTERVAL_S:
             batch.last_logged = now
             progress = batch.progress()
@@ -427,6 +438,10 @@ class WorkshopDownloadService(Plugin):
                 progress.bytes_done / 2**20,
                 now - batch.started,
             )
+
+    def _emit_item_progress(
+        self, batch: _Batch, pid: str, done: int, total: int
+    ) -> None:
         self.download_item_status_changed.emit(
             DownloadItemStatus(
                 mod_id=pid, status="downloading", bytes_done=done, bytes_total=total

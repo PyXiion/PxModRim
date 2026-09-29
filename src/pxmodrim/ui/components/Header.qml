@@ -186,6 +186,15 @@ Rectangle {
                     value: root.controller.workshopValue
                     indeterminate: root.controller.workshopTotal <= 0
                 }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.controller.openDownloads()
+                    ToolTip.text: "Open Downloads"
+                    ToolTip.visible: containsMouse
+                    hoverEnabled: true
+                }
             }
         }
 
@@ -268,7 +277,7 @@ Rectangle {
 
                 PxButton {
                     visible: root.controller.workshopAvailable
-                    variant: root.controller.workshopBusy ? "danger" : "default"
+                    variant: root.controller.workshopBusy ? "danger" : "secondary"
                     iconName: root.controller.workshopBusy ? "close" : "download"
                     ToolTip.text: root.controller.workshopBusy ? "Stop workshop download" : (root.controller.tooltips.update_workshop || "Update workshop mods")
                     onClicked: root.controller.updateWorkshop()

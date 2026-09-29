@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, ClassVar, Protocol
 
 from PySide6.QtWidgets import QWidget
@@ -38,13 +39,21 @@ class RailView(QWidget):
 
 
 class AppContext:
-    __slots__ = ("_core", "_plugins", "_rail_views", "_toasts", "_ui_prefs")
+    __slots__ = (
+        "_core",
+        "_navigate",
+        "_plugins",
+        "_rail_views",
+        "_toasts",
+        "_ui_prefs",
+    )
 
     def __init__(self, core: CoreContext, ui_prefs: UIPrefs | None = None) -> None:
         self._core = core
         self._plugins = PluginRegistry()
         self._rail_views: list[type[RailView]] = []
         self._toasts: Notifier | None = None
+        self._navigate: Callable[[str], None] | None = None
         self._ui_prefs = ui_prefs or UIPrefs()
 
     # ── Plugin system (UI layer) ──────────────────────
@@ -79,6 +88,16 @@ class AppContext:
     @toasts.setter
     def toasts(self, notifier: Notifier | None) -> None:
         self._toasts = notifier
+
+    # ── Navigation ────────────────────────────────────
+
+    def navigate(self, view_id: str) -> None:
+        """Switch the main window to the rail view *view_id* (no-op if unknown)."""
+        if self._navigate is not None:
+            self._navigate(view_id)
+
+    def set_navigator(self, navigate: Callable[[str], None] | None) -> None:
+        self._navigate = navigate
 
     # ── UI prefs ──────────────────────────────────────
 
