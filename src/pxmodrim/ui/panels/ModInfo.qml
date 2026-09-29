@@ -92,17 +92,8 @@ Rectangle {
         contentHeight: page.implicitHeight + 28
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        // Mouse drag must select text, not scroll; wheel and scrollbar still work.
-        interactive: false
 
         ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
-
-        WheelHandler {
-            onWheel: event => {
-                const max = Math.max(0, flick.contentHeight - flick.height)
-                flick.contentY = Math.max(0, Math.min(max, flick.contentY - event.angleDelta.y))
-            }
-        }
 
         ColumnLayout {
             id: page
