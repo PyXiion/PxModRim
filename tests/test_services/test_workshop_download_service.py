@@ -251,11 +251,11 @@ async def test_invalid_ids_do_not_toggle_busy(tmp_path: Path) -> None:
     assert busy == []
 
 
-def test_progress_counts_items_whose_bytes_are_complete() -> None:
+def test_progress_counts_complete_and_up_to_date_items() -> None:
     from pxmodrim.core.services.workshop_download_service import _Batch
 
     batch = _Batch(3)
     batch.bytes = {"1": (10, 10), "2": (5, 10), "3": (0, 0)}
-    assert batch.progress().completed == 1
+    assert batch.progress().completed == 2
     batch.succeeded.append("1")
-    assert batch.progress().completed == 1
+    assert batch.progress().completed == 2
