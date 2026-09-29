@@ -151,6 +151,7 @@ class ModInfoPanel(QWidget):
 
         self._set_qml("startup", None)
         self.set_issues(issues)
+        self._sync_updating()
         root: Any = self._qml.rootObject()
         if root is not None:
             QMetaObject.invokeMethod(root, "resetScroll")
@@ -171,6 +172,16 @@ class ModInfoPanel(QWidget):
 
     def _on_workshop_busy(self, busy: bool) -> None:
         self._set_qml("workshopBusy", busy)
+        self._sync_updating()
+
+    def _sync_updating(self) -> None:
+        pid = self._mod.published_file_id if self._mod is not None else None
+        updating = (
+            self._workshop is not None
+            and pid is not None
+            and pid in self._workshop.active_ids
+        )
+        self._set_qml("updatingThis", updating)
 
     @asyncSlot()
     async def _on_update_workshop(self) -> None:

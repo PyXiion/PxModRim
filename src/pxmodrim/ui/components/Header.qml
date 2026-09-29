@@ -268,9 +268,9 @@ Rectangle {
 
                 PxButton {
                     visible: root.controller.workshopAvailable
-                    enabled: !root.controller.workshopBusy
-                    iconName: "download"
-                    ToolTip.text: root.controller.workshopBusy ? "Workshop download in progress" : (root.controller.tooltips.update_workshop || "Update workshop mods")
+                    variant: root.controller.workshopBusy ? "danger" : "default"
+                    iconName: root.controller.workshopBusy ? "close" : "download"
+                    ToolTip.text: root.controller.workshopBusy ? "Stop workshop download" : (root.controller.tooltips.update_workshop || "Update workshop mods")
                     onClicked: root.controller.updateWorkshop()
                 }
 

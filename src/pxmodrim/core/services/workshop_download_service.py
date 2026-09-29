@@ -81,6 +81,8 @@ class DownloadItemStatus(msgspec.Struct):
 class DownloadResult(msgspec.Struct):
     succeeded: list[str]
     failed: list[str]
+    # Succeeded items that actually transferred data (others were already current).
+    changed: list[str] = msgspec.field(default_factory=list)
 
 
 class _Batch:
@@ -102,6 +104,9 @@ class _Batch:
         self.bytes: dict[str, tuple[int, int]] = {}
         self.succeeded: list[str] = []
         self.failed: list[str] = []
+
+    def changed(self) -> list[str]:
+        return [pid for pid in self.succeeded if self.bytes.get(pid, (0, 0))[1] > 0]
 
     def progress(self) -> DownloadProgress:
         # pxsteamdl returns results only after the whole batch, so an item that
@@ -131,6 +136,7 @@ class WorkshopDownloadService(Plugin):
     busy_changed: Event[bool]
 
     __slots__ = (
+        "_active_ids",
         "_client",
         "_client_factory",
         "_ctx",
@@ -154,6 +160,7 @@ class WorkshopDownloadService(Plugin):
         self._client_factory: ClientFactory = client_factory or _login
         self._client: WorkshopClient | None = None
         self._token: pxsteamdl.CancelToken | None = None
+        self._active_ids: frozenset[str] = frozenset()
         self._running: asyncio.Future[list[pxsteamdl.Result]] | None = None
 
     def setup(self, ctx: CoreContext) -> None:
@@ -166,6 +173,11 @@ class WorkshopDownloadService(Plugin):
         running = self._running
         if running is not None:
             await asyncio.wait([running])
+
+    @property
+    def active_ids(self) -> frozenset[str]:
+        """Published file ids of the batch currently downloading."""
+        return self._active_ids
 
     @property
     def is_downloading(self) -> bool:
@@ -192,6 +204,7 @@ class WorkshopDownloadService(Plugin):
         batch = _Batch(len(ids))
         token = pxsteamdl.CancelToken()
         self._token = token
+        self._active_ids = frozenset(ids)
         self.busy_changed.emit(True)
         logger.info(
             "[workshop] downloading {} items into {} (first ids: {})",
@@ -203,8 +216,13 @@ class WorkshopDownloadService(Plugin):
             await self._run(ids, root, batch, token)
         finally:
             self._token = None
+            self._active_ids = frozenset()
             self.busy_changed.emit(False)
-            result = DownloadResult(succeeded=batch.succeeded, failed=batch.failed)
+            result = DownloadResult(
+                succeeded=batch.succeeded,
+                failed=batch.failed,
+                changed=batch.changed(),
+            )
             logger.info(
                 "[workshop] finished in {:.1f}s: {} ok, {} failed{}",
                 time.monotonic() - batch.started,

@@ -48,6 +48,10 @@ from pxmodrim.ui.components import (
     create_qml_engine,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.components.workshop_update import (
+    CONFIRM_THRESHOLD,
+    ConfirmWorkshopUpdateDialog,
+)
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
@@ -486,10 +490,20 @@ class MainWindow(QMainWindow):
         workshop = self._workshop
         if workshop is None:
             return
+        if workshop.is_downloading:
+            logger.info("[workshop] stop requested from the header")
+            workshop.cancel()
+            return
         ids = workshop.updatable_ids()
         if not ids:
             self._toast_manager.info("No workshop mods to update")
             return
+        if len(ids) >= CONFIRM_THRESHOLD:
+            confirmed, _ = await await_dialog(
+                ConfirmWorkshopUpdateDialog, len(ids), self
+            )
+            if confirmed != QMessageBox.StandardButton.Yes:
+                return
         logger.info("[workshop] update-all requested for {} mods", len(ids))
         self._toast_manager.info(f"Updating {len(ids)} workshop mods\u2026")
         try:
@@ -507,15 +521,19 @@ class MainWindow(QMainWindow):
 
     def _on_workshop_download_finished(self, result: DownloadResult) -> None:
         ok, failed = len(result.succeeded), len(result.failed)
-        if failed:
-            self._toast_manager.warning(
-                f"Workshop download finished: {ok} succeeded, {failed} failed"
-            )
-        elif ok:
-            self._toast_manager.success(f"Workshop download finished: {ok} succeeded")
-        else:
+        changed = len(result.changed)
+        if not ok and not failed:
             self._toast_manager.info("Workshop download cancelled")
-        if ok:
+            return
+        summary = f"Workshop: {changed} updated, {ok - changed} unchanged"
+        if failed:
+            by_id = {m.published_file_id: m.name for m in self._ctx.all_mods.values()}
+            shown = ", ".join(by_id.get(pid, pid) for pid in result.failed[:3])
+            more = "…" if failed > 3 else ""
+            self._toast_manager.warning(f"{summary}, {failed} failed: {shown}{more}")
+        else:
+            self._toast_manager.success(summary)
+        if changed:
             self._workshop_refresh = asyncio.ensure_future(self._app_ctx.refresh_mods())
 
     @asyncSlot()

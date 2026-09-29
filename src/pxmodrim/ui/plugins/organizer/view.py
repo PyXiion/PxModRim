@@ -48,7 +48,11 @@ from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
-from pxmodrim.ui.components.workshop_update import can_update, update_workshop_mods
+from pxmodrim.ui.components.workshop_update import (
+    add_update_action,
+    update_state,
+    update_workshop_mods,
+)
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.plugins.organizer.dialogs import (
@@ -299,12 +303,12 @@ class OrganizerViewPanel(BaseViewPanel):
         mod_count = sum(node.kind == "mod" for node in selected)
         self._selection_label.setText(f"{_plural(mod_count, 'mod')} selected")
         self._selection_bar.setVisible(mod_count > 1)
-        self._update_button.setEnabled(
-            can_update(
-                self._ctx,
-                [n.leaf.uuid for n in selected if n.kind == "mod" and n.leaf],
-            )
+        state = update_state(
+            self._ctx, [n.leaf.uuid for n in selected if n.kind == "mod" and n.leaf]
         )
+        self._update_button.setText(state.label)
+        self._update_button.setEnabled(state.enabled)
+        self._update_button.setToolTip(state.tooltip)
         node = selected[0] if len(selected) == 1 else None
         uuid = node.leaf.uuid if node is not None and node.leaf is not None else None
         if uuid == self._selected_uuid and not force:
@@ -680,10 +684,9 @@ class OrganizerViewPanel(BaseViewPanel):
             self._menu.addAction("Enable", lambda: self._enable_many(uuids))
         if any(uuid in active for uuid in uuids):
             self._menu.addAction("Disable", lambda: self._disable_many(uuids))
-        if can_update(self._ctx, uuids):
-            self._menu.addAction(
-                "Update from Workshop", lambda: self._update_workshop(uuids)
-            )
+        add_update_action(
+            self._menu, self._ctx, uuids, lambda: self._update_workshop(uuids)
+        )
         self._menu.addSeparator()
         pids = list(
             dict.fromkeys(
@@ -723,9 +726,9 @@ class OrganizerViewPanel(BaseViewPanel):
         self._menu.addAction(
             "Disable all", lambda: self._disable_many(uuids)
         ).setEnabled(bool(uuids))
-        self._menu.addAction(
-            "Update from Workshop", lambda: self._update_workshop(uuids)
-        ).setEnabled(can_update(self._ctx, uuids))
+        add_update_action(
+            self._menu, self._ctx, uuids, lambda: self._update_workshop(uuids)
+        )
         self._menu.addSeparator()
         if node.kind == "ungrouped":
             self._menu.addAction("New folder…", self.newFolder)

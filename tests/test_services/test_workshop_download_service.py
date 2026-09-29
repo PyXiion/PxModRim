@@ -267,3 +267,20 @@ def test_updatable_ids_limited_to_given_mods_and_deduplicated(tmp_path: Path) ->
     b = _mod_at(tmp_path / "Mods" / "222", "222")
     _load(svc, [a, b])
     assert svc.updatable_ids([b, b, _mod_at(tmp_path / "Other" / "9", "9")]) == ["222"]
+
+
+async def test_result_changed_excludes_up_to_date_items(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path, FakeClient())
+    assert svc.active_ids == frozenset()
+    result = await svc.download_mods(["111"])
+    assert result.changed == ["111"]
+    assert svc.active_ids == frozenset()
+
+
+def test_batch_changed_ignores_zero_byte_items() -> None:
+    from pxmodrim.core.services.workshop_download_service import _Batch
+
+    batch = _Batch(2)
+    batch.succeeded = ["1", "2"]
+    batch.bytes = {"1": (0, 0), "2": (5, 5)}
+    assert batch.changed() == ["2"]

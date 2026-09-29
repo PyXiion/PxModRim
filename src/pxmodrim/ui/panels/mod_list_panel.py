@@ -31,7 +31,10 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.components.mod_activation import toggle_mods
-from pxmodrim.ui.components.workshop_update import can_update, update_workshop_mods
+from pxmodrim.ui.components.workshop_update import (
+    add_update_action,
+    update_workshop_mods,
+)
 from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
 from pxmodrim.ui.theme.palette import PALETTE
@@ -278,10 +281,8 @@ class ModListPanel(QWidget):
     def showContextMenu(self, uuids: list[str]) -> None:
         menu = QMenu(self)
         menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        update = menu.addAction(
-            "Update from Workshop", lambda: self._update_workshop(uuids)
-        )
-        update.setEnabled(can_update(self._ctx, uuids))
+        menu.setToolTipsVisible(True)
+        add_update_action(menu, self._ctx, uuids, lambda: self._update_workshop(uuids))
         menu.popup(self.cursor().pos())
 
     @asyncSlot()
