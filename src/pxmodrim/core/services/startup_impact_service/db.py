@@ -433,7 +433,7 @@ class StartupImpactDb:
 def _row_to_mod(row: aiosqlite.Row) -> StartupImpactMod:
     pid, name, impact, metrics_json, ot_json, ot_total = row
     pid_val: str | None = pid
-    if pid == name:
+    if pid == name and pid != BASE_GAME_PID:
         pid_val = None
     return StartupImpactMod(
         mod_name=name,

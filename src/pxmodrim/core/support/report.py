@@ -29,7 +29,8 @@ def get_app_version() -> str:
 
 
 # Username directories under these roots; matched case-insensitively.
-_USER_DIR_PREFIX = r"(?:/home|/Users|\\Users)[\\/]"
+# Backslashes may be doubled: repr() of a Windows path in a log line.
+_USER_DIR_PREFIX = r"(?:/home|/Users|/run/media|/media|\\{1,2}Users)(?:\\{1,2}|/)"
 # Path components start and end where no adjacent name characters exist.
 _COMPONENT_START = r"(?<![\w.-])"
 _COMPONENT_END = r"(?![\w.-])"
@@ -50,7 +51,13 @@ def redact(
             username = ""
 
     if home_str:
-        variants = {home_str, home_str.replace("\\", "/"), home_str.replace("/", "\\")}
+        backslashed = home_str.replace("/", "\\")
+        variants = {
+            home_str,
+            home_str.replace("\\", "/"),
+            backslashed,
+            backslashed.replace("\\", "\\\\"),
+        }
         alternatives = "|".join(
             re.escape(v) for v in sorted(variants, key=len, reverse=True)
         )

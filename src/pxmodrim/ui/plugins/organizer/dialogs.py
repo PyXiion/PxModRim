@@ -61,11 +61,15 @@ class DeleteFolderDialog(QMessageBox):
         self.setInformativeText(
             "Their mods become ungrouped. Load order is not affected."
         )
-        delete = self.addButton("Delete", QMessageBox.ButtonRole.AcceptRole)
-        delete.setObjectName("primaryAction")
-        cancel = self.addButton(QMessageBox.StandardButton.Cancel)
-        self.setDefaultButton(cancel)
-        self.setEscapeButton(cancel)
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+        )
+        self.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        self.setEscapeButton(QMessageBox.StandardButton.Cancel)
+        yes = self.button(QMessageBox.StandardButton.Yes)
+        if yes:
+            yes.setText("Delete")
+            yes.setObjectName("primaryAction")
 
 
 class FolderPickerDialog(QDialog):

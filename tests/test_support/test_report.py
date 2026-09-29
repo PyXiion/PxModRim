@@ -41,6 +41,20 @@ class TestRedact:
         result = redact(raw, home_dir="/home/bob", username="bob")
         assert result == "~/a and /home/bobby/b and ~"
 
+    def test_redacts_username_on_removable_media_mounts(self) -> None:
+        raw = "/run/media/alice/SD/mods and /media/alice/x and /media/alicia/y"
+        result = redact(raw, home_dir="/home/alice", username="alice")
+        assert (
+            result
+            == "/run/media/<user>/SD/mods and /media/<user>/x and /media/alicia/y"
+        )
+
+    def test_redacts_doubled_backslashes_from_repr(self) -> None:
+        raw = repr(r"C:\Users\Bob\AppData") + " and " + repr(r"D:\Users\Bob\mods")
+        result = redact(raw, home_dir=r"C:\Users\Bob", username="Bob")
+        assert "Bob" not in result
+        assert result.startswith("'~")
+
     def test_short_username_redacted_in_other_user_paths(self) -> None:
         raw = r"ed saw D:\Users\ed\mods and /Users/ED/x but not /Users/edgar"
         result = redact(raw, home_dir="/home/ed", username="ed")

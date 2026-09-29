@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import cast
@@ -316,6 +317,25 @@ async def test_highlighting_enabled_mod_keeps_user_selection(
     assert panel.property("highlightedUuids") == ["uuid-c"]
     assert _qml_list_property(list_view, "selectedUuids") == ["uuid-a"]
     assert list_view.property("currentUuid") == "uuid-a"
+
+
+@pytest.mark.asyncio
+async def test_highlight_tints_selected_row(qml_engine: QQmlEngine) -> None:
+    panel = _widget_panel(qml_engine, ["uuid-a", "uuid-b"])
+    root = panel._qml.rootObject()
+    assert root is not None
+    list_view = root.findChild(QObject, "listView")
+    assert list_view is not None
+    root.selectRow(0, "uuid-a", 0)  # type: ignore[attr-defined]
+    await asyncio.sleep(0)
+    selected = list_view.property("contentItem").childItems()
+    before = {c.property("color").name() for c in selected if c.property("color")}
+
+    panel._highlight_rows(["uuid-a"])
+    await asyncio.sleep(0)
+    after = {c.property("color").name() for c in selected if c.property("color")}
+
+    assert before != after
 
 
 def test_qml_selection_clears_when_filter_hides_current_row(

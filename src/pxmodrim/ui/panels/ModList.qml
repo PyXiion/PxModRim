@@ -205,9 +205,13 @@ Rectangle {
             radius: Theme.radiusMd
 
             color: {
+                var highlighted = modListPanel
+                    && modListPanel.highlightedUuids.indexOf(model.uuid) >= 0
                 if (listView.selectedIndices.indexOf(index) >= 0)
-                    return Theme.elevate4
-                if (modListPanel && modListPanel.highlightedUuids.indexOf(model.uuid) >= 0)
+                    return highlighted
+                        ? Qt.tint(Theme.elevate4, Qt.alpha(Theme.primary, 0.25))
+                        : Theme.elevate4
+                if (highlighted)
                     return Qt.alpha(Theme.primary, 0.25)
                 if (mouseArea.containsMouse && !dragProxy.visible)
                     return Theme.elevate3
