@@ -21,7 +21,9 @@ def qapp() -> Iterator[QApplication]:
 
 def _click_close(dialog: QDialog) -> None:
     install_dialog_chrome(dialog)
-    dialog.findChild(QPushButton, "dialogCloseBtn").click()
+    button = dialog.findChild(QPushButton, "dialogCloseBtn")
+    assert button is not None
+    button.click()
 
 
 @pytest.mark.parametrize(
