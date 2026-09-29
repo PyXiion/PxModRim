@@ -269,6 +269,7 @@ class App:
         if not app_close_event.is_set():
             logger.info("Initial mod load complete: {} mods", mod_count)
             await self._app_ctx.init_all()
+            self.main_window.start_startup_update_check()
         await app_close_event.wait()
         await self._app_ctx.shutdown_all()
         return 0

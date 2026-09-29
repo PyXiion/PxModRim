@@ -8,3 +8,4 @@ from pxmodrim.core.constants import LaunchStrategy
 class UIPrefs(msgspec.Struct):
     desc_expanded: bool = False
     launch_strategy: LaunchStrategy = LaunchStrategy.DIRECT
+    skipped_update_tag: str = ""

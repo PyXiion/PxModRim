@@ -5,6 +5,7 @@ from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
+import httpx
 from loguru import logger
 from PySide6.QtCore import QEvent, QObject, Qt, QUrl
 from PySide6.QtGui import (
@@ -33,6 +34,7 @@ from qasync import asyncSlot
 from pxmodrim.core.config import config_dir
 from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.view.sidebar import SidebarEntry
+from pxmodrim.core.services.update_service import UpdateService
 from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import (
     HeaderController,
@@ -55,6 +57,7 @@ from pxmodrim.ui.panels.restore_snapshot_dialog import (
     RestoreSnapshotDialog,
 )
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
+from pxmodrim.ui.panels.update_dialog import SKIP_RESULT, UpdateDialog
 from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
 from pxmodrim.ui.theme.constants import (
     RAIL_COLLAPSE_WIDTH,
@@ -114,6 +117,8 @@ class MainWindow(QMainWindow):
         self._close_prompt_open = False
         self._close_confirmed = False
         self._close_task: asyncio.Task[None] | None = None
+        self._update_service = UpdateService(get_app_version())
+        self._update_task: asyncio.Task[None] | None = None
 
         self._setup_window_basics()
         self._setup_qml()
@@ -191,6 +196,7 @@ class MainWindow(QMainWindow):
             ActionId.UPLOAD_LOGS: self._upload_log_and_system_info,
             ActionId.OPEN_LOGS: self._open_logs_folder,
             ActionId.SHORTCUTS: self._show_shortcuts,
+            ActionId.CHECK_UPDATES: self._check_updates_manually,
             ActionId.ABOUT: self._show_about,
         }
         for action_id, handler in handlers.items():
@@ -466,6 +472,38 @@ class MainWindow(QMainWindow):
         await await_dialog(
             AboutPanel, self, ctx=self._ctx, toast_manager=self._toast_manager
         )
+
+    def start_startup_update_check(self) -> None:
+        self._update_task = asyncio.create_task(self._check_for_updates(manual=False))
+
+    @asyncSlot()
+    async def _check_updates_manually(self) -> None:
+        await self._check_for_updates(manual=True)
+
+    async def _check_for_updates(self, *, manual: bool) -> None:
+        try:
+            release = await self._update_service.check()
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("Update check failed: {}", exc)
+            if manual:
+                self._toast_manager.error("Could not check for updates")
+            return
+        if release is None:
+            if manual:
+                self._toast_manager.success("PxModRim is up to date")
+            return
+        if not manual and release.tag == self._ui_prefs.skipped_update_tag:
+            logger.debug("Update {} was skipped by the user", release.tag)
+            return
+
+        result, _ = await await_dialog(
+            UpdateDialog, release, self._update_service.current_version, self
+        )
+        if result == QDialog.DialogCode.Accepted:
+            QDesktopServices.openUrl(QUrl(release.url))
+        elif result == SKIP_RESULT:
+            self._ui_prefs.skipped_update_tag = release.tag
+            save_ui_prefs(self._ui_prefs, self._ctx.config_service)
 
     @asyncSlot()
     async def _upload_log_and_system_info(self) -> None:

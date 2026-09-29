@@ -39,6 +39,7 @@ MENU_LAYOUT: tuple[tuple[str, tuple[ActionId | None, ...]], ...] = (
             ActionId.UPLOAD_LOGS,
             ActionId.OPEN_LOGS,
             ActionId.SHORTCUTS,
+            ActionId.CHECK_UPDATES,
             None,
             ActionId.ABOUT,
         ),

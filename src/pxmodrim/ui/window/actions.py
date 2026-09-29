@@ -23,6 +23,7 @@ class ActionId(StrEnum):
     UPLOAD_LOGS = "upload_logs"
     OPEN_LOGS = "open_logs"
     SHORTCUTS = "shortcuts"
+    CHECK_UPDATES = "check_updates"
     ABOUT = "about"
 
 
@@ -61,6 +62,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
     ),
     ActionSpec(ActionId.OPEN_LOGS, "Open &Logs Folder", "Open logs folder"),
     ActionSpec(ActionId.SHORTCUTS, "&Keyboard Shortcuts", "Keyboard shortcuts"),
+    ActionSpec(ActionId.CHECK_UPDATES, "Check for &Updates\u2026", "Check for updates"),
     ActionSpec(ActionId.ABOUT, "&About PxModRim", "About PxModRim", "F1"),
 )
 
