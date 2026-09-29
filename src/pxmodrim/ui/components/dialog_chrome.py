@@ -38,18 +38,29 @@ class _CloseButton(QPushButton):
         self.setToolTip("Close")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._set_icon_color(PALETTE["DANGER"])
-
-    def _set_icon_color(self, color: str) -> None:
-        self.setIcon(icon("close", 12, color))
+        self._normal_icon = icon("close", 12, PALETTE["DANGER"])
+        self._hover_icon = icon("close", 12, PALETTE["TEXT_ON_ACCENT"])
+        self.setIcon(self._normal_icon)
 
     def enterEvent(self, event: QEnterEvent) -> None:
-        self._set_icon_color(PALETTE["TEXT_ON_ACCENT"])
+        self.setIcon(self._hover_icon)
         super().enterEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:
-        self._set_icon_color(PALETTE["DANGER"])
+        self.setIcon(self._normal_icon)
         super().leaveEvent(event)
+
+
+def _close_like_escape(dialog: QDialog) -> None:
+    if isinstance(dialog, QMessageBox):
+        button = dialog.escapeButton()
+        if button is not None:
+            button.click()
+            return
+        if dialog.button(QMessageBox.StandardButton.Cancel) is not None:
+            dialog.done(int(QMessageBox.StandardButton.Cancel))
+            return
+    dialog.reject()
 
 
 class _TitleBar(QWidget):
@@ -68,7 +79,7 @@ class _TitleBar(QWidget):
 
         if closable:
             close_btn = _CloseButton(self)
-            close_btn.clicked.connect(dialog.reject)
+            close_btn.clicked.connect(lambda: _close_like_escape(dialog))
             layout.addWidget(close_btn)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
