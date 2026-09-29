@@ -67,3 +67,5 @@ opencode.json
 
 # Steam workshop plugin
 src/pxmodrim/ui/plugins/steam_workshop/
+# Local classification data dump
+installed-mod-categories.csv
