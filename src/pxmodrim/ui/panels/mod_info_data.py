@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModIssueView
 
 _URL_RE = re.compile(r"https?://[^\s<>\"]+")
+_IMG_RE = re.compile(r"\[img\](https?://[^\s\[<\"]+)\[/img\]", re.IGNORECASE)
+# Replaced by the QML page with the description's pixel width.
+IMG_WIDTH_TOKEN = "__IMG_WIDTH__"
 _TAG_RE = re.compile(r"(<[^>]+>)")
 _TRAILING_PUNCT = ".,;:!?)"
 _UNITS = (
@@ -22,6 +25,13 @@ _UNITS = (
     ("day", 86400),
     ("hour", 3600),
 )
+
+
+def bbcode_images(html_text: str) -> str:
+    """Turn Steam-style [img]url[/img] into width-constrained <img> tags."""
+    return _IMG_RE.sub(
+        lambda m: f'<img src="{m.group(1)}" width="{IMG_WIDTH_TOKEN}">', html_text
+    )
 
 
 def autolink(html_text: str) -> str:
@@ -200,7 +210,7 @@ def build_mod_info(
         "needs": needs,
         "conflicts": conflicts,
         "neededBy": needed_by,
-        "description": autolink(unity_rich_text_to_html(mod.description))
+        "description": autolink(bbcode_images(unity_rich_text_to_html(mod.description)))
         if mod.description
         else "",
         "details": _details(mod),

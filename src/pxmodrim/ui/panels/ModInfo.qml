@@ -285,7 +285,7 @@ Rectangle {
                 Item {
                     id: descClip
                     FontMetrics { id: descMetrics; font: descText.font }
-                    readonly property real collapsedHeight: descMetrics.lineSpacing * 4
+                    readonly property real collapsedHeight: root.hasInfo && root.info.description.indexOf("<img") >= 0 ? 220 : descMetrics.lineSpacing * 4
                     readonly property bool overflows: descText.implicitHeight > collapsedHeight + 1
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.descExpanded ? descText.implicitHeight
@@ -309,7 +309,10 @@ Rectangle {
                         id: descText
                         objectName: "descText"
                         width: parent.width
-                        text: root.hasInfo ? "<style>a { color: " + Theme.primary + "; }</style>" + root.info.description : ""
+                        text: root.hasInfo
+                            ? "<style>a { color: " + Theme.primary + "; }</style>"
+                              + root.info.description.replace(/__IMG_WIDTH__/g, Math.max(1, Math.floor(width)))
+                            : ""
                         textFormat: TextEdit.RichText
                         readOnly: true
                         selectByMouse: true

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import QWidget
 
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.models.view.sidebar import SidebarEntry
+from pxmodrim.core.models.view.sidebar import AllModsEntry, SidebarEntry
 from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.models.sidebar_model import SidebarModel
 
@@ -40,6 +40,18 @@ class SidebarPanel(FilterSidebar):
         if 0 <= selected < len(self._entries):
             return self._entries[selected]
         return None
+
+    def select_all_entry(self) -> None:
+        """Highlight and activate the unfiltered "All" entry."""
+        row = next(
+            (i for i, e in enumerate(self._entries) if isinstance(e, AllModsEntry)), -1
+        )
+        root = self.rootObject()
+        view = root.findChild(QObject, "listView") if root is not None else None
+        if row < 0 or view is None:
+            return
+        view.setProperty("currentIndex", row)
+        self._on_activated(row)
 
     def _on_activated(self, row: int) -> None:
         if 0 <= row < len(self._entries):

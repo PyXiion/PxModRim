@@ -564,7 +564,11 @@ class MainWindow(QMainWindow):
 
     @asyncSlot(str)
     async def _on_mod_requested(self, uuid: str) -> None:
-        # Filtered-out mods can't be highlighted in the list; still show their info.
+        if self.mod_list.select_uuid(uuid):
+            return
+        # Hidden by the search box or a sidebar filter: reset both, then retry.
+        self.mod_list.search_input.clear()
+        self.sidebar.select_all_entry()
         if not self.mod_list.select_uuid(uuid):
             await self._on_mod_selected(uuid)
 
