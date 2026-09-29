@@ -41,6 +41,7 @@ from pxmodrim.core.config import (  # noqa: E402
 )
 from pxmodrim.core.context import CoreContext  # noqa: E402
 from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
+from pxmodrim.ui.components.wheel_scaler import WheelScaler  # noqa: E402
 from pxmodrim.ui.config import UIPrefsService  # noqa: E402
 from pxmodrim.ui.context import AppContext  # noqa: E402
 from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
@@ -128,6 +129,7 @@ class App:
         self.qt_app.setApplicationDisplayName("PxModRim")
         self.qt_app.setDesktopFileName("pxmodrim")
 
+        WheelScaler(self.qt_app)
         self._apply_theme()
 
     def _apply_theme(self) -> None:
