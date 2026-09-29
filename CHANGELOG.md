@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Standard auto-folder rules come from popular Workshop collections: exact About.xml package ids for libraries, performance and quality-of-life mods, family prefixes for Vanilla Expanded (including Races/Quests/Storytellers), Alpha, Combat Extended and Dubs. Loose `framework`/`performance` name matching is removed to avoid false positives.
 - Enabling mods places them next to load-order constraints and briefly highlights the new row.
 - Active mod-list changes show an unsaved indicator and prompt to save, discard, or cancel before closing.
+- Startup impact window redesigned: a last-launch summary bar (base game, mods, off-thread), a filterable ranked list of every mod with per-phase bars and expandable breakdowns, and a Phases view grouping game metrics into fixed categories (textures & audio, constructors, patches, defs & XML, deferred init) with per-phase mod lists and optional base-game contribution. Durations of a minute or more show as `4m 29s`.
 
 ## [0.1.0] - 2026-09-28
 ### Added

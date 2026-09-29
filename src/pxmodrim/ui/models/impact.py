@@ -12,7 +12,10 @@ def format_duration(seconds: float) -> str:
         return "0 ms"
     if seconds < 1:
         return f"{round(seconds * 1000)} ms"
-    return f"{seconds:.2f} s"
+    if seconds < 60:
+        return f"{seconds:.2f} s"
+    minutes, secs = divmod(round(seconds), 60)
+    return f"{minutes}m {secs:02d}s"
 
 
 def impact_color(seconds: float) -> str:
