@@ -66,6 +66,12 @@ QMenu::item {
 QMenu::item:selected {
     background-color: $ELEVATE_3;
 }
+QMenu::item:disabled {
+    color: $TEXT_DIM;
+}
+QMenu::item:disabled:selected {
+    background-color: transparent;
+}
 QMenu::separator {
     height: 1px;
     background-color: $BORDER;
