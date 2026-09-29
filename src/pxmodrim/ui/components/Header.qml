@@ -158,7 +158,36 @@ Rectangle {
             }
         }
 
-        Item { Layout.fillWidth: true }
+        // ── Workshop progress (centre; idle = empty) ──
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            ColumnLayout {
+                visible: root.controller.workshopBusy
+                anchors.centerIn: parent
+                width: Math.min(parent.width, 360)
+                spacing: 6
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.controller.workshopText
+                    color: Theme.textMuted
+                    elide: Text.ElideRight
+                    font.pixelSize: Theme.fontSizeSm
+                    font.family: Theme.fontFamily
+                }
+
+                PxProgressBar {
+                    Layout.fillWidth: true
+                    from: 0
+                    to: Math.max(root.controller.workshopTotal, 1)
+                    value: root.controller.workshopValue
+                    indeterminate: root.controller.workshopTotal <= 0
+                }
+            }
+        }
 
         // ── Buttons column ──
         ColumnLayout {
