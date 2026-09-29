@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 IMPACT_WARN_THRESHOLD_S = 1.0
 IMPACT_HIGH_THRESHOLD_S = 5.0
+BASE_GAME_PID = "__base_game__"
 
 
 @dataclass(frozen=True, slots=True)

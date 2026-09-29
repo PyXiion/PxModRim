@@ -8,6 +8,7 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.services.startup_impact_service import db
 from pxmodrim.core.services.startup_impact_service.db import StartupImpactDb
 from pxmodrim.core.services.startup_impact_service.models import (
+    BASE_GAME_PID,
     StartupImpactMod,
     StartupImpactReport,
     normalize_package_id,
@@ -16,8 +17,6 @@ from pxmodrim.core.services.startup_impact_service.parser import (
     get_startup_impact_path,
     parse_startup_impact,
 )
-
-_BASE_GAME_PID = "__base_game__"
 
 
 class StartupImpactService:
@@ -46,9 +45,14 @@ class StartupImpactService:
             if base > 0.001:
                 entries.append(
                     StartupImpactMod(
-                        mod_name="__base_game__",
-                        package_id=_BASE_GAME_PID,
+                        mod_name=BASE_GAME_PID,
+                        package_id=BASE_GAME_PID,
                         total_impact_s=base,
+                        metrics=report.metrics,
+                        off_thread_metrics=report.off_thread_metrics,
+                        off_thread_total_impact_s=sum(
+                            report.off_thread_metrics.values()
+                        ),
                     )
                 )
             full = StartupImpactReport(
@@ -74,7 +78,7 @@ class StartupImpactService:
 
     async def estimated_total(self, active_pids: list[str]) -> float:
         dbp = db.db_path(self._ctx.config_service.config_dir)
-        bg = await self._db.get_average(dbp, _BASE_GAME_PID)
+        bg = await self._db.get_average(dbp, BASE_GAME_PID)
         totals = await self._db.get_totals_for(dbp, active_pids)
         mod_sum = sum(on + off for on, off in totals.values())
         return bg + mod_sum
@@ -86,7 +90,7 @@ class StartupImpactService:
 
     async def base_game_average(self) -> float:
         return await self._db.get_average(
-            db.db_path(self._ctx.config_service.config_dir), _BASE_GAME_PID
+            db.db_path(self._ctx.config_service.config_dir), BASE_GAME_PID
         )
 
     async def snapshot(

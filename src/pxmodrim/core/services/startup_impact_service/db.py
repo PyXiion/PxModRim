@@ -9,6 +9,7 @@ import aiosqlite
 
 from pxmodrim.core.migrator import ensure_schema
 from pxmodrim.core.services.startup_impact_service.models import (
+    BASE_GAME_PID,
     StartupImpactMod,
     StartupImpactReport,
 )
@@ -47,8 +48,6 @@ _SCHEMA = """
 """
 
 _SCHEMA_VERSION = 1
-
-_BASE_GAME_PID = "__base_game__"
 
 # CTE ranking the most recent sessions by recency and assigning a descending
 # weight (WEIGHT_SPREAD for the newest, WEIGHT_SPREAD-1 for the next, ... down
@@ -359,7 +358,7 @@ class StartupImpactDb:
                 JOIN w ON w.session_id = e.session_id
                 WHERE e.package_id = ?
                 """,
-                (*_CTE_PARAMS, _BASE_GAME_PID),
+                (*_CTE_PARAMS, BASE_GAME_PID),
             )
             base_row = await cursor.fetchone()
             base_avg = float(base_row[0]) if base_row else 0.0

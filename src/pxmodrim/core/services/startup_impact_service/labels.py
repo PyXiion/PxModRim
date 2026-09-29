@@ -52,8 +52,20 @@ METRIC_LABELS: dict[str, str] = {
 _PREFIX = "LoadingProgress.StartupImpact."
 
 
+def strip_metric_prefix(key: str) -> str:
+    return key.removeprefix(_PREFIX)
+
+
 def metric_label(key: str) -> str:
-    key = key.removeprefix(_PREFIX)
+    key = strip_metric_prefix(key)
+    key, _, target = key.partition("|")
+    label = _base_label(key)
+    if target:
+        return f"{label} ({target.split(' -> ', 1)[0]})"
+    return label
+
+
+def _base_label(key: str) -> str:
     if key in METRIC_LABELS:
         return METRIC_LABELS[key]
     tail = key.split(".")[-1]
