@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import functools
 import re
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -205,14 +205,13 @@ class WorkshopDownloadService(Plugin):
         pfid = mod.published_file_id
         return pfid if pfid == path.name else None
 
-    def updatable_ids(self) -> list[str]:
+    def updatable_ids(self, mods: Iterable[ListedMod] | None = None) -> list[str]:
+        """Updatable ids among *mods* (all loaded mods by default), deduplicated."""
         if self._ctx is None:
             return []
-        return [
-            pid
-            for m in self._ctx.all_mods.values()
-            if (pid := self.updatable_id(m)) is not None
-        ]
+        source = self._ctx.all_mods.values() if mods is None else mods
+        ids = (self.updatable_id(m) for m in source)
+        return list(dict.fromkeys(pid for pid in ids if pid is not None))
 
     def cancel(self) -> None:
         token = self._token

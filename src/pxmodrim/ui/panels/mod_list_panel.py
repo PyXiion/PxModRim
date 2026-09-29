@@ -21,6 +21,7 @@ from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
+    QMenu,
     QVBoxLayout,
     QWidget,
 )
@@ -30,6 +31,7 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.components.mod_activation import toggle_mods
+from pxmodrim.ui.components.workshop_update import can_update, update_workshop_mods
 from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
 from pxmodrim.ui.theme.palette import PALETTE
@@ -271,6 +273,20 @@ class ModListPanel(QWidget):
         await asyncio.sleep(1.2)
         if generation == self._highlight_generation:
             self._set_highlighted([])
+
+    @Slot("QVariantList")
+    def showContextMenu(self, uuids: list[str]) -> None:
+        menu = QMenu(self)
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        update = menu.addAction(
+            "Update from Workshop", lambda: self._update_workshop(uuids)
+        )
+        update.setEnabled(can_update(self._ctx, uuids))
+        menu.popup(self.cursor().pos())
+
+    @asyncSlot()
+    async def _update_workshop(self, uuids: list[str]) -> None:
+        await update_workshop_mods(self._ctx, uuids)
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:

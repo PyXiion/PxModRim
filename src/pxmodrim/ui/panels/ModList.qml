@@ -225,7 +225,16 @@ Rectangle {
                 id: mouseArea
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: (mouse) => root.selectRow(index, model.uuid, mouse.modifiers)
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.RightButton) {
+                        if (listView.selectedUuids.indexOf(model.uuid) < 0)
+                            root.selectRow(index, model.uuid, Qt.NoModifier)
+                        modListPanel.showContextMenu(listView.selectedUuids)
+                        return
+                    }
+                    root.selectRow(index, model.uuid, mouse.modifiers)
+                }
             }
 
             Item {

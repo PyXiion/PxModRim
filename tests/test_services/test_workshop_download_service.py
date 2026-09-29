@@ -259,3 +259,11 @@ def test_progress_counts_complete_and_up_to_date_items() -> None:
     assert batch.progress().completed == 2
     batch.succeeded.append("1")
     assert batch.progress().completed == 2
+
+
+def test_updatable_ids_limited_to_given_mods_and_deduplicated(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path)
+    a = _mod_at(tmp_path / "Mods" / "111", "111")
+    b = _mod_at(tmp_path / "Mods" / "222", "222")
+    _load(svc, [a, b])
+    assert svc.updatable_ids([b, b, _mod_at(tmp_path / "Other" / "9", "9")]) == ["222"]

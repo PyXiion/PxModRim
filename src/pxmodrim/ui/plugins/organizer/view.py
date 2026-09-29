@@ -41,12 +41,14 @@ from pxmodrim.core.organizer import (
     RuleSpec,
 )
 from pxmodrim.core.organizer.resolve import preview_rule_matches
+from pxmodrim.core.services.workshop_download_service import workshop_service
 from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
+from pxmodrim.ui.components.workshop_update import can_update, update_workshop_mods
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
 from pxmodrim.ui.plugins.organizer.dialogs import (
@@ -203,8 +205,11 @@ class OrganizerViewPanel(BaseViewPanel):
             ("Move to folder…", "move"),
             ("Manage tags…", "tags"),
             ("Create folder from selection", "create"),
+            ("Update from Workshop", "update"),
         ):
             button = AppButton(label, self._selection_bar)
+            if action == "update":
+                self._update_button = button
             button.clicked.connect(
                 lambda _checked=False, name=action: self.selectionAction(name)
             )
@@ -240,6 +245,9 @@ class OrganizerViewPanel(BaseViewPanel):
             self._refresh_diagnostics
         )
         self._service.changed.connect(self._notify_editor)
+        workshop = workshop_service(ctx)
+        if workshop is not None:
+            workshop.busy_changed.connect(lambda _busy: self._sync_info())
 
     @Property(bool, notify=readyChanged)
     def ready(self) -> bool:
@@ -291,6 +299,12 @@ class OrganizerViewPanel(BaseViewPanel):
         mod_count = sum(node.kind == "mod" for node in selected)
         self._selection_label.setText(f"{_plural(mod_count, 'mod')} selected")
         self._selection_bar.setVisible(mod_count > 1)
+        self._update_button.setEnabled(
+            can_update(
+                self._ctx,
+                [n.leaf.uuid for n in selected if n.kind == "mod" and n.leaf],
+            )
+        )
         node = selected[0] if len(selected) == 1 else None
         uuid = node.leaf.uuid if node is not None and node.leaf is not None else None
         if uuid == self._selected_uuid and not force:
@@ -365,6 +379,10 @@ class OrganizerViewPanel(BaseViewPanel):
                     await self._move_mods(pids)
                 else:
                     await self._new_folder_from(pids)
+        elif action == "update":
+            await update_workshop_mods(
+                self._ctx, [n.leaf.uuid for n in nodes if n.leaf is not None]
+            )
         elif action in ("enable", "disable"):
             uuids = [node.leaf.uuid for node in nodes if node.leaf is not None]
             if action == "enable":
@@ -662,6 +680,10 @@ class OrganizerViewPanel(BaseViewPanel):
             self._menu.addAction("Enable", lambda: self._enable_many(uuids))
         if any(uuid in active for uuid in uuids):
             self._menu.addAction("Disable", lambda: self._disable_many(uuids))
+        if can_update(self._ctx, uuids):
+            self._menu.addAction(
+                "Update from Workshop", lambda: self._update_workshop(uuids)
+            )
         self._menu.addSeparator()
         pids = list(
             dict.fromkeys(
@@ -701,6 +723,9 @@ class OrganizerViewPanel(BaseViewPanel):
         self._menu.addAction(
             "Disable all", lambda: self._disable_many(uuids)
         ).setEnabled(bool(uuids))
+        self._menu.addAction(
+            "Update from Workshop", lambda: self._update_workshop(uuids)
+        ).setEnabled(can_update(self._ctx, uuids))
         self._menu.addSeparator()
         if node.kind == "ungrouped":
             self._menu.addAction("New folder…", self.newFolder)
@@ -805,6 +830,10 @@ class OrganizerViewPanel(BaseViewPanel):
             await self._service.reset_to_rules(package_ids)
         except OrganizerError as exc:
             await self._error(exc)
+
+    @asyncSlot()
+    async def _update_workshop(self, uuids: list[str]) -> None:
+        await update_workshop_mods(self._ctx, uuids)
 
     @asyncSlot()
     async def _enable_many(self, uuids: list[str]) -> None:
