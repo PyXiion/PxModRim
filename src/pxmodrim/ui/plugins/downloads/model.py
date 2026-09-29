@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         DownloadResult,
     )
 
-_ACTIVE = frozenset({"queued", "downloading"})
+_ACTIVE = frozenset({"queued", "checking", "downloading"})
 _FLUSH_MS = 150
 _SPEED_TICK_MS = 1000
 HISTORY_LEN = 90
@@ -48,6 +48,7 @@ class DownloadsModel(QAbstractListModel):
 
     summary_changed = Signal()
     speed_changed = Signal()
+    phase_changed = Signal()
 
     _IdRole = Qt.ItemDataRole.UserRole + 1
     _TitleRole = Qt.ItemDataRole.UserRole + 2
@@ -68,6 +69,7 @@ class DownloadsModel(QAbstractListModel):
         self._timer.setSingleShot(True)
         self._timer.setInterval(_FLUSH_MS)
         self._timer.timeout.connect(self._flush)
+        self._phase = ""
         self._bytes = 0
         self._sampled_bytes = 0
         self._speed = 0.0
@@ -82,6 +84,7 @@ class DownloadsModel(QAbstractListModel):
         self._timer.stop()
         self._dirty.clear()
         self._reset_speed()
+        self.set_phase("")
         self.beginResetModel()
         self._rows = [_Row(pid, titles.get(pid, pid)) for pid in ids]
         self._by_id = {row.pid: row for row in self._rows}
@@ -110,9 +113,18 @@ class DownloadsModel(QAbstractListModel):
 
     def set_title(self, item: DownloadItemTitle) -> None:
         row = self._by_id.get(item.mod_id)
-        if row is not None and row.title == row.pid:
+        if row is None:
+            return
+        if row.title == row.pid:
             row.title = item.title
-            self._mark(row)
+        if row.state == "queued":
+            row.state = "checking"
+        self._mark(row)
+
+    def set_phase(self, phase: str) -> None:
+        if phase != self._phase:
+            self._phase = phase
+            self.phase_changed.emit()
 
     def finish(self, result: DownloadResult) -> None:
         for row in self._rows:
@@ -267,7 +279,15 @@ class DownloadsModel(QAbstractListModel):
 
     @Property(int, notify=summary_changed)  # type: ignore[arg-type]
     def active(self) -> int:
-        return self._count("queued", "downloading")
+        return self._count("queued", "checking", "downloading")
+
+    @Property(str, notify=phase_changed)  # type: ignore[arg-type]
+    def phase(self) -> str:
+        return self._phase
+
+    @Property(int, notify=summary_changed)  # type: ignore[arg-type]
+    def resolved(self) -> int:
+        return len(self._rows) - self._count("queued")
 
     @Property(float, notify=speed_changed)  # type: ignore[arg-type]
     def speed(self) -> float:

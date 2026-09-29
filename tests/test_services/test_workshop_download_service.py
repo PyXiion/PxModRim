@@ -330,6 +330,10 @@ async def test_titles_from_steam_are_emitted(tmp_path: Path) -> None:
     titles: dict[str, str] = {}
     svc.download_item_titled.connect(lambda t: titles.update({t.mod_id: t.title}))
 
+    phases: list[str] = []
+    svc.download_phase_changed.connect(phases.append)
+
     await svc.download_mods(["111", "222"])
 
+    assert phases == ["login", "query", "run"]
     assert titles == {"111": "Title 111", "222": "Title 222"}

@@ -107,6 +107,7 @@ class _Batch:
         "failed",
         "last_emitted",
         "last_logged",
+        "resolved",
         "seen",
         "started",
         "succeeded",
@@ -119,6 +120,7 @@ class _Batch:
         self.last_logged = self.started
         self.last_emitted = 0.0
         self.seen = 0
+        self.resolved = 0
         self.bytes: dict[str, tuple[int, int]] = {}
         self.succeeded: list[str] = []
         self.failed: list[str] = []
@@ -152,6 +154,8 @@ class WorkshopDownloadService(Plugin):
     download_item_status_changed: Event[DownloadItemStatus]
     download_finished: Event[DownloadResult]
     download_item_titled: Event[DownloadItemTitle]
+    # "login" -> "query" (Steam item details) -> "run" (all items resolved)
+    download_phase_changed: Event[str]
     busy_changed: Event[bool]
     batch_started: Event[list[str]]
 
@@ -169,6 +173,7 @@ class WorkshopDownloadService(Plugin):
         "download_finished",
         "download_item_status_changed",
         "download_item_titled",
+        "download_phase_changed",
         "download_progress",
         "status_message_changed",
     )
@@ -179,6 +184,7 @@ class WorkshopDownloadService(Plugin):
         self.download_item_status_changed = Event()
         self.download_finished = Event()
         self.download_item_titled = Event()
+        self.download_phase_changed = Event()
         self.busy_changed = Event()
         self.batch_started = Event()
 
@@ -346,6 +352,8 @@ class WorkshopDownloadService(Plugin):
         try:
             await asyncio.to_thread(root.mkdir, parents=True, exist_ok=True)
             login_started = time.monotonic()
+            if self._client is None:
+                self.download_phase_changed.emit("login")
             client = await self._ensure_client()
             logger.debug(
                 "[workshop] steam session ready in {:.1f}s",
@@ -373,17 +381,16 @@ class WorkshopDownloadService(Plugin):
 
         def on_resolved(info: pxsteamdl.ItemInfo) -> None:
             # Called on the download() thread.
-            if info.title:
-                loop.call_soon_threadsafe(
-                    self.download_item_titled.emit,
-                    DownloadItemTitle(str(info.item_id), info.title),
-                )
+            loop.call_soon_threadsafe(
+                self._on_resolved, batch, str(info.item_id), info.title
+            )
 
         def on_progress(p: pxsteamdl.Progress) -> None:
             loop.call_soon_threadsafe(
                 self._on_progress, batch, str(p.item_id), p.bytes_done, p.bytes_total
             )
 
+        self.download_phase_changed.emit("query")
         running = loop.run_in_executor(
             None,
             functools.partial(
@@ -426,6 +433,13 @@ class WorkshopDownloadService(Plugin):
             self.status_message_changed.emit("Logging in to Steam\u2026")
             self._client = await self._client_factory()
         return self._client
+
+    def _on_resolved(self, batch: _Batch, pid: str, title: str) -> None:
+        batch.resolved += 1
+        if title:
+            self.download_item_titled.emit(DownloadItemTitle(pid, title))
+        if batch.resolved >= batch.total:
+            self.download_phase_changed.emit("run")
 
     def _on_progress(self, batch: _Batch, pid: str, done: int, total: int) -> None:
         if pid in batch.succeeded or pid in batch.failed:

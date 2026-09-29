@@ -9,6 +9,7 @@ Rectangle {
 
     readonly property var stateLabels: ({
         queued: "Queued",
+        checking: "Checking",
         downloading: "Downloading",
         updated: "Updated",
         unchanged: "Up to date",
@@ -19,7 +20,7 @@ Rectangle {
     function stateColor(state) {
         if (state === "updated") return Theme.success
         if (state === "failed") return Theme.danger
-        if (state === "downloading") return Theme.primary
+        if (state === "downloading" || state === "checking") return Theme.primary
         return Theme.textDim
     }
 
@@ -142,6 +143,19 @@ Rectangle {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.Bold
+            }
+            Text {
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.margins: 10
+                visible: text.length > 0
+                text: downloadsModel.phase === "login" ? "Logging in to Steam\u2026"
+                    : downloadsModel.phase === "query"
+                        ? "Querying mod info from Steam\u2026 " + downloadsModel.resolved + " / " + downloadsModel.total
+                        : ""
+                color: Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSm
             }
             Text {
                 anchors.right: parent.right
