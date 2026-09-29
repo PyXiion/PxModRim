@@ -164,7 +164,7 @@ Rectangle {
             Layout.fillHeight: true
 
             ColumnLayout {
-                visible: root.controller.workshopBusy
+                visible: root.controller.workshopBusy && root.controller.workshopProgressShown
                 anchors.centerIn: parent
                 width: Math.min(parent.width, 360)
                 spacing: 6

@@ -25,6 +25,7 @@ class HeaderController(QObject):
     update_workshop_requested = Signal()
     workshop_busy_changed = Signal()
     workshop_progress_changed = Signal()
+    workshop_progress_shown_changed = Signal()
     downloads_requested = Signal()
 
     def __init__(
@@ -48,6 +49,7 @@ class HeaderController(QObject):
         self._workshop_text = ""
         self._workshop_value = 0
         self._workshop_total = 0
+        self._workshop_progress_shown = True
 
     def is_frameless_getter(self) -> bool:
         return self._is_frameless
@@ -152,6 +154,17 @@ class HeaderController(QObject):
         if self._workshop_busy != value:
             self._workshop_busy = value
             self.workshop_busy_changed.emit()
+
+    def set_workshop_progress_shown(self, shown: bool) -> None:
+        if self._workshop_progress_shown != shown:
+            self._workshop_progress_shown = shown
+            self.workshop_progress_shown_changed.emit()
+
+    workshopProgressShown = Property(
+        bool,
+        lambda self: self._workshop_progress_shown,
+        notify=workshop_progress_shown_changed,  # type: ignore[arg-type]
+    )
 
     def set_workshop_progress(self, text: str, value: int, total: int) -> None:
         self._workshop_text = text

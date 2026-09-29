@@ -253,6 +253,7 @@ class MainWindow(QMainWindow):
     def _select_view(self, index: int) -> None:
         if 0 <= index < self._stack.count():
             self._rail.set_current(index)
+            self._on_rail_tab_changed(index)
 
     def _cycle_view(self, direction: int) -> None:
         count = self._stack.count()
@@ -737,6 +738,9 @@ class MainWindow(QMainWindow):
     def _on_rail_tab_changed(self, index: int) -> None:
         logger.debug("main_window: rail tab changed to {}", index)
         self._stack.setCurrentIndex(index)
+        self._header_controller.set_workshop_progress_shown(
+            self._views[index].view_id != "downloads"
+        )
         # Preload an adjacent tab (e.g. the Steam view next to Mods) so its
         # content is already warm when the user moves to it.
         for adjacent in (index - 1, index + 1):

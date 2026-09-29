@@ -29,7 +29,6 @@ def test_view_shortcuts_wrap_and_ignore_invalid_indexes() -> None:
     class Rail:
         def set_current(self, index: int) -> None:
             selections.append(index)
-            stack.index = index
 
     class Window:
         _stack = stack
@@ -38,11 +37,16 @@ def test_view_shortcuts_wrap_and_ignore_invalid_indexes() -> None:
         def _select_view(self, index: int) -> None:
             MainWindow._select_view(cast(MainWindow, self), index)
 
+        def _on_rail_tab_changed(self, index: int) -> None:
+            stack.index = index
+
     window = cast(MainWindow, Window())
     MainWindow._cycle_view(window, -1)
     assert selections == [2]
+    assert stack.index == 2
     MainWindow._cycle_view(window, 1)
     assert selections == [2, 0]
+    assert stack.index == 0
     MainWindow._select_view(window, 3)
     assert selections == [2, 0]
 
