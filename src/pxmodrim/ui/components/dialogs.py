@@ -5,6 +5,8 @@ from typing import Any
 
 from PySide6.QtWidgets import QDialog
 
+from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
+
 
 async def await_dialog[T: QDialog](
     cls: type[T],
@@ -17,6 +19,7 @@ async def await_dialog[T: QDialog](
     must read what they need from it synchronously after the await.
     """
     dialog = cls(*args, **kwargs)
+    install_dialog_chrome(dialog)
     dialog.setModal(True)
 
     future: asyncio.Future[int] = asyncio.get_running_loop().create_future()

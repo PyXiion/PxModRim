@@ -23,6 +23,7 @@ from qasync import asyncSlot
 
 from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import AppButton
+from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
 from pxmodrim.ui.panels.upload_report_dialog import handle_upload_report
 
 if TYPE_CHECKING:
@@ -260,6 +261,7 @@ class AboutPanel(QDialog):
         close_button.clicked.connect(dialog.reject)
         footer.addWidget(close_button)
         layout.addLayout(footer)
+        install_dialog_chrome(dialog)
         return dialog
 
     def _credits_html(self) -> str:

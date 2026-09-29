@@ -14,6 +14,7 @@ from pxmodrim.core.services.startup_impact_service.models import (
     StartupImpactMod,
     StartupImpactReport,
 )
+from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
 from pxmodrim.ui.models.impact import format_duration, impact_color
 from pxmodrim.ui.theme.palette import PALETTE
 
@@ -235,3 +236,4 @@ class StartupImpactDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         self.panel = TimeAnalyticsPanel(sis, qml_engine, self)
         layout.addWidget(self.panel)
+        install_dialog_chrome(self)

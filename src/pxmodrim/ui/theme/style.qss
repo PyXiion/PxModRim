@@ -484,6 +484,31 @@ QTabBar::tab:hover {
 
 
 
+/* ── Dialog chrome (frameless dialogs) ── */
+QDialog[chromed="true"] {
+    border: 1px solid $BORDER;
+}
+QWidget#dialogTitleBar {
+    background-color: $ELEVATE_1;
+    border-bottom: 1px solid $BORDER;
+}
+QLabel#dialogTitleText {
+    background: transparent;
+    font-weight: 600;
+    font-size: 13px;
+}
+QPushButton#dialogCloseBtn {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 0;
+    min-height: 0;
+    min-width: 0;
+}
+QPushButton#dialogCloseBtn:hover {
+    background-color: $DANGER_BG;
+}
+
 /* ── Icon Buttons ── */
 QPushButton#iconBtn {
     background-color: $ELEVATE_3;

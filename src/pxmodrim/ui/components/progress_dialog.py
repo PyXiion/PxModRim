@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from pxmodrim.core.loading import LoadingState
+from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
 from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.theme.palette import PALETTE
 
@@ -52,6 +53,7 @@ class ProgressDialog(QDialog):
         layout.setSpacing(0)
         layout.addWidget(self._crumbs)
         layout.addWidget(self._progress)
+        install_dialog_chrome(self, closable=False)
 
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)

@@ -42,6 +42,7 @@ from pxmodrim.core.organizer import (
 )
 from pxmodrim.core.organizer.resolve import preview_rule_matches
 from pxmodrim.ui.components.button import AppButton
+from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.components.icon_button import IconButton
@@ -173,6 +174,7 @@ class OrganizerViewPanel(BaseViewPanel):
         self._rules_qml.rootContext().setContextProperty("organizerPanel", self)
         self._rules_qml.setSource(QUrl.fromLocalFile(str(_QML_DIR / "RuleEditor.qml")))
         rules_layout.addWidget(self._rules_qml)
+        install_dialog_chrome(self._rules_dialog)
         self._rules_dialog.finished.connect(self._on_rules_dialog_finished)
         hint = QWidget(main)
         hint.setObjectName("organizerHint")
