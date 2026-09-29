@@ -92,7 +92,9 @@ class IconTabWidget(QWidget):
         self._tab_layout.setSpacing(0)
 
         self._stack = QStackedWidget(self)
-        self._stack.setStyleSheet(f"background: {PALETTE['ELEVATE_2']}; border: none;")
+        self._stack.setStyleSheet(
+            f"QStackedWidget {{ background: {PALETTE['ELEVATE_2']}; border: none; }}"
+        )
 
         root.addWidget(self._tab_bar)
         root.addWidget(self._stack, 1)
