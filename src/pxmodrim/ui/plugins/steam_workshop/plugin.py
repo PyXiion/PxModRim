@@ -71,6 +71,9 @@ class SteamWorkshopUiPlugin(Plugin):
         self._active_ids: set[str] = set()
         self._checked_ids: dict[str, str] = {}
         self._download_statuses: dict[str, str] = {}
+        # The service is shared with MainWindow's update actions; only batches
+        # started from this view may drive the queue sidebar.
+        self._own_download = False
 
     # ── Plugin lifecycle ─────────────────────────────────
 
@@ -89,6 +92,7 @@ class SteamWorkshopUiPlugin(Plugin):
         self._svc.download_progress.connect(self._on_download_progress)
         self._svc.download_item_status_changed.connect(self._on_item_status)
         self._svc.download_finished.connect(self._on_download_finished)
+        self._svc.busy_changed.connect(self.download_busy_changed.emit)
 
     async def init(self, ctx: AppContext) -> None:
         self._refresh_cached_ids()
@@ -100,6 +104,7 @@ class SteamWorkshopUiPlugin(Plugin):
             self._svc.download_progress.disconnect(self._on_download_progress)
             self._svc.download_item_status_changed.disconnect(self._on_item_status)
             self._svc.download_finished.disconnect(self._on_download_finished)
+            self._svc.busy_changed.disconnect(self.download_busy_changed.emit)
             self._core.mod_service.mods_changed.disconnect(self._on_mods_changed)
             self._core.active_state_changed.disconnect(
                 self._on_active_state_changed
@@ -178,9 +183,12 @@ class SteamWorkshopUiPlugin(Plugin):
         if self._core is None or not self._core.config.paths.local:
             self._svc.status_message_changed.emit("Local mods path is not configured")
             return
+        if self._svc.is_downloading:
+            self._svc.status_message_changed.emit("A download is already running")
+            return
         logger.debug("[steam] download requested: {}", ids)
 
-        self.download_busy_changed.emit(True)
+        self._own_download = True
         try:
             for mod_id in ids:
                 self._download_statuses[mod_id] = "queued"
@@ -189,7 +197,7 @@ class SteamWorkshopUiPlugin(Plugin):
             )
             await self._svc.download_mods(ids)
         finally:
-            self.download_busy_changed.emit(False)
+            self._own_download = False
 
     def stop_download(self) -> None:
         logger.info("[steam] download stop requested")
@@ -232,6 +240,8 @@ class SteamWorkshopUiPlugin(Plugin):
         self.active_refresh_requested.emit(list(self._active_ids))
 
     def _on_download_progress(self, progress: DownloadProgress) -> None:
+        if not self._own_download:
+            return
         self.progress_updated.emit(
             ProgressInfo(
                 progress.total,
@@ -242,12 +252,16 @@ class SteamWorkshopUiPlugin(Plugin):
         )
 
     def _on_item_status(self, item: DownloadItemStatus) -> None:
+        if not self._own_download:
+            return
         self._download_statuses[item.mod_id] = item.status
         self.item_status_changed.emit(
             ItemStatus(item.mod_id, item.status, item.bytes_done, item.bytes_total)
         )
 
     def _on_download_finished(self, result: DownloadResult) -> None:
+        if not self._own_download:
+            return
         logger.info(
             "[steam] download finished: {} ok, {} failed",
             len(result.succeeded),
