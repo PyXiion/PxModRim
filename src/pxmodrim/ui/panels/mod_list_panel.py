@@ -133,6 +133,10 @@ class ModListPanel(QWidget):
 
         self._qml.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._qml.installEventFilter(self)
+        # Reused, not recreated per click: a fresh QMenu per right-click never got
+        # pointer input on Wayland, while the organizer's long-lived menu does.
+        self._menu = QMenu(self)
+        self._menu.setToolTipsVisible(True)
 
         ctx.active_state_changed.connect(self._on_core_state_changed)
         if hasattr(ctx, "config_changed"):
@@ -282,11 +286,11 @@ class ModListPanel(QWidget):
     def showContextMenu(self, uuids: list[str]) -> None:
         if not download_manager(self._ctx).available:
             return
-        menu = QMenu(self)
-        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        menu.setToolTipsVisible(True)
-        add_update_action(menu, self._ctx, uuids, lambda: self._update_selected(uuids))
-        menu.popup(self.cursor().pos())
+        self._menu.clear()
+        add_update_action(
+            self._menu, self._ctx, uuids, lambda: self._update_selected(uuids)
+        )
+        self._menu.popup(self.cursor().pos())
 
     @asyncSlot()
     async def _update_selected(self, uuids: list[str]) -> None:
