@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PxModRim — Startup impact redesign mockups</title>
+<style>
+  :root {
+    --e0:#0b0d10; --e1:#121418; --e2:#1a1d21; --e3:#22262b; --e4:#2c3036;
+    --border:#2f333a; --text:#f2f3f5; --muted:#949ba4; --dim:#6c737f;
+    --primary:#66c0f4; --primary-bg:rgba(102,192,244,.12);
+    --success:#3ba55d; --warning:#f9a825; --danger:#ed4245; --neutral:#5b626c;
+    --radius:6px;
+    --c-defs:#66c0f4; --c-tex:#b87cf0; --c-xml:#f9a825; --c-patch:#ed7b45; --c-code:#3ba55d; --c-audio:#42d4c0; --c-other:#5b626c;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:#050608; color:var(--text); font:13px/1.35 "Inter","Segoe UI",system-ui,sans-serif; }
+  body { padding:28px; display:flex; flex-direction:column; align-items:center; gap:36px; }
+  h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+  .caption { width:820px; color:var(--muted); font-size:12px; }
+  .caption b { color:var(--text); }
+  .caption ul { margin:6px 0 0; padding-left:18px; }
+  button { font:inherit; color:inherit; }
+  .mono { font-family:"JetBrains Mono","DejaVu Sans Mono",monospace; }
+
+  .win { width:820px; height:640px; background:var(--e2); border:1px solid var(--border); overflow:hidden;
+    display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,.6); }
+  .tb { height:32px; flex:none; display:flex; align-items:center; padding-left:12px; background:var(--e0);
+    border-bottom:1px solid var(--border); color:var(--muted); font-size:12px; }
+  .tb .x { margin-left:auto; width:40px; height:32px; display:grid; place-items:center; }
+  .body { flex:1; min-height:0; display:flex; flex-direction:column; }
+
+  .lbl { color:var(--dim); font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+  .dim { color:var(--dim); } .muted { color:var(--muted); }
+  .chip { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:11px;
+    background:var(--e4); color:var(--muted); font-size:11.5px; }
+  .chip.on { background:var(--primary-bg); color:var(--primary); }
+  .seg { display:flex; height:100%; }
+  .seg > i { display:block; height:100%; min-width:2px; }
+  .bar { height:8px; border-radius:4px; background:var(--e4); overflow:hidden; }
+  .sw { width:10px; height:10px; border-radius:2px; flex:none; display:inline-block; }
+  .search { height:28px; display:flex; align-items:center; gap:8px; padding:0 10px; background:var(--e0);
+    border:1px solid var(--border); border-radius:var(--radius); color:var(--dim); }
+  .search.grow { flex:1; }
+  .hot { color:var(--danger); } .warm { color:var(--warning); } .cool { color:var(--muted); }
+
+  /* ─── A: ranked table ─── */
+  .summary { padding:16px 18px 14px; border-bottom:1px solid var(--border); background:var(--e2); }
+  .summary .big { display:flex; align-items:baseline; gap:12px; }
+  .summary .big b { font-size:28px; font-weight:700; }
+  .stack { height:14px; border-radius:7px; overflow:hidden; margin:12px 0 8px; background:var(--e4); }
+  .legend { display:flex; gap:18px; color:var(--muted); font-size:11.5px; }
+  .legend span, .foot span { display:inline-flex; gap:6px; align-items:center; }
+  .toolrow { display:flex; gap:8px; align-items:center; padding:10px 18px; border-bottom:1px solid var(--border); }
+  .list { flex:1; overflow:auto; padding:6px 10px; }
+  .th, .row { display:grid; grid-template-columns:28px minmax(0,1fr) 260px 70px; align-items:center; gap:12px; padding:0 10px; }
+  .th { height:24px; color:var(--dim); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .row { height:36px; border-radius:var(--radius); }
+  .row:hover { background:var(--e3); }
+  .row.sel { background:var(--primary-bg); box-shadow:inset 3px 0 var(--primary); }
+  .row .rk { color:var(--dim); text-align:right; font-size:11.5px; }
+  .row .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .val { text-align:right; font-weight:600; }
+  .detail { margin:2px 10px 8px 48px; padding:10px 12px; background:var(--e1); border:1px solid var(--border); border-radius:var(--radius); }
+  .detail .mrow { display:grid; grid-template-columns:200px minmax(0,1fr) 60px; gap:10px; align-items:center; height:22px; font-size:12px; }
+  .foot { flex:none; height:34px; display:flex; align-items:center; justify-content:space-between; padding:0 18px;
+    border-top:1px solid var(--border); color:var(--dim); font-size:11.5px; }
+
+  /* ─── B: phases ─── */
+  .cols { flex:1; min-height:0; display:grid; grid-template-columns:1fr 250px; }
+  .phases { padding:12px 14px; overflow:hidden; border-right:1px solid var(--border); }
+  .ph { border-radius:var(--radius); margin-bottom:2px; }
+  .ph .h { display:grid; grid-template-columns:14px minmax(0,1fr) 150px 60px 44px; gap:10px; align-items:center; height:34px; padding:0 8px; border-radius:var(--radius); }
+  .ph.open { background:var(--e3); }
+  .ph .h:hover { background:var(--e3); }
+  .ph .who { padding:2px 8px 10px 32px; }
+  .ph .who .w { display:grid; grid-template-columns:minmax(0,1fr) 110px 56px; gap:10px; align-items:center; height:24px; font-size:12px; }
+  .side { padding:14px; display:flex; flex-direction:column; gap:14px; background:var(--e1); }
+  .card { background:var(--e2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; }
+  .card .t { font-size:20px; font-weight:700; margin-top:2px; }
+  .card .s { color:var(--muted); font-size:11.5px; margin-top:2px; }
+
+  /* ─── C: timeline + treemap ─── */
+  .tl { padding:14px 18px 10px; border-bottom:1px solid var(--border); }
+  .tl .track { position:relative; height:34px; border-radius:var(--radius); overflow:hidden; background:var(--e4); margin-top:8px; }
+  .tl .track > i { position:absolute; top:0; bottom:0; display:block; border-right:1px solid var(--e2); }
+  .tl .axis { position:relative; height:16px; margin-top:4px; color:var(--dim); font-size:10.5px; }
+  .tl .axis span { position:absolute; white-space:nowrap; transform:translateX(-50%); }
+  .tl .axis span:first-child { transform:none; } .tl .axis span:last-child { transform:translateX(-100%); }
+  .tm { flex:1; min-height:0; padding:12px 18px; display:flex; flex-direction:column; gap:8px; }
+  .treemap { flex:1; min-height:0; position:relative; border-radius:var(--radius); overflow:hidden; }
+  .treemap .cell { position:absolute; padding:6px 8px; overflow:hidden; border:1px solid var(--e2); font-size:11.5px; }
+  .treemap .cell b { display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .treemap .cell span { opacity:.8; font-size:10.5px; }
+  .treemap .cell.sel { outline:2px solid var(--text); outline-offset:-2px; z-index:2; }
+  .insight { display:flex; gap:10px; }
+  .insight .card { flex:1; }
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <h2>Startup impact — redesign options</h2>
+  Problems with today's dialog: it only shows <b>one</b> mod at a time (the selected one); metric colours are a random 20-colour preset
+  with no meaning; the donut/bar toggle shows the same three numbers; there is no way to see <b>all</b> mods ranked, which phases
+  cost the most, or which mods were on/off the main thread. Data available: base-game phase metrics, per-mod metrics
+  (main-thread + off-thread), report timestamp and total loading time. All mockups use the same fake data.
+</div>
+
+<!-- ═══════════ A ═══════════ -->
+<div>
+  <div class="caption" style="margin-bottom:10px">
+    <h2>A — Ranked mods</h2>
+    <b>Leaderboard.</b> The answer to "what is slowing my startup?" in one glance: every mod ranked, each bar coloured by its dominant phase
+    (same phase palette everywhere). Click a row for its own phase breakdown. Opened from a mod → that row is pre-selected and expanded.
+    <ul><li>Best for: finding culprits fast; closest to how users think ("which mod is slow").</li>
+    <li>Cost: smallest change — reuses the data model; one QML list + expandable delegate.</li></ul>
+  </div>
+  <div class="win" id="A"></div>
+</div>
+
+<!-- ═══════════ B ═══════════ -->
+<div>
+  <div class="caption" style="margin-bottom:10px">
+    <h2>B — By phase</h2>
+    <b>Diagnostic view.</b> Rows are RimWorld loading phases (Loading defs, Textures, Patches, XML, static constructors…). Expanding a phase shows
+    which mods spent time in it. Answers "why is <i>Applying patches</i> 40 s?". Side cards give the takeaways (top phase, top mod, off-thread share).
+    <ul><li>Best for: modpack builders tuning the load; makes the cryptic metric names meaningful (grouped into ~7 categories, raw name on hover).</li>
+    <li>Cost: needs a metric→category map in <span class="mono">labels.py</span> and per-phase mod aggregation in the service.</li></ul>
+  </div>
+  <div class="win" id="B"></div>
+</div>
+
+<!-- ═══════════ C ═══════════ -->
+<div>
+  <div class="caption" style="margin-bottom:10px">
+    <h2>C — Timeline + treemap</h2>
+    <b>Visual overview.</b> Top: the load as a left-to-right timeline of phases (base game and mods together, true proportions with a time axis).
+    Bottom: treemap where area = mod time, coloured by dominant phase; the mod selected in the main window is outlined. Insight cards call out concentration
+    ("5 mods = 61 % of mod time").
+    <ul><li>Best for: an impressive at-a-glance picture, spotting one huge outlier.</li>
+    <li>Cost: highest — custom treemap layout (squarify) in QML/JS; small mods become unreadable slivers, so needs an "Others" cell and click-to-zoom.</li></ul>
+  </div>
+  <div class="win" id="C"></div>
+</div>
+
+<div class="caption">
+  <h2>Recommendation</h2>
+  <b>A as the default view, with B as a second tab</b> ("Mods | Phases") in the same dialog, sharing the phase palette and the summary stack on top. C is the flashiest but weakest for
+  actually acting on the data. Whichever is chosen: replace the random colour preset with a fixed phase palette, and put the total + base/mods/off-thread split at the top.
+</div>
+
+<script>
+// ─── fake data ───
+const PH = {
+  defs:  {n:'Loading defs',        c:'var(--c-defs)'},
+  tex:   {n:'Textures & audio',    c:'var(--c-tex)'},
+  xml:   {n:'XML parsing',         c:'var(--c-xml)'},
+  patch: {n:'Patches',             c:'var(--c-patch)'},
+  code:  {n:'Static constructors', c:'var(--c-code)'},
+  other: {n:'Other',               c:'var(--c-other)'},
+};
+const base = {defs:9.1, tex:14.2, xml:6.4, patch:2.1, code:3.0, other:2.2};       // base game, s
+// per mod: [name, {phase:s}, offThread s]
+const mods = [
+  ['Vanilla Expanded Framework', {defs:3.1,tex:6.8,xml:3.9,patch:5.2,code:2.4}, 1.1],
+  ['Rimatomics',                 {defs:1.6,tex:7.9,xml:1.2,patch:0.4,code:0.6}, 0.3],
+  ['Combat Extended',            {defs:2.2,tex:2.4,xml:2.8,patch:8.6,code:1.1}, 0],
+  ['RimHUD',                     {defs:0.2,tex:0.4,xml:0.1,patch:0.1,code:3.9}, 0],
+  ['Harmony',                    {defs:0.0,tex:0.1,xml:0.0,patch:0.0,code:2.7}, 0],
+  ['Dubs Bad Hygiene',           {defs:0.9,tex:1.4,xml:0.8,patch:0.7,code:0.6}, 0.2],
+  ['Alpha Animals',              {defs:0.7,tex:3.2,xml:0.6,patch:0.2,code:0.1}, 0],
+  ['Better Vanilla Fire',        {defs:0.2,tex:0.9,xml:0.3,patch:0.4,code:0.1}, 0],
+  ['Wall Light',                 {defs:0.2,tex:0.7,xml:0.2,patch:0.1,code:0.1}, 0],
+  ['Fluffy Breakdowns',          {defs:0.1,tex:0.1,xml:0.1,patch:0.1,code:0.5}, 0],
+  ['Simple Sidearms',            {defs:0.1,tex:0.2,xml:0.1,patch:0.1,code:0.5}, 0],
+  ['Pick Up And Haul',           {defs:0.1,tex:0.1,xml:0.1,patch:0.3,code:0.2}, 0],
+];
+const SEL = 'Combat Extended';
+const sum = o => Object.values(o).reduce((a,b)=>a+b,0);
+const T = m => sum(m[1]) + m[2];
+mods.sort((a,b)=>T(b)-T(a));
+const baseT = sum(base), modsT = mods.reduce((a,m)=>a+T(m),0), offT = mods.reduce((a,m)=>a+m[2],0), total = baseT+modsT;
+const fmt = s => s>=60 ? `${Math.floor(s/60)}m ${Math.round(s%60)}s` : s>=1 ? `${s.toFixed(1)} s` : `${Math.round(s*1000)} ms`;
+const heat = s => s>=8 ? 'hot' : s>=3 ? 'warm' : 'cool';
+const dom = m => Object.entries(m[1]).sort((a,b)=>b[1]-a[1])[0][0];
+const segs = (o, denom) => Object.entries(o).filter(([,v])=>v>0).map(([k,v])=>`<i title="${PH[k].n}: ${fmt(v)}" style="width:${v/denom*100}%;background:${PH[k].c}"></i>`).join('');
+const phaseLegend = () => Object.entries(PH).map(([k,p])=>`<span><i class="sw" style="background:${p.c}"></i>${p.n}</span>`).join('');
+const titleBar = t => `<div class="tb">${t}<div class="x"><svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.4"><path d="M1 1l8 8M9 1l-8 8"/></svg></div></div>`;
+const phaseTotals = {}; for (const k in PH) phaseTotals[k] = base[k] + mods.reduce((a,m)=>a+(m[1][k]||0),0);
+
+// ─── A ───
+(() => {
+  const max = T(mods[0]);
+  const rows = mods.map((m,i) => {
+    const sel = m[0]===SEL, t=T(m);
+    const detail = sel ? `<div class="detail">
+      <div class="lbl" style="margin-bottom:6px">Where ${m[0]} spends its time</div>
+      ${Object.entries(m[1]).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="mrow"><span><i class="sw" style="background:${PH[k].c};margin-right:8px"></i>${PH[k].n}</span><div class="bar"><div style="height:100%;width:${v/m[1][dom(m)]*100}%;background:${PH[k].c}"></div></div><span class="mono" style="text-align:right">${fmt(v)}</span></div>`).join('')}
+      ${m[2]?`<div class="mrow"><span class="dim">↳ off main thread</span><span></span><span class="mono dim" style="text-align:right">${fmt(m[2])}</span></div>`:''}
+    </div>`:'';
+    return `<div class="row ${sel?'sel':''}"><span class="rk">${i+1}</span><span class="nm">${m[0]}</span>
+      <div class="bar" style="height:10px"><div class="seg" style="width:${t/max*100}%">${segs(m[1], t)}</div></div>
+      <span class="val mono ${heat(t)}">${fmt(t)}</span></div>${detail}`;
+  }).join('');
+  document.getElementById('A').innerHTML = titleBar('Startup impact') + `<div class="body">
+    <div class="summary">
+      <div class="big"><b>${fmt(total)}</b><span class="muted">estimated loading time</span><span style="flex:1"></span><span class="dim" style="font-size:11.5px">report from 2026-09-28 21:14</span></div>
+      <div class="stack"><div class="seg"><i style="width:${baseT/total*100}%;background:var(--neutral)"></i><i style="width:${(modsT-offT)/total*100}%;background:var(--primary)"></i><i style="width:${offT/total*100}%;background:repeating-linear-gradient(45deg,var(--primary),var(--primary) 3px,#3d8db8 3px,#3d8db8 6px)"></i></div></div>
+      <div class="legend"><span><i class="sw" style="background:var(--neutral)"></i>Base game ${fmt(baseT)} · ${Math.round(baseT/total*100)}%</span>
+        <span><i class="sw" style="background:var(--primary)"></i>Mods, main thread ${fmt(modsT-offT)}</span>
+        <span><i class="sw" style="background:#3d8db8"></i>Mods, off-thread ${fmt(offT)}</span></div>
+    </div>
+    <div class="toolrow"><div class="search grow">🔍 Filter mods…</div>
+      <span class="chip on">All ${mods.length}</span><span class="chip">Active only</span><span class="chip">Slow &gt; 3 s</span>
+      <span class="chip">Sort: Time ▾</span></div>
+    <div class="list"><div class="th"><span></span><span>Mod</span><span>Phase breakdown</span><span style="text-align:right">Time</span></div>${rows}</div>
+    <div class="foot"><span style="display:flex;gap:14px">${phaseLegend()}</span><span>12 of 148 mods shown</span></div>
+  </div>`;
+})();
+
+// ─── B ───
+(() => {
+  const order = Object.keys(PH).sort((a,b)=>phaseTotals[b]-phaseTotals[a]);
+  const maxP = phaseTotals[order[0]];
+  const rows = order.map((k,idx) => {
+    const open = idx===1 || idx===3;
+    const contrib = [['Base game', base[k]], ...mods.map(m=>[m[0], m[1][k]||0])].filter(x=>x[1]>0.05).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const cm = contrib[0][1];
+    return `<div class="ph ${open?'open':''}"><div class="h"><span class="dim">${open?'▾':'▸'}</span>
+      <span><i class="sw" style="background:${PH[k].c};margin-right:8px"></i>${PH[k].n}</span>
+      <div class="bar" style="height:10px"><div style="height:100%;width:${phaseTotals[k]/maxP*100}%;background:${PH[k].c}"></div></div>
+      <span class="mono" style="text-align:right;font-weight:600">${fmt(phaseTotals[k])}</span><span class="dim" style="text-align:right">${Math.round(phaseTotals[k]/total*100)}%</span></div>
+      ${open?`<div class="who">${contrib.map(([n,v])=>`<div class="w"><span class="${n===SEL?'':'muted'}" style="${n===SEL?'color:var(--primary);font-weight:600':''}">${n}</span><div class="bar" style="height:6px"><div style="height:100%;width:${v/cm*100}%;background:${PH[k].c};opacity:.7"></div></div><span class="mono muted" style="text-align:right">${fmt(v)}</span></div>`).join('')}
+        <div class="dim" style="margin-top:4px;font-size:11.5px">+ ${mods.filter(m=>(m[1][k]||0)>0).length - contrib.length + 1} more mods…</div></div>`:''}</div>`;
+  }).join('');
+  const topMod = mods[0];
+  document.getElementById('B').innerHTML = titleBar('Startup impact') + `<div class="body">
+    <div class="toolrow"><span class="chip">Mods</span><span class="chip on">Phases</span><span style="flex:1"></span>
+      <span class="chip on">Include base game</span><span class="chip">Include off-thread</span></div>
+    <div class="cols">
+      <div class="phases"><div class="th" style="grid-template-columns:14px minmax(0,1fr) 150px 60px 44px"><span></span><span>Phase</span><span></span><span style="text-align:right">Time</span><span style="text-align:right">Share</span></div>${rows}</div>
+      <div class="side">
+        <div class="card"><div class="lbl">Total</div><div class="t">${fmt(total)}</div><div class="s">Base game ${fmt(baseT)} · Mods ${fmt(modsT)}</div></div>
+        <div class="card"><div class="lbl">Costliest phase</div><div class="t">${PH[order[0]].n}</div><div class="s">${fmt(phaseTotals[order[0]])} · ${Math.round(phaseTotals[order[0]]/total*100)}% of load</div></div>
+        <div class="card"><div class="lbl">Costliest mod</div><div class="t" style="font-size:15px">${topMod[0]}</div><div class="s">${fmt(T(topMod))} · mostly ${PH[dom(topMod)].n.toLowerCase()}</div></div>
+        <div class="card"><div class="lbl">Off main thread</div><div class="t">${fmt(offT)}</div><div class="s">Doesn't block the loading screen</div></div>
+        <div style="flex:1"></div><div class="dim" style="font-size:11px">Hover a phase for the raw metric names<br>(e.g. <span class="mono">ApplyPatches</span>, <span class="mono">LoadDefs</span>).</div>
+      </div>
+    </div></div>`;
+})();
+
+// ─── C ───
+(() => {
+  // timeline: phases in fixed load order, base + mods merged
+  const loadOrder = ['code','xml','defs','patch','tex','other'];
+  let x = 0;
+  const tl = loadOrder.map(k => { const w = phaseTotals[k]/total*100, s = `<i title="${PH[k].n}: ${fmt(phaseTotals[k])}" style="left:${x}%;width:${w}%;background:${PH[k].c}"></i>`; x += w; return s; }).join('');
+  const ticks = [0,.25,.5,.75,1].map(f=>`<span style="left:${f*100}%">${fmt(total*f).replace(' s','s')}</span>`).join('');
+  // slice-and-dice treemap, big first, alternating direction
+  const items = mods.map(m=>({m, v:T(m)}));
+  const cells = [];
+  (function lay(list, x,y,w,h, vert){
+    if (!list.length) return;
+    if (list.length===1){ cells.push({...list[0],x,y,w,h}); return; }
+    const tot = list.reduce((a,i)=>a+i.v,0);
+    let acc=0, k=0; while (k<list.length-1 && acc + list[k].v < tot/2) acc += list[k++].v; if(k===0){acc=list[0].v;k=1;}
+    const a=list.slice(0,k), b=list.slice(k), f=acc/tot;
+    if (vert){ lay(a,x,y,w*f,h,!vert); lay(b,x+w*f,y,w*(1-f),h,!vert); }
+    else { lay(a,x,y,w,h*f,!vert); lay(b,x,y+h*f,w,h*(1-f),!vert); }
+  })(items, 0,0,100,100, true);
+  const tm = cells.map(c=>{ const k=dom(c.m), sel=c.m[0]===SEL;
+    return `<div class="cell ${sel?'sel':''}" style="left:${c.x}%;top:${c.y}%;width:${c.w}%;height:${c.h}%;background:color-mix(in srgb, ${PH[k].c} ${sel?85:55}%, var(--e2))"><b>${c.w>9&&c.h>12?c.m[0]:''}</b><span>${c.w>9&&c.h>12?fmt(c.v):''}</span></div>`;}).join('');
+  const top5 = mods.slice(0,5).reduce((a,m)=>a+T(m),0);
+  document.getElementById('C').innerHTML = titleBar('Startup impact') + `<div class="body">
+    <div class="tl">
+      <div style="display:flex;align-items:baseline;gap:12px"><b style="font-size:28px">${fmt(total)}</b><span class="muted">estimated loading time</span></div>
+      <div class="track">${tl}</div><div class="axis">${ticks}</div>
+      <div class="legend" style="margin-top:8px;flex-wrap:wrap">${phaseLegend()}</div>
+    </div>
+    <div class="tm">
+      <div style="display:flex;align-items:center;gap:8px"><span class="lbl">Mods by time · area = seconds · colour = dominant phase</span><span style="flex:1"></span><span class="chip">Include base game</span></div>
+      <div class="treemap">${tm}</div>
+      <div class="insight">
+        <div class="card"><div class="lbl">Concentration</div><div class="s" style="color:var(--text)">Top 5 mods = <b>${Math.round(top5/modsT*100)}%</b> of mod time</div></div>
+        <div class="card"><div class="lbl">Selected</div><div class="s" style="color:var(--text)"><b style="color:var(--primary)">${SEL}</b> — ${fmt(T(mods.find(m=>m[0]===SEL)))}, #${mods.findIndex(m=>m[0]===SEL)+1} of ${mods.length}</div></div>
+        <div class="card"><div class="lbl">Off-thread</div><div class="s" style="color:var(--text)"><b>${fmt(offT)}</b> not blocking</div></div>
+      </div>
+    </div></div>`;
+})();
+</script>
+</body>
+</html>
