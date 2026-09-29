@@ -10,7 +10,9 @@ Rectangle {
 
     property var info: null
     property var startup: null
+    readonly property bool startupKnown: startup !== null && startup !== undefined
     property bool descExpanded: false
+    property bool neededExpanded: false
 
     signal openFolder()
     signal openUrl()
@@ -79,17 +81,28 @@ Rectangle {
 
     function resetScroll() {
         flick.contentY = 0
+        neededExpanded = false
     }
 
     Flickable {
         id: flick
+        objectName: "flick"
         anchors.fill: parent
         visible: root.hasInfo
         contentHeight: page.implicitHeight + 28
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        // Mouse drag must select text, not scroll; wheel and scrollbar still work.
+        interactive: false
 
         ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+
+        WheelHandler {
+            onWheel: event => {
+                const max = Math.max(0, flick.contentHeight - flick.height)
+                flick.contentY = Math.max(0, Math.min(max, flick.contentY - event.angleDelta.y))
+            }
+        }
 
         ColumnLayout {
             id: page
@@ -225,7 +238,7 @@ Rectangle {
                     visible: root.hasInfo && root.info.neededBy.length > 0
 
                     Repeater {
-                        model: root.hasInfo ? root.info.neededBy : []
+                        model: !root.hasInfo ? [] : root.neededExpanded ? root.info.neededBy : root.info.neededBy.slice(0, 6)
                         delegate: PxBadge {
                             text: modelData
                             textColor: Theme.textMuted
@@ -233,13 +246,16 @@ Rectangle {
                         }
                     }
                     Text {
-                        visible: root.hasInfo && root.info.neededByMore > 0
-                        text: "+" + (root.hasInfo ? root.info.neededByMore : 0) + " more"
-                        color: Theme.textDim
+                        visible: root.hasInfo && root.info.neededBy.length > 6
+                        text: root.neededExpanded ? "Show less" : "+" + (root.hasInfo ? root.info.neededBy.length - 6 : 0) + " more"
+                        color: Theme.primary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         height: 20
                         verticalAlignment: Text.AlignVCenter
+
+                        TapHandler { onTapped: root.neededExpanded = !root.neededExpanded }
+                        HoverHandler { cursorShape: Qt.PointingHandCursor }
                     }
                 }
             }
@@ -251,7 +267,8 @@ Rectangle {
                 CardLabel { text: "Description" }
                 Item {
                     id: descClip
-                    readonly property real collapsedHeight: descText.lineHeight * 4
+                    FontMetrics { id: descMetrics; font: descText.font }
+                    readonly property real collapsedHeight: descMetrics.lineSpacing * 4
                     readonly property bool overflows: descText.implicitHeight > collapsedHeight + 1
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.descExpanded ? descText.implicitHeight
@@ -271,19 +288,25 @@ Rectangle {
                         }
                     }
 
-                    Text {
+                    TextEdit {
                         id: descText
+                        objectName: "descText"
                         width: parent.width
-                        text: root.hasInfo ? root.info.description : ""
-                        textFormat: Text.RichText
+                        text: root.hasInfo ? "<style>a { color: " + Theme.primary + "; }</style>" + root.info.description : ""
+                        textFormat: TextEdit.RichText
+                        readOnly: true
+                        selectByMouse: true
+                        selectedTextColor: Theme.onAccent
+                        selectionColor: Theme.primary
                         color: Theme.textMuted
-                        linkColor: Theme.primary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeMd
-                        wrapMode: Text.WordWrap
-                        lineHeightMode: Text.FixedHeight
-                        lineHeight: 19
+                        wrapMode: TextEdit.WordWrap
                         onLinkActivated: link => Qt.openUrlExternally(link)
+
+                        HoverHandler {
+                            cursorShape: descText.hoveredLink.length > 0 ? Qt.PointingHandCursor : Qt.IBeamCursor
+                        }
                     }
                 }
                 Text {
@@ -306,7 +329,7 @@ Rectangle {
             // ── Startup impact ──
             Card {
                 id: startupCard
-                visible: root.startup !== null
+                readonly property bool ready: root.startupKnown && root.startup.available
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -314,62 +337,107 @@ Rectangle {
 
                     CardLabel { text: "Startup impact" }
                     Text {
-                        visible: root.startup !== null
-                        text: "Details \u203A"
+                        visible: startupCard.ready
+                        text: "Full breakdown \u203A"
                         color: startupHover.hovered ? Theme.primaryHover : Theme.primary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                     }
                 }
 
-                RowLayout {
-                    visible: root.startup !== null
+                Text {
                     Layout.fillWidth: true
-                    spacing: 12
+                    visible: !startupCard.ready
+                    text: !root.startupKnown ? "Loading\u2026" : (root.startup.message || "")
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeMd
+                    wrapMode: Text.WordWrap
+                }
 
-                    Row {
-                        spacing: 3
-                        Layout.alignment: Qt.AlignBottom
+                ColumnLayout {
+                    visible: startupCard.ready
+                    Layout.fillWidth: true
+                    spacing: 8
 
-                        Repeater {
-                            model: root.startup ? root.startup.spark : []
-                            delegate: Rectangle {
-                                width: 6
-                                height: Math.max(3, 30 * modelData)
-                                anchors.bottom: parent.bottom
-                                radius: 1
-                                color: root.startup ? root.startup.color : Theme.primary
-                            }
-                        }
-                    }
-                    Item { Layout.fillWidth: true }
-                    ColumnLayout {
-                        spacing: 0
+                    RowLayout {
+                        Layout.fillWidth: true
+
                         Text {
-                            Layout.alignment: Qt.AlignRight
-                            text: root.startup ? root.startup.own : ""
-                            color: Theme.textMain
+                            text: startupCard.ready ? root.startup.own : ""
+                            color: startupCard.ready ? root.startup.color : Theme.textMain
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeLg
+                            font.pixelSize: Theme.fontSizeXl
                             font.weight: Font.Bold
                         }
+                        Item { Layout.fillWidth: true }
                         Text {
-                            Layout.alignment: Qt.AlignRight
-                            text: root.startup ? root.startup.rank : ""
+                            text: startupCard.ready ? root.startup.rank : ""
                             color: Theme.textMuted
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSm
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: startupCard.ready && root.startup.estimated
+                            ? "Estimated extra game load time if you activate this mod"
+                            : "Extra game load time caused by this mod"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Repeater {
+                        model: startupCard.ready ? root.startup.rows : []
+
+                        delegate: ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.label
+                                    elide: Text.ElideRight
+                                    color: Theme.textMuted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSm
+                                }
+                                Text {
+                                    text: modelData.value
+                                    color: Theme.textMain
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSm
+                                }
+                            }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 4
+                                radius: 2
+                                color: Theme.elevate4
+
+                                Rectangle {
+                                    width: parent.width * modelData.fraction
+                                    height: parent.height
+                                    radius: 2
+                                    color: root.startup.color
+                                }
+                            }
                         }
                     }
                 }
 
                 HoverHandler {
                     id: startupHover
-                    enabled: root.startup !== null
+                    enabled: startupCard.ready
                     cursorShape: Qt.PointingHandCursor
                 }
                 TapHandler {
-                    enabled: root.startup !== null
+                    enabled: startupCard.ready
                     onTapped: root.openStartupDetails()
                 }
             }

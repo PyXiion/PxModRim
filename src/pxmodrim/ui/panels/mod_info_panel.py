@@ -13,6 +13,7 @@ from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+from pxmodrim.core.services.startup_impact_service.labels import metric_label
 from pxmodrim.ui.components import AspectRatioBanner, generate_preview
 from pxmodrim.ui.models.impact import format_duration, impact_color
 from pxmodrim.ui.panels.mod_info_data import build_mod_info
@@ -25,7 +26,8 @@ if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModIssueView
 
 _QML = Path(__file__).parent / "ModInfo.qml"
-_SPARK_BARS = 8
+_TOP_METRICS = 3
+_NO_STARTUP = {"available": False, "message": "Startup impact is unavailable."}
 
 
 def _first_sentence(text: str, max_len: int = 80) -> str:
@@ -191,28 +193,54 @@ class ModInfoPanel(QWidget):
 
         sis = self._ctx.mod_service.startup_impact
         if not sis or not pid:
-            self._set_qml("startup", None)
+            self._set_qml("startup", _NO_STARTUP)
             return
 
         report, *_, own = await sis.snapshot(active_pids, pid)
         if token != self._startup_token:
             return
 
-        mod = report.find(pid, None) if report else None
-        if report is None or mod is None or own < 0.001:
-            self._set_qml("startup", None)
+        if report is None:
+            self._set_qml(
+                "startup",
+                {
+                    "available": False,
+                    "message": "No startup data recorded yet. "
+                    "Launch the game to generate it.",
+                },
+            )
+            return
+
+        mod = report.find(pid, None)
+        if mod is None or own < 0.001:
+            self._set_qml(
+                "startup",
+                {
+                    "available": False,
+                    "message": "This mod wasn't measured in the last recorded launch.",
+                },
+            )
             return
 
         rank = 1 + sum(1 for m in report.mods if m.total_impact_s > own)
-        metrics = sorted(mod.metrics.values(), reverse=True)[:_SPARK_BARS]
-        peak = max(metrics, default=0.0)
+        top = sorted(mod.metrics.items(), key=lambda kv: kv[1], reverse=True)
         self._set_qml(
             "startup",
             {
+                "available": True,
                 "own": format_duration(own),
-                "rank": f"#{rank} slowest of {len(report.mods)}",
-                "spark": [v / peak for v in metrics] if peak > 0 else [],
+                "rank": f"#{rank} slowest of {len(report.mods)} mods",
+                "estimated": pid.lower() not in {a.lower() for a in active_pids},
                 "color": impact_color(own),
+                "rows": [
+                    {
+                        "label": metric_label(name),
+                        "value": format_duration(value),
+                        "fraction": min(1.0, value / own),
+                    }
+                    for name, value in top[:_TOP_METRICS]
+                    if value >= 0.001
+                ],
             },
         )
 

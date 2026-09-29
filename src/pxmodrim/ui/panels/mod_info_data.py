@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -11,7 +12,9 @@ if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.models.view.diagnostics import ModIssueView
 
-_NEEDED_BY_LIMIT = 6
+_URL_RE = re.compile(r"https?://[^\s<>\"]+")
+_TAG_RE = re.compile(r"(<[^>]+>)")
+_TRAILING_PUNCT = ".,;:!?)"
 _UNITS = (
     ("year", 365 * 86400),
     ("month", 30 * 86400),
@@ -19,6 +22,29 @@ _UNITS = (
     ("day", 86400),
     ("hour", 3600),
 )
+
+
+def autolink(html_text: str) -> str:
+    """Wrap bare http(s) URLs in anchors, leaving text inside existing <a> alone."""
+
+    def link(match: re.Match[str]) -> str:
+        url = match.group(0)
+        stripped = url.rstrip(_TRAILING_PUNCT)
+        return f'<a href="{stripped}">{stripped}</a>{url[len(stripped) :]}'
+
+    out = []
+    in_anchor = False
+    for part in _TAG_RE.split(html_text):
+        if part.startswith("<"):
+            lowered = part.lower()
+            if lowered.startswith("<a ") or lowered == "<a>":
+                in_anchor = True
+            elif lowered == "</a>":
+                in_anchor = False
+            out.append(part)
+        else:
+            out.append(part if in_anchor else _URL_RE.sub(link, part))
+    return "".join(out)
 
 
 def format_age(mtime: float, now: float | None = None) -> str:
@@ -89,7 +115,7 @@ def _conflicts(
     return sorted(names, key=str.lower)
 
 
-def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> tuple[list[str], int]:
+def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> list[str]:
     pid = str(mod.package_id).lower()
     names = [
         m.name
@@ -103,7 +129,7 @@ def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> tuple[list[str], int]:
         )
     ]
     names.sort(key=str.lower)
-    return names[:_NEEDED_BY_LIMIT], max(0, len(names) - _NEEDED_BY_LIMIT)
+    return names
 
 
 def _version_support(mod: ListedMod, target: str) -> dict[str, Any]:
@@ -141,13 +167,12 @@ def build_mod_info(
 
     needs: list[dict[str, str]] = []
     needed_by: list[str] = []
-    needed_by_more = 0
     conflicts: list[str] = []
     if isinstance(mod, AboutXmlMod):
         index = _pid_index(ctx)
         needs = _needs(mod, index, active)
         conflicts = _conflicts(mod, index, active)
-        needed_by, needed_by_more = _needed_by(mod, ctx)
+        needed_by = _needed_by(mod, ctx)
 
     return {
         "name": mod.name,
@@ -169,8 +194,7 @@ def build_mod_info(
         "needs": needs,
         "conflicts": conflicts,
         "neededBy": needed_by,
-        "neededByMore": needed_by_more,
-        "description": unity_rich_text_to_html(mod.description)
+        "description": autolink(unity_rich_text_to_html(mod.description))
         if mod.description
         else "",
         "details": _details(mod),
