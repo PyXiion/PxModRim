@@ -41,7 +41,6 @@ from pxmodrim.core.config import (  # noqa: E402
 )
 from pxmodrim.core.context import CoreContext  # noqa: E402
 from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
-from pxmodrim.ui.components.wheel_scaler import WheelScaler  # noqa: E402
 from pxmodrim.ui.config import UIPrefsService  # noqa: E402
 from pxmodrim.ui.context import AppContext  # noqa: E402
 from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
@@ -104,6 +103,9 @@ def _parse_disabled_plugins() -> set[str]:
     return {n.strip() for n in disabled_raw.split(",") if n.strip()}
 
 
+_WHEEL_SCROLL_LINES = 8
+
+
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
@@ -129,7 +131,8 @@ class App:
         self.qt_app.setApplicationDisplayName("PxModRim")
         self.qt_app.setDesktopFileName("pxmodrim")
 
-        WheelScaler(self.qt_app)
+        # Honoured by widgets and Qt Quick alike; the default of 3 feels slow.
+        self.qt_app.styleHints().setWheelScrollLines(_WHEEL_SCROLL_LINES)
         self._apply_theme()
 
     def _apply_theme(self) -> None:
