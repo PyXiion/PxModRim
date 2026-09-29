@@ -15,17 +15,19 @@ class Theme(QObject):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._logo_data_uri = self._load_logo()
+        self._logo_variants = self._load_logos()
+        self._logo_data_uri = random.choice(self._logo_variants)
 
     @staticmethod
-    def _load_logo() -> str:
-        logo_files = [f"logo_nobg_{N}.svg" for N in range(1, 4 + 1)]
-
-        chosen = random.choice(logo_files)
-        svg_path = resource_files("pxmodrim.ui.assets") / chosen
-        raw = svg_path.read_bytes()
-        encoded = base64.b64encode(raw).decode("ascii")
-        return f"data:image/svg+xml;base64,{encoded}"
+    def _load_logos() -> list[str]:
+        uris = []
+        for n in range(1, 4 + 1):
+            raw = (
+                resource_files("pxmodrim.ui.assets") / f"logo_nobg_{n}.svg"
+            ).read_bytes()
+            encoded = base64.b64encode(raw).decode("ascii")
+            uris.append(f"data:image/svg+xml;base64,{encoded}")
+        return uris
 
     # ── Elevation backgrounds ────────────────────────────
 
@@ -202,6 +204,10 @@ class Theme(QObject):
     @Property(int, constant=True)
     def sidebarWidth(self) -> int:
         return constants.SIDEBAR_WIDTH
+
+    @Property(list, constant=True)
+    def logoVariants(self) -> list[str]:
+        return self._logo_variants
 
     @Property(str, constant=True)
     def logoFileDataUri(self) -> str:

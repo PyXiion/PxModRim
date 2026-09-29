@@ -24,6 +24,13 @@ Rectangle {
             Layout.fillHeight: true
 
             property int pokes: 0
+            property string currentLogo: Theme.logoFileDataUri
+
+            function swapLogo() {
+                var others = Theme.logoVariants.filter(function (u) { return u !== currentLogo })
+                if (others.length > 0)
+                    currentLogo = others[Math.floor(Math.random() * others.length)]
+            }
             readonly property var quips: [
                 "Oh, hello.", "Ow.", "Hey!", "Stop poking me.",
                 "Load order: sorted.", "Nothing to see here."
@@ -38,7 +45,7 @@ Rectangle {
             Image {
                 id: logo
                 anchors.fill: parent
-                source: Theme.logoFileDataUri
+                source: logoBox.currentLogo
                 fillMode: Image.PreserveAspectFit
                 scale: logoArea.pressed ? 0.92 : logoArea.containsMouse ? 1.08 : 1.0
                 Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
@@ -51,14 +58,25 @@ Rectangle {
                     angle: 0
                 }
 
-                NumberAnimation {
+                SequentialAnimation {
                     id: spin
-                    target: flip
-                    property: "angle"
-                    from: 0
-                    to: 360
-                    duration: 600
-                    easing.type: Easing.OutBack
+                    NumberAnimation {
+                        target: flip
+                        property: "angle"
+                        from: 0
+                        to: 90
+                        duration: 300
+                        easing.type: Easing.InCubic
+                    }
+                    ScriptAction { script: logoBox.swapLogo() }
+                    NumberAnimation {
+                        target: flip
+                        property: "angle"
+                        from: 90
+                        to: 0
+                        duration: 300
+                        easing.type: Easing.OutCubic
+                    }
                 }
             }
 
@@ -73,14 +91,10 @@ Rectangle {
                     logoBox.pokes += 1
                     pokeReset.restart()
                     if (logoBox.pokes >= 10) {
-                        bubble.show("Fine. Have a crab. \ud83e\udd80")
-                        spin.duration = 1400
-                        spin.to = 1440
+                        bubble.show("Fine. Have a crab. 🦀")
                         logoBox.pokes = 0
                     } else {
                         bubble.show(logoBox.quips[Math.min(logoBox.pokes - 1, logoBox.quips.length - 1)])
-                        spin.duration = 600
-                        spin.to = 360
                     }
                     spin.restart()
                 }
@@ -122,6 +136,7 @@ Rectangle {
                 }
             }
         }
+
 
         // ── Text column ──
         ColumnLayout {
