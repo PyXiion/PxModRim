@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -32,14 +33,15 @@ _NO_STARTUP = {"available": False, "message": "Startup impact is unavailable."}
 
 
 _MARKUP_RE = re.compile(
-    r"\[img\].*?\[/img\]|<[^>]+>|\[/?\w+(?:=[^\]]*)?\]", re.IGNORECASE | re.DOTALL
+    r"\[img\].*?\[/img\]|<[^>]+>|\[/?\w+(?:=[^\]]*)?\]|\[\*\]",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
 def _first_sentence(text: str, max_len: int = 80) -> str:
     if not text:
         return ""
-    stripped = " ".join(_MARKUP_RE.sub(" ", text).split())
+    stripped = " ".join(html.unescape(_MARKUP_RE.sub(" ", text)).split())
     end = stripped.find(".")
     result = stripped[: end + 1] if end != -1 else stripped
     if len(result) > max_len:

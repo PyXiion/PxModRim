@@ -18,8 +18,40 @@ _URL_TAG_RE = re.compile(
     r"\[url=(https?://[^\]\s\"<]+)\](.*?)\[/url\]", re.IGNORECASE | re.DOTALL
 )
 _BARE_URL_TAG_RE = re.compile(r"\[url\](https?://[^\[\s\"<]+)\[/url\]", re.IGNORECASE)
-_FORMAT_TAGS = {"b": "b", "i": "i", "u": "u", "s": "s", "strike": "s"}
-_FORMAT_RE = re.compile(r"\[(/?)(" + "|".join(_FORMAT_TAGS) + r")\]", re.IGNORECASE)
+_ENTITY_RE = re.compile(r"&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});")
+_QUOTE_AUTHOR_RE = re.compile(r"\[quote=([^\]]+)\]", re.IGNORECASE)
+_TABLE_OPEN_RE = re.compile(r"\[table[^\]]*\]", re.IGNORECASE)
+# BBCode name -> HTML tag, for tags that map one-to-one.
+_PAIRED_TAGS = {
+    "b": "b",
+    "i": "i",
+    "u": "u",
+    "s": "s",
+    "strike": "s",
+    "h1": "h1",
+    "h2": "h2",
+    "h3": "h3",
+    "code": "pre",
+    "quote": "blockquote",
+    "list": "ul",
+    "olist": "ol",
+    "table": "table",
+    "tr": "tr",
+    "td": "td",
+    "th": "th",
+}
+_PAIRED_RE = re.compile(r"\[(/?)(" + "|".join(_PAIRED_TAGS) + r")\]", re.IGNORECASE)
+# Tags that only exist to be stripped (Steam spoiler/noparse have no HTML form).
+_STRIP_RE = re.compile(r"\[/?(?:spoiler|noparse)\]", re.IGNORECASE)
+_BLOCK = r"(?:ul|ol|li|table|tr|td|th|blockquote|pre|h[1-3])"
+_BLOCK_AFTER = r"(?:/h[1-3]|/?ul|/?ol|/?table|/?tr|/?blockquote|/?pre)"
+# Line breaks the text converter emits around block tags would add blank lines.
+_BR_BEFORE_BLOCK_RE = re.compile(r"(?:<br>\s*)+(?=</?" + _BLOCK + r"\b)")
+_BR_AFTER_BLOCK_RE = re.compile(r"(<" + _BLOCK_AFTER + r">)(?:<br>\s*)+")
+_URL_TAG_RE = re.compile(
+    r"\[url=(https?://[^\]\s\"<]+)\](.*?)\[/url\]", re.IGNORECASE | re.DOTALL
+)
+_BARE_URL_TAG_RE = re.compile(r"\[url\](https?://[^\[\s\"<]+)\[/url\]", re.IGNORECASE)
 # Replaced by the QML page with the description's pixel width.
 IMG_WIDTH_TOKEN = "__IMG_WIDTH__"
 _TAG_RE = re.compile(r"(<[^>]+>)")
@@ -40,13 +72,25 @@ def bbcode_images(html_text: str) -> str:
     )
 
 
+def restore_entities(html_text: str) -> str:
+    """Un-escape entities like &#8226; that authors wrote into plain-text fields."""
+    return _ENTITY_RE.sub(r"&\1;", html_text)
+
+
 def bbcode_markup(html_text: str) -> str:
-    """Convert Steam-style [url], [b], [i], [u] and [s] tags to HTML."""
+    """Convert Steam-style BBCode (links, formatting, lists, tables) to HTML."""
     html_text = _URL_TAG_RE.sub(r'<a href="\1">\2</a>', html_text)
     html_text = _BARE_URL_TAG_RE.sub(r'<a href="\1">\1</a>', html_text)
-    return _FORMAT_RE.sub(
-        lambda m: f"<{m.group(1)}{_FORMAT_TAGS[m.group(2).lower()]}>", html_text
+    html_text = _QUOTE_AUTHOR_RE.sub(r"<blockquote><i>\1 wrote:</i><br>", html_text)
+    html_text = _TABLE_OPEN_RE.sub("<table>", html_text)
+    html_text = _STRIP_RE.sub("", html_text)
+    html_text = re.sub(r"\[hr\]", "<hr>", html_text, flags=re.IGNORECASE)
+    html_text = html_text.replace("[*]", "<li>")
+    html_text = _PAIRED_RE.sub(
+        lambda m: f"<{m.group(1)}{_PAIRED_TAGS[m.group(2).lower()]}>", html_text
     )
+    html_text = _BR_BEFORE_BLOCK_RE.sub("", html_text)
+    return _BR_AFTER_BLOCK_RE.sub(r"\1", html_text)
 
 
 def autolink(html_text: str) -> str:
@@ -226,7 +270,11 @@ def build_mod_info(
         "conflicts": conflicts,
         "neededBy": needed_by,
         "description": autolink(
-            bbcode_markup(bbcode_images(unity_rich_text_to_html(mod.description)))
+            bbcode_markup(
+                bbcode_images(
+                    restore_entities(unity_rich_text_to_html(mod.description))
+                )
+            )
         )
         if mod.description
         else "",

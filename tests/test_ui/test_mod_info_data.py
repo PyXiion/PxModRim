@@ -5,6 +5,7 @@ from pxmodrim.ui.panels.mod_info_data import (
     autolink,
     bbcode_images,
     bbcode_markup,
+    restore_entities,
 )
 
 
@@ -56,3 +57,30 @@ class TestBbcodeMarkup:
 
     def test_bold_and_italic(self) -> None:
         assert bbcode_markup("[b]a[/b] [i]b[/i]") == "<b>a</b> <i>b</i>"
+
+
+class TestSteamTags:
+    def test_list_items_have_no_stray_line_breaks(self) -> None:
+        html = bbcode_markup("[list]<br>[*]one<br>[*]two<br>[/list]<br>after")
+        assert html == "<ul><li>one<li>two</ul>after"
+
+    def test_heading_swallows_following_break(self) -> None:
+        assert bbcode_markup("[h2]Title[/h2]<br>body") == "<h2>Title</h2>body"
+
+    def test_quote_with_author(self) -> None:
+        assert bbcode_markup("[quote=Bob]hi[/quote]") == (
+            "<blockquote><i>Bob wrote:</i><br>hi</blockquote>"
+        )
+
+    def test_table_with_attributes(self) -> None:
+        assert bbcode_markup("[table noborder=1][tr][td]x[/td][/tr][/table]") == (
+            "<table><tr><td>x</td></tr></table>"
+        )
+
+
+class TestRestoreEntities:
+    def test_numeric_entity_is_unescaped_once(self) -> None:
+        assert restore_entities("&amp;#8226; item") == "&#8226; item"
+
+    def test_plain_ampersand_stays_escaped(self) -> None:
+        assert restore_entities("a &amp; b") == "a &amp; b"

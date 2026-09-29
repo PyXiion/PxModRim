@@ -310,7 +310,11 @@ Rectangle {
                         objectName: "descText"
                         width: parent.width
                         text: root.hasInfo
-                            ? "<style>a { color: " + Theme.primary + "; }</style>"
+                            ? "<style>a { color: " + Theme.primary + "; }"
+                              + " h1 { font-size: 18px; color: " + Theme.textMain + "; }"
+                              + " h2 { font-size: 16px; color: " + Theme.textMain + "; }"
+                              + " h3 { font-size: 14px; color: " + Theme.textMain + "; }"
+                              + " blockquote { color: " + Theme.textDim + "; }</style>"
                               + root.info.description.replace(/__IMG_WIDTH__/g, Math.max(1, Math.floor(width)))
                             : ""
                         textFormat: TextEdit.RichText
