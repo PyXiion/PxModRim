@@ -7,6 +7,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QWidget
+from shiboken6 import isValid
 
 from pxmodrim.core.services.startup_impact_service import StartupImpactService
 from pxmodrim.core.services.startup_impact_service.labels import metric_label
@@ -87,7 +88,7 @@ class TimeAnalyticsPanel(QWidget):
             return
 
         report, base, totals, own = await sis.snapshot(active_pids, pid)
-        if request_token != self._request_token:
+        if request_token != self._request_token or not isValid(root_obj):
             return
         if not report:
             root_obj.setProperty("sourceData", None)

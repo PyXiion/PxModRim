@@ -5,7 +5,7 @@ import re
 from functools import lru_cache
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap, QRadialGradient
+from PySide6.QtGui import QColor, QImage, QPainter, QRadialGradient
 
 from pxmodrim.ui.theme.constants import BANNER_OVERLAY_HEIGHT
 
@@ -61,13 +61,17 @@ def _blob(
 
 
 @lru_cache(maxsize=16)
-def generate_preview(title: str, width: int, height: int) -> QPixmap:
-    """Aurora: dark tinted base, two soft hue-shifted glows, ghosted initials."""
-    pixmap = QPixmap(width, height)
-    hue = _seedrand(title)
-    pixmap.fill(_hsl(hue, 0.40, 0.12))
+def generate_preview(title: str, width: int, height: int) -> QImage:
+    """Aurora: dark tinted base, two soft hue-shifted glows, ghosted initials.
 
-    painter = QPainter(pixmap)
+    Returns a QImage: QPixmap painting is only safe on the GUI thread, and this
+    runs in a worker thread.
+    """
+    image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
+    hue = _seedrand(title)
+    image.fill(_hsl(hue, 0.40, 0.12))
+
+    painter = QPainter(image)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setPen(Qt.PenStyle.NoPen)
 
@@ -99,4 +103,4 @@ def generate_preview(title: str, width: int, height: int) -> QPixmap:
     )
 
     painter.end()
-    return pixmap
+    return image

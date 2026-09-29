@@ -9,6 +9,7 @@ Rectangle {
     clip: true
 
     property var info: null
+    property string description: ""
     property var startup: null
     readonly property bool startupKnown: startup !== null && startup !== undefined
     property bool descExpanded: false
@@ -279,13 +280,13 @@ Rectangle {
 
             // ── Description ──
             Card {
-                visible: root.hasInfo && root.info.description.length > 0
+                visible: root.description.length > 0
 
                 CardLabel { text: "Description" }
                 Item {
                     id: descClip
                     FontMetrics { id: descMetrics; font: descText.font }
-                    readonly property real collapsedHeight: root.hasInfo && root.info.description.indexOf("<img") >= 0 ? 220 : descMetrics.lineSpacing * 4
+                    readonly property real collapsedHeight: root.description.indexOf("<img") >= 0 ? 220 : descMetrics.lineSpacing * 4
                     readonly property bool overflows: descText.implicitHeight > collapsedHeight + 1
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.descExpanded ? descText.implicitHeight
@@ -315,7 +316,7 @@ Rectangle {
                               + " h2 { font-size: 16px; color: " + Theme.textMain + "; }"
                               + " h3 { font-size: 14px; color: " + Theme.textMain + "; }"
                               + " blockquote { color: " + Theme.textDim + "; }</style>"
-                              + root.info.description.replace(/__IMG_WIDTH__/g, Math.max(1, Math.floor(width)))
+                              + root.description.replace(/__IMG_WIDTH__/g, Math.max(1, Math.floor(width)))
                             : ""
                         textFormat: TextEdit.RichText
                         readOnly: true
@@ -488,7 +489,7 @@ Rectangle {
                         implicitWidth: 24
                         variant: "ghost"
                         iconName: "link"
-                        ToolTip.text: "Open mod URL"
+                        ToolTip.text: root.hasInfo ? "Open mod URL: " + root.info.url : "Open mod URL"
                         onClicked: root.openUrl()
                     }
                 }
