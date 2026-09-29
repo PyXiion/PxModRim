@@ -77,7 +77,12 @@ Rectangle {
         font.letterSpacing: 0.8
     }
 
+    function resetScroll() {
+        flick.contentY = 0
+    }
+
     Flickable {
+        id: flick
         anchors.fill: parent
         visible: root.hasInfo
         contentHeight: page.implicitHeight + 28
@@ -92,26 +97,6 @@ Rectangle {
             y: 14
             width: parent.width - 28
             spacing: 12
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-                visible: root.hasInfo && (root.info.canOpenFolder || root.info.url.length > 0)
-
-                PxButton {
-                    visible: root.hasInfo && root.info.canOpenFolder
-                    iconName: "folder"
-                    ToolTip.text: "Open mod folder"
-                    onClicked: root.openFolder()
-                }
-                PxButton {
-                    visible: root.hasInfo && root.info.url.length > 0
-                    iconName: "link"
-                    ToolTip.text: "Open mod URL"
-                    onClicked: root.openUrl()
-                }
-                Item { Layout.fillWidth: true }
-            }
 
             // ── Status ──
             Card {
@@ -183,9 +168,145 @@ Rectangle {
                 }
             }
 
+            // ── Relationships ──
+            Card {
+                CardLabel { text: "Requires" }
+                Text {
+                    visible: root.hasInfo && root.info.needs.length === 0
+                    text: "No dependencies"
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeMd
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: root.hasInfo && root.info.needs.length > 0
+
+                    Repeater {
+                        model: root.hasInfo ? root.info.needs : []
+                        delegate: PxBadge {
+                            text: root.stateMark(modelData.state) + modelData.name
+                            textColor: root.stateColor(modelData.state)
+                            fillColor: root.stateBg(modelData.state)
+                            tooltip: root.stateHint(modelData.state)
+                        }
+                    }
+                }
+
+                CardLabel {
+                    Layout.topMargin: 4
+                    visible: root.hasInfo && root.info.conflicts.length > 0
+                    text: "Conflicts with (active)"
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: root.hasInfo && root.info.conflicts.length > 0
+
+                    Repeater {
+                        model: root.hasInfo ? root.info.conflicts : []
+                        delegate: PxBadge {
+                            text: "\u2715 " + modelData
+                            textColor: Theme.danger
+                            fillColor: Theme.dangerBg
+                        }
+                    }
+                }
+
+                CardLabel {
+                    Layout.topMargin: 4
+                    visible: root.hasInfo && root.info.neededBy.length > 0
+                    text: "Needed by"
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: root.hasInfo && root.info.neededBy.length > 0
+
+                    Repeater {
+                        model: root.hasInfo ? root.info.neededBy : []
+                        delegate: PxBadge {
+                            text: modelData
+                            textColor: Theme.textMuted
+                            fillColor: Theme.elevate4
+                        }
+                    }
+                    Text {
+                        visible: root.hasInfo && root.info.neededByMore > 0
+                        text: "+" + (root.hasInfo ? root.info.neededByMore : 0) + " more"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        height: 20
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
+            // ── Description ──
+            Card {
+                visible: root.hasInfo && root.info.description.length > 0
+
+                CardLabel { text: "Description" }
+                Item {
+                    id: descClip
+                    readonly property real collapsedHeight: descText.lineHeight * 4
+                    readonly property bool overflows: descText.implicitHeight > collapsedHeight + 1
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.descExpanded ? descText.implicitHeight
+                        : Math.min(descText.implicitHeight, collapsedHeight)
+                    clip: true
+
+                    Rectangle {
+                        z: 1
+                        visible: descClip.overflows && !root.descExpanded
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 24
+                        gradient: Gradient {
+                            GradientStop { position: 0; color: "transparent" }
+                            GradientStop { position: 1; color: Theme.elevate3 }
+                        }
+                    }
+
+                    Text {
+                        id: descText
+                        width: parent.width
+                        text: root.hasInfo ? root.info.description : ""
+                        textFormat: Text.RichText
+                        color: Theme.textMuted
+                        linkColor: Theme.primary
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMd
+                        wrapMode: Text.WordWrap
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: 19
+                        onLinkActivated: link => Qt.openUrlExternally(link)
+                    }
+                }
+                Text {
+                    visible: descClip.overflows
+                    text: root.descExpanded ? "Show less" : "Show more"
+                    color: Theme.primary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+
+                    TapHandler {
+                        onTapped: {
+                            root.descExpanded = !root.descExpanded
+                            root.descToggled(root.descExpanded)
+                        }
+                    }
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                }
+            }
+
             // ── Startup impact ──
             Card {
                 id: startupCard
+                visible: root.startup !== null
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -199,14 +320,6 @@ Rectangle {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                     }
-                }
-
-                Text {
-                    visible: root.startup === null
-                    text: "No data"
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeMd
                 }
 
                 RowLayout {
@@ -261,111 +374,32 @@ Rectangle {
                 }
             }
 
-            // ── Relationships ──
-            Card {
-                CardLabel { text: "Requires" }
-                Text {
-                    visible: root.hasInfo && root.info.needs.length === 0
-                    text: "No dependencies"
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeMd
-                }
-                Flow {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    visible: root.hasInfo && root.info.needs.length > 0
-
-                    Repeater {
-                        model: root.hasInfo ? root.info.needs : []
-                        delegate: PxBadge {
-                            text: root.stateMark(modelData.state) + modelData.name
-                            textColor: root.stateColor(modelData.state)
-                            fillColor: root.stateBg(modelData.state)
-                            tooltip: root.stateHint(modelData.state)
-                        }
-                    }
-                }
-
-                CardLabel {
-                    Layout.topMargin: 4
-                    visible: root.hasInfo && root.info.neededBy.length > 0
-                    text: "Needed by"
-                }
-                Flow {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    visible: root.hasInfo && root.info.neededBy.length > 0
-
-                    Repeater {
-                        model: root.hasInfo ? root.info.neededBy : []
-                        delegate: PxBadge {
-                            text: modelData
-                            textColor: Theme.textMuted
-                            fillColor: Theme.elevate4
-                        }
-                    }
-                    Text {
-                        visible: root.hasInfo && root.info.neededByMore > 0
-                        text: "+" + (root.hasInfo ? root.info.neededByMore : 0) + " more"
-                        color: Theme.textDim
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        height: 20
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-            }
-
-            // ── Description ──
-            Card {
-                visible: root.hasInfo && root.info.description.length > 0
-
-                CardLabel { text: "Description" }
-                Item {
-                    id: descClip
-                    readonly property real collapsedHeight: descText.lineHeight * 4
-                    readonly property bool overflows: descText.implicitHeight > collapsedHeight + 1
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: root.descExpanded ? descText.implicitHeight
-                        : Math.min(descText.implicitHeight, collapsedHeight)
-                    clip: true
-
-                    Text {
-                        id: descText
-                        width: parent.width
-                        text: root.hasInfo ? root.info.description : ""
-                        textFormat: Text.RichText
-                        color: Theme.textMuted
-                        linkColor: Theme.primary
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMd
-                        wrapMode: Text.WordWrap
-                        lineHeightMode: Text.FixedHeight
-                        lineHeight: 19
-                        onLinkActivated: link => Qt.openUrlExternally(link)
-                    }
-                }
-                Text {
-                    visible: descClip.overflows
-                    text: root.descExpanded ? "Show less" : "Show more"
-                    color: Theme.primary
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
-
-                    TapHandler {
-                        onTapped: {
-                            root.descExpanded = !root.descExpanded
-                            root.descToggled(root.descExpanded)
-                        }
-                    }
-                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-                }
-            }
-
             // ── Details ──
             Card {
-                CardLabel { text: "Details" }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    CardLabel { text: "Details" }
+                    PxButton {
+                        visible: root.hasInfo && root.info.canOpenFolder
+                        implicitHeight: 24
+                        implicitWidth: 24
+                        variant: "ghost"
+                        iconName: "folder"
+                        ToolTip.text: "Open mod folder"
+                        onClicked: root.openFolder()
+                    }
+                    PxButton {
+                        visible: root.hasInfo && root.info.url.length > 0
+                        implicitHeight: 24
+                        implicitWidth: 24
+                        variant: "ghost"
+                        iconName: "link"
+                        ToolTip.text: "Open mod URL"
+                        onClicked: root.openUrl()
+                    }
+                }
 
                 Repeater {
                     model: root.hasInfo ? root.info.details : []

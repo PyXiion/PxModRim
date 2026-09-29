@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QMetaObject, Qt, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QGuiApplication, QImage, QPixmap
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -122,6 +122,9 @@ class ModInfoPanel(QWidget):
 
         self._set_qml("startup", None)
         self.set_issues(issues)
+        root: Any = self._qml.rootObject()
+        if root is not None:
+            QMetaObject.invokeMethod(root, "resetScroll")
 
         self._preview_task = asyncio.ensure_future(
             self._load_preview(mod.mod_path, mod_id, mod.name)

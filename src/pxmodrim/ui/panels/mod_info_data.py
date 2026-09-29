@@ -78,6 +78,17 @@ def _needs(
     return result
 
 
+def _conflicts(
+    mod: AboutXmlMod, index: dict[str, ListedMod], active: set[str]
+) -> list[str]:
+    names = []
+    for pid in mod.about_rules.incompatible_with:
+        other = index.get(str(pid).lower())
+        if other is not None and other.uuid in active:
+            names.append(other.name)
+    return sorted(names, key=str.lower)
+
+
 def _needed_by(mod: AboutXmlMod, ctx: CoreContext) -> tuple[list[str], int]:
     pid = str(mod.package_id).lower()
     names = [
@@ -131,8 +142,11 @@ def build_mod_info(
     needs: list[dict[str, str]] = []
     needed_by: list[str] = []
     needed_by_more = 0
+    conflicts: list[str] = []
     if isinstance(mod, AboutXmlMod):
-        needs = _needs(mod, _pid_index(ctx), active)
+        index = _pid_index(ctx)
+        needs = _needs(mod, index, active)
+        conflicts = _conflicts(mod, index, active)
         needed_by, needed_by_more = _needed_by(mod, ctx)
 
     return {
@@ -153,6 +167,7 @@ def build_mod_info(
         },
         "version": _version_support(mod, ctx.target_version),
         "needs": needs,
+        "conflicts": conflicts,
         "neededBy": needed_by,
         "neededByMore": needed_by_more,
         "description": unity_rich_text_to_html(mod.description)
