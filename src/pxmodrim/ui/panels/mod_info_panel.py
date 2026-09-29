@@ -2,40 +2,30 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QImage, QPixmap
+from PySide6.QtGui import QColor, QDesktopServices, QGuiApplication, QImage, QPixmap
 from PySide6.QtQml import QQmlEngine
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtQuickWidgets import QQuickWidget
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
-from pxmodrim.ui.components import (
-    AccordionSection,
-    AspectRatioBanner,
-    DescriptionRenderer,
-    MetaChipRow,
-    generate_preview,
-)
-from pxmodrim.ui.components.icon_button import IconButton
-from pxmodrim.ui.components.icon_tab_widget import IconTabWidget
-from pxmodrim.ui.components.icons import pixmap
-from pxmodrim.ui.models.mod_list_model import provider_label
-from pxmodrim.ui.panels.time_analytics_panel import TimeAnalyticsPanel
+from pxmodrim.ui.components import AspectRatioBanner, generate_preview
+from pxmodrim.ui.models.impact import format_duration, impact_color
+from pxmodrim.ui.panels.mod_info_data import build_mod_info
+from pxmodrim.ui.panels.time_analytics_panel import StartupImpactDialog
 from pxmodrim.ui.theme.constants import BANNER_MAX_HEIGHT
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.ui_prefs import UIPrefs
 
 if TYPE_CHECKING:
     from pxmodrim.core.models.view.diagnostics import ModIssueView
+
+_QML = Path(__file__).parent / "ModInfo.qml"
+_SPARK_BARS = 8
 
 
 def _first_sentence(text: str, max_len: int = 80) -> str:
@@ -56,38 +46,6 @@ def _find_preview(mod_path: Path | None) -> Path | None:
     return candidate if candidate.exists() else None
 
 
-class IssueRow(QWidget):
-    def __init__(self, issue: ModIssueView, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 4)
-        layout.setSpacing(8)
-
-        icon_name = "error" if issue.is_error else "warning"
-        color = PALETTE["DANGER"] if issue.is_error else PALETTE["WARNING"]
-        icon_label = QLabel(self)
-        icon_label.setPixmap(pixmap(icon_name, 16, color))
-        icon_label.setFixedSize(16, 16)
-        layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
-
-        content = QVBoxLayout()
-        content.setContentsMargins(0, 0, 0, 0)
-        content.setSpacing(2)
-
-        cat_label = QLabel(issue.category_display_name, self)
-        cat_label.setStyleSheet(f"color: {color}; font-weight: bold;")
-        content.addWidget(cat_label)
-
-        if issue.detail:
-            detail_label = QLabel(issue.detail, self)
-            detail_label.setWordWrap(True)
-            detail_label.setStyleSheet(f"color: {PALETTE['TEXT_MUTED']};")
-            content.addWidget(detail_label)
-
-        layout.addLayout(content, 1)
-
-
 class ModInfoPanel(QWidget):
     def __init__(
         self,
@@ -98,164 +56,49 @@ class ModInfoPanel(QWidget):
     ) -> None:
         super().__init__(parent)
         self._ctx = ctx
+        self._qml_engine = qml_engine
         self._ui_prefs = ui_prefs or UIPrefs()
         self._mod: ListedMod | None = None
         self._current_mod_id: str | None = None
         self._preview_task: asyncio.Task[None] | None = None
+        self._startup_token = 0
+        self._startup_args: tuple[str | None, list[str]] = (None, [])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Banner (persistent header, above tabs)
         self._banner = AspectRatioBanner(self, max_height=BANNER_MAX_HEIGHT)
         self._banner.hide()
         layout.addWidget(self._banner, 0, Qt.AlignmentFlag.AlignTop)
 
-        # Placeholder (shown when no mod is selected)
         self._placeholder = QLabel("Select a mod to view details", self)
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setObjectName("placeholder")
         layout.addWidget(self._placeholder, 0, Qt.AlignmentFlag.AlignTop)
 
-        # ── Tab widget ──────────────────────────────────────────────────────────
-        self._tabs = IconTabWidget(self)
-        self._tabs.hide()
-        layout.addWidget(self._tabs, 1)
+        self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
+        self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        self._qml.setClearColor(QColor(PALETTE["ELEVATE_2"]))
+        self._qml.setSource(QUrl.fromLocalFile(str(_QML)))
+        self._qml.hide()
+        layout.addWidget(self._qml, 1)
 
-        self._setup_info_tab()
-        self._setup_issues_tab()
-        self._setup_time_analytics_tab(qml_engine)
+        root: Any = self._qml.rootObject()
+        if root is not None:
+            root.setProperty("descExpanded", self._ui_prefs.desc_expanded)
+            root.openFolder.connect(self._on_open_folder)
+            root.openUrl.connect(self._on_open_url)
+            root.copyText.connect(self._on_copy_text)
+            root.openStartupDetails.connect(self._on_open_startup_details)
+            root.descToggled.connect(self._on_desc_toggled)
 
-    def _setup_info_tab(self) -> None:
-        # ── Info tab ────────────────────────────────────────────────────────────
-        self._info_tab = QWidget(self)
-        info_layout = QVBoxLayout(self._info_tab)
-        info_layout.setContentsMargins(0, 0, 0, 0)
-        info_layout.setSpacing(0)
+    def _set_qml(self, name: str, value: object) -> None:
+        root = self._qml.rootObject()
+        if root is not None:
+            root.setProperty(name, value)
 
-        info_scroll = QScrollArea(self._info_tab)
-        info_scroll.setWidgetResizable(True)
-        info_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        info_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        info_scroll.viewport().setAutoFillBackground(False)
-
-        info_content = QWidget(info_scroll)
-        ic_layout = QVBoxLayout(info_content)
-        ic_layout.setContentsMargins(0, 0, 0, 0)
-        ic_layout.setSpacing(0)
-
-        info_scroll.setWidget(info_content)
-        info_layout.addWidget(info_scroll, 1)
-
-        # Open mod folder / URL buttons
-        self._btn_container = QWidget(info_content)
-        self._btn_container.setObjectName("infoButtonContainer")
-        btn_layout = QHBoxLayout(self._btn_container)
-        btn_layout.setContentsMargins(16, 8, 16, 8)
-
-        self._open_folder_btn = IconButton(
-            "folder", "Open mod folder", size=32, parent=self._btn_container
-        )
-        self._open_folder_btn.clicked.connect(self._on_open_folder)
-        btn_layout.addWidget(self._open_folder_btn)
-
-        self._open_url_btn = IconButton(
-            "link", "Open mod URL", size=32, parent=self._btn_container
-        )
-        self._open_url_btn.clicked.connect(self._on_open_url)
-        btn_layout.addWidget(self._open_url_btn)
-        btn_layout.addStretch()
-
-        self._btn_container.hide()
-        ic_layout.addWidget(self._btn_container, 0, Qt.AlignmentFlag.AlignTop)
-
-        # Meta chips
-        self._meta_chips = MetaChipRow(
-            {
-                "package_id": "Package ID",
-                "author": "Author",
-                "version": "Version",
-                "source": "Source",
-            },
-            info_content,
-        )
-        ic_layout.addWidget(self._meta_chips, 0, Qt.AlignmentFlag.AlignTop)
-
-        # Description accordion
-        self._desc_renderer = DescriptionRenderer(info_content)
-        self._desc_section = AccordionSection(
-            "Description",
-            self._desc_renderer,
-            expanded=self._ui_prefs.desc_expanded,
-            parent=info_content,
-        )
-        self._desc_section.toggled.connect(self._on_desc_toggled)
-        self._desc_section.hide()
-        ic_layout.addWidget(self._desc_section, 0, Qt.AlignmentFlag.AlignTop)
-
-        # Dependencies accordion
-        self._deps_label = QLabel("None", info_content)
-        self._deps_label.setWordWrap(True)
-        self._deps_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        self._deps_section = AccordionSection(
-            "Dependencies",
-            self._deps_label,
-            expanded=self._ui_prefs.deps_expanded,
-            parent=info_content,
-        )
-        self._deps_section.toggled.connect(self._on_deps_toggled)
-        self._deps_section.hide()
-        ic_layout.addWidget(self._deps_section, 0, Qt.AlignmentFlag.AlignTop)
-        ic_layout.addStretch()
-
-        self._tabs.addTab(self._info_tab, "info", "Info")
-
-    def _setup_issues_tab(self) -> None:
-        # ── Issues tab ──────────────────────────────────────────────────────────
-        self._issues_tab = QWidget(self)
-        issues_layout = QVBoxLayout(self._issues_tab)
-        issues_layout.setContentsMargins(0, 0, 0, 0)
-        issues_layout.setSpacing(0)
-
-        issues_scroll = QScrollArea(self._issues_tab)
-        issues_scroll.setWidgetResizable(True)
-        issues_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        issues_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        issues_scroll.viewport().setAutoFillBackground(False)
-
-        self._issues_content = QWidget(issues_scroll)
-        self._issues_content_layout = QVBoxLayout(self._issues_content)
-        self._issues_content_layout.setContentsMargins(16, 8, 16, 8)
-        self._issues_content_layout.setSpacing(0)
-
-        self._no_issues_label = QLabel("No issues detected", self._issues_content)
-        self._no_issues_label.setObjectName("issuesLabel")
-        self._no_issues_label.setWordWrap(True)
-        self._no_issues_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        self._issues_content_layout.addWidget(self._no_issues_label)
-        self._issues_content_layout.addStretch()
-
-        issues_scroll.setWidget(self._issues_content)
-        issues_layout.addWidget(issues_scroll, 1)
-
-        self._current_issues: list[ModIssueView] = []
-        self._tabs.addTab(self._issues_tab, "warning", "Issues")
-
-    def _setup_time_analytics_tab(self, qml_engine: QQmlEngine | None) -> None:
-        # ── Time analytics tab ──────────────────────────────────────────────────
-        self._time_panel = TimeAnalyticsPanel(
-            self._ctx.mod_service.startup_impact, qml_engine, self
-        )
-        self._tabs.addTab(self._time_panel, "clock", "Startup impact")
-
-    def show_mod(self, mod: ListedMod) -> None:
+    def show_mod(self, mod: ListedMod, issues: list[ModIssueView]) -> None:
         if self._preview_task and not self._preview_task.done():
             self._preview_task.cancel()
 
@@ -268,7 +111,7 @@ class ModInfoPanel(QWidget):
 
         self._placeholder.hide()
         self._banner.show()
-        self._tabs.show()
+        self._qml.show()
 
         self._banner.setTitle(mod.name)
         self._banner.setSubtitle(
@@ -277,79 +120,17 @@ class ModInfoPanel(QWidget):
             else (str(mod.package_id) if isinstance(mod, AboutXmlMod) else "")
         )
 
-        self._btn_container.setVisible(
-            mod.mod_path is not None and mod.mod_path.exists()
-        )
-
-        if isinstance(mod, AboutXmlMod) and bool(mod.url):
-            self._open_url_btn.setVisible(True)
-            self._open_url_btn.setToolTip(f"Open mod URL: {mod.url}")
-        else:
-            self._open_url_btn.setVisible(False)
+        self._set_qml("startup", None)
+        self.set_issues(issues)
 
         self._preview_task = asyncio.ensure_future(
             self._load_preview(mod.mod_path, mod_id, mod.name)
         )
 
-        if isinstance(mod, AboutXmlMod):
-            self._meta_chips.update_values(
-                {
-                    "package_id": str(mod.package_id),
-                    "author": ", ".join(mod.authors) if mod.authors else "—",
-                    "version": mod.mod_version or "—",
-                    "source": provider_label(mod.provider_id, str(mod.package_id))
-                    or "—",
-                }
-            )
-        else:
-            self._meta_chips.update_values(
-                {
-                    "package_id": "—",
-                    "author": "—",
-                    "version": "—",
-                    "source": "—",
-                }
-            )
-
-        # Description
-        if mod.description:
-            self._desc_renderer.set_description(mod.description)
-            self._desc_section.show()
-        else:
-            self._desc_section.hide()
-
-        # Dependencies
-        if isinstance(mod, AboutXmlMod) and mod.about_rules.dependencies:
-            deps = [str(d.package_id) for d in mod.about_rules.dependencies.values()]
-            self._deps_label.setText("<br>".join(f"• {d}" for d in deps))
-            self._deps_section.show()
-        else:
-            self._deps_section.hide()
-
     def set_issues(self, issues: list[ModIssueView]) -> None:
-        self._current_issues = issues
-        self._show_issues(issues)
-
-    def _show_issues(self, issues: list[ModIssueView]) -> None:
-        issues_layout = self._issues_content_layout
-
-        while issues_layout.count():
-            item = issues_layout.takeAt(0)
-            if item is not None:
-                w = item.widget()
-                if w is not None and w is not self._no_issues_label:
-                    w.deleteLater()
-
-        if not issues:
-            self._no_issues_label.show()
-            issues_layout.addWidget(self._no_issues_label)
-            issues_layout.addStretch()
+        if self._mod is None:
             return
-
-        self._no_issues_label.hide()
-        for issue in issues:
-            issues_layout.addWidget(IssueRow(issue, self._issues_content))
-        issues_layout.addStretch()
+        self._set_qml("info", build_mod_info(self._ctx, self._mod, issues))
 
     def _on_open_folder(self) -> None:
         if self._mod is not None and self._mod.mod_path is not None:
@@ -358,6 +139,18 @@ class ModInfoPanel(QWidget):
     def _on_open_url(self) -> None:
         if isinstance(self._mod, AboutXmlMod) and self._mod.url:
             QDesktopServices.openUrl(QUrl(self._mod.url))
+
+    def _on_copy_text(self, text: str) -> None:
+        QGuiApplication.clipboard().setText(text)
+
+    @asyncSlot()
+    async def _on_open_startup_details(self) -> None:
+        pid, active_pids = self._startup_args
+        dialog = StartupImpactDialog(
+            self._ctx.mod_service.startup_impact, self._qml_engine, self
+        )
+        dialog.show()
+        await dialog.panel.set_data(pid, active_pids)
 
     async def _load_preview(
         self, mod_path: Path | None, mod_id: str, mod_name: str
@@ -389,22 +182,46 @@ class ModInfoPanel(QWidget):
         pid: str | None,
         active_pids: list[str],
     ) -> None:
-        await self._time_panel.set_data(pid, active_pids)
+        self._startup_token += 1
+        token = self._startup_token
+        self._startup_args = (pid, active_pids)
+
+        sis = self._ctx.mod_service.startup_impact
+        if not sis or not pid:
+            self._set_qml("startup", None)
+            return
+
+        report, *_, own = await sis.snapshot(active_pids, pid)
+        if token != self._startup_token:
+            return
+
+        mod = report.find(pid, None) if report else None
+        if report is None or mod is None or own < 0.001:
+            self._set_qml("startup", None)
+            return
+
+        rank = 1 + sum(1 for m in report.mods if m.total_impact_s > own)
+        metrics = sorted(mod.metrics.values(), reverse=True)[:_SPARK_BARS]
+        peak = max(metrics, default=0.0)
+        self._set_qml(
+            "startup",
+            {
+                "own": format_duration(own),
+                "rank": f"#{rank} slowest of {len(report.mods)}",
+                "spark": [v / peak for v in metrics] if peak > 0 else [],
+                "color": impact_color(own),
+            },
+        )
 
     def clear(self) -> None:
         self._mod = None
         self._current_mod_id = None
+        self._startup_token += 1
         self._placeholder.show()
         self._banner.hide()
-        self._tabs.hide()
-        self._time_panel.clear()
-
-    @asyncSlot(bool)
-    async def _on_deps_toggled(self, expanded: bool) -> None:
-        self._ui_prefs.deps_expanded = expanded
-        from pxmodrim.ui.config import save_ui_prefs
-
-        await asyncio.to_thread(save_ui_prefs, self._ui_prefs, self._ctx.config_service)
+        self._qml.hide()
+        self._set_qml("info", None)
+        self._set_qml("startup", None)
 
     @asyncSlot(bool)
     async def _on_desc_toggled(self, expanded: bool) -> None:

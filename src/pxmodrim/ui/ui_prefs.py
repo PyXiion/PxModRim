@@ -6,6 +6,5 @@ from pxmodrim.core.constants import LaunchStrategy
 
 
 class UIPrefs(msgspec.Struct):
-    deps_expanded: bool = True
     desc_expanded: bool = False
     launch_strategy: LaunchStrategy = LaunchStrategy.DIRECT

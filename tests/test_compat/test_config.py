@@ -87,7 +87,6 @@ async def test_legacy_ui_prefs_migrates_with_backup(
 ) -> None:
     service = ConfigService(tmp_path)
     expected = UIPrefs(
-        deps_expanded=False,
         desc_expanded=True,
         launch_strategy=LaunchStrategy.STEAM,
     )

@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QWidget
 
 from pxmodrim.core.services.startup_impact_service import StartupImpactService
 from pxmodrim.core.services.startup_impact_service.labels import metric_label
@@ -216,3 +216,22 @@ class TimeAnalyticsPanel(QWidget):
         root_obj = self._qml.rootObject()
         if root_obj:
             root_obj.setProperty("sourceData", None)
+
+
+class StartupImpactDialog(QDialog):
+    """Non-modal window showing the full startup impact breakdown."""
+
+    def __init__(
+        self,
+        sis: StartupImpactService | None,
+        qml_engine: QQmlEngine | None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Startup impact")
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.resize(460, 640)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.panel = TimeAnalyticsPanel(sis, qml_engine, self)
+        layout.addWidget(self.panel)

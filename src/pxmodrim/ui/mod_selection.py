@@ -26,8 +26,7 @@ class ModSelectionPresenter:
             self._panel.clear()
             return
 
-        self._panel.show_mod(mod)
-        self._panel.set_issues(self._ctx.diagnostics_service.issues_for(uuid))
+        self._panel.show_mod(mod, self._ctx.diagnostics_service.issues_for(uuid))
         pid = getattr(mod, "package_id", None)
         active_pids = self._resolve_active_pids()
 
