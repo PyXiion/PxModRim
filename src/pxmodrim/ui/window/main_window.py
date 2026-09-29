@@ -5,7 +5,6 @@ from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
-import httpx
 from loguru import logger
 from PySide6.QtCore import QEvent, QObject, Qt, QUrl
 from PySide6.QtGui import (
@@ -34,7 +33,7 @@ from qasync import asyncSlot
 from pxmodrim.core.config import config_dir
 from pxmodrim.core.constants import LaunchStrategy
 from pxmodrim.core.models.view.sidebar import SidebarEntry
-from pxmodrim.core.services.update_service import UpdateService
+from pxmodrim.core.services.update_service import UpdateCheckError, UpdateService
 from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import (
     HeaderController,
@@ -380,6 +379,8 @@ class MainWindow(QMainWindow):
                 self._close_task = asyncio.create_task(self._confirm_close())
             return
         logger.info("main_window: shutting down")
+        if self._update_task is not None:
+            self._update_task.cancel()
         # Release WebEngine views (their dedicated profiles) before the
         # Qt widget tree is torn down. Then disconnect aboutToQuit: on this
         # Chromium/Qt build, WebEngine registers an aboutToQuit handler
@@ -474,16 +475,20 @@ class MainWindow(QMainWindow):
         )
 
     def start_startup_update_check(self) -> None:
-        self._update_task = asyncio.create_task(self._check_for_updates(manual=False))
+        self._start_update_check(manual=False)
 
-    @asyncSlot()
-    async def _check_updates_manually(self) -> None:
-        await self._check_for_updates(manual=True)
+    def _check_updates_manually(self) -> None:
+        self._start_update_check(manual=True)
+
+    def _start_update_check(self, *, manual: bool) -> None:
+        if self._update_task is not None and not self._update_task.done():
+            return
+        self._update_task = asyncio.create_task(self._check_for_updates(manual=manual))
 
     async def _check_for_updates(self, *, manual: bool) -> None:
         try:
             release = await self._update_service.check()
-        except (httpx.HTTPError, ValueError) as exc:
+        except UpdateCheckError as exc:
             logger.warning("Update check failed: {}", exc)
             if manual:
                 self._toast_manager.error("Could not check for updates")

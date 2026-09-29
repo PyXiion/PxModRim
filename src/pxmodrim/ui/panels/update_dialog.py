@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -22,6 +24,13 @@ _AUTO_UPDATE_NOTE = (
     "Automatic updating may be added later. For now, downloading the release "
     "yourself is the safest way to avoid update bugs."
 )
+
+_WEB_SCHEMES = frozenset({"http", "https"})
+
+
+def _open_web_link(url: QUrl) -> None:
+    if url.scheme().lower() in _WEB_SCHEMES:
+        QDesktopServices.openUrl(url)
 
 
 class UpdateDialog(QDialog):
@@ -44,7 +53,9 @@ class UpdateDialog(QDialog):
         layout.addWidget(QLabel(f"You are running {current_version}.", self))
 
         notes = QTextBrowser(self)
-        notes.setOpenExternalLinks(True)
+        notes.setOpenLinks(False)
+        notes.setOpenExternalLinks(False)
+        notes.anchorClicked.connect(_open_web_link)
         notes.setMarkdown(release.notes or "No release notes.")
         layout.addWidget(notes, 1)
 

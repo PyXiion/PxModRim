@@ -212,3 +212,29 @@ def test_unsupported_config_schema_fails_without_mutation(tmp_path: Path) -> Non
         ConfigService(tmp_path).load("config.json", AppConfig)
 
     assert path.read_bytes() == before
+
+
+def test_ui_prefs_skipped_update_tag_round_trips(tmp_path: Path) -> None:
+    service = ConfigService(tmp_path)
+    service.save("ui_prefs.json", UIPrefs(skipped_update_tag="v0.2.0"))
+
+    assert service.load("ui_prefs.json", UIPrefs).skipped_update_tag == "v0.2.0"
+
+
+def test_ui_prefs_with_removed_key_still_loads(tmp_path: Path) -> None:
+    (tmp_path / "ui_prefs.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "deps_expanded": True,
+                "desc_expanded": True,
+                "skipped_update_tag": "v0.3.0",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    prefs = ConfigService(tmp_path).load("ui_prefs.json", UIPrefs)
+
+    assert prefs.desc_expanded is True
+    assert prefs.skipped_update_tag == "v0.3.0"
