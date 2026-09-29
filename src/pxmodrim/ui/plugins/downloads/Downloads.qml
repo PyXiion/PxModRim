@@ -84,6 +84,76 @@ Rectangle {
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 96
+            visible: downloadsModel.total > 0
+            radius: Theme.radiusMd
+            color: Theme.elevate2
+
+            function formatBytes(n) {
+                if (n >= 1073741824) return (n / 1073741824).toFixed(2) + " GB"
+                if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB"
+                return Math.round(n / 1024) + " KB"
+            }
+
+            Canvas {
+                id: graph
+                anchors.fill: parent
+                anchors.margins: 1
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    var h = downloadsModel.speedHistory
+                    if (h.length < 2) return
+                    var peak = Math.max.apply(null, h.concat([1]))
+                    var stepX = width / (90 - 1)
+                    var x0 = width - (h.length - 1) * stepX
+                    ctx.beginPath()
+                    ctx.moveTo(x0, height)
+                    for (var i = 0; i < h.length; i++)
+                        ctx.lineTo(x0 + i * stepX, height - (h[i] / peak) * (height - 28) - 2)
+                    ctx.lineTo(width, height)
+                    ctx.closePath()
+                    ctx.fillStyle = Qt.alpha(Theme.primary, 0.25)
+                    ctx.fill()
+                    ctx.beginPath()
+                    for (var j = 0; j < h.length; j++) {
+                        var y = height - (h[j] / peak) * (height - 28) - 2
+                        if (j === 0) ctx.moveTo(x0, y)
+                        else ctx.lineTo(x0 + j * stepX, y)
+                    }
+                    ctx.strokeStyle = Theme.primary
+                    ctx.lineWidth = 2
+                    ctx.stroke()
+                }
+                Connections {
+                    target: downloadsModel
+                    function onSpeed_changed() { graph.requestPaint() }
+                }
+            }
+
+            Text {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: 10
+                text: parent.formatBytes(downloadsModel.speed) + "/s"
+                color: Theme.textMain
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeLg
+                font.weight: Font.Bold
+            }
+            Text {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 10
+                text: "Downloaded " + parent.formatBytes(downloadsModel.bytesDone)
+                color: Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSm
+            }
+        }
+
         PxProgressBar {
             Layout.fillWidth: true
             visible: downloadsModel.total > 0

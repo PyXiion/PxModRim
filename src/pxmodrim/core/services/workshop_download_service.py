@@ -44,6 +44,7 @@ class WorkshopClient(Protocol):
         parallel_items: int = ...,
         threads_per_item: int = ...,
         on_progress: Callable[[pxsteamdl.Progress], None] | None = None,
+        on_resolved: Callable[[pxsteamdl.ItemInfo], None] | None = None,
         cancel: pxsteamdl.CancelToken | None = None,
     ) -> list[pxsteamdl.Result]: ...
 
@@ -80,6 +81,11 @@ class DownloadItemStatus(msgspec.Struct):
     bytes_done: int = 0
     bytes_total: int = 0
     error: str = ""
+
+
+class DownloadItemTitle(msgspec.Struct):
+    mod_id: str
+    title: str
 
 
 class DownloadResult(msgspec.Struct):
@@ -145,6 +151,7 @@ class WorkshopDownloadService(Plugin):
     download_progress: Event[DownloadProgress]
     download_item_status_changed: Event[DownloadItemStatus]
     download_finished: Event[DownloadResult]
+    download_item_titled: Event[DownloadItemTitle]
     busy_changed: Event[bool]
     batch_started: Event[list[str]]
 
@@ -161,6 +168,7 @@ class WorkshopDownloadService(Plugin):
         "busy_changed",
         "download_finished",
         "download_item_status_changed",
+        "download_item_titled",
         "download_progress",
         "status_message_changed",
     )
@@ -170,6 +178,7 @@ class WorkshopDownloadService(Plugin):
         self.download_progress = Event()
         self.download_item_status_changed = Event()
         self.download_finished = Event()
+        self.download_item_titled = Event()
         self.busy_changed = Event()
         self.batch_started = Event()
 
@@ -362,6 +371,14 @@ class WorkshopDownloadService(Plugin):
         )
         loop = asyncio.get_running_loop()
 
+        def on_resolved(info: pxsteamdl.ItemInfo) -> None:
+            # Called on the download() thread.
+            if info.title:
+                loop.call_soon_threadsafe(
+                    self.download_item_titled.emit,
+                    DownloadItemTitle(str(info.item_id), info.title),
+                )
+
         def on_progress(p: pxsteamdl.Progress) -> None:
             loop.call_soon_threadsafe(
                 self._on_progress, batch, str(p.item_id), p.bytes_done, p.bytes_total
@@ -376,6 +393,7 @@ class WorkshopDownloadService(Plugin):
                 parallel_items=PARALLEL_ITEMS,
                 threads_per_item=THREADS_PER_ITEM,
                 on_progress=on_progress,
+                on_resolved=on_resolved,
                 cancel=token,
             ),
         )

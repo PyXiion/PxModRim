@@ -40,11 +40,16 @@ class FakeClient:
         parallel_items: int = 4,
         threads_per_item: int = 8,
         on_progress: Callable[[Any], None] | None = None,
+        on_resolved: Callable[[Any], None] | None = None,
         cancel: Any = None,
     ) -> list[Any]:
         self.calls.append((list(ids), Path(root), parallel_items * threads_per_item))
         results = []
         for item_id in ids:
+            if on_resolved is not None:
+                on_resolved(
+                    SimpleNamespace(item_id=item_id, title=f"Title {item_id}", error="")
+                )
             if on_progress is not None:
                 on_progress(
                     SimpleNamespace(item_id=item_id, bytes_done=5, bytes_total=10)
@@ -318,3 +323,13 @@ async def test_auto_update_only_syncs_stale_mods_when_enabled(tmp_path: Path) ->
     synced = svc.last_synced("1")
     await svc._auto_update_once()
     assert svc.last_synced("1") == synced
+
+
+async def test_titles_from_steam_are_emitted(tmp_path: Path) -> None:
+    svc, _ = _service(tmp_path, FakeClient())
+    titles: dict[str, str] = {}
+    svc.download_item_titled.connect(lambda t: titles.update({t.mod_id: t.title}))
+
+    await svc.download_mods(["111", "222"])
+
+    assert titles == {"111": "Title 111", "222": "Title 222"}

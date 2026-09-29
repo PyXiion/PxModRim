@@ -18,11 +18,14 @@ from PySide6.QtCore import (
 if TYPE_CHECKING:
     from pxmodrim.core.services.workshop_download_service import (
         DownloadItemStatus,
+        DownloadItemTitle,
         DownloadResult,
     )
 
 _ACTIVE = frozenset({"queued", "downloading"})
 _FLUSH_MS = 150
+_SPEED_TICK_MS = 1000
+HISTORY_LEN = 90
 
 
 @dataclass(slots=True)
@@ -32,6 +35,7 @@ class _Row:
     state: str = "queued"
     progress: float = 0.0
     error: str = ""
+    bytes_done: int = 0
 
 
 def _final_state(bytes_total: int) -> str:
@@ -43,6 +47,7 @@ class DownloadsModel(QAbstractListModel):
     """Per-mod state of the current or last Workshop download batch."""
 
     summary_changed = Signal()
+    speed_changed = Signal()
 
     _IdRole = Qt.ItemDataRole.UserRole + 1
     _TitleRole = Qt.ItemDataRole.UserRole + 2
@@ -63,12 +68,20 @@ class DownloadsModel(QAbstractListModel):
         self._timer.setSingleShot(True)
         self._timer.setInterval(_FLUSH_MS)
         self._timer.timeout.connect(self._flush)
+        self._bytes = 0
+        self._sampled_bytes = 0
+        self._speed = 0.0
+        self._history: list[float] = []
+        self._speed_timer = QTimer(self)
+        self._speed_timer.setInterval(_SPEED_TICK_MS)
+        self._speed_timer.timeout.connect(self._sample_speed)
 
     # ── batch lifecycle ───────────────────────────────
 
     def begin(self, ids: list[str], titles: dict[str, str]) -> None:
         self._timer.stop()
         self._dirty.clear()
+        self._reset_speed()
         self.beginResetModel()
         self._rows = [_Row(pid, titles.get(pid, pid)) for pid in ids]
         self._by_id = {row.pid: row for row in self._rows}
@@ -81,6 +94,9 @@ class DownloadsModel(QAbstractListModel):
         row = self._by_id.get(status.mod_id)
         if row is None:
             return
+        done = status.bytes_done if status.status != "error" else row.bytes_done
+        self._bytes += done - row.bytes_done
+        row.bytes_done = done
         if status.status == "error":
             row.state, row.error, row.progress = "failed", status.error, 0.0
         elif status.status == "success":
@@ -91,6 +107,12 @@ class DownloadsModel(QAbstractListModel):
         else:
             row.state, row.progress = _final_state(status.bytes_total), 1.0
         self._mark(row)
+
+    def set_title(self, item: DownloadItemTitle) -> None:
+        row = self._by_id.get(item.mod_id)
+        if row is not None and row.title == row.pid:
+            row.title = item.title
+            self._mark(row)
 
     def finish(self, result: DownloadResult) -> None:
         for row in self._rows:
@@ -103,6 +125,13 @@ class DownloadsModel(QAbstractListModel):
     def set_busy(self, busy: bool) -> None:
         if self._busy != busy:
             self._busy = busy
+            if busy:
+                self._sampled_bytes = self._bytes
+                self._speed_timer.start()
+            else:
+                self._speed_timer.stop()
+                self._speed = 0.0
+                self.speed_changed.emit()
             self.summary_changed.emit()
 
     def failed_ids(self) -> list[str]:
@@ -123,6 +152,19 @@ class DownloadsModel(QAbstractListModel):
             self.summary_changed.emit()
 
     # ── internals ─────────────────────────────────────
+
+    def _reset_speed(self) -> None:
+        self._bytes = self._sampled_bytes = 0
+        self._speed = 0.0
+        self._history = []
+        self.speed_changed.emit()
+
+    def _sample_speed(self) -> None:
+        delta = self._bytes - self._sampled_bytes
+        self._sampled_bytes = self._bytes
+        self._speed = delta * 1000 / _SPEED_TICK_MS
+        self._history = [*self._history[-(HISTORY_LEN - 1) :], self._speed]
+        self.speed_changed.emit()
 
     def _mark(self, row: _Row) -> None:
         self._dirty.add(row.pid)
@@ -226,6 +268,18 @@ class DownloadsModel(QAbstractListModel):
     @Property(int, notify=summary_changed)  # type: ignore[arg-type]
     def active(self) -> int:
         return self._count("queued", "downloading")
+
+    @Property(float, notify=speed_changed)  # type: ignore[arg-type]
+    def speed(self) -> float:
+        return self._speed
+
+    @Property(float, notify=speed_changed)  # type: ignore[arg-type]
+    def bytesDone(self) -> float:
+        return float(self._bytes)
+
+    @Property(list, notify=speed_changed)  # type: ignore[arg-type]
+    def speedHistory(self) -> list[float]:
+        return self._history
 
     @Property(bool, notify=summary_changed)  # type: ignore[arg-type]
     def busy(self) -> bool:

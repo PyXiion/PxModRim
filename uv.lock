@@ -261,8 +261,8 @@ dev = [
 
 [[package]]
 name = "pxsteamdl"
-version = "0.1.0"
-source = { git = "https://github.com/PyXiion/PxSteamDL#407d2deefbd27763872198369e2a393d3786f372" }
+version = "0.2.0"
+source = { git = "https://github.com/PyXiion/PxSteamDL#67e4e310e1d82a6bb78a35eb4c1e5bce91c7d924" }
 
 [[package]]
 name = "pydeps"

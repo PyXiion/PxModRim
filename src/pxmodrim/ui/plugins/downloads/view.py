@@ -55,6 +55,7 @@ class DownloadsViewPanel(BaseViewPanel):
             self.model.set_busy(self._workshop.is_downloading)
             self._workshop.batch_started.connect(self._on_batch_started)
             self._workshop.download_item_status_changed.connect(self.model.apply)
+            self._workshop.download_item_titled.connect(self.model.set_title)
             self._workshop.download_finished.connect(self._on_finished)
             self._workshop.busy_changed.connect(self.model.set_busy)
 
