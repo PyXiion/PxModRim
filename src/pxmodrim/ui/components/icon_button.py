@@ -24,6 +24,13 @@ class IconButton(QPushButton):
         self.set_icon_color(PALETTE["TEXT_MUTED"])
         self.setFixedSize(size, size)
         self.setObjectName("iconBtn")
+        # QSS min-height on QPushButton overrides setFixedSize; the 1px border sits
+        # outside the QSS content box, so subtract it.
+        inner = size - 2
+        self.setStyleSheet(
+            f"QPushButton#iconBtn {{ min-width: {inner}px; max-width: {inner}px;"
+            f" min-height: {inner}px; max-height: {inner}px; }}"
+        )
         if primary:
             self.setProperty("primary", True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
