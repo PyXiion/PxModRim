@@ -43,7 +43,7 @@ jobs:
           chmod +x /usr/local/bin/appimagetool
 
       - name: Install Dependencies
-        run: uv sync --locked --dev
+        run: uv sync --locked --dev --extra steam
 
       - name: Build with Nuitka
         run: just build-release-bundled
@@ -130,7 +130,7 @@ jobs:
           tool: just@1.40.0
 
       - name: Install Dependencies
-        run: uv sync --locked --dev
+        run: uv sync --locked --dev --extra steam
       - name: Install NSIS
         shell: pwsh
         run: |
@@ -193,7 +193,7 @@ jobs:
           tool: just@1.40.0
 
       - name: Install Dependencies
-        run: uv sync --locked --dev
+        run: uv sync --locked --dev --extra steam
 
       - name: Build with Nuitka
         run: just build-release-bundled

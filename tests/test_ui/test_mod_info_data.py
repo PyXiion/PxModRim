@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, cast
 
+from pxmodrim.core.downloads import DownloadManager
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
     BaseRules,
@@ -57,12 +58,14 @@ def make_mod(
 
 
 def make_ctx(mods: list[ListedMod], active: list[str]) -> Any:
+    registry = PluginRegistry()
+    registry.register(DownloadManager())
     return cast(
         Any,
         SimpleNamespace(
             all_mods={m.uuid: m for m in mods},
             active_uuids=active,
-            plugins=PluginRegistry(),
+            plugins=registry,
             target_version="1.5",
         ),
     )

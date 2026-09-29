@@ -210,7 +210,7 @@ Rectangle {
                 visible: listView.count === 0
                 title: downloadsModel.total === 0 ? "No downloads yet" : "Nothing in this filter"
                 detail: downloadsModel.total === 0
-                    ? "Updates from the mod list, organizer, header, auto-update and the Steam Workshop tab show up here."
+                    ? "Updates from the mod list, organizer, header, auto-update and download-source tabs show up here."
                     : ""
             }
 

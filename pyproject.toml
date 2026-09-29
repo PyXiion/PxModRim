@@ -10,17 +10,21 @@ dependencies = [
     "lxml>=6.1.1",
     "msgspec>=0.21.1",
     "pyside6>=6.11.1",
-    "pxsteamdl>=0.1.0",
     "qasync>=0.28.0",
     "toposort>=1.10",
     "ttimer>=0.0.2",
 ]
+
+[project.optional-dependencies]
+# Steam Workshop downloads; without it the app runs as a plain mod sorter.
+steam = ["pxsteamdl>=0.2.0"]
 
 [project.gui-scripts]
 pxmodrim = "pxmodrim.__main__:main"
 
 [dependency-groups]
 dev = [
+    "pxsteamdl>=0.2.0",
     "nuitka>=2.6.7",
     "pydeps>=3.0.7",
     "pyright>=1.1.411",

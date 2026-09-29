@@ -15,7 +15,7 @@ class ActionId(StrEnum):
     REFRESH = "refresh"
     FULL_RESCAN = "full_rescan"
     AUTO_SORT = "auto_sort"
-    UPDATE_WORKSHOP = "update_workshop"
+    UPDATE_MODS = "update_mods"
     FOCUS_SEARCH = "focus_search"
     NEXT_VIEW = "next_view"
     PREV_VIEW = "prev_view"
@@ -51,9 +51,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         ActionId.FULL_RESCAN, "&Full Mod Rescan", "Full mod rescan", "Ctrl+Shift+R"
     ),
     ActionSpec(ActionId.AUTO_SORT, "&Auto-Sort Mods", "Auto-sort mods"),
-    ActionSpec(
-        ActionId.UPDATE_WORKSHOP, "&Update Workshop Mods", "Update workshop mods"
-    ),
+    ActionSpec(ActionId.UPDATE_MODS, "&Update Mods", "Update downloaded mods"),
     ActionSpec(ActionId.FOCUS_SEARCH, "Focus &Search", "Focus search", "Ctrl+F"),
     ActionSpec(ActionId.NEXT_VIEW, "&Next View", "Next view", "Ctrl+Tab"),
     ActionSpec(ActionId.PREV_VIEW, "&Previous View", "Previous view", "Ctrl+Shift+Tab"),

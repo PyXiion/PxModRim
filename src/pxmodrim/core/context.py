@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from pxmodrim.core.config import AppConfig
+from pxmodrim.core.downloads.manager import DownloadManager
 from pxmodrim.core.events import Event
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.core.plugin import PluginRegistry
@@ -73,6 +74,8 @@ class CoreContext:
         self._providers: list[BaseModProvider] | None = None
         self._pool: ThreadPoolExecutor | None = None
         self._plugins = PluginRegistry()
+        # Always present; stays empty until a downloader plugin registers with it.
+        self._plugins.register(DownloadManager())
         self._active_state_changed = Event[tuple[str, ...]]()
         self._config_changed = Event[AppConfig]()
 

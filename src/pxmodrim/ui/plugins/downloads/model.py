@@ -16,7 +16,7 @@ from PySide6.QtCore import (
 )
 
 if TYPE_CHECKING:
-    from pxmodrim.core.services.workshop_download_service import (
+    from pxmodrim.core.downloads import (
         DownloadItemStatus,
         DownloadItemTitle,
         DownloadResult,
@@ -44,7 +44,7 @@ def _final_state(bytes_total: int) -> str:
 
 
 class DownloadsModel(QAbstractListModel):
-    """Per-mod state of the current or last Workshop download batch."""
+    """Per-mod state of the current or last download batch."""
 
     summary_changed = Signal()
     speed_changed = Signal()

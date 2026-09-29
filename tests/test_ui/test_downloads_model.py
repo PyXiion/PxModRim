@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from pxmodrim.core.services.workshop_download_service import (
-    DownloadItemStatus,
-    DownloadResult,
-)
+from pxmodrim.core.downloads import DownloadItemStatus, DownloadResult
 from pxmodrim.ui.plugins.downloads.model import DownloadsModel
 
 

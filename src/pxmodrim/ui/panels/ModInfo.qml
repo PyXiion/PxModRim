@@ -13,13 +13,13 @@ Rectangle {
     property var startup: null
     readonly property bool startupKnown: startup !== null && startup !== undefined
     property bool descExpanded: false
-    property bool workshopBusy: false
+    property bool downloadsBusy: false
     property bool updatingThis: false
     property bool neededExpanded: false
 
     signal openFolder()
     signal openUrl()
-    signal updateWorkshop()
+    signal updateMods()
     signal selectMod(string uuid)
     signal copyText(string text)
     signal openStartupDetails()
@@ -497,14 +497,14 @@ Rectangle {
                     }
 
                     PxButton {
-                        visible: root.hasInfo && root.info.canUpdateWorkshop && !root.updatingThis
-                        enabled: !root.workshopBusy
+                        visible: root.hasInfo && root.info.canUpdate && !root.updatingThis
+                        enabled: !root.downloadsBusy
                         implicitHeight: 24
                         implicitWidth: 24
                         variant: "ghost"
                         iconName: "download"
-                        ToolTip.text: root.workshopBusy ? "Workshop download in progress" : "Update from Steam Workshop"
-                        onClicked: root.updateWorkshop()
+                        ToolTip.text: root.downloadsBusy ? "Download in progress" : "Update from " + (root.hasInfo ? root.info.updateSource : "source")
+                        onClicked: root.updateMods()
                     }
 
                     BusyIndicator {
@@ -512,7 +512,7 @@ Rectangle {
                         running: visible
                         implicitHeight: 24
                         implicitWidth: 24
-                        ToolTip.text: "Updating from Steam Workshop\u2026"
+                        ToolTip.text: "Updating\u2026"
                         ToolTip.visible: hovered
                     }
                 }

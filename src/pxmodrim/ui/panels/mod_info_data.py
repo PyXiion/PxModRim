@@ -4,8 +4,8 @@ import re
 import time
 from typing import TYPE_CHECKING, Any
 
+from pxmodrim.core.downloads import download_manager
 from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
-from pxmodrim.core.services.workshop_download_service import workshop_service
 from pxmodrim.ui.components.unity_rich_text import unity_rich_text_to_html
 from pxmodrim.ui.models.mod_list_model import provider_label
 
@@ -256,7 +256,8 @@ def build_mod_info(
         conflicts = _conflicts(mod, index, active)
         needed_by = _needed_by(mod, ctx)
 
-    svc = workshop_service(ctx)
+    downloads = download_manager(ctx)
+    source = downloads.source_of(mod)
     return {
         "name": mod.name,
         "author": ", ".join(mod.authors) if isinstance(mod, AboutXmlMod) else "",
@@ -286,10 +287,9 @@ def build_mod_info(
         )
         if mod.description
         else "",
-        "details": _details(
-            mod, svc.last_synced(mod.published_file_id) if svc is not None else None
-        ),
+        "details": _details(mod, downloads.last_synced(mod)),
         "canOpenFolder": mod.mod_path is not None and mod.mod_path.exists(),
-        "canUpdateWorkshop": svc is not None and svc.updatable_id(mod) is not None,
+        "canUpdate": source is not None,
+        "updateSource": source.label if source is not None else "",
         "url": mod.url if isinstance(mod, AboutXmlMod) else "",
     }

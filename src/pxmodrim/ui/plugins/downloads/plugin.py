@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 class DownloadsUiPlugin(Plugin):
     name = "downloads_ui"
-    dependencies: ClassVar[list[str]] = ["workshop_download"]
+    dependencies: ClassVar[list[str]] = ["downloads"]
 
     def setup(self, ctx: AppContext) -> None:  # type: ignore[override]
         ctx.add_rail_view(DownloadsViewPanel)

@@ -42,6 +42,7 @@ GROUPS: dict[str, set[str]] = {
     "core.providers": {"core.providers"},
     "core.services": {"core.services"},
     "core.mod_service": {"core.mod_service"},
+    "core.downloads": {"core.downloads"},
     "core.organizer": {"core.organizer"},
     "core.support": {"core.support"},
     "ui.progress": {"ui.progress"},
@@ -96,6 +97,12 @@ ALLOWED: dict[str, set[str]] = {
         "core.providers",
         "core.services",
         "core.mods_config",
+    },
+    "core.downloads": {
+        "core.foundation",
+        "core.models",
+        "core.config",
+        "core.context",
     },
     "core.organizer": {
         "core.foundation",

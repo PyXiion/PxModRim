@@ -200,6 +200,7 @@ Rectangle {
 
                     Group {
                         title: "Steam Workshop"
+                        visible: root.initial.steamAvailable
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8

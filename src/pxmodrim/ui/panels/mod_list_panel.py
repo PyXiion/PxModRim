@@ -31,9 +31,9 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.models.metadata.structures import ListedMod
 from pxmodrim.ui.components.icons import icon
 from pxmodrim.ui.components.mod_activation import toggle_mods
-from pxmodrim.ui.components.workshop_update import (
+from pxmodrim.ui.components.mod_updates import (
     add_update_action,
-    update_workshop_mods,
+    update_mods,
 )
 from pxmodrim.ui.models.mod_list_model import ModListModel
 from pxmodrim.ui.models.mod_list_proxy_model import ModListProxyModel
@@ -282,12 +282,12 @@ class ModListPanel(QWidget):
         menu = QMenu(self)
         menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         menu.setToolTipsVisible(True)
-        add_update_action(menu, self._ctx, uuids, lambda: self._update_workshop(uuids))
+        add_update_action(menu, self._ctx, uuids, lambda: self._update_selected(uuids))
         menu.popup(self.cursor().pos())
 
     @asyncSlot()
-    async def _update_workshop(self, uuids: list[str]) -> None:
-        await update_workshop_mods(self._ctx, uuids)
+    async def _update_selected(self, uuids: list[str]) -> None:
+        await update_mods(self._ctx, uuids)
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:

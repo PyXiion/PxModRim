@@ -22,10 +22,10 @@ class HeaderController(QObject):
     close_requested = Signal()
     drag_started = Signal()
     unsaved_changes_changed = Signal()
-    update_workshop_requested = Signal()
-    workshop_busy_changed = Signal()
-    workshop_progress_changed = Signal()
-    workshop_progress_shown_changed = Signal()
+    update_mods_requested = Signal()
+    downloads_busy_changed = Signal()
+    downloads_progress_changed = Signal()
+    downloads_progress_shown_changed = Signal()
     downloads_requested = Signal()
 
     def __init__(
@@ -35,7 +35,7 @@ class HeaderController(QObject):
         initial_strategy: int = 0,
         app_version: str = "",
         tooltips: dict[str, str] | None = None,
-        workshop_available: bool = False,
+        downloads_available: bool = False,
     ) -> None:
         super().__init__(parent)
         self._is_frameless = is_frameless
@@ -44,12 +44,12 @@ class HeaderController(QObject):
         self._unsaved_changes = False
         self._app_version = app_version
         self._tooltips = tooltips or {}
-        self._workshop_available = workshop_available
-        self._workshop_busy = False
-        self._workshop_text = ""
-        self._workshop_value = 0
-        self._workshop_total = 0
-        self._workshop_progress_shown = True
+        self._downloads_available = downloads_available
+        self._downloads_busy = False
+        self._downloads_text = ""
+        self._downloads_value = 0
+        self._downloads_total = 0
+        self._downloads_progress_shown = True
 
     def is_frameless_getter(self) -> bool:
         return self._is_frameless
@@ -58,8 +58,8 @@ class HeaderController(QObject):
 
     appVersion = Property(str, lambda self: self._app_version, constant=True)
     tooltips = Property(dict, lambda self: self._tooltips, constant=True)
-    workshopAvailable = Property(
-        bool, lambda self: self._workshop_available, constant=True
+    downloadsAvailable = Property(
+        bool, lambda self: self._downloads_available, constant=True
     )
 
     @Property("QVariantList", constant=True)  # type: ignore[operator]
@@ -89,8 +89,8 @@ class HeaderController(QObject):
         self.downloads_requested.emit()
 
     @Slot()
-    def updateWorkshop(self) -> None:
-        self.update_workshop_requested.emit()
+    def updateMods(self) -> None:
+        self.update_mods_requested.emit()
 
     @Slot()
     def save(self) -> None:
@@ -150,47 +150,47 @@ class HeaderController(QObject):
     )
 
     @Slot(bool)
-    def set_workshop_busy(self, value: bool) -> None:
-        if self._workshop_busy != value:
-            self._workshop_busy = value
-            self.workshop_busy_changed.emit()
+    def set_downloads_busy(self, value: bool) -> None:
+        if self._downloads_busy != value:
+            self._downloads_busy = value
+            self.downloads_busy_changed.emit()
 
-    def set_workshop_progress_shown(self, shown: bool) -> None:
-        if self._workshop_progress_shown != shown:
-            self._workshop_progress_shown = shown
-            self.workshop_progress_shown_changed.emit()
+    def set_downloads_progress_shown(self, shown: bool) -> None:
+        if self._downloads_progress_shown != shown:
+            self._downloads_progress_shown = shown
+            self.downloads_progress_shown_changed.emit()
 
-    workshopProgressShown = Property(
+    downloadsProgressShown = Property(
         bool,
-        lambda self: self._workshop_progress_shown,
-        notify=workshop_progress_shown_changed,  # type: ignore[arg-type]
+        lambda self: self._downloads_progress_shown,
+        notify=downloads_progress_shown_changed,  # type: ignore[arg-type]
     )
 
-    def set_workshop_progress(self, text: str, value: int, total: int) -> None:
-        self._workshop_text = text
-        self._workshop_value = value
-        self._workshop_total = total
-        self.workshop_progress_changed.emit()
+    def set_downloads_progress(self, text: str, value: int, total: int) -> None:
+        self._downloads_text = text
+        self._downloads_value = value
+        self._downloads_total = total
+        self.downloads_progress_changed.emit()
 
-    workshopText = Property(
+    downloadsText = Property(
         str,
-        lambda self: self._workshop_text,
-        notify=workshop_progress_changed,  # type: ignore[arg-type]
+        lambda self: self._downloads_text,
+        notify=downloads_progress_changed,  # type: ignore[arg-type]
     )
-    workshopValue = Property(
+    downloadsValue = Property(
         int,
-        lambda self: self._workshop_value,
-        notify=workshop_progress_changed,  # type: ignore[arg-type]
+        lambda self: self._downloads_value,
+        notify=downloads_progress_changed,  # type: ignore[arg-type]
     )
-    workshopTotal = Property(
+    downloadsTotal = Property(
         int,
-        lambda self: self._workshop_total,
-        notify=workshop_progress_changed,  # type: ignore[arg-type]
+        lambda self: self._downloads_total,
+        notify=downloads_progress_changed,  # type: ignore[arg-type]
     )
 
-    workshopBusy = Property(
+    downloadsBusy = Property(
         bool,
-        lambda self: self._workshop_busy,
-        set_workshop_busy,
-        notify=workshop_busy_changed,
+        lambda self: self._downloads_busy,
+        set_downloads_busy,
+        notify=downloads_busy_changed,
     )

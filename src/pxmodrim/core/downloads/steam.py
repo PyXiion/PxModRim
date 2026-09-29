@@ -5,7 +5,7 @@ import contextlib
 import functools
 import re
 import time
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -14,8 +14,13 @@ import msgspec
 import pxsteamdl
 from loguru import logger
 
-from pxmodrim.core.events import Event
-from pxmodrim.core.plugin import Plugin
+from pxmodrim.core.downloads.downloader import Downloader
+from pxmodrim.core.downloads.types import (
+    DownloadItemStatus,
+    DownloadItemTitle,
+    DownloadProgress,
+    DownloadResult,
+)
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
@@ -68,33 +73,6 @@ def _validate_published_file_ids(publishedfileids: list[str]) -> None:
         )
 
 
-class DownloadProgress(msgspec.Struct):
-    total: int
-    completed: int
-    bytes_done: int
-    bytes_total: int
-
-
-class DownloadItemStatus(msgspec.Struct):
-    mod_id: str
-    status: str  # "downloading" | "success" | "error"
-    bytes_done: int = 0
-    bytes_total: int = 0
-    error: str = ""
-
-
-class DownloadItemTitle(msgspec.Struct):
-    mod_id: str
-    title: str
-
-
-class DownloadResult(msgspec.Struct):
-    succeeded: list[str]
-    failed: list[str]
-    # Succeeded items that actually transferred data (others were already current).
-    changed: list[str] = msgspec.field(default_factory=list)
-
-
 class WorkshopSyncState(msgspec.Struct):
     """When each Workshop item was last synced with Steam (unix seconds)."""
 
@@ -144,50 +122,14 @@ class _Batch:
         )
 
 
-class WorkshopDownloadService(Plugin):
+class SteamDownloader(Downloader):
     """Downloads Steam Workshop items into the local mods folder via PxSteamDL."""
 
-    name = "workshop_download"
-
-    status_message_changed: Event[str]
-    download_progress: Event[DownloadProgress]
-    download_item_status_changed: Event[DownloadItemStatus]
-    download_finished: Event[DownloadResult]
-    download_item_titled: Event[DownloadItemTitle]
-    # "login" -> "query" (Steam item details) -> "run" (all items resolved)
-    download_phase_changed: Event[str]
-    busy_changed: Event[bool]
-    batch_started: Event[list[str]]
-
-    __slots__ = (
-        "_active_ids",
-        "_auto_task",
-        "_client",
-        "_client_factory",
-        "_ctx",
-        "_running",
-        "_sync",
-        "_token",
-        "batch_started",
-        "busy_changed",
-        "download_finished",
-        "download_item_status_changed",
-        "download_item_titled",
-        "download_phase_changed",
-        "download_progress",
-        "status_message_changed",
-    )
+    name = "steam_downloader"
+    label = "Steam Workshop"
 
     def __init__(self, client_factory: ClientFactory | None = None) -> None:
-        self.status_message_changed = Event()
-        self.download_progress = Event()
-        self.download_item_status_changed = Event()
-        self.download_finished = Event()
-        self.download_item_titled = Event()
-        self.download_phase_changed = Event()
-        self.busy_changed = Event()
-        self.batch_started = Event()
-
+        super().__init__()
         self._ctx: CoreContext | None = None
         self._client_factory: ClientFactory = client_factory or _login
         self._client: WorkshopClient | None = None
@@ -198,6 +140,7 @@ class WorkshopDownloadService(Plugin):
         self._running: asyncio.Future[list[pxsteamdl.Result]] | None = None
 
     def setup(self, ctx: CoreContext) -> None:
+        super().setup(ctx)
         self._ctx = ctx
 
     async def init(self, ctx: CoreContext) -> None:
@@ -225,23 +168,26 @@ class WorkshopDownloadService(Plugin):
     def is_downloading(self) -> bool:
         return self._token is not None
 
-    async def download_mods(self, publishedfileids: list[str]) -> DownloadResult:
+    def accepts(self, mod_id: str) -> bool:
+        return _PUBLISHED_FILE_ID_RE.fullmatch(mod_id) is not None
+
+    async def download_mods(self, mod_ids: list[str]) -> DownloadResult:
         """Download items into ``paths.local/<id>/``; per-item failures don't raise.
 
         ``cancel()`` stops the batch: finished items stay, the rest are dropped.
         """
-        if not publishedfileids:
+        if not mod_ids:
             raise ValueError("No mods selected for download.")
-        _validate_published_file_ids(publishedfileids)
+        _validate_published_file_ids(mod_ids)
         if self._ctx is None:
-            raise RuntimeError("WorkshopDownloadService used before setup()")
+            raise RuntimeError("SteamDownloader used before setup()")
         local = self._ctx.config.paths.local
         if not local:
             raise ValueError("Local mods path is not configured.")
         if self.is_downloading:
             raise RuntimeError("A download is already running.")
 
-        ids = list(dict.fromkeys(publishedfileids))
+        ids = list(dict.fromkeys(mod_ids))
         root = Path(local)
         batch = _Batch(len(ids))
         token = pxsteamdl.CancelToken()
@@ -287,14 +233,21 @@ class WorkshopDownloadService(Plugin):
         pfid = mod.published_file_id
         return pfid if pfid == path.name else None
 
-    def last_synced(self, pid: str | None) -> float | None:
+    def last_synced(self, mod: ListedMod) -> float | None:
+        pid = self.updatable_id(mod)
         return self._sync.synced.get(pid) if pid else None
 
     def stale_ids(self, max_age_s: float, now: float | None = None) -> list[str]:
         """Updatable ids never synced or synced over *max_age_s* ago, oldest first."""
         cutoff = (time.time() if now is None else now) - max_age_s
         synced = self._sync.synced
-        stale = [pid for pid in self.updatable_ids() if synced.get(pid, 0.0) < cutoff]
+        if self._ctx is None:
+            return []
+        stale = [
+            pid
+            for pid in self.updatable_ids(self._ctx.all_mods.values())
+            if synced.get(pid, 0.0) < cutoff
+        ]
         return sorted(stale, key=lambda pid: synced.get(pid, 0.0))
 
     def _record_synced(self, ids: list[str]) -> None:
@@ -327,14 +280,6 @@ class WorkshopDownloadService(Plugin):
             await self.download_mods(ids)
         except (RuntimeError, ValueError) as exc:
             logger.warning("[workshop] auto-update not started: {}", exc)
-
-    def updatable_ids(self, mods: Iterable[ListedMod] | None = None) -> list[str]:
-        """Updatable ids among *mods* (all loaded mods by default), deduplicated."""
-        if self._ctx is None:
-            return []
-        source = self._ctx.all_mods.values() if mods is None else mods
-        ids = (self.updatable_id(m) for m in source)
-        return list(dict.fromkeys(pid for pid in ids if pid is not None))
 
     def cancel(self) -> None:
         token = self._token
@@ -495,8 +440,3 @@ class WorkshopDownloadService(Plugin):
             )
         self.download_item_status_changed.emit(status)
         self.download_progress.emit(batch.progress())
-
-
-def workshop_service(ctx: CoreContext) -> WorkshopDownloadService | None:
-    svc = ctx.plugins.get(WorkshopDownloadService.name)
-    return svc if isinstance(svc, WorkshopDownloadService) else None

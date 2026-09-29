@@ -63,6 +63,7 @@ class _SettingsBackend(QObject):
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
             "autoUpdateHours": cfg.workshop_auto_update_hours,
+            "steamAvailable": ctx.plugins.get("steam_downloader") is not None,
             "useAltIds": cfg.sort.use_alternative_package_ids,
             "checkMissing": cfg.sort.check_missing_dependencies,
             "useCommunity": cfg.sort.use_community_rules,

@@ -10,7 +10,7 @@
 ## Environment
 **uv**, **Python 3.12.\*** only, **PySide6 >=6.11 + qasync**.
 Task runner is **just** (`just` to list). CI uses `uv sync --locked --dev`.
-`pxsteamdl` (Workshop downloader) is a hard dependency built from source: needs CMake >= 3.24 and a C++20 compiler (GCC, Clang, or MSVC); external dependencies are vendored via CPM.
+`pxsteamdl` (Workshop downloader) is an optional dependency (`steam` extra, also in the `dev` group), built from source: needs CMake >= 3.24 and a C++20 compiler (GCC, Clang, or MSVC); external dependencies are vendored via CPM. Without it the app runs as a plain mod sorter.
 
 ## Entrypoint
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)
@@ -24,6 +24,13 @@ src/pxmodrim/
 ├── core/                # all domain logic; never imports ui/
 └── ui/                  # Qt widgets + QML; imports core/ freely
 ```
+
+## Download plugins
+Downloads are plugins; the UI only talks to `core/downloads/manager.py` (`DownloadManager`, always present, plugin name `downloads`).
+- Sources subclass `core.downloads.Downloader` (`core/downloads/steam.py` = `steam_downloader`, the only one today) and register with the manager in `setup()`. Third-party imports stay inside the source's own module; `_app.py` imports it lazily and skips it if disabled or missing.
+- UI plugins: `downloads_ui` (Downloads tab, source-agnostic, shown when any downloader exists), `steamworkshop` (Steam WebView, needs `steam_downloader`).
+- Disable at runtime: `PX_DISABLED_PLUGINS=steam_downloader,steamworkshop,downloads_ui` (comma-separated).
+- New source: subclass `Downloader`, register in `_app.py`, add its name to the `downloaders` list; UI needs no change.
 
 ## Key conventions
 - `from __future__ import annotations` in every `.py` file

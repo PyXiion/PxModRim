@@ -11,11 +11,8 @@ from pxmodrim.core.plugin import Plugin
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
-    from pxmodrim.core.services.workshop_download_service import (
-        DownloadItemStatus,
-        DownloadResult,
-        WorkshopDownloadService,
-    )
+    from pxmodrim.core.downloads import DownloadItemStatus, DownloadResult
+    from pxmodrim.core.downloads.steam import SteamDownloader
     from pxmodrim.ui.context import AppContext
 
 
@@ -33,7 +30,7 @@ class ItemStatus(NamedTuple):
 
 class SteamWorkshopUiPlugin(Plugin):
     name = "steamworkshop"
-    dependencies = ["workshop_download"]
+    dependencies = ["steam_downloader"]
 
     badges_refresh_requested: Event[list[str]]
     sidebar_sync_requested: Event[SidebarSync]
@@ -43,7 +40,7 @@ class SteamWorkshopUiPlugin(Plugin):
     clear_checked_requested: Event[None]
     active_refresh_requested: Event[list[str]]
 
-    _svc: WorkshopDownloadService
+    _svc: SteamDownloader
 
     def __init__(self) -> None:
         self.badges_refresh_requested = Event()
@@ -70,9 +67,7 @@ class SteamWorkshopUiPlugin(Plugin):
     def setup(self, ctx: AppContext) -> None:  # type: ignore[override]
         self._core = ctx.core
         self._app_ctx = ctx
-        self._svc = cast(
-            "WorkshopDownloadService", ctx.core.plugins.get("workshop_download")
-        )
+        self._svc = cast("SteamDownloader", ctx.core.plugins.get("steam_downloader"))
         from pxmodrim.ui.plugins.steam_workshop.view import SteamWorkshopViewPanel
 
         ctx.add_rail_view(SteamWorkshopViewPanel)

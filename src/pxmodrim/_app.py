@@ -187,21 +187,28 @@ class App:
 
         disabled = _parse_disabled_plugins()
 
-        if "workshop_download" not in disabled:
-            from pxmodrim.core.services.workshop_download_service import (
-                WorkshopDownloadService,
-            )
+        downloaders: list[str] = []
+        steam_enabled = "steam_downloader" not in disabled
+        if steam_enabled:
+            try:
+                from pxmodrim.core.downloads.steam import SteamDownloader
+            except ImportError:
+                logger.info("pxsteamdl is not installed; Steam downloads disabled")
+                steam_enabled = False
+            else:
+                self._ctx.register_plugin(SteamDownloader())
+                downloaders.append("steam")
 
-            self._ctx.register_plugin(WorkshopDownloadService())
-
-            from pxmodrim.ui.plugins.downloads import DownloadsUiPlugin
-
-            self._app_ctx.register_plugin(DownloadsUiPlugin())
-
-        if "steamworkshop" not in disabled:
+        if "steam" in downloaders and "steamworkshop" not in disabled:
             from pxmodrim.ui.plugins import SteamWorkshopUiPlugin
 
             self._app_ctx.register_plugin(SteamWorkshopUiPlugin())
+
+        # The Downloads tab is source-agnostic: shown whenever any downloader exists.
+        if downloaders and "downloads_ui" not in disabled:
+            from pxmodrim.ui.plugins.downloads import DownloadsUiPlugin
+
+            self._app_ctx.register_plugin(DownloadsUiPlugin())
 
         self._app_ctx.setup_all()
         self.main_window = MainWindow(self._app_ctx)

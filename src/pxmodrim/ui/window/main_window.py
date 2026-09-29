@@ -32,13 +32,9 @@ from qasync import asyncSlot
 
 from pxmodrim.core.config import config_dir
 from pxmodrim.core.constants import LaunchStrategy
+from pxmodrim.core.downloads import DownloadProgress, DownloadResult, download_manager
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.core.services.update_service import UpdateCheckError, UpdateService
-from pxmodrim.core.services.workshop_download_service import (
-    DownloadProgress,
-    DownloadResult,
-    workshop_service,
-)
 from pxmodrim.core.support import get_app_version
 from pxmodrim.ui.components import (
     HeaderController,
@@ -48,9 +44,9 @@ from pxmodrim.ui.components import (
     create_qml_engine,
 )
 from pxmodrim.ui.components.dialogs import await_dialog
-from pxmodrim.ui.components.workshop_update import (
+from pxmodrim.ui.components.mod_updates import (
     CONFIRM_THRESHOLD,
-    ConfirmWorkshopUpdateDialog,
+    ConfirmUpdateDialog,
 )
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
@@ -163,8 +159,8 @@ class MainWindow(QMainWindow):
 
     def _setup_header_and_shortcuts(self) -> None:
         logger.debug("main_window: setting up header and shortcuts")
-        self._workshop = workshop_service(self._ctx)
-        self._workshop_refresh: asyncio.Task[int] | None = None
+        self._downloads = download_manager(self._ctx)
+        self._downloads_refresh: asyncio.Task[int] | None = None
         self._header_controller = HeaderController(
             is_frameless=self._is_frameless,
             initial_strategy=int(self._ui_prefs.launch_strategy),
@@ -174,9 +170,9 @@ class MainWindow(QMainWindow):
                 "sort": ACTIONS[ActionId.AUTO_SORT].tooltip(),
                 "save": ACTIONS[ActionId.SAVE].tooltip(),
                 "settings": ACTIONS[ActionId.SETTINGS].tooltip(),
-                "update_workshop": ACTIONS[ActionId.UPDATE_WORKSHOP].tooltip(),
+                "update_mods": ACTIONS[ActionId.UPDATE_MODS].tooltip(),
             },
-            workshop_available=self._workshop is not None,
+            downloads_available=self._downloads.available,
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
@@ -192,9 +188,7 @@ class MainWindow(QMainWindow):
             lambda: self._show_view("downloads")
         )
         self._app_ctx.set_navigator(self._show_view)
-        self._header_controller.update_workshop_requested.connect(
-            self._update_workshop_mods
-        )
+        self._header_controller.update_mods_requested.connect(self._update_mods)
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
 
@@ -206,7 +200,7 @@ class MainWindow(QMainWindow):
             ActionId.QUIT: self.close,
             ActionId.REFRESH: self._refresh_mods,
             ActionId.FULL_RESCAN: self._full_rescan,
-            ActionId.UPDATE_WORKSHOP: self._update_workshop_mods,
+            ActionId.UPDATE_MODS: self._update_mods,
             ActionId.AUTO_SORT: self._auto_sort,
             ActionId.FOCUS_SEARCH: self._focus_search,
             ActionId.NEXT_VIEW: lambda: self._cycle_view(1),
@@ -221,7 +215,7 @@ class MainWindow(QMainWindow):
         }
         for action_id, handler in handlers.items():
             self._actions[action_id].triggered.connect(handler)
-        self._actions[ActionId.UPDATE_WORKSHOP].setEnabled(self._workshop is not None)
+        self._actions[ActionId.UPDATE_MODS].setEnabled(self._downloads.available)
 
         for index, key in enumerate(VIEW_SWITCH_KEYS):
             switch = QAction(self)
@@ -278,9 +272,9 @@ class MainWindow(QMainWindow):
     def _open_logs_folder() -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(config_dir() / "logs")))
 
-    def _on_workshop_progress(self, progress: DownloadProgress) -> None:
-        self._header_controller.set_workshop_progress(
-            f"Updating workshop mods: {progress.completed} / {progress.total}"
+    def _on_downloads_progress(self, progress: DownloadProgress) -> None:
+        self._header_controller.set_downloads_progress(
+            f"Updating mods: {progress.completed} / {progress.total}"
             f" · {progress.bytes_done / 2**20:.0f} MB",
             progress.completed,
             progress.total,
@@ -354,13 +348,11 @@ class MainWindow(QMainWindow):
         self._ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message
         )
-        if self._workshop is not None:
-            self._workshop.busy_changed.connect(self._on_workshop_busy)
-            self._workshop.download_progress.connect(self._on_workshop_progress)
-            self._workshop.download_finished.connect(
-                self._on_workshop_download_finished
-            )
-            self._workshop.status_message_changed.connect(self._on_status_message)
+        if self._downloads.available:
+            self._downloads.busy_changed.connect(self._on_downloads_busy)
+            self._downloads.download_progress.connect(self._on_downloads_progress)
+            self._downloads.download_finished.connect(self._on_downloads_finished)
+            self._downloads.status_message_changed.connect(self._on_status_message)
 
         self.installEventFilter(self)
 
@@ -497,46 +489,42 @@ class MainWindow(QMainWindow):
         self._toast_manager.info(message)
 
     @asyncSlot()
-    async def _update_workshop_mods(self) -> None:
-        workshop = self._workshop
-        if workshop is None:
+    async def _update_mods(self) -> None:
+        downloads = self._downloads
+        if not downloads.available:
             return
-        if workshop.is_downloading:
-            logger.info("[workshop] stop requested from the header")
-            workshop.cancel()
+        if downloads.is_downloading:
+            logger.info("[downloads] stop requested from the header")
+            downloads.cancel()
             return
-        ids = workshop.updatable_ids()
+        ids = downloads.updatable_ids(self._ctx.all_mods.values())
         if not ids:
-            self._toast_manager.info("No workshop mods to update")
+            self._toast_manager.info("No downloaded mods to update")
             return
         if len(ids) >= CONFIRM_THRESHOLD:
-            confirmed, _ = await await_dialog(
-                ConfirmWorkshopUpdateDialog, len(ids), self
-            )
+            confirmed, _ = await await_dialog(ConfirmUpdateDialog, len(ids), self)
             if confirmed != QMessageBox.StandardButton.Yes:
                 return
-        logger.info("[workshop] update-all requested for {} mods", len(ids))
-        self._toast_manager.info(f"Updating {len(ids)} workshop mods\u2026")
+        logger.info("[downloads] update-all requested for {} mods", len(ids))
+        self._toast_manager.info(f"Updating {len(ids)} mods\u2026")
         try:
-            await workshop.download_mods(ids)
+            await downloads.download_mods(ids)
         except (RuntimeError, ValueError) as exc:
             self._toast_manager.error(str(exc))
 
-    def _on_workshop_busy(self, busy: bool) -> None:
-        self._header_controller.set_workshop_busy(busy)
-        self._actions[ActionId.UPDATE_WORKSHOP].setEnabled(not busy)
+    def _on_downloads_busy(self, busy: bool) -> None:
+        self._header_controller.set_downloads_busy(busy)
+        self._actions[ActionId.UPDATE_MODS].setEnabled(not busy)
         if busy:
-            self._header_controller.set_workshop_progress(
-                "Updating workshop mods…", 0, 0
-            )
+            self._header_controller.set_downloads_progress("Updating mods…", 0, 0)
 
-    def _on_workshop_download_finished(self, result: DownloadResult) -> None:
+    def _on_downloads_finished(self, result: DownloadResult) -> None:
         ok, failed = len(result.succeeded), len(result.failed)
         changed = len(result.changed)
         if not ok and not failed:
-            self._toast_manager.info("Workshop download cancelled")
+            self._toast_manager.info("Download cancelled")
             return
-        summary = f"Workshop: {changed} updated, {ok - changed} unchanged"
+        summary = f"{changed} updated, {ok - changed} unchanged"
         if failed:
             by_id = {m.published_file_id: m.name for m in self._ctx.all_mods.values()}
             shown = ", ".join(by_id.get(pid, pid) for pid in result.failed[:3])
@@ -545,7 +533,9 @@ class MainWindow(QMainWindow):
         else:
             self._toast_manager.success(summary)
         if changed:
-            self._workshop_refresh = asyncio.ensure_future(self._app_ctx.refresh_mods())
+            self._downloads_refresh = asyncio.ensure_future(
+                self._app_ctx.refresh_mods()
+            )
 
     @asyncSlot()
     async def _open_settings(self) -> None:
@@ -738,7 +728,7 @@ class MainWindow(QMainWindow):
     def _on_rail_tab_changed(self, index: int) -> None:
         logger.debug("main_window: rail tab changed to {}", index)
         self._stack.setCurrentIndex(index)
-        self._header_controller.set_workshop_progress_shown(
+        self._header_controller.set_downloads_progress_shown(
             self._views[index].view_id != "downloads"
         )
         # Preload an adjacent tab (e.g. the Steam view next to Mods) so its

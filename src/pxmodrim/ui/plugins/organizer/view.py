@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from qasync import asyncSlot
 
 from pxmodrim.core.context import CoreContext
+from pxmodrim.core.downloads import download_manager
 from pxmodrim.core.organizer import (
     MAX_DEPTH,
     ROOT_ID,
@@ -41,17 +42,16 @@ from pxmodrim.core.organizer import (
     RuleSpec,
 )
 from pxmodrim.core.organizer.resolve import preview_rule_matches
-from pxmodrim.core.services.workshop_download_service import workshop_service
 from pxmodrim.ui.components.button import AppButton
 from pxmodrim.ui.components.dialog_chrome import install_dialog_chrome
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.filter_sidebar import FilterSidebar
 from pxmodrim.ui.components.icon_button import IconButton
 from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
-from pxmodrim.ui.components.workshop_update import (
+from pxmodrim.ui.components.mod_updates import (
     add_update_action,
+    update_mods,
     update_state,
-    update_workshop_mods,
 )
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
 from pxmodrim.ui.panels.mod_info_panel import ModInfoPanel
@@ -209,7 +209,7 @@ class OrganizerViewPanel(BaseViewPanel):
             ("Move to folder…", "move"),
             ("Manage tags…", "tags"),
             ("Create folder from selection", "create"),
-            ("Update from Workshop", "update"),
+            ("Update", "update"),
         ):
             button = AppButton(label, self._selection_bar)
             if action == "update":
@@ -249,9 +249,7 @@ class OrganizerViewPanel(BaseViewPanel):
             self._refresh_diagnostics
         )
         self._service.changed.connect(self._notify_editor)
-        workshop = workshop_service(ctx)
-        if workshop is not None:
-            workshop.busy_changed.connect(lambda _busy: self._sync_info())
+        download_manager(ctx).busy_changed.connect(lambda _busy: self._sync_info())
 
     @Property(bool, notify=readyChanged)
     def ready(self) -> bool:
@@ -384,7 +382,7 @@ class OrganizerViewPanel(BaseViewPanel):
                 else:
                     await self._new_folder_from(pids)
         elif action == "update":
-            await update_workshop_mods(
+            await update_mods(
                 self._ctx, [n.leaf.uuid for n in nodes if n.leaf is not None]
             )
         elif action in ("enable", "disable"):
@@ -685,7 +683,7 @@ class OrganizerViewPanel(BaseViewPanel):
         if any(uuid in active for uuid in uuids):
             self._menu.addAction("Disable", lambda: self._disable_many(uuids))
         add_update_action(
-            self._menu, self._ctx, uuids, lambda: self._update_workshop(uuids)
+            self._menu, self._ctx, uuids, lambda: self._update_selected(uuids)
         )
         self._menu.addSeparator()
         pids = list(
@@ -727,7 +725,7 @@ class OrganizerViewPanel(BaseViewPanel):
             "Disable all", lambda: self._disable_many(uuids)
         ).setEnabled(bool(uuids))
         add_update_action(
-            self._menu, self._ctx, uuids, lambda: self._update_workshop(uuids)
+            self._menu, self._ctx, uuids, lambda: self._update_selected(uuids)
         )
         self._menu.addSeparator()
         if node.kind == "ungrouped":
@@ -835,8 +833,8 @@ class OrganizerViewPanel(BaseViewPanel):
             await self._error(exc)
 
     @asyncSlot()
-    async def _update_workshop(self, uuids: list[str]) -> None:
-        await update_workshop_mods(self._ctx, uuids)
+    async def _update_selected(self, uuids: list[str]) -> None:
+        await update_mods(self._ctx, uuids)
 
     @asyncSlot()
     async def _enable_many(self, uuids: list[str]) -> None:

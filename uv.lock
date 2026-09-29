@@ -214,16 +214,21 @@ dependencies = [
     { name = "loguru" },
     { name = "lxml" },
     { name = "msgspec" },
-    { name = "pxsteamdl" },
     { name = "pyside6" },
     { name = "qasync" },
     { name = "toposort" },
     { name = "ttimer" },
 ]
 
+[package.optional-dependencies]
+steam = [
+    { name = "pxsteamdl" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "nuitka" },
+    { name = "pxsteamdl" },
     { name = "pydeps" },
     { name = "pyright" },
     { name = "pytest" },
@@ -240,16 +245,18 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "lxml", specifier = ">=6.1.1" },
     { name = "msgspec", specifier = ">=0.21.1" },
-    { name = "pxsteamdl", git = "https://github.com/PyXiion/PxSteamDL" },
+    { name = "pxsteamdl", marker = "extra == 'steam'", git = "https://github.com/PyXiion/PxSteamDL" },
     { name = "pyside6", specifier = ">=6.11.1" },
     { name = "qasync", specifier = ">=0.28.0" },
     { name = "toposort", specifier = ">=1.10" },
     { name = "ttimer", specifier = ">=0.0.2" },
 ]
+provides-extras = ["steam"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "nuitka", specifier = ">=2.6.7" },
+    { name = "pxsteamdl", git = "https://github.com/PyXiion/PxSteamDL" },
     { name = "pydeps", specifier = ">=3.0.7" },
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "pytest", specifier = ">=9.1.1" },

@@ -8,19 +8,18 @@ from loguru import logger
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QDialog, QMenu, QMessageBox, QWidget
 
-from pxmodrim.core.services.workshop_download_service import workshop_service
+from pxmodrim.core.downloads import download_manager
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
 
 
 def updatable_ids(ctx: CoreContext, uuids: Iterable[str]) -> list[str]:
-    """Workshop ids among the mods *uuids* that PxModRim can update."""
-    svc = workshop_service(ctx)
-    if svc is None:
-        return []
+    """Source ids among the mods *uuids* that PxModRim can update."""
     all_mods = ctx.all_mods
-    return svc.updatable_ids(all_mods[u] for u in uuids if u in all_mods)
+    return download_manager(ctx).updatable_ids(
+        all_mods[u] for u in uuids if u in all_mods
+    )
 
 
 CONFIRM_THRESHOLD = 25
@@ -36,14 +35,14 @@ class UpdateState:
 def update_state(ctx: CoreContext, uuids: Iterable[str]) -> UpdateState:
     selected = list(uuids)
     ids = updatable_ids(ctx, selected)
-    label = "Update from Workshop"
+    label = "Update"
     if len(selected) > 1:
         label += f" ({len(ids)} of {len(selected)})"
-    svc = workshop_service(ctx)
-    if svc is None:
-        return UpdateState(label, False, "Workshop downloads are disabled")
-    if svc.is_downloading:
-        return UpdateState(label, False, "A Workshop download is in progress")
+    downloads = download_manager(ctx)
+    if not downloads.available:
+        return UpdateState(label, False, "No download sources are enabled")
+    if downloads.is_downloading:
+        return UpdateState(label, False, "A download is in progress")
     if not ids:
         return UpdateState(
             label, False, "None of these mods were downloaded by PxModRim"
@@ -61,16 +60,17 @@ def add_update_action(
     return action
 
 
-class ConfirmWorkshopUpdateDialog(QMessageBox):
+class ConfirmUpdateDialog(QMessageBox):
     def __init__(self, count: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setIcon(QMessageBox.Icon.Question)
-        QDialog.setWindowTitle(self, "Update Workshop Mods")
-        self.setText(f"Re-sync {count} Workshop mods?")
+        QDialog.setWindowTitle(self, "Update Mods")
+        self.setText(f"Update {count} mods?")
         self.setInformativeText(
-            "Every mod downloaded by PxModRim is checked against Steam and "
-            "changed files are downloaded. Mods from Steam's own Workshop "
-            "folder are not included. This can take a long time."
+            "Every mod downloaded by PxModRim is checked against its source and "
+            "changed files are downloaded. Mods managed by other tools, such as "
+            "Steam's own Workshop folder, are not included. This can take a "
+            "long time."
         )
         self.setStandardButtons(
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
@@ -82,15 +82,15 @@ class ConfirmWorkshopUpdateDialog(QMessageBox):
             yes.setObjectName("primaryAction")
 
 
-async def update_workshop_mods(ctx: CoreContext, uuids: Iterable[str]) -> None:
-    """Re-sync the updatable mods among *uuids*; results are toasted by MainWindow."""
-    svc = workshop_service(ctx)
+async def update_mods(ctx: CoreContext, uuids: Iterable[str]) -> None:
+    """Update the updatable mods among *uuids*; results are toasted by MainWindow."""
+    downloads = download_manager(ctx)
     ids = updatable_ids(ctx, uuids)
-    if svc is None or not ids:
-        logger.debug("[workshop] update requested but nothing is updatable")
+    if not ids:
+        logger.debug("[downloads] update requested but nothing is updatable")
         return
-    logger.info("[workshop] update requested for {} mods", len(ids))
+    logger.info("[downloads] update requested for {} mods", len(ids))
     try:
-        await svc.download_mods(ids)
+        await downloads.download_mods(ids)
     except (RuntimeError, ValueError) as exc:
-        logger.warning("[workshop] update not started: {}", exc)
+        logger.warning("[downloads] update not started: {}", exc)

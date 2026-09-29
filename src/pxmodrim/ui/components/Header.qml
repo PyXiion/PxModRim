@@ -164,7 +164,7 @@ Rectangle {
             Layout.fillHeight: true
 
             ColumnLayout {
-                visible: root.controller.workshopBusy && root.controller.workshopProgressShown
+                visible: root.controller.downloadsBusy && root.controller.downloadsProgressShown
                 anchors.centerIn: parent
                 width: Math.min(parent.width, 360)
                 spacing: 6
@@ -172,7 +172,7 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: root.controller.workshopText
+                    text: root.controller.downloadsText
                     color: Theme.textMuted
                     elide: Text.ElideRight
                     font.pixelSize: Theme.fontSizeSm
@@ -182,9 +182,9 @@ Rectangle {
                 PxProgressBar {
                     Layout.fillWidth: true
                     from: 0
-                    to: Math.max(root.controller.workshopTotal, 1)
-                    value: root.controller.workshopValue
-                    indeterminate: root.controller.workshopTotal <= 0
+                    to: Math.max(root.controller.downloadsTotal, 1)
+                    value: root.controller.downloadsValue
+                    indeterminate: root.controller.downloadsTotal <= 0
                 }
 
                 MouseArea {
@@ -276,11 +276,11 @@ Rectangle {
                 }
 
                 PxButton {
-                    visible: root.controller.workshopAvailable
-                    variant: root.controller.workshopBusy ? "danger" : "secondary"
-                    iconName: root.controller.workshopBusy ? "close" : "download"
-                    ToolTip.text: root.controller.workshopBusy ? "Stop workshop download" : (root.controller.tooltips.update_workshop || "Update workshop mods")
-                    onClicked: root.controller.updateWorkshop()
+                    visible: root.controller.downloadsAvailable
+                    variant: root.controller.downloadsBusy ? "danger" : "secondary"
+                    iconName: root.controller.downloadsBusy ? "close" : "download"
+                    ToolTip.text: root.controller.downloadsBusy ? "Stop download" : (root.controller.tooltips.update_mods || "Update downloaded mods")
+                    onClicked: root.controller.updateMods()
                 }
 
                 // ── Launch split-button ──

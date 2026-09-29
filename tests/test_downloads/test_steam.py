@@ -12,13 +12,9 @@ import pytest
 
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
+from pxmodrim.core.downloads import DownloadItemStatus, DownloadResult
+from pxmodrim.core.downloads.steam import SteamDownloader, WorkshopSyncState
 from pxmodrim.core.models.metadata.structures import ListedMod
-from pxmodrim.core.services.workshop_download_service import (
-    DownloadItemStatus,
-    DownloadResult,
-    WorkshopDownloadService,
-    WorkshopSyncState,
-)
 
 
 class FakeClient:
@@ -66,7 +62,7 @@ class FakeClient:
 
 def _service(
     tmp_path: Path, client: FakeClient | None = None, *, local: bool = True
-) -> tuple[WorkshopDownloadService, list[int]]:
+) -> tuple[SteamDownloader, list[int]]:
     cfg = AppConfig()
     if local:
         cfg.paths.local = str(tmp_path / "Mods")
@@ -78,8 +74,9 @@ def _service(
             raise RuntimeError("logon denied")
         return client
 
-    svc = WorkshopDownloadService(factory)
-    svc.setup(CoreContext(cfg, ConfigService(tmp_path)))
+    svc = SteamDownloader(factory)
+    ctx = CoreContext(cfg, ConfigService(tmp_path))
+    svc.setup(ctx)
     return svc, logins
 
 
@@ -216,7 +213,11 @@ def _mod_at(path: Path, pfid: str | None = None) -> ListedMod:
     return ListedMod(_mod_path=path)
 
 
-def _load(svc: WorkshopDownloadService, mods: list[ListedMod]) -> None:
+def _synced(tmp_path: Path, svc: SteamDownloader, pid: str) -> float | None:
+    return svc.last_synced(ListedMod(_mod_path=tmp_path / "Mods" / pid))
+
+
+def _load(svc: SteamDownloader, mods: list[ListedMod]) -> None:
     assert svc._ctx is not None
     svc._ctx.load({m.uuid: m for m in mods}, [])
 
@@ -231,7 +232,8 @@ def test_updatable_id_only_for_downloads_in_local_mods(tmp_path: Path) -> None:
     ]
     _load(svc, mods)
     assert [svc.updatable_id(m) for m in mods] == ["111", None, "333", None]
-    assert svc.updatable_ids() == ["111", "333"]
+    assert svc._ctx is not None
+    assert svc.updatable_ids(svc._ctx.all_mods.values()) == ["111", "333"]
 
 
 def test_updatable_id_none_without_local_path(tmp_path: Path) -> None:
@@ -258,7 +260,7 @@ async def test_invalid_ids_do_not_toggle_busy(tmp_path: Path) -> None:
 
 
 def test_progress_counts_complete_and_up_to_date_items() -> None:
-    from pxmodrim.core.services.workshop_download_service import _Batch
+    from pxmodrim.core.downloads.steam import _Batch
 
     batch = _Batch(3)
     batch.bytes = {"1": (10, 10), "2": (5, 10), "3": (0, 0)}
@@ -284,7 +286,7 @@ async def test_result_changed_excludes_up_to_date_items(tmp_path: Path) -> None:
 
 
 def test_batch_changed_ignores_zero_byte_items() -> None:
-    from pxmodrim.core.services.workshop_download_service import _Batch
+    from pxmodrim.core.downloads.steam import _Batch
 
     batch = _Batch(2)
     batch.succeeded = ["1", "2"]
@@ -295,8 +297,8 @@ def test_batch_changed_ignores_zero_byte_items() -> None:
 async def test_success_records_sync_time_and_persists(tmp_path: Path) -> None:
     svc, _ = _service(tmp_path, FakeClient(errors={222: "gone"}))
     await svc.download_mods(["111", "222"])
-    assert svc.last_synced("111") is not None
-    assert svc.last_synced("222") is None
+    assert _synced(tmp_path, svc, "111") is not None
+    assert _synced(tmp_path, svc, "222") is None
     reloaded = ConfigService(tmp_path).load("workshop_sync.json", WorkshopSyncState)
     assert set(reloaded.synced) == {"111"}
 
@@ -315,14 +317,14 @@ async def test_auto_update_only_syncs_stale_mods_when_enabled(tmp_path: Path) ->
     assert svc._ctx is not None
     _load(svc, [_mod_at(tmp_path / "Mods" / "1", "1")])
     await svc._auto_update_once()
-    assert svc.last_synced("1") is None
+    assert _synced(tmp_path, svc, "1") is None
 
     svc._ctx.config.workshop_auto_update_hours = 6
     await svc._auto_update_once()
-    assert svc.last_synced("1") is not None
-    synced = svc.last_synced("1")
+    assert _synced(tmp_path, svc, "1") is not None
+    synced = _synced(tmp_path, svc, "1")
     await svc._auto_update_once()
-    assert svc.last_synced("1") == synced
+    assert _synced(tmp_path, svc, "1") == synced
 
 
 async def test_titles_from_steam_are_emitted(tmp_path: Path) -> None:
