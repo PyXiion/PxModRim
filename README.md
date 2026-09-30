@@ -61,13 +61,17 @@ first, then growing from there.
 | Experience                      | RimSort                                                              | PxModRim                                          |
 |---------------------------------|----------------------------------------------------------------------|---------------------------------------------------|
 | UI while scanning big mod lists | Can freeze or stutter                                                | Stays responsive                                  |
-| Metadata scan (~200 mods)       | ~900ms                              | ~15ms                                             |
-| Sorting (~200 active mods)      | Sort in ~5ms, then **UI freezes ~500ms** rebuilding all widgets      | Sort + diagnostics in ~10ms, no widget rebuild    |
+| Metadata scan (~1800 mods)      | ~1-2s                                                                | ~170ms warm (~1.1s cold disk cache)               |
+| Sorting (~1760 active mods)     | Rebuilding the mod lists **freezes the UI for ~6s** (sort time not measured) | Graph + sort in ~20ms, no widget rebuild  |
 | Settings dialog                 | Large 9-tab modal with many options                                  | Smaller (i hope)                                  |
 | How mod sources are shown       | Detected from folder paths                                           | Separated cleanly by source                       |
 | Load-order sorting              | Implemented well, but causes UI lag                                  | No UI lag                                         |
 | Error visibility                | Separate dialogs and panels                                          | Sidebar "With errors" filter + inline diagnostics |
 | Power-user features             | Many: SteamCMD, backups, player logs, file search, instances, themes | Uh... WIP!!!                                      |
+
+*Measured on one real setup: a local `Mods` folder with 2426 folders (~1820 valid mods, 1764 active), RimSort v1.8.0 AppImage
+vs. this repo's `scan_mod_directory` / `ConstraintGraph` + `topological_sort` (no community rules). RimSort timings come from
+its own log (second resolution); PxModRim timings are `time.perf_counter` runs after the disk cache is warm. Not a controlled benchmark.*
 
 ---
 
