@@ -9,6 +9,8 @@ SpinBox {
     implicitHeight: 32
     implicitWidth: 110
     editable: true
+    leftPadding: 28
+    rightPadding: 28
     hoverEnabled: true
     font.family: Theme.fontFamily
     font.pixelSize: Theme.fontSizeMd
@@ -25,24 +27,31 @@ SpinBox {
         inputMethodHints: Qt.ImhFormattedNumbersOnly
     }
 
-    up.indicator: Text {
-        x: control.width - width - 10
+    up.indicator: Item {
+        x: control.width - width
+        width: 28
         height: control.height
-        text: "+"
-        font: control.font
-        verticalAlignment: Text.AlignVCenter
-        color: !control.up.pressed && !control.up.hovered ? Theme.textDim : Theme.textMain
         opacity: control.value < control.to ? 1 : Theme.disabledOpacity
+
+        Text {
+            anchors.centerIn: parent
+            text: "+"
+            font: control.font
+            color: control.up.pressed || control.up.hovered ? Theme.textMain : Theme.textDim
+        }
     }
 
-    down.indicator: Text {
-        x: 10
+    down.indicator: Item {
+        width: 28
         height: control.height
-        text: "\u2212"
-        font: control.font
-        verticalAlignment: Text.AlignVCenter
-        color: !control.down.pressed && !control.down.hovered ? Theme.textDim : Theme.textMain
         opacity: control.value > control.from ? 1 : Theme.disabledOpacity
+
+        Text {
+            anchors.centerIn: parent
+            text: "\u2212"
+            font: control.font
+            color: control.down.pressed || control.down.hovered ? Theme.textMain : Theme.textDim
+        }
     }
 
     background: Rectangle {
