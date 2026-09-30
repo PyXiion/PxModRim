@@ -62,6 +62,8 @@ class _SettingsBackend(QObject):
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
             "autoUpdateHours": cfg.workshop_auto_update_hours,
+            "parallelItems": cfg.workshop_parallel_items,
+            "threadsPerItem": cfg.workshop_threads_per_item,
             "steamAvailable": ctx.plugins.get("steam_downloader") is not None,
             "useAltIds": cfg.sort.use_alternative_package_ids,
             "checkMissing": cfg.sort.check_missing_dependencies,
@@ -223,6 +225,8 @@ class SettingsPanel(QDialog):
             ),
             compact_mod_list=bool(values["compact"]),
             workshop_auto_update_hours=int(values["autoUpdateHours"]),
+            workshop_parallel_items=int(values["parallelItems"]),
+            workshop_threads_per_item=int(values["threadsPerItem"]),
         )
         self.accept()
 

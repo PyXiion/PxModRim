@@ -67,6 +67,8 @@ class AppConfig(msgspec.Struct):
     max_snapshots: int = 10
     compact_mod_list: bool = False
     workshop_auto_update_hours: int = 0
+    workshop_parallel_items: int = 2
+    workshop_threads_per_item: int = 4
     log_upload_endpoint: str = "https://paste.rs/"
 
 

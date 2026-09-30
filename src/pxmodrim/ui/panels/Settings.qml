@@ -20,6 +20,8 @@ Rectangle {
             config: configFolder.text.trim(),
             compact: compact.checked,
             autoUpdateHours: autoUpdate.currentValue,
+            parallelItems: parallelItems.value,
+            threadsPerItem: threadsPerItem.value,
             useAltIds: useAltIds.checked,
             checkMissing: checkMissing.checked,
             useCommunity: useCommunity.checked
@@ -231,6 +233,52 @@ Rectangle {
                         Text {
                             Layout.fillWidth: true
                             text: "Re-syncs mods downloaded by PxModRim while the app is running."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Parallel mods"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxSpinBox {
+                                id: parallelItems
+                                from: 1
+                                to: 8
+                                value: root.initial.parallelItems
+                                Accessible.name: "Parallel Workshop mod downloads"
+                                toolTipText: "How many mods are downloaded at the same time. Raise it for many small mods; lower it if Steam throttles or drops the connection."
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Threads per mod"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxSpinBox {
+                                id: threadsPerItem
+                                from: 1
+                                to: 16
+                                value: root.initial.threadsPerItem
+                                Accessible.name: "Download threads per Workshop mod"
+                                toolTipText: "Connections used to fetch chunks of a single mod. Raise it for large mods on a fast link; total load is parallel mods \u00d7 threads."
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Total connections = parallel mods \u00d7 threads per mod. Applies to the next download."
                             wrapMode: Text.Wrap
                             color: Theme.textDim
                             font.family: Theme.fontFamily

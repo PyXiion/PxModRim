@@ -392,3 +392,18 @@ async def test_auto_update_loop_survives_unexpected_error(
     assert calls >= 2
     del svc
     gc.collect()
+
+
+async def test_download_uses_configured_parallelism_clamped(tmp_path: Path) -> None:
+    client = FakeClient()
+    svc, _ = _service(tmp_path, client)
+    assert svc._ctx is not None
+    svc._ctx.config.workshop_parallel_items = 3
+    svc._ctx.config.workshop_threads_per_item = 5
+    await svc.download_mods(["1"])
+    svc._ctx.config.workshop_parallel_items = 0
+    svc._ctx.config.workshop_threads_per_item = 999
+    await svc.download_mods(["2"])
+    assert [c[2] for c in client.calls] == [15, 16]
+    del svc
+    gc.collect()

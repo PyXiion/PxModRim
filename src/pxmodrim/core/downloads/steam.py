@@ -27,8 +27,8 @@ if TYPE_CHECKING:
     from pxmodrim.core.models.metadata.structures import ListedMod
 
 # PxSteamDL runs one shared pool of parallel_items * threads_per_item workers.
-PARALLEL_ITEMS = 2
-THREADS_PER_ITEM = 4
+MAX_PARALLEL_ITEMS = 8
+MAX_THREADS_PER_ITEM = 16
 
 _CANCELLED = "cancelled"
 _PROGRESS_LOG_INTERVAL_S = 15.0
@@ -319,11 +319,18 @@ class SteamDownloader(Downloader):
                 self._finish_item(batch, pid, error=message)
             return
 
+        cfg = self._ctx.config if self._ctx is not None else None
+        parallel_items = min(
+            MAX_PARALLEL_ITEMS, max(1, cfg.workshop_parallel_items if cfg else 2)
+        )
+        threads_per_item = min(
+            MAX_THREADS_PER_ITEM, max(1, cfg.workshop_threads_per_item if cfg else 4)
+        )
         logger.debug(
             "[workshop] client.download start: {} items, {} parallel x {} threads",
             len(ids),
-            PARALLEL_ITEMS,
-            THREADS_PER_ITEM,
+            parallel_items,
+            threads_per_item,
         )
         loop = asyncio.get_running_loop()
 
@@ -345,8 +352,8 @@ class SteamDownloader(Downloader):
                 client.download,
                 [int(pid) for pid in ids],
                 root,
-                parallel_items=PARALLEL_ITEMS,
-                threads_per_item=THREADS_PER_ITEM,
+                parallel_items=parallel_items,
+                threads_per_item=threads_per_item,
                 on_progress=on_progress,
                 on_resolved=on_resolved,
                 cancel=token,
