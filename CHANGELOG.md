@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings > Steam Workshop: `Parallel mods` (1-8) and `Threads per mod` (1-16) control pxsteamdl download concurrency, with tooltips. Defaults are 8 and 1.
 
 ### Changed
+- No Version Warning and Use This Instead databases load from cache instantly and refresh in the background (progress shown in the header) when missing or older than 7 days, instead of blocking startup.
 - Organizer is the first view; its left navigation and right mod-info sidebar match Mods in width. Its search, folder actions, selection controls, and tree layout follow the #37 mockup while retaining the existing mod-info sidebar.
 - Auto-folder rules show first-match and newly assignable mod counts without blocking the editor; folder expansion controls persist their state.
 - Organizer auto-rules open in a centered, resizable window parented to the main window, with the rule list scrolling inside the window.

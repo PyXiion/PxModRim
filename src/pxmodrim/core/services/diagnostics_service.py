@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import operator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from ttimer import Timer
 
@@ -43,6 +43,18 @@ if TYPE_CHECKING:
     from pxmodrim.core.config import ConfigService
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
+
+
+DATABASE_MAX_AGE_S = 7 * 24 * 3600
+
+
+def _needs_refresh(loaded: object, service: _AgedCache) -> bool:
+    age = service.cache_age_s()
+    return not loaded or age is None or age > DATABASE_MAX_AGE_S
+
+
+class _AgedCache(Protocol):
+    def cache_age_s(self) -> float | None: ...
 
 
 class DiagnosticsService:
@@ -121,26 +133,37 @@ class DiagnosticsService:
                 self._checker.set_community_rules(self._community_rules)
 
     async def _ensure_databases(self) -> None:
-        """Apply cached databases now; download missing ones in the background."""
+        """Apply cached databases now; refresh missing or stale ones in background."""
         nvw = await asyncio.to_thread(self._no_version_warning_service.load_if_exists)
         if nvw:
             self._checker.set_no_version_warning(nvw)
         uti = await asyncio.to_thread(self._use_this_instead_service.load_if_exists)
         if uti:
             self._checker.set_use_this_instead(uti)
-        if (not nvw or not uti) and (self._db_task is None or self._db_task.done()):
-            self._db_task = asyncio.create_task(self._download_missing_databases())
+        refresh_nvw = _needs_refresh(nvw, self._no_version_warning_service)
+        refresh_uti = _needs_refresh(uti, self._use_this_instead_service)
+        if (refresh_nvw or refresh_uti) and (
+            self._db_task is None or self._db_task.done()
+        ):
+            self._db_task = asyncio.create_task(
+                self._download_databases(refresh_nvw, refresh_uti)
+            )
 
-    async def _download_missing_databases(self) -> None:
+    async def _download_databases(self, nvw: bool, uti: bool) -> None:
         self.background_task_changed.emit("Downloading rule databases\u2026")
+        changed = False
         try:
-            nvw = await self._no_version_warning_service.ensure()
             if nvw:
-                self._checker.set_no_version_warning(nvw)
-            uti = await self._use_this_instead_service.ensure()
+                pids = await self._no_version_warning_service.ensure(force=True)
+                if pids:
+                    self._checker.set_no_version_warning(pids)
+                    changed = True
             if uti:
-                self._checker.set_use_this_instead(uti)
-            if nvw or uti:
+                entries = await self._use_this_instead_service.ensure(force=True)
+                if entries:
+                    self._checker.set_use_this_instead(entries)
+                    changed = True
+            if changed:
                 self.rebuild()
         finally:
             self.background_task_changed.emit("")

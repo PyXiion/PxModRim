@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import zipfile
 from collections.abc import Mapping
 from pathlib import Path
@@ -22,6 +23,13 @@ NO_VERSION_WARNING_URL = (
 USE_THIS_INSTEAD_URL = (
     "https://github.com/emipa606/UseThisInstead/archive/refs/heads/main.zip"
 )
+
+
+def _age_s(path: Path) -> float | None:
+    try:
+        return max(0.0, time.time() - path.stat().st_mtime)
+    except OSError:
+        return None
 
 
 class NoVersionWarningService:
@@ -45,6 +53,9 @@ class NoVersionWarningService:
                     self._loaded_stamp = stamp
                 return self._pids
         return await self._download()
+
+    def cache_age_s(self) -> float | None:
+        return _age_s(self._xml_path)
 
     def load_if_exists(self) -> set[PackageId]:
         """Load cached PIDs if the local file exists, otherwise return empty set."""
@@ -127,6 +138,9 @@ class UseThisInsteadService:
                     self._loaded_stamp = stamp
                 return self._entries
         return await self._download()
+
+    def cache_age_s(self) -> float | None:
+        return _age_s(self._json_path)
 
     def load_if_exists(self) -> Mapping[str, ReplacementInfo]:
         """Load cached replacement entries if local file exists, else empty dict."""
