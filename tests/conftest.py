@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gc
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -15,3 +17,10 @@ def config_service(tmp_path: Path) -> ConfigService:
     are isolated to this temp directory instead.
     """
     return ConfigService(tmp_path)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _collect_qobjects() -> Iterator[None]:
+    """Destroy unparented QObjects at module end, not at an arbitrary later GC."""
+    yield
+    gc.collect()

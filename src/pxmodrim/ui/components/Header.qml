@@ -189,6 +189,28 @@ Rectangle {
                 }
             }
 
+            ColumnLayout {
+                visible: !downloadsProgress.visible && root.controller.taskText !== ""
+                anchors.centerIn: parent
+                width: Math.min(parent.width, 360)
+                spacing: 6
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.controller.taskText
+                    color: Theme.textMuted
+                    elide: Text.ElideRight
+                    font.pixelSize: Theme.fontSizeSm
+                    font.family: Theme.fontFamily
+                }
+
+                PxProgressBar {
+                    Layout.fillWidth: true
+                    indeterminate: true
+                }
+            }
+
             MouseArea {
                 anchors.fill: downloadsProgress
                 visible: downloadsProgress.visible

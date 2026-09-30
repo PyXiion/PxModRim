@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import gc
 import threading
 from collections.abc import Callable, Sequence
 from os import PathLike
@@ -155,8 +154,6 @@ async def test_login_failure_fails_every_item_and_retries_next_time(
     assert sorted(result.failed) == ["111", "222"]
     assert any("logon denied" in m for m in messages)
     assert len(logins) == 2
-    del svc
-    gc.collect()
 
 
 async def test_client_session_is_reused(tmp_path: Path) -> None:
@@ -366,8 +363,6 @@ async def test_client_is_relogged_after_download_raises(tmp_path: Path) -> None:
     await svc.download_mods(["1"])
     await svc.download_mods(["2"])
     assert len(logins) == 2
-    del svc
-    gc.collect()
 
 
 async def test_auto_update_loop_survives_unexpected_error(
@@ -390,8 +385,6 @@ async def test_auto_update_loop_survives_unexpected_error(
         await asyncio.sleep(0)
     task.cancel()
     assert calls >= 2
-    del svc
-    gc.collect()
 
 
 async def test_download_uses_configured_parallelism_clamped(tmp_path: Path) -> None:
@@ -405,5 +398,3 @@ async def test_download_uses_configured_parallelism_clamped(tmp_path: Path) -> N
     svc._ctx.config.workshop_threads_per_item = 999
     await svc.download_mods(["2"])
     assert [c[2] for c in client.calls] == [15, 16]
-    del svc
-    gc.collect()

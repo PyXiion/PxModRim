@@ -27,6 +27,7 @@ class HeaderController(QObject):
     downloads_progress_changed = Signal()
     downloads_progress_shown_changed = Signal()
     downloads_requested = Signal()
+    task_text_changed = Signal()
 
     def __init__(
         self,
@@ -46,6 +47,7 @@ class HeaderController(QObject):
         self._tooltips = tooltips or {}
         self._downloads_available = downloads_available
         self._downloads_busy = False
+        self._task_text = ""
         self._downloads_text = ""
         self._downloads_value = 0
         self._downloads_total = 0
@@ -150,6 +152,17 @@ class HeaderController(QObject):
     )
 
     @Slot(bool)
+    def set_task_text(self, text: str) -> None:
+        if self._task_text != text:
+            self._task_text = text
+            self.task_text_changed.emit()
+
+    taskText = Property(
+        str,
+        lambda self: self._task_text,
+        notify=task_text_changed,  # type: ignore[arg-type]
+    )
+
     def set_downloads_busy(self, value: bool) -> None:
         if self._downloads_busy != value:
             self._downloads_busy = value

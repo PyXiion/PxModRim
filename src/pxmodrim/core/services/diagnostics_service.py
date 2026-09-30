@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import operator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -47,18 +48,21 @@ if TYPE_CHECKING:
 class DiagnosticsService:
     diagnostics_summary_changed: Event[dict[str, ModDiagnosticsView]]
     status_message_changed: Event[str]
+    background_task_changed: Event[str]
     sidebar_entries_changed: Event[list[SidebarEntry]]
 
     __slots__ = (
         "_checker",
         "_community_rules",
         "_ctx",
+        "_db_task",
         "_last_active_uuids",
         "_last_summary",
         "_last_summary_sources",
         "_no_version_warning_service",
         "_sidebar_base",
         "_use_this_instead_service",
+        "background_task_changed",
         "diagnostics_summary_changed",
         "sidebar_entries_changed",
         "status_message_changed",
@@ -70,6 +74,8 @@ class DiagnosticsService:
         """Initialise diagnostics with checkers, databases, and community rules."""
         self.diagnostics_summary_changed = Event()
         self.status_message_changed = Event()
+        self.background_task_changed = Event()
+        self._db_task: asyncio.Task[None] | None = None
         self.sidebar_entries_changed = Event()
         self._ctx = ctx
         cs = config_service or ctx.config_service
@@ -115,22 +121,29 @@ class DiagnosticsService:
                 self._checker.set_community_rules(self._community_rules)
 
     async def _ensure_databases(self) -> None:
-        """Fetch or load NoVersionWarning and UseThisInstead databases."""
-        nvw = await self._no_version_warning_service.ensure()
+        """Apply cached databases now; download missing ones in the background."""
+        nvw = await asyncio.to_thread(self._no_version_warning_service.load_if_exists)
         if nvw:
             self._checker.set_no_version_warning(nvw)
-        else:
-            nvw = self._no_version_warning_service.load_if_exists()
-            if nvw:
-                self._checker.set_no_version_warning(nvw)
-
-        uti = await self._use_this_instead_service.ensure()
+        uti = await asyncio.to_thread(self._use_this_instead_service.load_if_exists)
         if uti:
             self._checker.set_use_this_instead(uti)
-        else:
-            uti = self._use_this_instead_service.load_if_exists()
+        if (not nvw or not uti) and (self._db_task is None or self._db_task.done()):
+            self._db_task = asyncio.create_task(self._download_missing_databases())
+
+    async def _download_missing_databases(self) -> None:
+        self.background_task_changed.emit("Downloading rule databases\u2026")
+        try:
+            nvw = await self._no_version_warning_service.ensure()
+            if nvw:
+                self._checker.set_no_version_warning(nvw)
+            uti = await self._use_this_instead_service.ensure()
             if uti:
                 self._checker.set_use_this_instead(uti)
+            if nvw or uti:
+                self.rebuild()
+        finally:
+            self.background_task_changed.emit("")
 
     async def _load_community_rules(self) -> dict[PackageId, CommunityRule] | None:
         """Load community sorting rules from disk, if enabled."""

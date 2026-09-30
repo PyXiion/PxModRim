@@ -347,6 +347,9 @@ class MainWindow(QMainWindow):
         self._ctx.diagnostics_service.status_message_changed.connect(
             self._on_status_message
         )
+        self._ctx.diagnostics_service.background_task_changed.connect(
+            self._header_controller.set_task_text
+        )
         if self._downloads.available:
             self._downloads.busy_changed.connect(self._on_downloads_busy)
             self._downloads.download_progress.connect(self._on_downloads_progress)
