@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pxmodrim.core import mod_service as mod_service_module
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
@@ -285,3 +290,35 @@ def test_settings_panel_save_preserves_max_snapshots(qapp: QApplication) -> None
     panel = SettingsPanel(ctx, engine, host)
     panel._save(panel._backend._initial)
     assert panel.get_config().max_snapshots == 7
+
+
+@pytest.mark.asyncio
+async def test_concurrent_layout_saves_do_not_overlap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "px_config"
+    config_dir.mkdir()
+    game_config_dir = tmp_path / "game_config"
+    game_config_dir.mkdir()
+    app_cfg = AppConfig()
+    app_cfg.paths.config_folder = str(game_config_dir)
+    service = ModService(CoreContext(app_cfg, ConfigService(config_dir)), [])
+
+    running = 0
+    peak = 0
+    lock = threading.Lock()
+    real_write = mod_service_module.write_mods_config
+
+    def slow_write(*args: Any, **kwargs: Any) -> None:
+        nonlocal running, peak
+        with lock:
+            running += 1
+            peak = max(peak, running)
+        time.sleep(0.05)
+        real_write(*args, **kwargs)
+        with lock:
+            running -= 1
+
+    monkeypatch.setattr(mod_service_module, "write_mods_config", slow_write)
+    await asyncio.gather(*(service.save_active_layout([]) for _ in range(4)))
+    assert peak == 1

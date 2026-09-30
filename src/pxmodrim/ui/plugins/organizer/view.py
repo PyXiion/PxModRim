@@ -384,7 +384,7 @@ class OrganizerViewPanel(BaseViewPanel):
                     await self._new_folder_from(pids)
         elif action == "update":
             await update_mods(
-                self._ctx, [n.leaf.uuid for n in nodes if n.leaf is not None]
+                self._ctx, [n.leaf.uuid for n in nodes if n.leaf is not None], self
             )
         elif action in ("enable", "disable"):
             uuids = [node.leaf.uuid for node in nodes if node.leaf is not None]
@@ -835,7 +835,7 @@ class OrganizerViewPanel(BaseViewPanel):
 
     @asyncSlot()
     async def _update_selected(self, uuids: list[str]) -> None:
-        await update_mods(self._ctx, uuids)
+        await update_mods(self._ctx, uuids, self)
 
     @asyncSlot()
     async def _enable_many(self, uuids: list[str]) -> None:

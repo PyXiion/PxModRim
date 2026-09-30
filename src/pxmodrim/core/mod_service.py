@@ -40,6 +40,7 @@ class ModService:
         "_ctx",
         "_metadata_cache",
         "_providers",
+        "_save_lock",
         "_startup_impact_service",
         "mods_changed",
     )
@@ -51,6 +52,7 @@ class ModService:
         metadata_cache: MetadataCache | None = None,
     ) -> None:
         self._ctx = ctx
+        self._save_lock = asyncio.Lock()
         self._providers: dict[str, BaseModProvider] = {
             p.provider_id: p for p in providers
         }
@@ -250,7 +252,8 @@ class ModService:
                 config_path, data, snapshots_dir, max_snapshots=max_snapshots
             )
 
-        await asyncio.to_thread(_write)
+        async with self._save_lock:
+            await asyncio.to_thread(_write)
         return True
 
     async def close(self) -> None:

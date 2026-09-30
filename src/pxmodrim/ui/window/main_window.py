@@ -45,8 +45,7 @@ from pxmodrim.ui.components import (
 )
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.mod_updates import (
-    CONFIRM_THRESHOLD,
-    ConfirmUpdateDialog,
+    confirm_update,
 )
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
@@ -501,10 +500,8 @@ class MainWindow(QMainWindow):
         if not ids:
             self._toast_manager.info("No downloaded mods to update")
             return
-        if len(ids) >= CONFIRM_THRESHOLD:
-            confirmed, _ = await await_dialog(ConfirmUpdateDialog, len(ids), self)
-            if confirmed != QMessageBox.StandardButton.Yes:
-                return
+        if not await confirm_update(len(ids), self):
+            return
         logger.info("[downloads] update-all requested for {} mods", len(ids))
         self._toast_manager.info(f"Updating {len(ids)} mods\u2026")
         try:

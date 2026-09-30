@@ -290,7 +290,7 @@ class ModListPanel(QWidget):
 
     @asyncSlot()
     async def _update_selected(self, uuids: list[str]) -> None:
-        await update_mods(self._ctx, uuids)
+        await update_mods(self._ctx, uuids, self)
 
     @Slot(int, result=bool)
     def isChecked(self, row: int) -> bool:

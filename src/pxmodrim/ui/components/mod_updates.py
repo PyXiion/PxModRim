@@ -9,6 +9,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QDialog, QMenu, QMessageBox, QWidget
 
 from pxmodrim.core.downloads import download_manager
+from pxmodrim.ui.components.dialogs import await_dialog
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
@@ -85,12 +86,22 @@ class ConfirmUpdateDialog(QMessageBox):
             yes.setObjectName("primaryAction")
 
 
-async def update_mods(ctx: CoreContext, uuids: Iterable[str]) -> None:
+async def confirm_update(count: int, parent: QWidget) -> bool:
+    """Ask before a large update; small ones go through unasked."""
+    if count < CONFIRM_THRESHOLD:
+        return True
+    confirmed, _ = await await_dialog(ConfirmUpdateDialog, count, parent)
+    return confirmed == QMessageBox.StandardButton.Yes
+
+
+async def update_mods(ctx: CoreContext, uuids: Iterable[str], parent: QWidget) -> None:
     """Update the updatable mods among *uuids*; results are toasted by MainWindow."""
     downloads = download_manager(ctx)
     ids = updatable_ids(ctx, uuids)
     if not ids:
         logger.debug("[downloads] update requested but nothing is updatable")
+        return
+    if not await confirm_update(len(ids), parent):
         return
     logger.info("[downloads] update requested for {} mods", len(ids))
     try:
