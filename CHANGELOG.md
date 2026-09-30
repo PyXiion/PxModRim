@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
-- Settings > Steam Workshop: `Parallel mods` (1-8) and `Threads per mod` (1-16) control pxsteamdl download concurrency, with tooltips. Defaults stay 2 and 4.
+- Settings > Steam Workshop: `Parallel mods` (1-8) and `Threads per mod` (1-16) control pxsteamdl download concurrency, with tooltips. Defaults are 8 and 1.
 
 ### Changed
 - Organizer is the first view; its left navigation and right mod-info sidebar match Mods in width. Its search, folder actions, selection controls, and tree layout follow the #37 mockup while retaining the existing mod-info sidebar.

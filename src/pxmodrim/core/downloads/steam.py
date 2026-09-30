@@ -321,10 +321,10 @@ class SteamDownloader(Downloader):
 
         cfg = self._ctx.config if self._ctx is not None else None
         parallel_items = min(
-            MAX_PARALLEL_ITEMS, max(1, cfg.workshop_parallel_items if cfg else 2)
+            MAX_PARALLEL_ITEMS, max(1, cfg.workshop_parallel_items if cfg else 8)
         )
         threads_per_item = min(
-            MAX_THREADS_PER_ITEM, max(1, cfg.workshop_threads_per_item if cfg else 4)
+            MAX_THREADS_PER_ITEM, max(1, cfg.workshop_threads_per_item if cfg else 1)
         )
         logger.debug(
             "[workshop] client.download start: {} items, {} parallel x {} threads",
