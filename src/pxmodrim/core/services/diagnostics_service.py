@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from pxmodrim.core.models.metadata.structures import AboutXmlMod, ListedMod
 
 
-DATABASE_MAX_AGE_S = 7 * 24 * 3600
+DATABASE_MAX_AGE_S = 24 * 3600
 
 
 def _needs_refresh(loaded: object, service: _AgedCache) -> bool:
