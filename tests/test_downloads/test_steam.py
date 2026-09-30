@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import threading
 from collections.abc import Callable, Sequence
 from os import PathLike
@@ -60,12 +61,17 @@ class FakeClient:
         return results
 
 
-def _service(
-    tmp_path: Path, client: FakeClient | None = None, *, local: bool = True
-) -> tuple[SteamDownloader, list[int]]:
+def _cfg(tmp_path: Path, *, local: bool = True) -> AppConfig:
     cfg = AppConfig()
     if local:
         cfg.paths.local = str(tmp_path / "Mods")
+    return cfg
+
+
+def _service(
+    tmp_path: Path, client: FakeClient | None = None, *, local: bool = True
+) -> tuple[SteamDownloader, list[int]]:
+    cfg = _cfg(tmp_path, local=local)
     logins: list[int] = []
 
     async def factory() -> FakeClient:
@@ -149,6 +155,8 @@ async def test_login_failure_fails_every_item_and_retries_next_time(
     assert sorted(result.failed) == ["111", "222"]
     assert any("logon denied" in m for m in messages)
     assert len(logins) == 2
+    del svc
+    gc.collect()
 
 
 async def test_client_session_is_reused(tmp_path: Path) -> None:
@@ -339,3 +347,48 @@ async def test_titles_from_steam_are_emitted(tmp_path: Path) -> None:
 
     assert phases == ["login", "query", "run"]
     assert titles == {"111": "Title 111", "222": "Title 222"}
+
+
+async def test_client_is_relogged_after_download_raises(tmp_path: Path) -> None:
+    class Dying(FakeClient):
+        def download(self, ids, root, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("session lost")
+
+    clients: list[FakeClient] = [Dying(), FakeClient()]
+    logins: list[int] = []
+
+    async def factory() -> FakeClient:
+        logins.append(1)
+        return clients[len(logins) - 1]
+
+    svc = SteamDownloader(factory)
+    svc.setup(CoreContext(_cfg(tmp_path), ConfigService(tmp_path)))
+    await svc.download_mods(["1"])
+    await svc.download_mods(["2"])
+    assert len(logins) == 2
+    del svc
+    gc.collect()
+
+
+async def test_auto_update_loop_survives_unexpected_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pxmodrim.core.downloads.steam.AUTO_STARTUP_DELAY_S", 0)
+    monkeypatch.setattr("pxmodrim.core.downloads.steam.AUTO_CHECK_INTERVAL_S", 0)
+    svc, _ = _service(tmp_path, FakeClient())
+    calls = 0
+
+    async def flaky() -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise KeyError("boom")
+
+    monkeypatch.setattr(svc, "_auto_update_once", flaky)
+    task = asyncio.create_task(svc._auto_update_loop())
+    for _ in range(20):
+        await asyncio.sleep(0)
+    task.cancel()
+    assert calls >= 2
+    del svc
+    gc.collect()

@@ -354,7 +354,9 @@ class ModListModel(QAbstractListModel):
                 key=lambda kv: kv[1].name.lower(),
             )
             self._items = [
-                self._make_item(uuid, mods[uuid], True) for uuid in active_uuids
+                self._make_item(uuid, mods[uuid], True)
+                for uuid in active_uuids
+                if uuid in mods
             ] + [self._make_item(uuid, mod, False) for uuid, mod in inactive]
             self._update_load_indices()
         finally:

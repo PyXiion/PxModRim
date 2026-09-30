@@ -41,6 +41,13 @@ def model(qapp: QApplication) -> ModListModel:
     return m
 
 
+class TestLoadMods:
+    def test_active_uuid_missing_from_mods_is_skipped(self, qapp: QApplication) -> None:
+        m = ModListModel(_provider_colors())
+        m.load_mods({"a": _mod("A")}, ["ghost", "a"])
+        assert m.active_uuids() == ["a"]
+
+
 class TestSetData:
     def test_toggle_check_emits_dataChanged_not_reset(
         self, model: ModListModel

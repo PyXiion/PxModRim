@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import Any
 
@@ -13,14 +14,12 @@ from qasync import asyncSlot
 
 from pxmodrim.core.config import (
     AppConfig,
-    PathConfig,
     community_rules_file,
     detect_game_paths,
 )
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
-from pxmodrim.core.sort.config import SortSettings
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
 from pxmodrim.ui.theme.palette import PALETTE
@@ -209,13 +208,15 @@ class SettingsPanel(QDialog):
     def _save(self, values: dict[str, Any]) -> None:
         self._config = msgspec.structs.replace(
             self._config,
-            paths=PathConfig(
+            paths=msgspec.structs.replace(
+                self._config.paths,
                 game=values["game"].strip(),
                 local=values["local"].strip(),
                 workshop=values["workshop"].strip(),
                 config_folder=values["config"].strip(),
             ),
-            sort=SortSettings(
+            sort=dataclasses.replace(
+                self._config.sort,
                 use_alternative_package_ids=bool(values["useAltIds"]),
                 check_missing_dependencies=bool(values["checkMissing"]),
                 use_community_rules=bool(values["useCommunity"]),

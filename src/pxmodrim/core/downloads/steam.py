@@ -263,7 +263,10 @@ class SteamDownloader(Downloader):
     async def _auto_update_loop(self) -> None:
         await asyncio.sleep(AUTO_STARTUP_DELAY_S)
         while True:
-            await self._auto_update_once()
+            try:
+                await self._auto_update_once()
+            except Exception:  # noqa: BLE001
+                logger.exception("[workshop] auto-update iteration failed")
             await asyncio.sleep(AUTO_CHECK_INTERVAL_S)
 
     async def _auto_update_once(self) -> None:
@@ -359,6 +362,7 @@ class SteamDownloader(Downloader):
                     await asyncio.wait([running])
             raise
         except (RuntimeError, OSError) as exc:
+            self._client = None
             for pid in ids:
                 self._finish_item(batch, pid, error=str(exc) or type(exc).__name__)
             return
