@@ -72,6 +72,7 @@ class AppConfig(msgspec.Struct):
     workshop_proxy: str = ""
     workshop_connect_timeout: int = 10
     workshop_stall_timeout: int = 30
+    workshop_catalog_url: str = "https://api.modrim.pyxiion.dev"
     log_upload_endpoint: str = "https://paste.rs/"
     launch_args: str = ""
     launch_wrapper: str = ""

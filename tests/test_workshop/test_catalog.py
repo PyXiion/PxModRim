@@ -1,0 +1,244 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import httpx
+import msgspec
+import pytest
+
+from pxmodrim.core.config import AppConfig, ConfigService
+from pxmodrim.core.context import CoreContext
+from pxmodrim.core.downloads.manager import download_manager
+from pxmodrim.core.downloads.steam import SteamDownloader, WorkshopSyncState
+from pxmodrim.core.downloads.types import DownloadResult
+from pxmodrim.core.mod_service import ModService
+from pxmodrim.core.models.metadata.structures import ListedMod
+from pxmodrim.core.workshop import (
+    CatalogClient,
+    CatalogError,
+    CatalogMod,
+    DownloadPlan,
+    WorkshopCatalog,
+)
+
+
+def make_context(tmp_path: Path) -> tuple[CoreContext, SteamDownloader]:
+    config = AppConfig()
+    config.paths.local = str(tmp_path / "Mods")
+    config.paths.workshop = str(tmp_path / "Workshop")
+    ctx = CoreContext(config, ConfigService(tmp_path))
+    ctx._mod_service = ModService(ctx, [])
+    downloader = SteamDownloader()
+    downloader.setup(ctx)
+    downloader._sync = WorkshopSyncState(synced={"1": 200, "2": 50})
+    mods = [
+        ListedMod(_mod_path=tmp_path / "Mods" / "1"),
+        ListedMod(_mod_path=tmp_path / "Mods" / "2"),
+        ListedMod(_mod_path=tmp_path / "Workshop" / "3", provider_id="workshop"),
+        ListedMod(_mod_path=tmp_path / "Mods" / "4"),
+        ListedMod(_mod_path=tmp_path / "Mods" / "NotWorkshop"),
+    ]
+    ctx.load({mod.uuid: mod for mod in mods}, [mods[0].uuid])
+    return ctx, downloader
+
+
+def decode_mod(
+    payload: dict[str, Any], id: str, updated: int | None = 100
+) -> CatalogMod:
+    return msgspec.json.decode(
+        msgspec.json.encode({**payload, "id": id, "updated_at": updated}),
+        type=CatalogMod,
+    )
+
+
+async def test_install_state_uses_sync_not_directory_mtime(
+    tmp_path: Path, mod_payload: dict[str, Any]
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog.setup(ctx)
+    assert catalog.install_state(decode_mod(mod_payload, "1")) == "installed"
+    assert catalog.install_state(decode_mod(mod_payload, "2")) == "outdated"
+    assert catalog.install_state(decode_mod(mod_payload, "3")) == "installed"
+    assert catalog.install_state(decode_mod(mod_payload, "4")) == "installed"
+    assert catalog.install_state(decode_mod(mod_payload, "5")) == "missing"
+    assert catalog.install_state(decode_mod(mod_payload, "2", None)) == "installed"
+    assert catalog.install_state(decode_mod(mod_payload, "2", 50)) == "installed"
+    await catalog.shutdown()
+
+
+async def test_plan_keeps_dependency_order_and_incomplete_flags(
+    tmp_path: Path, mod_payload: dict[str, Any], collection_payload: dict[str, Any]
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    active_before = ctx.active_uuids
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "roots": ["5", "picked:starter"],
+                "items": {
+                    **{
+                        id: {
+                            **mod_payload,
+                            "id": id,
+                            "updated_at": 100,
+                            "title": f"Title {id}",
+                        }
+                        for id in ["1", "2", "3", "4", "5"]
+                    },
+                    "picked:starter": collection_payload,
+                },
+                "mod_ids": ["1", "2", "3", "4", "5"],
+                "unavailable_ids": ["99"],
+                "incomplete_collection_ids": ["picked:starter"],
+                "is_complete": False,
+            },
+        )
+
+    catalog = WorkshopCatalog(
+        lambda: ctx.config, lambda url: CatalogClient(url, httpx.MockTransport(handler))
+    )
+    catalog.setup(ctx)
+    try:
+        plan = await catalog.plan(["5"], ["picked:starter"])
+        assert plan.to_download == ["2", "5"]
+        assert plan.already_current == ["1", "3", "4"]
+        assert plan.unavailable_ids == ["99"]
+        assert plan.incomplete_collection_ids == ["picked:starter"]
+        assert not plan.is_complete
+        assert plan.titles["2"] == "Title 2"
+        assert ctx.active_uuids == active_before
+        assert msgspec.json.decode(requests[0].content) == {
+            "ids": ["5"],
+            "collection_ids": ["picked:starter"],
+        }
+    finally:
+        await catalog.shutdown()
+
+
+async def test_installed_metadata_uses_batch(
+    tmp_path: Path, mod_payload: dict[str, Any]
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.extend(
+            msgspec.json.decode(request.content, type=dict[str, list[str]])["ids"]
+        )
+        return httpx.Response(
+            200,
+            json={
+                "items": [{**mod_payload, "id": "2", "updated_at": 100}],
+                "unavailable_ids": ["1", "3", "4"],
+            },
+        )
+
+    catalog = WorkshopCatalog(
+        lambda: ctx.config, lambda url: CatalogClient(url, httpx.MockTransport(handler))
+    )
+    catalog.setup(ctx)
+    try:
+        installed = await catalog.installed_with_updates()
+        assert requested == ["1", "2", "3", "4"]
+        assert catalog.install_state(installed[0]) == "outdated"
+    finally:
+        await catalog.shutdown()
+
+
+async def test_download_delegates_without_activation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog.setup(ctx)
+    calls: list[list[str]] = []
+    result = DownloadResult(succeeded=["2"], failed=[])
+
+    async def download(ids: list[str]) -> DownloadResult:
+        calls.append(ids)
+        return result
+
+    monkeypatch.setattr(download_manager(ctx), "download_mods", download)
+    active_before = ctx.active_uuids
+    try:
+        plan = DownloadPlan(["2"], ["1"], [], [], {"2": "Mod"}, True)
+        assert await catalog.download(plan) is result
+        assert calls == [["2"]]
+        assert ctx.active_uuids == active_before
+    finally:
+        await catalog.shutdown()
+
+
+async def test_empty_url_disabled_without_constructing_client(tmp_path: Path) -> None:
+    ctx, _ = make_context(tmp_path)
+    ctx.config.workshop_catalog_url = ""
+    clients: list[str] = []
+
+    def factory(url: str) -> CatalogClient:
+        clients.append(url)
+        raise AssertionError("Disabled catalog must not create a client")
+
+    catalog = WorkshopCatalog(lambda: ctx.config, factory)
+    catalog.setup(ctx)
+    try:
+        assert not catalog.configured
+        for operation in [
+            catalog.discover(),
+            catalog.installed_with_updates(),
+            catalog.plan(["1"], []),
+        ]:
+            with pytest.raises(CatalogError, match="disabled"):
+                await operation
+        assert clients == []
+    finally:
+        await catalog.shutdown()
+
+
+async def test_configuration_and_installed_events(
+    tmp_path: Path, mod_payload: dict[str, Any]
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    transports: list[httpx.AsyncClient] = []
+    urls: list[str] = []
+
+    def factory(url: str) -> CatalogClient:
+        urls.append(url)
+        client = CatalogClient(
+            url, httpx.MockTransport(lambda _: httpx.Response(200, json=mod_payload))
+        )
+        transports.append(client._http)
+        return client
+
+    catalog = WorkshopCatalog(lambda: ctx.config, factory)
+    catalog.setup(ctx)
+    changed: list[str] = []
+    installed: list[None] = []
+    catalog.catalog_url_changed.connect(changed.append)
+    catalog.installed_changed.connect(installed.append)
+    await catalog.mod("2009463077")
+    catalog.set_base_url(" https://other.example/ ")
+    assert ctx.config.workshop_catalog_url == "https://other.example"
+    assert (
+        ConfigService(tmp_path).load("config.json", AppConfig).workshop_catalog_url
+        == "https://other.example"
+    )
+    await catalog.mod("2009463077")
+    catalog.set_base_url("")
+    assert not catalog.configured
+    with pytest.raises(CatalogError, match="disabled"):
+        await catalog.discover()
+    ctx.mod_service.mods_changed.emit(None)
+    download_manager(ctx).download_finished.emit(DownloadResult([], []))
+    assert installed == [None, None]
+    assert changed == ["https://other.example", ""]
+    assert urls == ["https://api.modrim.pyxiion.dev", "https://other.example"]
+    await catalog.shutdown()
+    assert all(transport.is_closed for transport in transports)
+    ctx.mod_service.mods_changed.emit(None)
+    assert installed == [None, None]
