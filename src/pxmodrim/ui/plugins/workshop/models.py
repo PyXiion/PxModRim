@@ -138,6 +138,7 @@ def item_row(
         "versions": ", ".join(item.supported_versions) or "Not specified",
         "tags": " · ".join(item.tags),
         "state": state,
+        "queued": False,
         "stateLabel": {
             "missing": "Not installed",
             "installed": "Installed",
@@ -174,6 +175,7 @@ class CatalogListModel(QAbstractListModel):
         "workshopUrl",
         "fileSize",
         "votes",
+        "queued",
     )
 
     def __init__(self, parent: QObject) -> None:

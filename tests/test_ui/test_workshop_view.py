@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QWidget
 
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
-from pxmodrim.core.downloads import DownloadManager, DownloadResult
+from pxmodrim.core.downloads import DownloadManager
 from pxmodrim.core.workshop import (
     Author,
     CatalogCollection,
@@ -124,9 +124,8 @@ class FakeCatalog(WorkshopCatalog):
             not collection_ids,
         )
 
-    async def download(self, plan: DownloadPlan) -> DownloadResult:
+    def enqueue(self, plan: DownloadPlan) -> None:
         self.downloaded.extend(plan.to_download)
-        return DownloadResult(plan.to_download, [])
 
 
 @pytest.fixture
@@ -175,6 +174,7 @@ async def test_view_paging_filters_and_catalog_errors(
         catalog.queries[-1].cursor == "second" and catalog.queries[-1].version == "1.6"
     )
     catalog.failure = True
+    view._query = "uncached"
     await view.load()
     assert view.error == "Catalog unavailable"
     catalog.failure = False

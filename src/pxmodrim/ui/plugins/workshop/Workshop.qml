@@ -59,16 +59,16 @@ Rectangle {
                 placeholderText: "Search mods or collections…"
                 Accessible.name: "Search Workshop"
                 maximumLength: 200
-                enabled: workshopPanel.configured && !workshopPanel.busy
+                enabled: workshopPanel.configured
                 onAccepted: root.applyFilters()
             }
-            PxButton { text: "Search"; enabled: workshopPanel.configured && !workshopPanel.busy; onClicked: root.applyFilters() }
+            PxButton { text: "Search"; enabled: workshopPanel.configured; onClicked: root.applyFilters() }
             PxProgressBar {
                 Layout.preferredWidth: 48
                 Layout.alignment: Qt.AlignVCenter
                 thickness: 3
                 indeterminate: true
-                opacity: workshopPanel.busy ? 1 : 0
+                opacity: workshopPanel.busy || workshopPanel.planning ? 1 : 0
                 Accessible.name: "Loading"
             }
         }
@@ -86,7 +86,6 @@ Rectangle {
                         readonly property bool current: workshopPanel.tab === modelData
                         implicitWidth: tabLabel.implicitWidth + 32
                         implicitHeight: 36
-                        opacity: workshopPanel.busy && !current ? Theme.disabledOpacity : 1
                         Text {
                             id: tabLabel
                             anchors.centerIn: parent
@@ -104,7 +103,7 @@ Rectangle {
                             color: tabItem.current ? Theme.primary : "transparent"
                         }
                         HoverHandler { id: tabHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { enabled: !workshopPanel.busy; onTapped: workshopPanel.selectTab(tabItem.modelData) }
+                        TapHandler { onTapped: workshopPanel.selectTab(tabItem.modelData) }
                         Accessible.role: Accessible.PageTab
                         Accessible.name: modelData
                     }
@@ -114,7 +113,7 @@ Rectangle {
                     visible: workshopPanel.tab === "Installed"
                     text: "Update all (" + workshopPanel.updateCount + ")"
                     variant: "primary"
-                    enabled: !workshopPanel.busy && !workshopPanel.downloading && workshopPanel.updateCount > 0
+                    enabled: workshopPanel.updateCount > 0 && !workshopPanel.planning
                     onClicked: workshopPanel.updateAll()
                 }
             }
@@ -129,7 +128,6 @@ Rectangle {
                 model: workshopPanel.versionOptions
                 Accessible.name: "Game version filter"
                 Component.onCompleted: currentIndex = Math.max(0, model.indexOf(workshopPanel.gameVersion))
-                enabled: !workshopPanel.busy
                 onActivated: root.applyFilters()
             }
             PxComboBox {
@@ -139,7 +137,6 @@ Rectangle {
                 valueRole: "value"
                 model: [ {text: "All sources", value: "all"}, {text: "Steam collections", value: "steam"}, {text: "PxModRim picks", value: "picked"} ]
                 Accessible.name: "Collection source"
-                enabled: !workshopPanel.busy
                 onActivated: root.applyFilters()
             }
             PxTextField {
@@ -149,7 +146,6 @@ Rectangle {
                 placeholderText: "Tag (exact match)"
                 maximumLength: 100
                 Accessible.name: "Tag filter"
-                enabled: !workshopPanel.busy
                 onAccepted: root.applyFilters()
             }
             Item { Layout.fillWidth: true }
@@ -159,7 +155,6 @@ Rectangle {
                 valueRole: "value"
                 model: [ {text: "Popular", value: "popular"}, {text: "Recently updated", value: "updated"}, {text: "Newest", value: "newest"}, {text: "Trending", value: "trending"}, {text: "Relevance", value: "relevance"} ]
                 Accessible.name: "Catalog sort order"
-                enabled: !workshopPanel.busy
                 onActivated: root.applyFilters()
             }
         }
@@ -190,7 +185,7 @@ Rectangle {
                 Copy { text: workshopPanel.notice; color: workshopPanel.pendingPlan ? Theme.warning : Theme.textMuted }
                 RowLayout {
                     visible: workshopPanel.pendingPlan
-                    PxButton { text: "Download available mods"; enabled: workshopPanel.canDownloadAvailable && !workshopPanel.busy && !workshopPanel.downloading; onClicked: workshopPanel.downloadAvailable() }
+                    PxButton { text: "Download available mods"; enabled: workshopPanel.canDownloadAvailable; onClicked: workshopPanel.downloadAvailable() }
                     PxButton { text: "Cancel"; variant: "ghost"; onClicked: workshopPanel.dismissPlan() }
                 }
             }
@@ -237,7 +232,7 @@ Rectangle {
                     }
                     PxButton {
                         text: "Load more"
-                        visible: workshopPanel.tab === "Collections" ? catalogCollections.hasMore : workshopPanel.tab === "Mods" && catalogMods.hasMore
+                        visible: workshopPanel.tab === "Collections" ? catalogCollections.hasMore : (workshopPanel.tab === "Mods" || workshopPanel.tab === "Installed") && catalogMods.hasMore
                         enabled: !workshopPanel.busy
                         onClicked: workshopPanel.loadMore()
                     }
@@ -322,7 +317,7 @@ Rectangle {
                                 PxButton {
                                     text: root.detail.actionLabel || "Download"
                                     variant: root.detail.state === "outdated" ? "primary" : "secondary"
-                                    enabled: !workshopPanel.busy && !workshopPanel.downloading && root.detail.state !== "installed"
+                                    enabled: root.detail.state !== "installed" && !root.detail.queued
                                     onClicked: workshopPanel.downloadItem(root.detail.itemId, root.detail.kind)
                                 }
                                 PxButton { visible: !!root.detail.workshopUrl; text: "View on Steam"; variant: "ghost"; onClicked: workshopPanel.openLink(root.detail.workshopUrl) }
@@ -388,6 +383,7 @@ Rectangle {
                                         required property string state
                                         required property string actionLabel
                                         required property bool incompatible
+                                        required property bool queued
                                         Layout.fillWidth: true
                                         implicitHeight: memberRow.implicitHeight + 20
                                         radius: Theme.radiusSm
@@ -404,7 +400,7 @@ Rectangle {
                                                 Copy { text: member.stateLabel + (member.incompatible ? " · incompatible" : ""); font.pixelSize: Theme.fontSizeSm; color: member.incompatible ? Theme.warning : Theme.textMuted }
                                             }
                                             PxButton { text: "Details"; variant: "ghost"; onClicked: workshopPanel.openItem(member.itemId, member.kind) }
-                                            PxButton { visible: member.state !== "installed"; text: member.actionLabel; variant: member.state === "outdated" ? "primary" : "secondary"; enabled: !workshopPanel.busy && !workshopPanel.downloading; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
+                                            PxButton { visible: member.state !== "installed"; text: member.actionLabel; variant: member.state === "outdated" ? "primary" : "secondary"; enabled: !member.queued; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
                                         }
                                     }
                                 }
@@ -412,25 +408,6 @@ Rectangle {
                         }
                     }
                 }
-            }
-        }
-        Rectangle {
-            Layout.fillWidth: true
-            visible: workshopPanel.downloading
-            implicitHeight: downloadRow.implicitHeight + 24
-            color: Theme.elevate2
-            radius: Theme.radiusMd
-            ColumnLayout {
-                id: downloadRow
-                anchors.fill: parent
-                anchors.margins: 12
-                RowLayout {
-                    Layout.fillWidth: true
-                    Copy { Layout.fillWidth: true; text: "Downloading · " + workshopPanel.queueSummary; font.pixelSize: Theme.fontSizeSm }
-                    PxButton { text: "Stop"; variant: "danger"; onClicked: workshopPanel.stop() }
-                    PxButton { text: "Open Downloads"; variant: "ghost"; onClicked: workshopPanel.openDownloads() }
-                }
-                PxProgressBar { Layout.fillWidth: true; value: workshopPanel.queueProgress }
             }
         }
     }

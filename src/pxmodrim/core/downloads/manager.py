@@ -131,6 +131,10 @@ class DownloadManager(Plugin):
             total.changed += result.changed
         return total
 
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
+
     def cancel(self) -> None:
         self._cancelled = True
         for downloader in self._downloaders:

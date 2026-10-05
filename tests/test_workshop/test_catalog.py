@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -242,3 +243,60 @@ async def test_configuration_and_installed_events(
     assert all(transport.is_closed for transport in transports)
     ctx.mod_service.mods_changed.emit(None)
     assert installed == [None, None]
+
+
+async def test_cached_serves_remembered_value_before_refreshing(
+    tmp_path: Path,
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog.setup(ctx)
+    values = iter(["first", "second", "second"])
+    calls = 0
+
+    async def produce() -> str:
+        nonlocal calls
+        calls += 1
+        return next(values)
+
+    async def seen(fresh_for: float) -> list[str]:
+        return [value async for value in catalog.cached("k", produce, fresh_for)]
+
+    try:
+        assert await seen(300) == ["first"]
+        assert await seen(300) == ["first"] and calls == 1
+        assert await seen(0) == ["first", "second"] and calls == 2
+        assert await seen(0) == ["second"] and calls == 3
+    finally:
+        await catalog.shutdown()
+
+
+async def test_enqueue_runs_batches_in_order_after_the_running_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx, downloader = make_context(tmp_path)
+    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog.setup(ctx)
+    manager = download_manager(ctx)
+    manager.register(downloader)
+    calls: list[list[str]] = []
+    busy = True
+
+    async def download(ids: list[str]) -> DownloadResult:
+        calls.append(ids)
+        return DownloadResult(succeeded=ids, failed=[])
+
+    monkeypatch.setattr(manager, "download_mods", download)
+    monkeypatch.setattr(type(manager), "is_downloading", property(lambda _self: busy))
+    try:
+        catalog.enqueue(DownloadPlan(["5", "6"], [], [], [], {}, True))
+        catalog.enqueue(DownloadPlan(["6", "7"], [], [], [], {}, True))
+        assert catalog.queued_ids == {"5", "6", "7"}
+        await asyncio.sleep(0.05)
+        assert calls == []
+        busy = False
+        manager.busy_changed.emit(False)
+        await asyncio.wait_for(catalog._runner, 2)  # type: ignore[arg-type]
+        assert calls == [["5", "6"], ["7"]] and not catalog.queued_ids
+    finally:
+        await catalog.shutdown()

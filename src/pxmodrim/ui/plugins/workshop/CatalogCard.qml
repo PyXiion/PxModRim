@@ -17,6 +17,7 @@ Rectangle {
     required property string state
     required property string actionLabel
     required property bool incompatible
+    required property bool queued
     required property int memberCount
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
@@ -150,7 +151,7 @@ Rectangle {
             PxButton {
                 text: card.actionLabel
                 variant: card.state === "outdated" ? "primary" : "secondary"
-                enabled: !workshopPanel.busy && !workshopPanel.downloading && card.state !== "installed"
+                enabled: card.state !== "installed" && !card.queued
                 onClicked: workshopPanel.downloadItem(card.itemId, card.kind)
             }
         }

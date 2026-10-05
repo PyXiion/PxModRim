@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, ClassVar
+import asyncio
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, ClassVar
+
+from loguru import logger
 
 from pxmodrim.core.downloads.manager import DownloadManager, download_manager
 from pxmodrim.core.events import Event
@@ -24,6 +28,9 @@ if TYPE_CHECKING:
     from pxmodrim.core.downloads.types import DownloadResult
     from pxmodrim.core.models.metadata.structures import ListedMod
 
+_FRESH_SECONDS = 300.0
+_CACHE_LIMIT = 200
+
 
 class WorkshopCatalog(Plugin):
     name = "workshop_catalog"
@@ -35,6 +42,11 @@ class WorkshopCatalog(Plugin):
         client_factory: Callable[[str], CatalogClient] = CatalogClient,
     ) -> None:
         self.installed_changed: Event[None] = Event()
+        self.queue_changed: Event[None] = Event()
+        self._queue: list[list[str]] = []
+        self._queued: set[str] = set()
+        self._runner: asyncio.Future[None] | None = None
+        self._idle = asyncio.Event()
         self.catalog_url_changed: Event[str] = Event()
         self._config = config_accessor
         self._client_factory = client_factory
@@ -43,21 +55,27 @@ class WorkshopCatalog(Plugin):
         self._clients: list[CatalogClient] = []
         self._ctx: CoreContext | None = None
         self._manager: DownloadManager | None = None
+        self._installed_index: dict[str, list[ListedMod]] | None = None
+        self._responses: dict[str, tuple[float, Any]] = {}
 
     def setup(self, ctx: CoreContext) -> None:
         self._ctx = ctx
         self._manager = download_manager(ctx)
         ctx.mod_service.mods_changed.connect(self._on_installed_changed)
         self._manager.download_finished.connect(self._on_download_finished)
+        self._manager.busy_changed.connect(self._on_busy_changed)
         ctx.config_changed.connect(self._on_config_changed)
 
     def _on_installed_changed(self, _: None) -> None:
+        self._installed_index = None
         self.installed_changed.emit(None)
 
     def _on_download_finished(self, _: DownloadResult) -> None:
+        self._installed_index = None
         self.installed_changed.emit(None)
 
     def _on_config_changed(self, config: AppConfig) -> None:
+        self._installed_index = None
         self._change_url(config.workshop_catalog_url)
         self.installed_changed.emit(None)
 
@@ -90,11 +108,16 @@ class WorkshopCatalog(Plugin):
         return self._client
 
     async def shutdown(self) -> None:
+        self.cancel_queue()
+        if self._runner is not None:
+            self._runner.cancel()
+            self._runner = None
         if self._ctx is not None:
             self._ctx.mod_service.mods_changed.disconnect(self._on_installed_changed)
             self._ctx.config_changed.disconnect(self._on_config_changed)
         if self._manager is not None:
             self._manager.download_finished.disconnect(self._on_download_finished)
+            self._manager.busy_changed.disconnect(self._on_busy_changed)
         for client in self._clients:
             await client.shutdown()
         self._clients.clear()
@@ -118,12 +141,38 @@ class WorkshopCatalog(Plugin):
     def _installed(self) -> dict[str, list[ListedMod]]:
         if self._ctx is None:
             raise RuntimeError("Workshop catalog accessed before setup")
-        installed: dict[str, list[ListedMod]] = {}
-        for mod in self._ctx.all_mods.values():
-            id = mod.published_file_id
-            if id is not None:
-                installed.setdefault(id, []).append(mod)
-        return installed
+        if self._installed_index is None:
+            installed: dict[str, list[ListedMod]] = {}
+            for mod in self._ctx.all_mods.values():
+                id = mod.published_file_id
+                if id is not None:
+                    installed.setdefault(id, []).append(mod)
+            self._installed_index = installed
+        return self._installed_index
+
+    async def cached[T](
+        self,
+        key: str,
+        produce: Callable[[], Awaitable[T]],
+        fresh_for: float = _FRESH_SECONDS,
+    ) -> AsyncIterator[T]:
+        """Yield the remembered value at once, then the refreshed one if it differs.
+
+        A value younger than *fresh_for* is served without contacting the catalog.
+        """
+        key = f"{self._base_url}|{key}"
+        entry = self._responses.get(key)
+        if entry is not None:
+            yield entry[1]
+            if time.monotonic() - entry[0] < fresh_for:
+                return
+        value = await produce()
+        self._responses.pop(key, None)
+        self._responses[key] = (time.monotonic(), value)
+        while len(self._responses) > _CACHE_LIMIT:
+            del self._responses[next(iter(self._responses))]
+        if entry is None or value != entry[1]:
+            yield value
 
     def _install_state(
         self, mod: CatalogMod, installed: dict[str, list[ListedMod]]
@@ -178,3 +227,55 @@ class WorkshopCatalog(Plugin):
         if self._manager is None:
             raise RuntimeError("Workshop catalog accessed before setup")
         return await self._manager.download_mods(plan.to_download)
+
+    @property
+    def queued_ids(self) -> frozenset[str]:
+        return frozenset(self._queued)
+
+    def enqueue(self, plan: DownloadPlan) -> None:
+        """Queue *plan* behind any running download without waiting for it."""
+        if self._manager is None:
+            raise RuntimeError("Workshop catalog accessed before setup")
+        active = self._manager.active_ids
+        ids = [
+            id for id in plan.to_download if id not in self._queued and id not in active
+        ]
+        if not ids:
+            return
+        self._queue.append(ids)
+        self._queued.update(ids)
+        self.queue_changed.emit(None)
+        if self._runner is None or self._runner.done():
+            self._runner = asyncio.ensure_future(self._drain())
+
+    def cancel_queue(self) -> None:
+        self._queue.clear()
+        self._queued.clear()
+        self.queue_changed.emit(None)
+
+    async def _drain(self) -> None:
+        manager = self._manager
+        if manager is None:
+            return
+        while self._queue:
+            ids = self._queue.pop(0)
+            waited = manager.is_downloading
+            while manager.is_downloading:
+                self._idle.clear()
+                await self._idle.wait()
+            if waited and manager.cancelled:
+                self.cancel_queue()
+                return
+            try:
+                await manager.download_mods(ids)
+            except (RuntimeError, ValueError) as exc:
+                logger.warning("[workshop] queued download failed: {}", exc)
+            self._queued.difference_update(ids)
+            self.queue_changed.emit(None)
+            if manager.cancelled:
+                self.cancel_queue()
+                return
+
+    def _on_busy_changed(self, busy: bool) -> None:
+        if not busy:
+            self._idle.set()

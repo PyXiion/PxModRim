@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from loguru import logger
 from PySide6.QtCore import Property, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -31,8 +33,18 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from pxmodrim.core.context import CoreContext
-    from pxmodrim.core.downloads import DownloadProgress
     from pxmodrim.ui.context import AppContext
+
+
+_PAGE = 48
+
+
+@dataclass(frozen=True)
+class _Detail:
+    item: CatalogMod | CatalogCollection
+    members: tuple[CatalogMod | CatalogCollection, ...]
+    warning: str
+    complete: bool
 
 
 class WorkshopViewPanel(BaseViewPanel):
@@ -40,7 +52,6 @@ class WorkshopViewPanel(BaseViewPanel):
     icon_name = "steam"
     label = "Workshop"
     changed = Signal()
-    queueChanged = Signal()
 
     def __init__(
         self,
@@ -75,9 +86,10 @@ class WorkshopViewPanel(BaseViewPanel):
         self._pending: DownloadPlan | None = None
         self._titles: dict[str, str] = {}
         self._items: dict[str, CatalogMod | CatalogCollection] = {}
-        self._downloading = self._downloads.is_downloading
-        self._queue_progress = 0.0
-        self._queue_summary = ""
+        self._planning = 0
+        self._update_count = 0
+        self._installed_view: list[CatalogMod] = []
+        self._installed_shown = _PAGE
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
         self._qml.setObjectName("workshopView")
         self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
@@ -94,8 +106,8 @@ class WorkshopViewPanel(BaseViewPanel):
             QUrl.fromLocalFile(str(Path(__file__).with_name("Workshop.qml")))
         )
         self._root.addWidget(self._qml, 1)
-        self._downloads.busy_changed.connect(self._on_busy)
-        self._downloads.download_progress.connect(self._on_progress)
+        self._downloads.busy_changed.connect(self._on_queue_changed)
+        self._catalog.queue_changed.connect(self._on_queue_changed)
         self._catalog.catalog_url_changed.connect(self._on_url_changed)
         self._catalog.installed_changed.connect(self._on_installed_changed)
 
@@ -104,7 +116,13 @@ class WorkshopViewPanel(BaseViewPanel):
         version = (
             "" if self._ctx.target_version == "Unknown" else self._ctx.target_version
         )
-        return item_row(item, self._catalog.install_state, version)
+        row = item_row(item, self._catalog.install_state, version)
+        if isinstance(item, CatalogMod) and row["state"] != "installed":
+            running = item.id in self._downloads.active_ids
+            if running or item.id in self._catalog.queued_ids:
+                row["queued"] = True
+                row["actionLabel"] = "Downloading" if running else "Queued"
+        return row
 
     async def _run(
         self, fetch: Callable[[], Awaitable[Any]], apply: Callable[[Any], None]
@@ -133,11 +151,49 @@ class WorkshopViewPanel(BaseViewPanel):
                 self._busy = False
                 self.changed.emit()
 
+    async def _run_stream(
+        self,
+        stream: Callable[[], AsyncIterator[Any]],
+        apply: Callable[[Any], None],
+    ) -> None:
+        self._generation += 1
+        generation = self._generation
+        self._busy, self._error = True, ""
+        self.changed.emit()
+
+        async def retry() -> None:
+            await self._run_stream(stream, apply)
+
+        self._retry = retry
+        shown = False
+        try:
+            async for result in stream():
+                if generation != self._generation:
+                    return
+                apply(result)
+                shown = True
+                self._busy = False
+                self.changed.emit()
+        except (CatalogError, RuntimeError, ValueError) as exc:
+            message = exc.message if isinstance(exc, CatalogError) else str(exc)
+            if generation == self._generation:
+                if shown:
+                    logger.warning("[workshop] background refresh failed: {}", message)
+                else:
+                    self._error = message
+        finally:
+            if generation == self._generation:
+                self._busy = False
+                self.changed.emit()
+
     async def load(self, *, append: bool = False) -> None:
         if not self._catalog.configured:
             self._generation += 1
             self._busy = False
             self.changed.emit()
+            return
+        if append and self._tab == "Installed":
+            self._show_more_installed()
             return
         self._detail = {}
         model = (
@@ -165,20 +221,34 @@ class WorkshopViewPanel(BaseViewPanel):
                     None,
                 )
 
-            await self._run(self._catalog.discover, apply_discover)
+            await self._run_stream(
+                lambda: self._catalog.cached("discover", self._catalog.discover),
+                apply_discover,
+            )
         elif self._tab == "Installed":
 
             def apply_installed(items: list[CatalogMod]) -> None:
                 self._installed = items
-                rows = [
-                    self._row(item)
+                self._recount()
+                needle = self._query.casefold()
+                self._installed_view = [
+                    item
                     for item in items
-                    if not self._query
-                    or self._query.casefold() in item.title.casefold()
+                    if not needle or needle in item.title.casefold()
                 ]
-                self.mods_model.set_page(rows, len(rows), None)
+                shown = self._installed_view[: self._installed_shown]
+                self.mods_model.set_page(
+                    [self._row(item) for item in shown],
+                    len(self._installed_view),
+                    "more" if len(shown) < len(self._installed_view) else None,
+                )
 
-            await self._run(self._catalog.installed_with_updates, apply_installed)
+            await self._run_stream(
+                lambda: self._catalog.cached(
+                    "installed", self._catalog.installed_with_updates, fresh_for=0
+                ),
+                apply_installed,
+            )
         else:
             fetch = (
                 self._catalog.collections
@@ -194,7 +264,26 @@ class WorkshopViewPanel(BaseViewPanel):
                     append=append,
                 )
 
-            await self._run(lambda: fetch(query), apply_page)
+            if append:
+                await self._run(lambda: fetch(query), apply_page)
+            else:
+                await self._run_stream(
+                    lambda: self._catalog.cached(
+                        f"{self._tab}|{query!r}", lambda: fetch(query)
+                    ),
+                    apply_page,
+                )
+
+    def _show_more_installed(self) -> None:
+        start = self.mods_model.rowCount()
+        chunk = self._installed_view[start : start + _PAGE]
+        self._installed_shown = start + len(chunk)
+        self.mods_model.set_page(
+            [self._row(item) for item in chunk],
+            len(self._installed_view),
+            "more" if self._installed_shown < len(self._installed_view) else None,
+            append=True,
+        )
 
     @asyncSlot()
     async def refresh(self) -> None:
@@ -203,12 +292,14 @@ class WorkshopViewPanel(BaseViewPanel):
     @asyncSlot(str)
     async def selectTab(self, tab: str) -> None:
         self._tab, self._notice, self._pending = tab, "", None
+        self._installed_shown = _PAGE
         await self.load()
 
     @asyncSlot(str, str, str, str, str)
     async def filter(
         self, query: str, version: str, source: str, sort: str, tag: str
     ) -> None:
+        self._installed_shown = _PAGE
         self._query, self._version, self._source, self._sort, self._tag = (
             query,
             version,
@@ -234,53 +325,59 @@ class WorkshopViewPanel(BaseViewPanel):
         await self.open_item(item_id, kind)
 
     async def open_item(self, item_id: str, kind: str) -> None:
-        async def fetch() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        async def fetch() -> _Detail:
             if kind == "collection":
                 detail = await self._catalog.collection(item_id)
                 if detail is None:
                     raise CatalogError("This collection is no longer available.", 404)
-                row = self._row(detail.collection)
-                row["complete"] = detail.is_complete
-                row["warning"] = (
+                warning = (
                     ""
                     if detail.is_complete
                     else "This collection is incomplete. "
                     "Some members are unavailable or not listed."
                 )
                 if detail.unavailable_ids:
-                    row["warning"] += " Unavailable: " + ", ".join(
-                        detail.unavailable_ids
-                    )
-                members = [self._row(item) for item in detail.members]
-                row["actionLabel"] = (
-                    "Complete download"
-                    if any(member["state"] != "missing" for member in members)
-                    else "Download all"
+                    warning += " Unavailable: " + ", ".join(detail.unavailable_ids)
+                return _Detail(
+                    detail.collection,
+                    tuple(detail.members),
+                    warning,
+                    detail.is_complete,
                 )
-                return row, members
             mod = await self._catalog.mod(item_id)
             if mod is None:
                 raise CatalogError("This mod is no longer available.", 404)
             dependencies = await asyncio.gather(
                 *(self._catalog.mod(pid) for pid in mod.dependencies)
             )
-            row = self._row(mod)
             missing = [
                 pid
                 for pid, item in zip(mod.dependencies, dependencies, strict=True)
                 if item is None
             ]
-            row["warning"] = (
-                "Unavailable dependencies: " + ", ".join(missing) if missing else ""
+            return _Detail(
+                mod,
+                tuple(item for item in dependencies if item is not None),
+                "Unavailable dependencies: " + ", ".join(missing) if missing else "",
+                not missing,
             )
-            row["complete"] = not missing
-            return row, [self._row(item) for item in dependencies if item is not None]
 
-        def apply(result: tuple[dict[str, Any], list[dict[str, Any]]]) -> None:
-            self._detail, members = result
+        def apply(detail: _Detail) -> None:
+            row = self._row(detail.item)
+            members = [self._row(item) for item in detail.members]
+            row["complete"], row["warning"] = detail.complete, detail.warning
+            if isinstance(detail.item, CatalogCollection):
+                row["actionLabel"] = (
+                    "Complete download"
+                    if any(member["state"] != "missing" for member in members)
+                    else "Download all"
+                )
+            self._detail = row
             self.members_model.set_page(members, len(members), None)
 
-        await self._run(fetch, apply)
+        await self._run_stream(
+            lambda: self._catalog.cached(f"detail|{kind}|{item_id}", fetch), apply
+        )
 
     @Slot()
     def back(self) -> None:
@@ -288,39 +385,44 @@ class WorkshopViewPanel(BaseViewPanel):
         self._detail, self._error, self._busy = {}, "", False
         self.changed.emit()
 
+    def _queue_plan(self, plan: DownloadPlan) -> None:
+        self._catalog.enqueue(plan)
+        count = len(plan.to_download)
+        self._notice = (
+            f"Queued {count} mod{'s' if count != 1 else ''}. Progress is shown "
+            "in the header and results in Downloads. Mods are not activated."
+        )
+
     async def _download(self, ids: list[str], collections: list[str]) -> None:
-        self._notice, self._pending = "", None
-
-        async def fetch() -> DownloadPlan:
+        self._notice, self._pending = "Preparing download…", None
+        self._planning += 1
+        self.changed.emit()
+        try:
             plan = await self._catalog.plan(ids, collections)
-            self._titles.update(plan.titles)
-            if plan.is_complete and plan.to_download:
-                await self._catalog.download(plan)
-            return plan
-
-        def apply(plan: DownloadPlan) -> None:
-            if not plan.is_complete:
-                self._pending = plan
-                parts = ["The download plan is incomplete."]
-                if plan.unavailable_ids:
-                    parts.append("Unavailable: " + ", ".join(plan.unavailable_ids))
-                if plan.incomplete_collection_ids:
-                    parts.append(
-                        "Incomplete collections: "
-                        + ", ".join(plan.incomplete_collection_ids)
-                    )
-                self._notice = " ".join(parts)
-            elif not plan.to_download:
-                self._notice = (
-                    "All available mods are already installed and up to date."
+        except (CatalogError, RuntimeError, ValueError) as exc:
+            message = exc.message if isinstance(exc, CatalogError) else str(exc)
+            self._notice = f"Could not prepare the download: {message}"
+            return
+        finally:
+            self._planning -= 1
+            self.changed.emit()
+        self._titles.update(plan.titles)
+        if not plan.is_complete:
+            self._pending = plan
+            parts = ["The download plan is incomplete."]
+            if plan.unavailable_ids:
+                parts.append("Unavailable: " + ", ".join(plan.unavailable_ids))
+            if plan.incomplete_collection_ids:
+                parts.append(
+                    "Incomplete collections: "
+                    + ", ".join(plan.incomplete_collection_ids)
                 )
-            else:
-                self._notice = (
-                    "Download finished. See Downloads for item results. "
-                    "Mods were not activated."
-                )
-
-        await self._run(fetch, apply)
+            self._notice = " ".join(parts)
+        elif not plan.to_download:
+            self._notice = "All available mods are already installed and up to date."
+        else:
+            self._queue_plan(plan)
+        self.changed.emit()
 
     @asyncSlot(str, str)
     async def downloadItem(self, item_id: str, kind: str) -> None:
@@ -343,14 +445,8 @@ class WorkshopViewPanel(BaseViewPanel):
     async def downloadAvailable(self) -> None:
         plan, self._pending = self._pending, None
         if plan and plan.to_download:
-            await self._run(
-                lambda: self._catalog.download(plan),
-                lambda _: setattr(
-                    self,
-                    "_notice",
-                    "Download finished. See Downloads for item results.",
-                ),
-            )
+            self._queue_plan(plan)
+        self.changed.emit()
 
     @Slot()
     def dismissPlan(self) -> None:
@@ -361,11 +457,6 @@ class WorkshopViewPanel(BaseViewPanel):
     def openLink(self, url: str) -> None:
         if safe_url(url):
             QDesktopServices.openUrl(QUrl(url))
-
-    @Slot()
-    def openDownloads(self) -> None:
-        if self._app_ctx:
-            self._app_ctx.navigate("downloads")
 
     @asyncSlot()
     async def openSettings(self) -> None:
@@ -378,22 +469,9 @@ class WorkshopViewPanel(BaseViewPanel):
             self._ctx.update_config(dialog.get_config())
         dialog.deleteLater()
 
-    @Slot()
-    def stop(self) -> None:
-        self._downloads.cancel()
-
-    def _on_busy(self, busy: bool) -> None:
-        self._downloading = busy
-        if busy:
-            self._queue_progress, self._queue_summary = 0.0, "Starting…"
-        self.queueChanged.emit()
-
-    def _on_progress(self, progress: DownloadProgress) -> None:
-        self._queue_progress = (
-            progress.completed / progress.total if progress.total else 0.0
-        )
-        self._queue_summary = f"{progress.completed} / {progress.total} mods"
-        self.queueChanged.emit()
+    def _on_queue_changed(self, *_: object) -> None:
+        self._refresh_rows()
+        self.changed.emit()
 
     @asyncSlot(str)
     async def _on_url_changed(self, _url: str) -> None:
@@ -404,8 +482,12 @@ class WorkshopViewPanel(BaseViewPanel):
         self.members_model.set_page([], 0, None)
         await self.load()
 
-    @asyncSlot(object)
-    async def _on_installed_changed(self, _value: None) -> None:
+    def _recount(self) -> None:
+        self._update_count = sum(
+            self._catalog.install_state(item) == "outdated" for item in self._installed
+        )
+
+    def _refresh_rows(self) -> None:
         def convert(row: dict[str, Any]) -> dict[str, Any]:
             return self._row(self._items[row["itemId"]])
 
@@ -424,6 +506,11 @@ class WorkshopViewPanel(BaseViewPanel):
                 self._detail["actionLabel"] = (
                     "Complete download" if partially_installed else "Download all"
                 )
+
+    @asyncSlot(object)
+    async def _on_installed_changed(self, _value: None) -> None:
+        self._recount()
+        self._refresh_rows()
         self.changed.emit()
         if self._tab == "Installed" and not self._busy:
             await self.load()
@@ -485,18 +572,8 @@ class WorkshopViewPanel(BaseViewPanel):
 
     @Property(int, notify=changed)  # type: ignore[arg-type]
     def updateCount(self) -> int:
-        return sum(
-            self._catalog.install_state(item) == "outdated" for item in self._installed
-        )
+        return self._update_count
 
-    @Property(bool, notify=queueChanged)  # type: ignore[arg-type]
-    def downloading(self) -> bool:
-        return self._downloading
-
-    @Property(float, notify=queueChanged)  # type: ignore[arg-type]
-    def queueProgress(self) -> float:
-        return self._queue_progress
-
-    @Property(str, notify=queueChanged)  # type: ignore[arg-type]
-    def queueSummary(self) -> str:
-        return self._queue_summary
+    @Property(bool, notify=changed)  # type: ignore[arg-type]
+    def planning(self) -> bool:
+        return self._planning > 0
