@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 import platform
 import shutil
@@ -7,6 +8,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 def get_version(project_root: Path) -> str:
@@ -29,7 +31,9 @@ def debian_architecture(machine: str | None = None) -> str:
         ) from None
 
 
-def get_standalone_args(release: bool = False) -> list[str]:
+def get_standalone_args(
+    release: bool = False, workshop: str = "NativeWorkshop"
+) -> list[str]:
     project_root = Path(__file__).parent.parent
 
     args = [
@@ -46,6 +50,29 @@ def get_standalone_args(release: bool = False) -> list[str]:
     ]
 
     args.append("--include-qt-plugins=qml")
+
+    if workshop == "NativeWorkshop":
+        args.extend(
+            [
+                (
+                    "--nofollow-import-to=pxmodrim.ui.plugins.steam_workshop,"
+                    "PySide6.QtWebEngine*,PySide6.QtWebChannel"
+                ),
+                "--noinclude-data-files=pxmodrim/ui/plugins/steam_workshop",
+                "--noinclude-data-files=PySide6/qml/QtWeb*/*",
+                "--noinclude-data-files=*qtwebengine*",
+                "--noinclude-dlls=PySide6/qml/QtWeb*/*",
+                "--noinclude-dlls=*WebEngine*",
+                "--noinclude-dlls=*WebChannel*",
+            ]
+        )
+    else:
+        args.extend(
+            [
+                "--nofollow-import-to=pxmodrim.ui.plugins.workshop",
+                "--noinclude-data-files=pxmodrim/ui/plugins/workshop",
+            ]
+        )
 
     if release:
         args.extend(
@@ -450,16 +477,14 @@ def create_macos_bundle(project_root: Path, release: bool = False) -> Path | Non
     return app_dir
 
 
-def strip_unused_qml_modules(dist_dir: Path) -> None:
-    """Remove QML modules not imported anywhere in the app's .qml files.
-
-    The app only uses QtQuick, QtQuick.Controls, QtQuick.Layouts,
-    QtWebChannel, and QtWebEngine.
-    """
+def strip_unused_qml_modules(dist_dir: Path, workshop: str = "NativeWorkshop") -> None:
+    """Remove QML modules unused by the selected Workshop browser."""
     qml_root = dist_dir / "PySide6" / "qml"
     if not qml_root.is_dir():
         return
-    keep = {"Qt", "QtQml", "QtQuick", "QtWebChannel", "QtWebEngine"}
+    keep = {"Qt", "QtQml", "QtQuick"}
+    if workshop == "SteamWorkshop":
+        keep.update({"QtWebChannel", "QtWebEngine"})
     removed = 0
     for entry in sorted(qml_root.iterdir()):
         if entry.is_dir() and entry.name not in keep:
@@ -542,21 +567,38 @@ def _get_dir_size(path: Path) -> int:
 
 
 def main() -> None:
-    release = "--release" in sys.argv
-    bundle_qt = "--bundle-qt" in sys.argv
+    parser = argparse.ArgumentParser(description="Build a standalone PxModRim package.")
+    parser.add_argument("--release", action="store_true")
+    parser.add_argument("--bundle-qt", action="store_true")
+    parser.add_argument(
+        "--workshop",
+        choices=("SteamWorkshop", "NativeWorkshop"),
+        default="NativeWorkshop",
+    )
+    options = parser.parse_args()
+    release = options.release
+    bundle_qt = options.bundle_qt
+    workshop = options.workshop
     project_root = Path(__file__).parent.parent
     system = platform.system()
 
     print("Step 0: Cleaning QML debug artifacts...")
     clean_qml_debug_artifacts()
 
-    print(f"Step 1: Building standalone (release={release}, bundle_qt={bundle_qt})...")
-    args = get_standalone_args(release=release)
-    print(f"Running: {' '.join(args)}")
+    print(
+        f"Step 1: Building standalone "
+        f"(release={release}, bundle_qt={bundle_qt}, workshop={workshop})..."
+    )
+    with TemporaryDirectory(prefix="pxmodrim-workshop-") as profile_dir:
+        manifest = Path(profile_dir) / "workshop-variant.txt"
+        manifest.write_text(workshop, encoding="utf-8")
+        args = get_standalone_args(release=release, workshop=workshop)
+        args.append(f"--include-data-files={manifest}=pxmodrim/workshop-variant.txt")
+        print(f"Running: {' '.join(args)}")
 
-    result = subprocess.run(args, check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+        result = subprocess.run(args, check=False)
+        if result.returncode != 0:
+            sys.exit(result.returncode)
 
     dist_dir = project_root / "dist" / "entrypoint.dist"
     if system == "Darwin":
@@ -572,7 +614,7 @@ def main() -> None:
     strip_qt_locales(dist_dir)
 
     print("\nStep 2b: Stripping unused QML modules...")
-    strip_unused_qml_modules(dist_dir)
+    strip_unused_qml_modules(dist_dir, workshop=workshop)
 
     print("\nStep 2c: Stripping Qt translations...")
     strip_qt_translations(dist_dir)

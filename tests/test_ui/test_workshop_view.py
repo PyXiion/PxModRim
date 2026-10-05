@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any, cast
 
 import msgspec
 import pytest
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QObject, QUrl
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QWidget
 from shiboken6 import delete, isValid
@@ -14,6 +15,11 @@ from shiboken6 import delete, isValid
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.downloads import DownloadManager
+from pxmodrim.core.models.metadata.structures import (
+    AboutXmlMod,
+    CaseInsensitiveStr,
+    ListedMod,
+)
 from pxmodrim.core.workshop import (
     Author,
     CatalogCollection,
@@ -29,6 +35,7 @@ from pxmodrim.core.workshop import (
     WorkshopCatalog,
 )
 from pxmodrim.ui.components import create_qml_engine
+from pxmodrim.ui.panels.mod_info_data import description_to_html
 from pxmodrim.ui.plugins.workshop.view import WorkshopViewPanel
 from pxmodrim.ui.theme.qml_theme import Theme
 
@@ -155,6 +162,20 @@ async def panel(
     owner.deleteLater()
 
 
+@pytest.fixture
+def installed_mods(tmp_path: Path) -> dict[str, ListedMod]:
+    mods: dict[str, ListedMod] = {}
+    for provider, pid in [("steamcmd", "1"), ("steam", "1"), ("steam", "2")]:
+        mod = AboutXmlMod(
+            name=f"Installed {pid}",
+            package_id=CaseInsensitiveStr(f"test.mod{pid}"),
+            provider_id=provider,
+            _mod_path=tmp_path / provider / pid,
+        )
+        mods[mod.uuid] = mod
+    return mods
+
+
 async def test_view_loads_qml_and_discovery_without_errors(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
 ) -> None:
@@ -175,12 +196,14 @@ async def test_destroyed_view_does_not_receive_core_shutdown_events(
     notifications: list[None] = []
     catalog.queue_changed.connect(notifications.append)
     downloads = view._downloads
+    ctx = view._ctx
     view._qml.setSource(QUrl())
     delete(view)
     await catalog.shutdown()
     downloads.busy_changed.emit(False)
     catalog.installed_changed.emit(None)
     catalog.catalog_url_changed.emit("")
+    ctx.active_state_changed.emit(())
     assert not isValid(model)
     assert notifications == [None]
 
@@ -241,11 +264,14 @@ async def test_mod_detail_safe_description_dependencies_and_download(
     await asyncio.sleep(0)
     await view.open_item("1", "mod")
     detail = cast("dict[str, Any]", view.detail)
-    assert detail["description"] == "<b>Safe description</b>"
+    assert detail["description"] == description_to_html(
+        catalog.mod_item.description, catalog.mod_item.description_format
+    )
     assert detail["actionLabel"] == "Update"
     assert view.members_model.count == 1
     await view.downloadItem("1", "mod")
     assert catalog.downloaded == ["2", "1"]
+    assert view._ctx.active_uuids == []
     assert not warnings, [warning.toString() for warning in warnings]
 
 
@@ -257,7 +283,9 @@ async def test_incomplete_collection_requires_explicit_partial_download(
     await view.open_item("picked:test", "collection")
     detail = cast("dict[str, Any]", view.detail)
     assert not detail["complete"] and "missing" in detail["warning"]
-    assert detail["description"] == "&lt;b&gt;Plain text&lt;/b&gt;"
+    assert detail["description"] == description_to_html(
+        catalog.collection_item.description, catalog.collection_item.description_format
+    )
     await view.downloadItem("picked:test", "collection")
     assert view.pendingPlan and not catalog.downloaded
     assert view.canDownloadAvailable
@@ -333,3 +361,153 @@ async def test_installed_search_filters_loaded_mods_without_refetching(
     assert view.mods_model.count == 1 and view.tab == "Installed" and fetches == 1
     await view.filter("", "", "all", "popular", "")
     assert view.mods_model.count == 3 and fetches == 1
+    assert view.searchQuery == ""
+
+
+@pytest.mark.parametrize("state", ["installed", "outdated"])
+async def test_activation_toggles_one_installed_copy_and_prefers_active_steam_copy(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    monkeypatch: pytest.MonkeyPatch,
+    state: InstallState,
+) -> None:
+    view, catalog, _ = panel
+    steamcmd, steam, unrelated = installed_mods
+    view._ctx.load(installed_mods, [])
+    view._ctx.set_active([steam, unrelated])
+    monkeypatch.setattr(catalog, "install_state", lambda _: state)
+    await view.load()
+    await view.open_item("1", "mod")
+    role = next(
+        role
+        for role, name in view.mods_model.roleNames().items()
+        if bytes(name.data()) == b"active"
+    )
+    assert view.mods_model.data(view.mods_model.index(0), role) is True
+    assert cast("dict[str, Any]", view.detail)["active"] is True
+    expected_action = "Update" if state == "outdated" else "Installed"
+    assert cast("dict[str, Any]", view.detail)["actionLabel"] == expected_action
+
+    await view.toggleActivation("1")
+    assert view._ctx.active_uuids == [unrelated]
+    assert view.mods_model.data(view.mods_model.index(0), role) is False
+    assert cast("dict[str, Any]", view.detail)["active"] is False
+
+    await view.toggleActivation("1")
+    assert set(view._ctx.active_uuids) == {steamcmd, unrelated}
+    assert steam not in view._ctx.active_uuids
+    assert view.mods_model.data(view.mods_model.index(0), role) is True
+    assert cast("dict[str, Any]", view.detail)["active"] is True
+
+
+async def test_external_activation_refreshes_listing_detail_and_members(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, _, _ = panel
+    _, steam, dependency = installed_mods
+    view._ctx.load(installed_mods, [])
+    await view.load()
+    await view.open_item("1", "mod")
+    role = next(
+        role
+        for role, name in view.mods_model.roleNames().items()
+        if bytes(name.data()) == b"active"
+    )
+
+    for active, expected in [([steam, dependency], True), ([], False)]:
+        view._ctx.set_active(active)
+        assert view.mods_model.data(view.mods_model.index(0), role) is expected
+        assert view.members_model.data(view.members_model.index(0), role) is expected
+        assert cast("dict[str, Any]", view.detail)["active"] is expected
+
+
+async def test_download_never_activates_installed_copies(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, catalog, _ = panel
+    view._ctx.load(installed_mods, [])
+    await view.downloadItem("1", "mod")
+    assert catalog.downloaded == ["2", "1"]
+    assert view._ctx.active_uuids == []
+
+
+async def test_activation_does_nothing_without_an_installed_copy(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    await view.toggleActivation("1")
+    assert view._ctx.active_uuids == []
+    assert catalog.downloaded == []
+
+
+async def test_teardown_disconnects_activation_and_blocks_toggles(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, _, _ = panel
+    _, steam, _ = installed_mods
+    view._ctx.load(installed_mods, [])
+    await view.load()
+    await view.open_item("1", "mod")
+    notifications: list[bool] = []
+    view.changed.connect(lambda: notifications.append(True))
+    view.teardown()
+    view.teardown()
+    view._ctx.set_active([steam])
+    await view.toggleActivation("1")
+    assert view._ctx.active_uuids == [steam]
+    assert not notifications
+    assert cast("dict[str, Any]", view.detail)["active"] is False
+
+
+async def test_known_tag_options_accumulate_loaded_tags_but_not_version_tags(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    await asyncio.sleep(0)
+    catalog.mod_item = msgspec.structs.replace(
+        catalog.mod_item, tags=["Utility", "1.5"]
+    )
+    catalog.collection_item = msgspec.structs.replace(
+        catalog.collection_item, tags=["Curated", "1.6"]
+    )
+    catalog.dependency = msgspec.structs.replace(
+        catalog.dependency, tags=["Dependency", "1.5"]
+    )
+    catalog._responses.clear()
+    await view.load()
+    assert view.tagOptions == ["All tags", "Curated", "Utility"]
+    await view.filter("utility", "1.5", "all", "popular", "Utility")
+    assert view.searchQuery == "utility"
+    assert view.tagOptions == ["All tags", "Curated", "Utility"]
+    await view.open_item("1", "mod")
+    assert view.tagOptions == ["All tags", "Curated", "Dependency", "Utility"]
+    await view.selectTab("Installed")
+    assert view.searchQuery == "utility"
+
+
+async def test_back_preserves_scroll_position_and_active_filters(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, _, _ = panel
+    view._qml.resize(800, 600)
+    await view.load()
+    await view.filter("test search", "1.5", "all", "popular", "Utility")
+    assert view.searchQuery == "test search"
+
+    root = view._qml.rootObject()
+    assert root is not None
+    listing_scroll = root.findChild(QObject, "listingScroll")
+    assert listing_scroll is not None
+    listing_scroll.setProperty("contentY", 184)
+
+    await view.open_item("1", "mod")
+    assert view.hasDetail
+
+    view.back()
+    assert not view.hasDetail
+    assert view.tab == "Mods"
+    assert view.searchQuery == "test search"
+    assert listing_scroll.property("contentY") == 184

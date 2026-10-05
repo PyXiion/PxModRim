@@ -25,6 +25,7 @@ from pxmodrim.core.workshop import (
 )
 from pxmodrim.core.workshop.catalog import FRESH_SECONDS
 from pxmodrim.ui.components.dialogs import await_dialog
+from pxmodrim.ui.components.mod_activation import toggle_mods
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.plugins.workshop.details import (
     Detail,
@@ -89,6 +90,9 @@ class WorkshopViewPanel(BaseViewPanel):
         self._pending: DownloadPlan | None = None
         self._planning = 0
         self._items: dict[str, CatalogMod | CatalogCollection] = {}
+        self._known_tags: set[str] = set()
+        self._active_ids: set[str] = set()
+        self._refresh_active_ids()
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
         self._qml.setObjectName("workshopView")
         self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
@@ -109,6 +113,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._catalog.queue_changed.connect(self._on_queue_changed)
         self._catalog.catalog_url_changed.connect(self._on_url_changed)
         self._catalog.installed_changed.connect(self._on_installed_changed)
+        self._ctx.active_state_changed.connect(self._on_active_state_changed)
         self.destroyed.connect(lambda: self.teardown())
 
     def teardown(self) -> None:
@@ -121,6 +126,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._catalog.queue_changed.disconnect(self._on_queue_changed)
         self._catalog.catalog_url_changed.disconnect(self._on_url_changed)
         self._catalog.installed_changed.disconnect(self._on_installed_changed)
+        self._ctx.active_state_changed.disconnect(self._on_active_state_changed)
 
     @property
     def _game_version(self) -> str:
@@ -129,9 +135,20 @@ class WorkshopViewPanel(BaseViewPanel):
 
     # -- rows -------------------------------------------------------------
 
+    def _refresh_active_ids(self) -> None:
+        mods = self._ctx.all_mods
+        self._active_ids = {
+            published_id
+            for uuid in self._ctx.active_uuids
+            if uuid in mods
+            and (published_id := mods[uuid].published_file_id) is not None
+        }
+
     def _row(self, item: CatalogMod | CatalogCollection) -> dict[str, Any]:
         self._items[item.id] = item
+        self._known_tags.update(set(item.tags) - set(item.supported_versions))
         row = item_row(item, self._catalog.install_state, self._game_version)
+        row["active"] = isinstance(item, CatalogMod) and item.id in self._active_ids
         if isinstance(item, CatalogMod) and row["state"] != "installed":
             running = item.id in self._downloads.active_ids
             if running or item.id in self._catalog.queued_ids:
@@ -407,6 +424,21 @@ class WorkshopViewPanel(BaseViewPanel):
             [item_id] if kind == "collection" else [],
         )
 
+    @asyncSlot(str)
+    async def toggleActivation(self, item_id: str) -> None:
+        if self._torn_down:
+            return
+        installed = [
+            uuid
+            for uuid, mod in self._ctx.all_mods.items()
+            if mod.published_file_id == item_id
+        ]
+        if not installed:
+            return
+        active = set(self._ctx.active_uuids)
+        uuid = next((uuid for uuid in installed if uuid in active), installed[0])
+        await toggle_mods(self._ctx, self, [uuid])
+
     @asyncSlot()
     async def updateAll(self) -> None:
         ids = [
@@ -473,6 +505,11 @@ class WorkshopViewPanel(BaseViewPanel):
 
     # -- catalog events ---------------------------------------------------
 
+    def _on_active_state_changed(self, _uuids: tuple[str, ...]) -> None:
+        self._refresh_active_ids()
+        self._refresh_rows()
+        self.changed.emit()
+
     def _on_queue_changed(self, *_: object) -> None:
         self._refresh_rows()
         self.changed.emit()
@@ -482,12 +519,14 @@ class WorkshopViewPanel(BaseViewPanel):
         self._clear_detail()
         self._error, self._notice, self._pending = "", "", None
         self._items.clear()
+        self._known_tags.clear()
         for model in (self.mods_model, self.collections_model, self.members_model):
             model.set_page([], 0, None)
         await self.load()
 
     @asyncSlot(object)
     async def _on_installed_changed(self, _value: None) -> None:
+        self._refresh_active_ids()
         self._recount()
         self._refresh_rows()
         self.changed.emit()
@@ -531,6 +570,14 @@ class WorkshopViewPanel(BaseViewPanel):
     @Property(bool, notify=changed)  # type: ignore[arg-type]
     def canDownloadAvailable(self) -> bool:
         return self._pending is not None and bool(self._pending.to_download)
+
+    @Property(str, notify=changed)  # type: ignore[arg-type]
+    def searchQuery(self) -> str:
+        return self._criteria.query
+
+    @Property(list, notify=changed)  # type: ignore[arg-type]
+    def tagOptions(self) -> list[str]:
+        return ["All tags", *sorted(self._known_tags)]
 
     @Property(str, constant=True)  # type: ignore[arg-type]
     def gameVersion(self) -> str:

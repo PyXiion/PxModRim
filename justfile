@@ -70,8 +70,8 @@ build *args: build-js
 build-release *args: build-js
     uv run python packaging/build.py --release {{args}}
 
-build-release-bundled: build-js
-    uv run python packaging/build.py --release --bundle-qt
+build-release-bundled *args: build-js
+    uv run python packaging/build.py --release --bundle-qt {{args}}
 
 build-clean:
     rm -rf build/ dist/ *.build/ *.dist/ *.onefile-build/

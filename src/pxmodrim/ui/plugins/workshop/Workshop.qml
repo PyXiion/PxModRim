@@ -11,7 +11,7 @@ Rectangle {
 
     function applyFilters() {
         workshopPanel.filter(search.text.trim(), version.currentIndex === 0 ? "" : version.currentText,
-            source.currentValue, sort.currentValue, tag.text.trim())
+            source.currentValue, sort.currentValue, tag.selectedTag)
     }
 
     component Copy: Text {
@@ -32,7 +32,7 @@ Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: Math.ceil(count / columns) * cellHeight
         cellWidth: width / columns
-        cellHeight: 298
+        cellHeight: 382
         interactive: false
         clip: true
         delegate: CatalogCard {
@@ -50,7 +50,7 @@ Rectangle {
             ColumnLayout {
                 spacing: 2
                 Heading { text: "Workshop" }
-                Copy { text: "Mods & collections for RimWorld"; font.pixelSize: Theme.fontSizeSm }
+                Copy { text: "Mods & collections for RimWorld" }
             }
             PxTextField {
                 id: search
@@ -84,6 +84,16 @@ Rectangle {
                         id: tabItem
                         required property string modelData
                         readonly property bool current: workshopPanel.tab === modelData
+                        activeFocusOnTab: true
+                        Keys.onReturnPressed: workshopPanel.selectTab(modelData)
+                        Keys.onSpacePressed: workshopPanel.selectTab(modelData)
+                        Rectangle {
+                            anchors.fill: parent
+                            visible: tabItem.activeFocus
+                            color: "transparent"
+                            border.color: Theme.primary
+                            radius: Theme.radiusSm
+                        }
                         implicitWidth: tabLabel.implicitWidth + 32
                         implicitHeight: 36
                         Text {
@@ -106,6 +116,8 @@ Rectangle {
                         TapHandler { onTapped: workshopPanel.selectTab(tabItem.modelData) }
                         Accessible.role: Accessible.PageTab
                         Accessible.name: modelData
+                        Accessible.selected: current
+                        Accessible.onPressAction: workshopPanel.selectTab(modelData)
                     }
                 }
                 Item { Layout.fillWidth: true }
@@ -139,14 +151,12 @@ Rectangle {
                 Accessible.name: "Collection source"
                 onActivated: root.applyFilters()
             }
-            PxTextField {
+            TagPicker {
                 id: tag
                 Layout.fillWidth: true
                 Layout.maximumWidth: 230
-                placeholderText: "Tag (exact match)"
-                maximumLength: 100
-                Accessible.name: "Tag filter"
-                onAccepted: root.applyFilters()
+                options: workshopPanel.tagOptions
+                onSelectedTagChanged: root.applyFilters()
             }
             Item { Layout.fillWidth: true }
             PxComboBox {
@@ -192,6 +202,8 @@ Rectangle {
         }
         ScrollView {
             id: contentScroll
+            objectName: "listingScroll"
+            visible: !workshopPanel.hasDetail
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -208,7 +220,7 @@ Rectangle {
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
-                    visible: workshopPanel.configured && !workshopPanel.hasDetail
+                    visible: workshopPanel.configured
                     Heading { text: workshopPanel.tab === "Discover" ? "Discover your next colony" : workshopPanel.tab }
                     Copy { visible: workshopPanel.tab === "Discover"; text: "Explore Steam mods and collections alongside PxModRim picks. Downloads include required dependencies, without activating mods." }
                     RowLayout {
@@ -237,13 +249,30 @@ Rectangle {
                         onClicked: workshopPanel.loadMore()
                     }
                 }
+            }
+        }
+        ScrollView {
+            id: detailScroll
+            objectName: "detailScroll"
+            visible: workshopPanel.hasDetail
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            contentWidth: availableWidth
+            ColumnLayout {
+                width: detailScroll.availableWidth
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.maximumWidth: 1200
                     Layout.alignment: Qt.AlignHCenter
                     visible: workshopPanel.configured && workshopPanel.hasDetail
                     spacing: 16
-                    PxButton { text: "← Back"; variant: "ghost"; onClicked: workshopPanel.back() }
+                    PxButton {
+                        text: "Back to " + workshopPanel.tab
+                        iconName: "chevron-left"
+                        Accessible.description: "Return to the listing with the same scroll position and filters"
+                        onClicked: workshopPanel.back()
+                    }
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 16
@@ -297,19 +326,25 @@ Rectangle {
                                 Layout.fillWidth: true
                                 spacing: 6
                                 PxBadge { text: (root.detail.sourceLabel || "").toUpperCase(); textColor: Theme.textMuted }
-                                PxBadge { visible: root.detail.state === "installed"; text: "INSTALLED"; textColor: Theme.success }
+                                PxBadge { visible: root.detail.kind === "mod" && root.detail.state !== "missing"; text: "INSTALLED"; textColor: Theme.success }
                                 PxBadge { visible: root.detail.state === "outdated"; text: "UPDATE AVAILABLE" }
                                 PxBadge { visible: !!root.detail.incompatible; text: "INCOMPATIBLE"; textColor: Theme.warning }
                             }
                             Heading { Layout.fillWidth: true; text: root.detail.title || ""; font.pixelSize: 26; wrapMode: Text.Wrap }
                             Copy { text: "by " + (root.detail.author || "") }
-                            Copy { Layout.fillWidth: true; text: "Supports " + (root.detail.versions || ""); font.pixelSize: Theme.fontSizeSm }
-                            Copy { Layout.fillWidth: true; visible: !!root.detail.tags; text: root.detail.tags || ""; font.pixelSize: Theme.fontSizeSm }
-                            Copy { Layout.fillWidth: true; visible: !!root.detail.incompatible; text: "Does not list your game version. Downloading does not make it compatible."; color: Theme.warning; font.pixelSize: Theme.fontSizeSm }
-                            Copy { Layout.fillWidth: true; visible: !!root.detail.warning; text: root.detail.warning || ""; color: Theme.warning; font.pixelSize: Theme.fontSizeSm }
+                            Copy { Layout.fillWidth: true; text: "Supports " + (root.detail.versions || "") }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.tags; text: root.detail.tags || "" }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.incompatible; text: "Does not list your game version. Downloading does not make it compatible."; color: Theme.warning }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.warning; text: root.detail.warning || ""; color: Theme.warning }
                             RowLayout {
                                 spacing: 8
                                 PxButton {
+                                    visible: root.detail.kind === "mod" && root.detail.state !== "missing"
+                                    text: root.detail.active ? "Deactivate" : "Activate"
+                                    onClicked: workshopPanel.toggleActivation(root.detail.itemId)
+                                }
+                                PxButton {
+                                    visible: root.detail.state !== "installed"
                                     text: root.detail.actionLabel || "Download"
                                     variant: root.detail.state === "outdated" ? "primary" : "secondary"
                                     enabled: root.detail.state !== "installed" && !root.detail.queued
@@ -317,8 +352,35 @@ Rectangle {
                                 }
                                 PxButton { visible: !!root.detail.workshopUrl; text: "View on Steam"; variant: "ghost"; onClicked: workshopPanel.openLink(root.detail.workshopUrl) }
                             }
-                            Copy { Layout.fillWidth: true; text: "Local mods · downloading does not enable or subscribe."; font.pixelSize: Theme.fontSizeSm; color: Theme.textDim }
-                            Copy { visible: root.detail.kind === "mod"; text: (root.detail.fileSize || "") + " · " + (root.detail.votes || ""); font.pixelSize: Theme.fontSizeSm }
+                            Copy { Layout.fillWidth: true; text: "Local mods · downloading does not enable or subscribe." }
+                            RowLayout {
+                                visible: root.detail.kind === "mod"
+                                spacing: 8
+                                Image {
+                                    width: 16; height: 16
+                                    sourceSize.width: 16; sourceSize.height: 16
+                                    source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
+                                }
+                                Copy { Layout.fillWidth: false; text: root.detail.votes || "Unrated" }
+                                Copy { Layout.fillWidth: false; text: (root.detail.fileSize || "Unknown") }
+                            }
+                            RowLayout {
+                                visible: !!root.detail.votesUp
+                                spacing: 8
+                                Image {
+                                    width: 16; height: 16
+                                    sourceSize.width: 16; sourceSize.height: 16
+                                    source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
+                                }
+                                Copy { Layout.fillWidth: false; text: root.detail.votesUp || ""; Accessible.name: text + " positive votes" }
+                                Image {
+                                    width: 16; height: 16
+                                    sourceSize.width: 16; sourceSize.height: 16
+                                    rotation: 180
+                                    source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
+                                }
+                                Copy { Layout.fillWidth: false; text: root.detail.votesDown || ""; Accessible.name: text + " negative votes" }
+                            }
                         }
                     }
                     RowLayout {
@@ -338,15 +400,9 @@ Rectangle {
                                 anchors.margins: 16
                                 spacing: 10
                                 Heading { text: "Description" }
-                                Text {
+                                ModDescription {
                                     Layout.fillWidth: true
-                                    text: root.detail.description || ""
-                                    textFormat: Text.RichText
-                                    wrapMode: Text.Wrap
-                                    color: Theme.textMuted
-                                    linkColor: Theme.primary
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeMd
+                                    description: root.detail.description || ""
                                     onLinkActivated: link => workshopPanel.openLink(link)
                                 }
                             }

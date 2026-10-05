@@ -12,6 +12,10 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        workshop: [SteamWorkshop, NativeWorkshop]
     steps:
       - uses: actions/checkout@v7
 
@@ -46,7 +50,7 @@ jobs:
         run: uv sync --locked --dev --extra steam
 
       - name: Build with Nuitka
-        run: just build-release-bundled
+        run: just build-release-bundled --workshop ${{ matrix.workshop }}
 
       - name: Verify glibc floor
         run: |
@@ -58,35 +62,51 @@ jobs:
           test "$(printf '%s\nGLIBC_2.35\n' "$max" | sort -V | tail -1)" = "GLIBC_2.35"
 
       - name: Package tar.gz
-        run: tar -czf PxModRim-Linux.tar.gz -C dist entrypoint.dist/
+        run: tar -czf PxModRim-Linux-${{ matrix.workshop }}.tar.gz -C dist entrypoint.dist/
+
+      - name: Rename Linux packages
+        run: |
+          set -euo pipefail
+          mv dist/PxModRim-x86_64.AppImage dist/PxModRim-Linux-x86_64-${{ matrix.workshop }}.AppImage
+          for f in dist/*.deb; do
+            [ -f "$f" ] || continue
+            mv "$f" "${f%.deb}-${{ matrix.workshop }}.deb"
+          done
+          for f in dist/*.rpm; do
+            [ -f "$f" ] || continue
+            mv "$f" "${f%.rpm}-${{ matrix.workshop }}.rpm"
+          done
 
       - name: Upload artifact (tar.gz)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-Linux
-          path: PxModRim-Linux.tar.gz
+          name: PxModRim-Linux-${{ matrix.workshop }}
+          path: PxModRim-Linux-${{ matrix.workshop }}.tar.gz
 
       - name: Upload artifact (AppImage)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-Linux-AppImage
-          path: dist/PxModRim-x86_64.AppImage
+          name: PxModRim-Linux-AppImage-${{ matrix.workshop }}
+          path: dist/PxModRim-Linux-x86_64-${{ matrix.workshop }}.AppImage
 
       - name: Upload artifact (deb)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-Linux-Deb
-          path: dist/*.deb
+          name: PxModRim-Linux-Deb-${{ matrix.workshop }}
+          path: dist/*-${{ matrix.workshop }}.deb
 
       - name: Upload artifact (rpm)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-Linux-RPM
-          path: dist/*.rpm
-
+          name: PxModRim-Linux-RPM-${{ matrix.workshop }}
+          path: dist/*-${{ matrix.workshop }}.rpm
   build-flatpak:
     needs: [build-linux]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workshop: [SteamWorkshop, NativeWorkshop]
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
       options: --privileged
@@ -96,25 +116,28 @@ jobs:
       - name: Download Linux dist
         uses: actions/download-artifact@v8
         with:
-          name: PxModRim-Linux
+          name: PxModRim-Linux-${{ matrix.workshop }}
           path: dist-archive
 
       - name: Extract Linux dist
         run: |
           mkdir -p dist
-          tar -xzf dist-archive/PxModRim-Linux.tar.gz -C dist
+          tar -xzf dist-archive/PxModRim-Linux-${{ matrix.workshop }}.tar.gz -C dist
 
       - name: Build Flatpak bundle
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           manifest-path: packaging/flatpak/com.github.PyXiion.PxModRim.yaml
-          bundle: com.github.PyXiion.PxModRim.flatpak
+          bundle: PxModRim-Linux-${{ matrix.workshop }}.flatpak
           build-bundle: true
           upload-artifact: true
-          artifact-name: PxModRim-Flatpak
-
+          artifact-name: PxModRim-Flatpak-${{ matrix.workshop }}
   build-windows:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workshop: [SteamWorkshop, NativeWorkshop]
     steps:
       - uses: actions/checkout@v7
 
@@ -154,22 +177,29 @@ jobs:
           & $makensis /VERSION
 
       - name: Build with Nuitka
-        run: just build-release-bundled
+        run: just build-release-bundled --workshop ${{ matrix.workshop }}
+
+      - name: Rename Windows installer
+        shell: bash
+        run: mv dist/PxModRim-Setup.exe dist/PxModRim-Windows-${{ matrix.workshop }}-Setup.exe
 
       - name: Upload artifact (dist)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-Windows
+          name: PxModRim-Windows-${{ matrix.workshop }}
           path: dist/entrypoint.dist/*
 
       - name: Upload artifact (installer)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-Windows-Installer
-          path: dist/PxModRim-Setup.exe
-
+          name: PxModRim-Windows-Installer-${{ matrix.workshop }}
+          path: dist/PxModRim-Windows-${{ matrix.workshop }}-Setup.exe
   build-macos:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workshop: [SteamWorkshop, NativeWorkshop]
     env:
       MACOS_SIGNING_CONFIGURED: >-
         ${{ secrets.MACOS_CERT != '' &&
@@ -205,7 +235,7 @@ jobs:
         run: uv sync --locked --dev --extra steam
 
       - name: Build with Nuitka
-        run: just build-release-bundled
+        run: just build-release-bundled --workshop ${{ matrix.workshop }}
 
       - name: Sign and notarize macOS app
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
@@ -258,82 +288,52 @@ jobs:
           security delete-keychain "$keychain_path"
           rm -f "$certificate" "$notary_zip"
 
+      - name: Rename macOS packages
+        run: |
+          set -euo pipefail
+          mv dist/PxModRim-macOS.zip dist/PxModRim-macOS-${{ matrix.workshop }}.zip
+          mv dist/PxModRim-macOS.dmg dist/PxModRim-macOS-${{ matrix.workshop }}.dmg
+
       - name: Upload artifact (dmg)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-macOS-DMG
-          path: dist/PxModRim-macOS.dmg
+          name: PxModRim-macOS-DMG-${{ matrix.workshop }}
+          path: dist/PxModRim-macOS-${{ matrix.workshop }}.dmg
 
       - name: Upload artifact (zip)
         uses: actions/upload-artifact@v7
         with:
-          name: PxModRim-macOS-ZIP
-          path: dist/PxModRim-macOS.zip
-
+          name: PxModRim-macOS-ZIP-${{ matrix.workshop }}
+          path: dist/PxModRim-macOS-${{ matrix.workshop }}.zip
   release:
     needs: [build-linux, build-flatpak, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/download-artifact@v8
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
         with:
-          name: PxModRim-Linux
-          path: linux-targz
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-Linux-AppImage
-          path: linux-appimage
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-Linux-Deb
-          path: linux-deb
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-Linux-RPM
-          path: linux-rpm
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-Flatpak
-          path: flatpak
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-Windows
-          path: windows
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-Windows-Installer
-          path: windows-installer
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-macOS-DMG
-          path: macos-dmg
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: PxModRim-macOS-ZIP
-          path: macos-zip
+          pattern: PxModRim-*
+          path: artifacts
+          merge-multiple: false
 
       - name: Package Windows release
-        run: 7z a PxModRim-Windows.zip ./windows/*
+        run: |
+          for variant in SteamWorkshop NativeWorkshop; do
+            7z a "PxModRim-Windows-${variant}.zip" "./artifacts/PxModRim-Windows-${variant}/*"
+          done
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            linux-targz/PxModRim-Linux.tar.gz
-            linux-appimage/PxModRim-x86_64.AppImage
-            linux-deb/*.deb
-            linux-rpm/*.rpm
-            flatpak/com.github.PyXiion.PxModRim.flatpak
-            PxModRim-Windows.zip
-            windows-installer/PxModRim-Setup.exe
-            macos-dmg/PxModRim-macOS.dmg
-            macos-zip/PxModRim-macOS.zip
+            artifacts/PxModRim-Linux-*/*.tar.gz
+            artifacts/PxModRim-Linux-AppImage-*/*.AppImage
+            artifacts/PxModRim-Linux-Deb-*/*.deb
+            artifacts/PxModRim-Linux-RPM-*/*.rpm
+            artifacts/PxModRim-Flatpak-*/*.flatpak
+            PxModRim-Windows-*.zip
+            artifacts/PxModRim-Windows-Installer-*/*-Setup.exe
+            artifacts/PxModRim-macOS-DMG-*/*.dmg
+            artifacts/PxModRim-macOS-ZIP-*/*.zip
           generate_release_notes: true

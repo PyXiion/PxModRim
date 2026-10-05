@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import html
-import re
 from collections.abc import Callable, Sequence
 from typing import Any
 from urllib.parse import urlsplit
@@ -18,10 +16,7 @@ from PySide6.QtCore import (
 )
 
 from pxmodrim.core.workshop import CatalogCollection, CatalogMod, InstallState
-
-_TOKEN = re.compile(
-    r"\[(/?)(b|i|u|h[1-3]|list|\*|url|img)(?:=([^\]]*))?\]", re.IGNORECASE
-)
+from pxmodrim.ui.panels.mod_info_data import description_to_html
 
 
 def safe_url(value: str) -> str:
@@ -32,56 +27,6 @@ def safe_url(value: str) -> str:
     except ValueError:
         return ""
     return value if parsed.scheme.lower() in {"http", "https"} and parsed.netloc else ""
-
-
-def description_rich_text(text: str, description_format: str = "bbcode") -> str:
-    """Convert untrusted descriptions to the small Qt rich-text subset we emit."""
-    if description_format == "text":
-        return html.escape(text).replace("\n", "<br>")
-    result: list[str] = []
-    stack: list[tuple[str, str]] = []
-    position = 0
-    while match := _TOKEN.search(text, position):
-        result.append(html.escape(text[position : match.start()]).replace("\n", "<br>"))
-        closing, tag, argument = match.groups()
-        tag = tag.lower()
-        position = match.end()
-        if not closing and tag in {"url", "img"}:
-            end = re.search(rf"\[/{tag}\]", text[position:], re.IGNORECASE)
-            if end is None:
-                result.append(html.escape(match.group()))
-                continue
-            body = text[position : position + end.start()]
-            url = safe_url(argument if argument is not None else body)
-            label = html.escape(body if tag == "url" else "Image")
-            result.append(
-                f'<a href="{html.escape(url, quote=True)}">{label}</a>'
-                if url
-                else label
-            )
-            position += end.end()
-        elif closing:
-            if stack and stack[-1][0] == "*" and tag == "list":
-                result.append(stack.pop()[1])
-            if stack and stack[-1][0] == tag:
-                result.append(stack.pop()[1])
-            else:
-                result.append(html.escape(match.group()))
-        elif tag == "*":
-            if stack and stack[-1][0] == "*":
-                result.append(stack.pop()[1])
-            if stack and stack[-1][0] == "list":
-                result.append("<li>")
-                stack.append((tag, "</li>"))
-            else:
-                result.append(html.escape(match.group()))
-        else:
-            output_tag = "ul" if tag == "list" else tag
-            result.append(f"<{output_tag}>")
-            stack.append((tag, f"</{output_tag}>"))
-    result.append(html.escape(text[position:]).replace("\n", "<br>"))
-    result.extend(close for _, close in reversed(stack))
-    return "".join(result)
 
 
 def item_row(
@@ -95,6 +40,7 @@ def item_row(
         and game_version not in item.supported_versions
     )
     file_size, votes, member_count = "Unknown", "Unrated", 0
+    votes_up = votes_down = "0"
     if isinstance(item, CatalogMod):
         state = install_state(item)
         incompatible = incompatible or item.incompatible
@@ -107,7 +53,10 @@ def item_row(
         if item.file_size is not None:
             file_size = f"{int(item.file_size) / 1048576:.1f} MB"
         if item.votes is not None:
-            votes = f"{item.votes.up} up / {item.votes.down} down"
+            votes_up, votes_down = f"{item.votes.up:,}", f"{item.votes.down:,}"
+            total = item.votes.up + item.votes.down
+            if total:
+                votes = f"{100 * item.votes.up / total:.0f}%"
     else:
         state = "missing"
         source_label = (
@@ -142,6 +91,7 @@ def item_row(
         or "Not specified",
         "tags": " · ".join(tag for tag in item.tags if tag not in versions),
         "state": state,
+        "active": False,
         "queued": False,
         "stateLabel": {
             "missing": "Not installed",
@@ -151,10 +101,12 @@ def item_row(
         "actionLabel": action_label,
         "incompatible": incompatible,
         "memberCount": member_count,
-        "description": description_rich_text(item.description, item.description_format),
+        "description": description_to_html(item.description, item.description_format),
         "workshopUrl": safe_url(item.workshop_url or ""),
         "fileSize": file_size,
         "votes": votes,
+        "votesUp": votes_up,
+        "votesDown": votes_down,
     }
 
 
@@ -171,6 +123,7 @@ class CatalogListModel(QAbstractListModel):
         "versions",
         "tags",
         "state",
+        "active",
         "stateLabel",
         "actionLabel",
         "incompatible",
@@ -179,6 +132,8 @@ class CatalogListModel(QAbstractListModel):
         "workshopUrl",
         "fileSize",
         "votes",
+        "votesUp",
+        "votesDown",
         "queued",
     )
 

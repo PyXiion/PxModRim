@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         "chevron-left",
         "chevron-down",
         "folder",
+        "thumbs-up",
         "tag",
         "steam",
         "local",
@@ -53,6 +54,13 @@ from pxmodrim.ui.theme.palette import PALETTE
 # Each icon is an SVG path data string.
 # stroke svg uses 24x24 viewBox, stroke-width 2, stroke="currentColor"
 _ICONS: dict[str, str] = {
+    "thumbs-up": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M7 10l5-7h2v7h5a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7"/>'
+        '<path d="M3 10h4v11H3z"/>'
+        "</svg>"
+    ),
     "logo": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'

@@ -19,6 +19,9 @@ Rectangle {
     required property bool incompatible
     required property bool queued
     required property int memberCount
+    required property string votes
+    required property string fileSize
+    required property bool active
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
     radius: Theme.radiusMd
@@ -83,7 +86,7 @@ Rectangle {
             textFormat: Text.PlainText
             color: Theme.textMuted
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            font.pixelSize: Theme.fontSizeMd
             elide: Text.ElideRight
         }
         Flow {
@@ -104,7 +107,7 @@ Rectangle {
                 fillColor: Theme.elevate3
             }
             PxBadge {
-                visible: card.kind === "mod" && card.state === "installed"
+                visible: card.kind === "mod" && card.state !== "missing"
                 compact: true
                 text: "INSTALLED"
                 textColor: Theme.success
@@ -127,24 +130,54 @@ Rectangle {
             Layout.fillWidth: true
             text: "Versions: " + card.versions
             textFormat: Text.PlainText
-            color: Theme.textDim
+            color: Theme.textMuted
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeXs
+            font.pixelSize: Theme.fontSizeMd
             elide: Text.ElideRight
         }
-        Item { Layout.fillHeight: true }
         RowLayout {
             Layout.fillWidth: true
+            visible: card.kind === "mod"
+            spacing: 6
+            Image {
+                width: 16; height: 16
+                sourceSize.width: 16; sourceSize.height: 16
+                source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
+            }
+            Text {
+                text: card.votes
+                color: Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeMd
+                Accessible.name: text === "Unrated" ? text : text + " positive votes"
+            }
+            Item { Layout.fillWidth: true }
+            Text {
+                text: card.fileSize
+                color: Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeMd
+            }
+        }
+        Item { Layout.fillHeight: true }
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
             PxButton {
                 text: "Details"
                 variant: "ghost"
                 onClicked: workshopPanel.openItem(card.itemId, card.kind)
             }
-            Item { Layout.fillWidth: true }
             PxButton {
+                visible: card.kind === "mod" && card.state !== "missing"
+                text: card.active ? "Deactivate" : "Activate"
+                onClicked: workshopPanel.toggleActivation(card.itemId)
+            }
+            PxButton {
+                visible: card.state !== "installed"
                 text: card.actionLabel
                 variant: card.state === "outdated" ? "primary" : "secondary"
-                enabled: card.state !== "installed" && !card.queued
+                enabled: !card.queued
                 onClicked: workshopPanel.downloadItem(card.itemId, card.kind)
             }
         }

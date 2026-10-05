@@ -9,7 +9,6 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 from qasync import QEventLoop
 
@@ -100,7 +99,15 @@ def _configure_file_logging() -> int:
 
 def _parse_disabled_plugins() -> set[str]:
     disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
-    return {n.strip() for n in disabled_raw.split(",") if n.strip()}
+    disabled = {n.strip() for n in disabled_raw.split(",") if n.strip()}
+    manifest = resource_files("pxmodrim") / "workshop-variant.txt"
+    if manifest.is_file():
+        exclusions = {
+            "NativeWorkshop": {"steamworkshop"},
+            "SteamWorkshop": {"workshop_catalog", "workshop_ui"},
+        }
+        disabled.update(exclusions[manifest.read_text(encoding="utf-8").strip()])
+    return disabled
 
 
 _WHEEL_SCROLL_LINES = 8
@@ -112,13 +119,21 @@ class App:
     __slots__ = (
         "_app_ctx",
         "_ctx",
+        "_disabled_plugins",
         "main_window",
         "qt_app",
     )
 
     def __init__(self) -> None:
         _configure_file_logging()
-        QtWebEngineQuick.initialize()
+        self._disabled_plugins = _parse_disabled_plugins()
+        if (
+            "steamworkshop" not in self._disabled_plugins
+            and "steam_downloader" not in self._disabled_plugins
+        ):
+            from PySide6.QtWebEngineQuick import QtWebEngineQuick
+
+            QtWebEngineQuick.initialize()
 
         self._ctx: CoreContext | None = None
         self.qt_app = QApplication(sys.argv)
@@ -185,7 +200,7 @@ class App:
 
         self._app_ctx.register_plugin(OrganizerUiPlugin())
 
-        disabled = _parse_disabled_plugins()
+        disabled = self._disabled_plugins
 
         downloaders: list[str] = []
         steam_enabled = "steam_downloader" not in disabled
@@ -200,7 +215,7 @@ class App:
                 downloaders.append("steam")
 
         if "steam" in downloaders and "steamworkshop" not in disabled:
-            from pxmodrim.ui.plugins import SteamWorkshopUiPlugin
+            from pxmodrim.ui.plugins.steam_workshop import SteamWorkshopUiPlugin
 
             self._app_ctx.register_plugin(SteamWorkshopUiPlugin())
 

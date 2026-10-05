@@ -4,61 +4,13 @@ import msgspec
 import pytest
 from PySide6.QtCore import QModelIndex, QObject, Qt
 
-from pxmodrim.core.workshop import Author, CatalogCollection, CatalogMod, Preview
+from pxmodrim.core.workshop import Author, CatalogCollection, CatalogMod, Preview, Votes
+from pxmodrim.ui.panels.mod_info_data import description_to_html
 from pxmodrim.ui.plugins.workshop.models import (
     CatalogListModel,
-    description_rich_text,
     item_row,
     safe_url,
 )
-
-
-@pytest.mark.parametrize(
-    ("source", "expected"),
-    [
-        (
-            "[b]Bold[/b] [i]italic[/i] [u]underlined[/u]",
-            "<b>Bold</b> <i>italic</i> <u>underlined</u>",
-        ),
-        (
-            "[h1]Heading[/h1][h2]Two[/h2][h3]Three[/h3]",
-            "<h1>Heading</h1><h2>Two</h2><h3>Three</h3>",
-        ),
-        ("[list][*]one[*]two[/list]", "<ul><li>one</li><li>two</li></ul>"),
-        ("<script>alert(1)</script>&", "&lt;script&gt;alert(1)&lt;/script&gt;&amp;"),
-        (
-            '[b]<img src="file:///secret">[/b]',
-            "<b>&lt;img src=&quot;file:///secret&quot;&gt;</b>",
-        ),
-        ("[url=javascript:alert(1)]click[/url]", "click"),
-        ("[url=file:///etc/passwd]secret[/url]", "secret"),
-        ("[url=data:text/html,test]data[/url]", "data"),
-        (
-            '[url=https://example.com/?x="&y=1]safe[/url]',
-            '<a href="https://example.com/?x=&quot;&amp;y=1">safe</a>',
-        ),
-        (
-            "[url]https://example.com[/url]",
-            '<a href="https://example.com">https://example.com</a>',
-        ),
-        (
-            "[img]https://example.com/picture.png[/img]",
-            '<a href="https://example.com/picture.png">Image</a>',
-        ),
-        ("[img]file:///secret[/img]", "Image"),
-        ("[b]unfinished", "<b>unfinished</b>"),
-        ("[unknown]<b>raw</b>[/unknown]", "[unknown]&lt;b&gt;raw&lt;/b&gt;[/unknown]"),
-    ],
-)
-def test_bbcode_emits_only_safe_markup(source: str, expected: str) -> None:
-    assert description_rich_text(source) == expected
-
-
-def test_text_descriptions_never_parse_bbcode_or_html() -> None:
-    assert (
-        description_rich_text("[b]<b>Text</b>[/b]\nnext", "text")
-        == "[b]&lt;b&gt;Text&lt;/b&gt;[/b]<br>next"
-    )
 
 
 @pytest.mark.parametrize(
@@ -138,6 +90,35 @@ def test_row_shows_update_and_game_incompatibility() -> None:
     assert row["fileSize"] == "1.0 MB"
 
 
+@pytest.mark.parametrize(
+    ("votes", "approval", "up", "down"),
+    [
+        (None, "Unrated", "0", "0"),
+        (Votes(0, 0, 100), "Unrated", "0", "0"),
+        (Votes(0, 1, None), "0%", "0", "1"),
+        (Votes(1, 0, None), "100%", "1", "0"),
+        (Votes(1, 2, None), "33%", "1", "2"),
+        (Votes(2, 1, None), "67%", "2", "1"),
+        (Votes(1_000, 3_000, None), "25%", "1,000", "3,000"),
+    ],
+)
+def test_vote_approval_and_counts(
+    votes: Votes | None, approval: str, up: str, down: str
+) -> None:
+    mod = msgspec.structs.replace(_mod("1"), votes=votes)
+    row = item_row(mod, lambda _: "installed", "1.5")
+    assert (row["votes"], row["votesUp"], row["votesDown"]) == (approval, up, down)
+
+
+@pytest.mark.parametrize("description_format", ["bbcode", "text"])
+def test_descriptions_use_shared_mod_info_renderer(description_format: str) -> None:
+    mod = msgspec.structs.replace(_mod("1"), description_format=description_format)
+    row = item_row(mod, lambda _: "missing", "1.5")
+    assert row["description"] == description_to_html(
+        mod.description, description_format
+    )
+
+
 def test_versions_are_unique_numeric_sorted_and_not_repeated_in_tags() -> None:
     mod = _mod("1")
     mod = msgspec.structs.replace(
@@ -176,3 +157,5 @@ def test_collection_image_prefers_own_then_first_image_then_member_collage() -> 
     row = item_row(bare, lambda _: "missing", "1.6")
     assert row["previewUrl"] == "https://images.test/own.png"
     assert row["collage"] == ["https://images.test/m.png"]
+    assert (row["votes"], row["votesUp"], row["votesDown"]) == ("Unrated", "0", "0")
+    assert row["active"] is False

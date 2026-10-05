@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workshop supported versions are deduplicated, sorted numerically, and shown once rather than repeated among category tags.
 - Collection detail pages show member-image collages when no collection preview is available, including cached responses without thumbnail metadata.
 - Closing the Workshop browser disconnects its core event subscriptions before Qt deletes its models, so queue cancellation during application shutdown no longer calls a deleted model.
+- App header logo SVGs place decorative orbital arcs behind the PxModRim text, eliminating the accidental strikethrough appearance across letters at smaller sizes.
 
 ### Added
 - Native QML Workshop browser: Discover, Mods, Collections and Installed views, catalog filters and detail pages, dependency-aware mod/collection downloads into Local mods, compatibility warnings and updates for downloader-managed copies. Downloads queue in the background (progress in the header, results in Downloads) so browsing stays usable, pages show remembered results immediately and refresh in the background, and the Installed tab loads 48 mods at a time. Catalog URL defaults to `https://api.modrim.pyxiion.dev` and can be changed or emptied to disable network requests; no catalog descriptions execute as HTML and downloads never activate mods.
@@ -20,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings > Launch: game arguments (also passed through `steam://run` for the Steam strategy), a wrapper command for direct launch (`KEY=VALUE` env vars, `%command%` placeholder, e.g. `gamemoderun %command%`), and what the window does after launch (stay open, minimize while the game runs, close).
 - Pre-launch prompts for a mod list with errors, unsaved changes (saved before launch), and a game that is already running. Each has a "Don't ask again" checkbox and a Settings toggle.
 - The left rail's collapsed/expanded state is remembered between sessions.
+- Native Workshop cards display approval percentage with thumb icons, formatted vote counts, score, and mod file size.
+- Installed Workshop mod cards and detail views provide Activate/Deactivate toggles alongside installed badges, keeping mods safe from accidental activation during download.
+- Workshop tag filtering uses a searchable dropdown populated from known mod and collection tags, replacing free-text exact matching.
+- Navigating back from Workshop mod details preserves the current tab, search query, active filters, and scroll position.
+- Workshop and Mod Info share the same sanitized description pipeline and selectable rich-text description renderer.
+- CI release matrix builds separate `SteamWorkshop` and `NativeWorkshop` artifact packages across Linux, macOS, and Windows.
 
 ### Changed
 - Updated PxSteamDL to 0.3.0: failed updates keep the previous item installed, concurrent downloads of one item are serialized by a lock, transient network failures are retried, and a failed item-details request fails only its batch instead of the whole download. Download progress uses the unpacked byte counters and cancellation uses `Result.cancelled`.
