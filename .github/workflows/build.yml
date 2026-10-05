@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
 
@@ -47,6 +47,13 @@ jobs:
 
       - name: Build with Nuitka
         run: just build-release-bundled
+
+      - name: Verify glibc floor
+        run: |
+          max=$(find dist/entrypoint.dist -type f \( -name '*.so*' -o -perm -u+x \) -exec objdump -T {} + 2>/dev/null \
+            | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+          echo "Highest GLIBC symbol: $max"
+          test "$(printf '%s\nGLIBC_2.35\n' "$max" | sort -V | tail -1)" = "GLIBC_2.35"
 
       - name: Package tar.gz
         run: tar -czf PxModRim-Linux.tar.gz -C dist entrypoint.dist/
