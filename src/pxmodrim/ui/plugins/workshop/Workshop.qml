@@ -71,12 +71,6 @@ Rectangle {
                 opacity: workshopPanel.busy ? 1 : 0
                 Accessible.name: "Loading"
             }
-            Copy {
-                Layout.fillWidth: false
-                visible: root.width > 1000
-                text: workshopPanel.gameVersion ? "Your game: " + workshopPanel.gameVersion : "Game version unknown"
-                font.pixelSize: Theme.fontSizeSm
-            }
         }
         ColumnLayout {
             Layout.fillWidth: true
@@ -250,91 +244,170 @@ Rectangle {
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
+                    Layout.maximumWidth: 1200
+                    Layout.alignment: Qt.AlignHCenter
                     visible: workshopPanel.configured && workshopPanel.hasDetail
+                    spacing: 16
                     PxButton { text: "← Back"; variant: "ghost"; onClicked: workshopPanel.back() }
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 240
-                        color: Theme.elevate2
-                        radius: Theme.radiusMd
-                        clip: true
-                        Image {
-                            id: detailImage
-                            anchors.fill: parent
-                            source: root.detail.previewUrl || ""
-                            asynchronous: true
-                            sourceSize.width: 1000
-                            sourceSize.height: 480
-                            fillMode: Image.PreserveAspectCrop
-                        }
-                        Image {
-                            anchors.centerIn: parent
-                            width: 48
-                            height: 48
-                            visible: detailImage.status !== Image.Ready
-                            source: "image://icons/grid?color=" + encodeURIComponent(Theme.textDim)
-                        }
-                    }
-                    Copy { text: root.detail.sourceLabel || ""; color: Theme.primary; font.pixelSize: Theme.fontSizeSm }
-                    Heading { text: root.detail.title || ""; font.pixelSize: 26 }
-                    Copy { text: "By " + (root.detail.author || "") }
-                    Copy { text: "Versions: " + (root.detail.versions || "") }
-                    Copy { text: root.detail.tags || "" }
-                    Copy { visible: !!root.detail.incompatible; text: "⚠ This item does not support your running game version. Downloading does not make it compatible."; color: Theme.warning }
-                    Copy { visible: !!root.detail.warning; text: root.detail.warning || ""; color: Theme.warning }
                     RowLayout {
-                        PxButton {
-                            text: root.detail.actionLabel || "Download"
-                            variant: "primary"
-                            enabled: !workshopPanel.busy && !workshopPanel.downloading && root.detail.state !== "installed"
-                            onClicked: workshopPanel.downloadItem(root.detail.itemId, root.detail.kind)
-                        }
-                        PxButton { visible: !!root.detail.workshopUrl; text: "View on Steam"; onClicked: workshopPanel.openLink(root.detail.workshopUrl) }
-                    }
-                    Copy { text: "Downloads go to Local mods. Nothing is enabled or subscribed automatically."; font.pixelSize: Theme.fontSizeSm }
-                    Copy { visible: root.detail.kind === "mod"; text: "Size: " + (root.detail.fileSize || "") + " · Votes: " + (root.detail.votes || "") }
-                    Heading { text: "Description" }
-                    Text {
                         Layout.fillWidth: true
-                        text: root.detail.description || ""
-                        textFormat: Text.RichText
-                        wrapMode: Text.Wrap
-                        color: Theme.textMuted
-                        linkColor: Theme.primary
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMd
-                        onLinkActivated: link => workshopPanel.openLink(link)
-                    }
-                    Heading { text: root.detail.kind === "collection" ? "Collection members (" + catalogMembers.count + ")" : "Required dependencies" }
-                    Copy { visible: catalogMembers.count === 0; text: "None listed." }
-                    Repeater {
-                        model: catalogMembers
+                        spacing: 16
                         Rectangle {
-                            id: member
-                            required property string itemId
-                            required property string kind
-                            required property string title
-                            required property string versions
-                            required property string stateLabel
-                            required property string state
-                            required property string actionLabel
-                            required property bool incompatible
                             Layout.fillWidth: true
-                            implicitHeight: memberRow.implicitHeight + 24
-                            radius: Theme.radiusMd
+                            Layout.preferredWidth: 3
+                            Layout.alignment: Qt.AlignTop
+                            Layout.preferredHeight: Math.max(220, Math.min(340, width * 0.5))
                             color: Theme.elevate2
-                            RowLayout {
-                                id: memberRow
+                            border.color: Theme.border
+                            radius: Theme.radiusMd
+                            clip: true
+                            Image {
+                                id: detailImage
                                 anchors.fill: parent
-                                anchors.margins: 12
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    Copy { text: member.title; color: Theme.textMain }
-                                    Copy { text: member.stateLabel + " · Versions: " + member.versions; font.pixelSize: Theme.fontSizeSm }
-                                    Copy { visible: member.incompatible; text: "⚠ Incompatible with your game"; color: Theme.warning; font.pixelSize: Theme.fontSizeSm }
+                                source: root.detail.previewUrl || ""
+                                asynchronous: true
+                                sourceSize.width: 1000
+                                sourceSize.height: 600
+                                fillMode: Image.PreserveAspectFit
+                            }
+                            Grid {
+                                id: detailCollage
+                                anchors.fill: parent
+                                visible: !root.detail.previewUrl && (root.detail.collage || []).length > 0
+                                columns: (root.detail.collage || []).length === 1 ? 1 : 2
+                                readonly property int rowCount: (root.detail.collage || []).length > 2 ? 2 : 1
+                                Repeater {
+                                    model: root.detail.collage || []
+                                    Image {
+                                        required property string modelData
+                                        width: detailCollage.width / detailCollage.columns
+                                        height: detailCollage.height / detailCollage.rowCount
+                                        source: modelData
+                                        asynchronous: true
+                                        fillMode: Image.PreserveAspectCrop
+                                        sourceSize.width: 480
+                                        sourceSize.height: 300
+                                    }
                                 }
-                                PxButton { text: "Details"; variant: "ghost"; onClicked: workshopPanel.openItem(member.itemId, member.kind) }
-                                PxButton { text: member.actionLabel; enabled: !workshopPanel.busy && !workshopPanel.downloading && member.state !== "installed"; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
+                            }
+                            Image {
+                                anchors.centerIn: parent
+                                width: 48
+                                height: 48
+                                visible: detailImage.status !== Image.Ready && !detailCollage.visible
+                                source: "image://icons/grid?color=" + encodeURIComponent(Theme.textDim)
+                            }
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 2
+                            Layout.alignment: Qt.AlignTop
+                            spacing: 10
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 6
+                                PxBadge { text: (root.detail.sourceLabel || "").toUpperCase(); textColor: Theme.textMuted }
+                                PxBadge { visible: root.detail.state === "installed"; text: "INSTALLED"; textColor: Theme.success }
+                                PxBadge { visible: root.detail.state === "outdated"; text: "UPDATE AVAILABLE" }
+                                PxBadge { visible: !!root.detail.incompatible; text: "INCOMPATIBLE"; textColor: Theme.warning }
+                            }
+                            Heading { Layout.fillWidth: true; text: root.detail.title || ""; font.pixelSize: 26; wrapMode: Text.Wrap }
+                            Copy { text: "by " + (root.detail.author || "") }
+                            Copy { Layout.fillWidth: true; text: "Supports " + (root.detail.versions || ""); font.pixelSize: Theme.fontSizeSm }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.tags; text: root.detail.tags || ""; font.pixelSize: Theme.fontSizeSm }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.incompatible; text: "Does not list your game version. Downloading does not make it compatible."; color: Theme.warning; font.pixelSize: Theme.fontSizeSm }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.warning; text: root.detail.warning || ""; color: Theme.warning; font.pixelSize: Theme.fontSizeSm }
+                            RowLayout {
+                                spacing: 8
+                                PxButton {
+                                    text: root.detail.actionLabel || "Download"
+                                    variant: root.detail.state === "outdated" ? "primary" : "secondary"
+                                    enabled: !workshopPanel.busy && !workshopPanel.downloading && root.detail.state !== "installed"
+                                    onClicked: workshopPanel.downloadItem(root.detail.itemId, root.detail.kind)
+                                }
+                                PxButton { visible: !!root.detail.workshopUrl; text: "View on Steam"; variant: "ghost"; onClicked: workshopPanel.openLink(root.detail.workshopUrl) }
+                            }
+                            Copy { Layout.fillWidth: true; text: "Local mods · downloading does not enable or subscribe."; font.pixelSize: Theme.fontSizeSm; color: Theme.textDim }
+                            Copy { visible: root.detail.kind === "mod"; text: (root.detail.fileSize || "") + " · " + (root.detail.votes || ""); font.pixelSize: Theme.fontSizeSm }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 3
+                            Layout.alignment: Qt.AlignTop
+                            implicitHeight: descColumn.implicitHeight + 32
+                            color: Theme.elevate2
+                            border.color: Theme.border
+                            radius: Theme.radiusMd
+                            ColumnLayout {
+                                id: descColumn
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 10
+                                Heading { text: "Description" }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: root.detail.description || ""
+                                    textFormat: Text.RichText
+                                    wrapMode: Text.Wrap
+                                    color: Theme.textMuted
+                                    linkColor: Theme.primary
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeMd
+                                    onLinkActivated: link => workshopPanel.openLink(link)
+                                }
+                            }
+                        }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 2
+                            Layout.alignment: Qt.AlignTop
+                            implicitHeight: membersColumn.implicitHeight + 32
+                            color: Theme.elevate2
+                            border.color: Theme.border
+                            radius: Theme.radiusMd
+                            ColumnLayout {
+                                id: membersColumn
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 8
+                                Heading { text: root.detail.kind === "collection" ? "Collection members · " + catalogMembers.count : "Required mods · " + catalogMembers.count }
+                                Copy { visible: catalogMembers.count === 0; text: "None listed." }
+                                Repeater {
+                                    model: catalogMembers
+                                    Rectangle {
+                                        id: member
+                                        required property string itemId
+                                        required property string kind
+                                        required property string title
+                                        required property string versions
+                                        required property string stateLabel
+                                        required property string state
+                                        required property string actionLabel
+                                        required property bool incompatible
+                                        Layout.fillWidth: true
+                                        implicitHeight: memberRow.implicitHeight + 20
+                                        radius: Theme.radiusSm
+                                        color: Theme.elevate3
+                                        RowLayout {
+                                            id: memberRow
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 8
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Copy { Layout.fillWidth: true; text: member.title; color: Theme.textMain; elide: Text.ElideRight; maximumLineCount: 1 }
+                                                Copy { text: member.stateLabel + (member.incompatible ? " · incompatible" : ""); font.pixelSize: Theme.fontSizeSm; color: member.incompatible ? Theme.warning : Theme.textMuted }
+                                            }
+                                            PxButton { text: "Details"; variant: "ghost"; onClicked: workshopPanel.openItem(member.itemId, member.kind) }
+                                            PxButton { visible: member.state !== "installed"; text: member.actionLabel; variant: member.state === "outdated" ? "primary" : "secondary"; enabled: !workshopPanel.busy && !workshopPanel.downloading; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
