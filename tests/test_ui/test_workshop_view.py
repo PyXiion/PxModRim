@@ -9,6 +9,7 @@ import pytest
 from PySide6.QtCore import QUrl
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QWidget
+from shiboken6 import delete, isValid
 
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
@@ -148,7 +149,9 @@ async def panel(
     view = WorkshopViewPanel(ctx, engine, owner, catalog=catalog)
     view.resize(1100, 800)
     yield view, catalog, warnings
-    view._qml.setSource(QUrl())
+    if isValid(view):
+        view.teardown()
+        view._qml.setSource(QUrl())
     owner.deleteLater()
 
 
@@ -160,6 +163,55 @@ async def test_view_loads_qml_and_discovery_without_errors(
     assert view._qml.status() == QQuickWidget.Status.Ready
     assert view.mods_model.count == 1 and view.collections_model.count == 1
     assert not warnings, [warning.toString() for warning in warnings]
+
+
+async def test_destroyed_view_does_not_receive_core_shutdown_events(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    await view.load()
+    model = view.mods_model
+    assert model.count == 1
+    notifications: list[None] = []
+    catalog.queue_changed.connect(notifications.append)
+    downloads = view._downloads
+    view._qml.setSource(QUrl())
+    delete(view)
+    await catalog.shutdown()
+    downloads.busy_changed.emit(False)
+    catalog.installed_changed.emit(None)
+    catalog.catalog_url_changed.emit("")
+    assert not isValid(model)
+    assert notifications == [None]
+
+
+async def test_teardown_discards_load_finishing_after_view_destruction(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, catalog, _ = panel
+    await view.load()
+    started, release = asyncio.Event(), asyncio.Event()
+    discover = catalog.discover
+
+    async def delayed_discover() -> Discover:
+        started.set()
+        await release.wait()
+        return await discover()
+
+    monkeypatch.setattr(catalog, "discover", delayed_discover)
+    catalog._responses.clear()
+    task = asyncio.ensure_future(view.refresh())
+    async with asyncio.timeout(3):
+        await started.wait()
+    view.teardown()
+    view.teardown()
+    model = view.mods_model
+    view._qml.setSource(QUrl())
+    delete(view)
+    release.set()
+    await task
+    assert not isValid(model)
 
 
 async def test_view_paging_filters_and_catalog_errors(

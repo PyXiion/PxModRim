@@ -80,6 +80,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._error = ""
         self._notice = ""
         self._generation = 0
+        self._torn_down = False
         self._retry: Callable[[], Awaitable[None]] | None = None
         self._detail: dict[str, Any] = {}
         self._detail_data: Detail | None = None
@@ -108,6 +109,18 @@ class WorkshopViewPanel(BaseViewPanel):
         self._catalog.queue_changed.connect(self._on_queue_changed)
         self._catalog.catalog_url_changed.connect(self._on_url_changed)
         self._catalog.installed_changed.connect(self._on_installed_changed)
+        self.destroyed.connect(lambda: self.teardown())
+
+    def teardown(self) -> None:
+        if self._torn_down:
+            return
+        self._torn_down = True
+        self._generation += 1
+        self._retry = None
+        self._downloads.busy_changed.disconnect(self._on_queue_changed)
+        self._catalog.queue_changed.disconnect(self._on_queue_changed)
+        self._catalog.catalog_url_changed.disconnect(self._on_url_changed)
+        self._catalog.installed_changed.disconnect(self._on_installed_changed)
 
     @property
     def _game_version(self) -> str:
@@ -181,6 +194,8 @@ class WorkshopViewPanel(BaseViewPanel):
     ) -> None:
         """Apply each value the stream yields; only a failure before the first
         value is shown to the user, later ones are background refreshes."""
+        if self._torn_down:
+            return
         self._generation += 1
         generation = self._generation
         self._busy, self._error = True, ""
