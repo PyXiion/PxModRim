@@ -70,6 +70,14 @@ class ModListPanel(QWidget):
     def highlightedUuids(self) -> list[str]:
         return self._highlighted_uuids
 
+    @Property(int, notify=highlighted_uuids_changed)
+    def highlightRevision(self) -> int:
+        return self._highlight_revision
+
+    @Slot(str, result=bool)
+    def isHighlighted(self, uuid: str) -> bool:
+        return uuid in self._highlighted_set
+
     def __init__(
         self,
         ctx: CoreContext,
@@ -83,6 +91,8 @@ class ModListPanel(QWidget):
             getattr(cfg, "compact_mod_list", False) if cfg else False
         )
         self._highlighted_uuids: list[str] = []
+        self._highlighted_set: frozenset[str] = frozenset()
+        self._highlight_revision = 0
         self._highlight_generation = 0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -271,6 +281,8 @@ class ModListPanel(QWidget):
 
     def _set_highlighted(self, uuids: list[str]) -> None:
         self._highlighted_uuids = uuids
+        self._highlighted_set = frozenset(uuids)
+        self._highlight_revision += 1
         self.highlighted_uuids_changed.emit()
 
     async def _clear_highlight(self, generation: int) -> None:

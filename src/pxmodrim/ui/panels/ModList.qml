@@ -206,7 +206,8 @@ Rectangle {
 
             color: {
                 var highlighted = modListPanel
-                    && modListPanel.highlightedUuids.indexOf(model.uuid) >= 0
+                    && modListPanel.highlightRevision >= 0
+                    && modListPanel.isHighlighted(model.uuid)
                 if (listView.selectedIndices.indexOf(index) >= 0)
                     return highlighted
                         ? Qt.tint(Theme.elevate4, Qt.alpha(Theme.primary, 0.25))

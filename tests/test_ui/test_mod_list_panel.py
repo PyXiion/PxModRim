@@ -135,6 +135,7 @@ def _panel(qapp: QApplication) -> ModListPanel:
 
     panel = ModListPanel.__new__(ModListPanel)
     panel._highlighted_uuids = []
+    panel._highlight_revision = 0
     panel._highlight_generation = 0
     panel._qml = cast(QQuickWidget, SimpleNamespace(rootObject=lambda: None))
     panel._ctx = cast(CoreContext, ctx)
