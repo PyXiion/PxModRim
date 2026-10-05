@@ -300,3 +300,35 @@ async def test_enqueue_runs_batches_in_order_after_the_running_download(
         assert calls == [["5", "6"], ["7"]] and not catalog.queued_ids
     finally:
         await catalog.shutdown()
+
+
+async def test_cached_values_survive_a_restart_and_corrupt_files_are_ignored(
+    tmp_path: Path,
+) -> None:
+    ctx, _ = make_context(tmp_path)
+
+    async def produce() -> list[int]:
+        return [1, 2]
+
+    async def must_not_run() -> list[int]:
+        raise AssertionError("A fresh value on disk must not hit the catalog")
+
+    first = WorkshopCatalog(lambda: ctx.config)
+    first.setup(ctx)
+    assert [v async for v in first.cached("k", produce, value_type=list[int])] == [
+        [1, 2]
+    ]
+
+    second = WorkshopCatalog(lambda: ctx.config)
+    second.setup(ctx)
+    assert [
+        v async for v in second.cached("k", must_not_run, value_type=list[int])
+    ] == [[1, 2]]
+
+    for file in (tmp_path / "workshop-cache").glob("*.json"):
+        file.write_text("{not json")
+    third = WorkshopCatalog(lambda: ctx.config)
+    third.setup(ctx)
+    assert [v async for v in third.cached("k", produce, value_type=list[int])] == [
+        [1, 2]
+    ]

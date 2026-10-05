@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import msgspec
 from loguru import logger
 from PySide6.QtCore import Property, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QDesktopServices
@@ -18,7 +18,9 @@ from pxmodrim.core.workshop import (
     CatalogCollection,
     CatalogError,
     CatalogMod,
+    CatalogPage,
     CatalogQuery,
+    Discover,
     DownloadPlan,
     WorkshopCatalog,
 )
@@ -39,10 +41,9 @@ if TYPE_CHECKING:
 _PAGE = 48
 
 
-@dataclass(frozen=True)
-class _Detail:
+class _Detail(msgspec.Struct, frozen=True):
     item: CatalogMod | CatalogCollection
-    members: tuple[CatalogMod | CatalogCollection, ...]
+    members: list[CatalogMod | CatalogCollection]
     warning: str
     complete: bool
 
@@ -222,7 +223,9 @@ class WorkshopViewPanel(BaseViewPanel):
                 )
 
             await self._run_stream(
-                lambda: self._catalog.cached("discover", self._catalog.discover),
+                lambda: self._catalog.cached(
+                    "discover", self._catalog.discover, value_type=Discover
+                ),
                 apply_discover,
             )
         elif self._tab == "Installed":
@@ -234,7 +237,10 @@ class WorkshopViewPanel(BaseViewPanel):
 
             await self._run_stream(
                 lambda: self._catalog.cached(
-                    "installed", self._catalog.installed_with_updates, fresh_for=0
+                    "installed",
+                    self._catalog.installed_with_updates,
+                    fresh_for=0,
+                    value_type=list[CatalogMod],
                 ),
                 apply_installed,
             )
@@ -256,9 +262,16 @@ class WorkshopViewPanel(BaseViewPanel):
             if append:
                 await self._run(lambda: fetch(query), apply_page)
             else:
+                page_type = (
+                    CatalogPage[CatalogCollection]
+                    if self._tab == "Collections"
+                    else CatalogPage[CatalogMod]
+                )
                 await self._run_stream(
                     lambda: self._catalog.cached(
-                        f"{self._tab}|{query!r}", lambda: fetch(query)
+                        f"{self._tab}|{query!r}",
+                        lambda: fetch(query),
+                        value_type=page_type,
                     ),
                     apply_page,
                 )
@@ -352,7 +365,7 @@ class WorkshopViewPanel(BaseViewPanel):
                     warning += " Unavailable: " + ", ".join(detail.unavailable_ids)
                 return _Detail(
                     detail.collection,
-                    tuple(detail.members),
+                    list(detail.members),
                     warning,
                     detail.is_complete,
                 )
@@ -369,7 +382,7 @@ class WorkshopViewPanel(BaseViewPanel):
             ]
             return _Detail(
                 mod,
-                tuple(item for item in dependencies if item is not None),
+                [item for item in dependencies if item is not None],
                 "Unavailable dependencies: " + ", ".join(missing) if missing else "",
                 not missing,
             )
@@ -388,7 +401,10 @@ class WorkshopViewPanel(BaseViewPanel):
             self.members_model.set_page(members, len(members), None)
 
         await self._run_stream(
-            lambda: self._catalog.cached(f"detail|{kind}|{item_id}", fetch), apply
+            lambda: self._catalog.cached(
+                f"detail|{kind}|{item_id}", fetch, value_type=_Detail
+            ),
+            apply,
         )
 
     @Slot()

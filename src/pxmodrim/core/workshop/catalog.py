@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
+import msgspec
 from loguru import logger
 
 from pxmodrim.core.downloads.manager import DownloadManager, download_manager
@@ -23,6 +25,8 @@ from pxmodrim.core.workshop.types import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pxmodrim.core.config import AppConfig
     from pxmodrim.core.context import CoreContext
     from pxmodrim.core.downloads.types import DownloadResult
@@ -30,6 +34,37 @@ if TYPE_CHECKING:
 
 _FRESH_SECONDS = 300.0
 _CACHE_LIMIT = 200
+_DISK_LIMIT = 300
+
+_V = TypeVar("_V")
+
+
+class _Stored(msgspec.Struct, Generic[_V]):  # noqa: UP046
+    at: float
+    value: _V
+
+
+def _cache_file(directory: Path, key: str) -> Path:
+    return directory / f"{hashlib.sha256(key.encode()).hexdigest()[:32]}.json"
+
+
+def _read_stored(path: Path, value_type: Any) -> tuple[float, Any] | None:
+    stored_type: Any = _Stored[value_type]
+    try:
+        stored = msgspec.json.decode(path.read_bytes(), type=stored_type)
+    except (OSError, msgspec.DecodeError):
+        return None
+    return stored.at, stored.value
+
+
+def _write_stored(directory: Path, path: Path, entry: tuple[float, Any]) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_bytes(msgspec.json.encode(_Stored(entry[0], entry[1])))
+    temporary.replace(path)
+    files = sorted(directory.glob("*.json"), key=lambda file: file.stat().st_mtime)
+    for stale in files[:-_DISK_LIMIT]:
+        stale.unlink(missing_ok=True)
 
 
 class WorkshopCatalog(Plugin):
@@ -57,9 +92,12 @@ class WorkshopCatalog(Plugin):
         self._manager: DownloadManager | None = None
         self._installed_index: dict[str, list[ListedMod]] | None = None
         self._responses: dict[str, tuple[float, Any]] = {}
+        self._cache_dir: Path | None = None
 
     def setup(self, ctx: CoreContext) -> None:
         self._ctx = ctx
+        if ctx.has_config_service:
+            self._cache_dir = ctx.config_service.config_dir / "workshop-cache"
         self._manager = download_manager(ctx)
         ctx.mod_service.mods_changed.connect(self._on_installed_changed)
         self._manager.download_finished.connect(self._on_download_finished)
@@ -155,22 +193,37 @@ class WorkshopCatalog(Plugin):
         key: str,
         produce: Callable[[], Awaitable[T]],
         fresh_for: float = _FRESH_SECONDS,
+        value_type: Any = None,
     ) -> AsyncIterator[T]:
         """Yield the remembered value at once, then the refreshed one if it differs.
 
         A value younger than *fresh_for* is served without contacting the catalog.
+        With *value_type*, values are also kept on disk, so they survive a restart.
         """
         key = f"{self._base_url}|{key}"
         entry = self._responses.get(key)
+        directory = self._cache_dir if value_type is not None else None
+        if entry is None and directory is not None:
+            entry = await asyncio.to_thread(
+                _read_stored, _cache_file(directory, key), value_type
+            )
         if entry is not None:
             yield entry[1]
-            if time.monotonic() - entry[0] < fresh_for:
+            if time.time() - entry[0] < fresh_for:
                 return
         value = await produce()
+        remembered = (time.time(), value)
         self._responses.pop(key, None)
-        self._responses[key] = (time.monotonic(), value)
+        self._responses[key] = remembered
         while len(self._responses) > _CACHE_LIMIT:
             del self._responses[next(iter(self._responses))]
+        if directory is not None:
+            try:
+                await asyncio.to_thread(
+                    _write_stored, directory, _cache_file(directory, key), remembered
+                )
+            except OSError as exc:
+                logger.warning("[workshop] cannot write cache: {}", exc)
         if entry is None or value != entry[1]:
             yield value
 

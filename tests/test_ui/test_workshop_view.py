@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
+import msgspec
 import pytest
 from PySide6.QtCore import QUrl
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -241,3 +242,30 @@ async def test_settings_saves_and_applies_catalog_url(
     assert view._ctx.config.workshop_catalog_url == "https://catalog.example.test"
     await asyncio.sleep(0)
     settings.deleteLater()
+
+
+async def test_installed_search_filters_loaded_mods_without_refetching(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    await asyncio.sleep(0)
+    fetches = 0
+    base = catalog.mod_item
+    mods = [
+        msgspec.structs.replace(base, id=str(i), title=title)
+        for i, title in enumerate(["Harmony", "HugsLib", "Rim HUD"])
+    ]
+
+    async def installed() -> list[CatalogMod]:
+        nonlocal fetches
+        fetches += 1
+        return mods
+
+    catalog.installed_with_updates = installed  # type: ignore[method-assign]
+    await view.selectTab("Installed")
+    assert view.mods_model.count == 3 and fetches == 1
+
+    await view.filter("hugs", "", "all", "popular", "")
+    assert view.mods_model.count == 1 and view.tab == "Installed" and fetches == 1
+    await view.filter("", "", "all", "popular", "")
+    assert view.mods_model.count == 3 and fetches == 1
