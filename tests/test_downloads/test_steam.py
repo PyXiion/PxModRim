@@ -34,6 +34,7 @@ class FakeClient:
         self.network_failures = network_failures
         self.stopped = False
         self.calls: list[tuple[list[int], Path, int]] = []
+        self.blocked = threading.Event()
 
     def download(
         self,
@@ -61,6 +62,7 @@ class FakeClient:
                 )
             gate = self.gates.get(item_id)
             if gate is not None:
+                self.blocked.set()
                 gate.wait(timeout=5)
             error = "cancelled" if self.stopped else self.errors.get(item_id, "")
             if not error:
@@ -217,7 +219,7 @@ async def test_cancel_keeps_finished_items_and_returns(tmp_path: Path) -> None:
     svc.download_finished.connect(finished.append)
 
     async def cancel_when_blocked() -> None:
-        while not (tmp_path / "Mods" / "111").exists():
+        while not client.blocked.is_set():
             await asyncio.sleep(0.01)
         svc.cancel()
         client.stopped = True
