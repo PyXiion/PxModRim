@@ -122,7 +122,7 @@ Rectangle {
         }
         RowLayout {
             Layout.fillWidth: true
-            visible: workshopPanel.configured && !workshopPanel.hasDetail && workshopPanel.tab !== "Installed"
+            visible: workshopPanel.configured && !workshopPanel.hasDetail && (workshopPanel.tab === "Mods" || workshopPanel.tab === "Collections")
             Copy { Layout.fillWidth: false; text: "Game version" }
             PxComboBox {
                 id: version
