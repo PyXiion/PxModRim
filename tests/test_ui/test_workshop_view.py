@@ -166,21 +166,18 @@ async def test_view_paging_filters_and_catalog_errors(
 ) -> None:
     view, catalog, _ = panel
     await asyncio.sleep(0)
-    view._tab = "Mods"
-    view._version = "1.6"
-    await view.load()
-    await view.load(append=True)
+    await view.selectTab("Mods")
+    await view.filter("", "1.6", "all", "popular", "")
+    await view.loadMore()
     assert view.mods_model.count == 2 and not view.mods_model.hasMore
     assert (
         catalog.queries[-1].cursor == "second" and catalog.queries[-1].version == "1.6"
     )
     catalog.failure = True
-    view._query = "uncached"
-    await view.load()
+    await view.filter("uncached", "1.6", "all", "popular", "")
     assert view.error == "Catalog unavailable"
     catalog.failure = False
-    assert view._retry is not None
-    await view._retry()
+    await view.retry()
     assert view.error == "" and view.mods_model.count == 1
 
 
@@ -194,7 +191,7 @@ async def test_mod_detail_safe_description_dependencies_and_download(
     assert detail["description"] == "<b>Safe description</b>"
     assert detail["actionLabel"] == "Update"
     assert view.members_model.count == 1
-    await view._download(["1"], [])
+    await view.downloadItem("1", "mod")
     assert catalog.downloaded == ["2", "1"]
     assert not warnings, [warning.toString() for warning in warnings]
 
@@ -208,7 +205,7 @@ async def test_incomplete_collection_requires_explicit_partial_download(
     detail = cast("dict[str, Any]", view.detail)
     assert not detail["complete"] and "missing" in detail["warning"]
     assert detail["description"] == "&lt;b&gt;Plain text&lt;/b&gt;"
-    await view._download([], ["picked:test"])
+    await view.downloadItem("picked:test", "collection")
     assert view.pendingPlan and not catalog.downloaded
     assert view.canDownloadAvailable
     await view.downloadAvailable()

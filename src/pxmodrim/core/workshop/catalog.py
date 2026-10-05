@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from pxmodrim.core.downloads.types import DownloadResult
     from pxmodrim.core.models.metadata.structures import ListedMod
 
-_FRESH_SECONDS = 300.0
+FRESH_SECONDS = 300.0
 _CACHE_LIMIT = 200
 _DISK_LIMIT = 300
 
@@ -192,7 +192,7 @@ class WorkshopCatalog(Plugin):
         self,
         key: str,
         produce: Callable[[], Awaitable[T]],
-        fresh_for: float = _FRESH_SECONDS,
+        fresh_for: float = FRESH_SECONDS,
         value_type: Any = None,
     ) -> AsyncIterator[T]:
         """Yield the remembered value at once, then the refreshed one if it differs.
