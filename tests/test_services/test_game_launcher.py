@@ -47,7 +47,8 @@ def test_unbalanced_quotes_raise() -> None:
 
 
 class _Proc:
-    def __init__(self, name: str, status: str = "running") -> None:
+    def __init__(self, name: str, status: str = "running", pid: int = 1) -> None:
+        self.pid = pid
         self.info = {"name": name, "status": status}
 
 
@@ -135,3 +136,18 @@ async def test_wait_for_start_false_when_spawned_process_died(
     launcher = GameLauncher(types.SimpleNamespace(config=AppConfig()))  # type: ignore[arg-type]
     launcher._proc = _Popen(1)  # type: ignore[assignment]
     assert await launcher.wait_for_start(5) is False
+
+
+@pytest.mark.asyncio
+async def test_stale_game_process_from_before_launch_is_ignored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pxmodrim.core.services.game_launcher._POLL_EXIT", 0)
+    stale = _Proc("RimWorldLinux", pid=10)
+    fresh = _Proc("RimWorldLinux", pid=20)
+    _patch_procs(monkeypatch, [[stale], [stale, fresh], [stale, fresh], [stale]])
+    launcher = GameLauncher(types.SimpleNamespace(config=AppConfig()))  # type: ignore[arg-type]
+    launcher._baseline = frozenset({10})
+    assert await launcher.wait_for_start(5) is True
+    await launcher.wait_for_exit()
+    assert GameLauncher.is_running() is True

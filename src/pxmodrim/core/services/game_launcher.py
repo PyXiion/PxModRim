@@ -56,11 +56,12 @@ def build_direct_command(
 
 
 class GameLauncher:
-    __slots__ = ("_ctx", "_proc")
+    __slots__ = ("_baseline", "_ctx", "_proc")
 
     def __init__(self, ctx: CoreContext) -> None:
         self._ctx = ctx
         self._proc: subprocess.Popen[bytes] | None = None
+        self._baseline: frozenset[int] = frozenset()
 
     async def launch(self, strategy: LaunchStrategy) -> tuple[bool, str]:
         if not self._ctx.config.paths.game:
@@ -68,26 +69,34 @@ class GameLauncher:
             return False, "Game path not configured"
 
         logger.info("Launching game with strategy: {}", strategy.name)
+        self._baseline = await asyncio.to_thread(self._game_pids)
         if strategy == LaunchStrategy.DIRECT:
             return await self._launch_direct()
         return await self._launch_steam()
 
     @staticmethod
-    def is_running() -> bool:
-        for proc in psutil.process_iter(["name", "status"]):
-            if (
-                proc.info["name"] in _PROCESS_NAMES
-                and proc.info["status"] != psutil.STATUS_ZOMBIE
-            ):
-                return True
-        return False
+    def _game_pids() -> frozenset[int]:
+        return frozenset(
+            proc.pid
+            for proc in psutil.process_iter(["name", "status"])
+            if proc.info["name"] in _PROCESS_NAMES
+            and proc.info["status"] != psutil.STATUS_ZOMBIE
+        )
+
+    @classmethod
+    def is_running(cls) -> bool:
+        return bool(cls._game_pids())
+
+    def _launched_alive(self) -> bool:
+        """A game process that appeared after launch; stale ones are ignored."""
+        return bool(self._game_pids() - self._baseline)
 
     async def wait_for_start(self, timeout: float = 60.0) -> bool:
         """Wait until a game process appears; False if it died or never showed."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while loop.time() < deadline:
-            if await asyncio.to_thread(self.is_running):
+            if await asyncio.to_thread(self._launched_alive):
                 return True
             if self._proc is not None and self._proc.poll() is not None:
                 return False
@@ -96,7 +105,7 @@ class GameLauncher:
 
     async def wait_for_exit(self) -> int | None:
         """Block until no game process remains; the exit code if we spawned it."""
-        while await asyncio.to_thread(self.is_running):
+        while await asyncio.to_thread(self._launched_alive):
             if self._proc is not None:
                 self._proc.poll()
             await asyncio.sleep(_POLL_EXIT)
