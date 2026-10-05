@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Navigating back from Workshop mod details preserves the current tab, search query, active filters, and scroll position.
 - Workshop and Mod Info share the same sanitized description pipeline and selectable rich-text description renderer.
 - CI release matrix builds separate `SteamWorkshop` and `NativeWorkshop` artifact packages across Linux, macOS, and Windows.
+- Fully downloaded Workshop collections show Activate all / Deactivate all and Activate only this pack (deactivates every other Workshop mod, keeps local mods), matching the Steam web integration. Workshop buttons are colour-coded: Download blue, Update orange, Activate green, Deactivate red.
 
 ### Changed
 - Updated PxSteamDL to 0.3.0: failed updates keep the previous item installed, concurrent downloads of one item are serialized by a lock, transient network failures are retried, and a failed item-details request fails only its batch instead of the whole download. Download progress uses the unpacked byte counters and cancellation uses `Result.cancelled`.

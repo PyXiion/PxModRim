@@ -511,3 +511,58 @@ async def test_back_preserves_scroll_position_and_active_filters(
     assert view.tab == "Mods"
     assert view.searchQuery == "test search"
     assert listing_scroll.property("contentY") == 184
+
+
+async def test_downloaded_collection_activates_all_or_only_its_pack(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    tmp_path: Path,
+) -> None:
+    view, _, _ = panel
+    steamcmd, _, dependency = installed_mods
+    outside = AboutXmlMod(
+        name="Outside",
+        package_id=CaseInsensitiveStr("test.outside"),
+        provider_id="steam",
+        _mod_path=tmp_path / "steam" / "9",
+    )
+    local = AboutXmlMod(
+        name="Local",
+        package_id=CaseInsensitiveStr("test.local"),
+        provider_id="local",
+        _mod_path=tmp_path / "local" / "Mine",
+    )
+    view._ctx.load({**installed_mods, outside.uuid: outside, local.uuid: local}, [])
+    view._ctx.set_active([outside.uuid, local.uuid])
+    await view.open_item("picked:test", "collection")
+    detail = cast("dict[str, Any]", view.detail)
+    assert detail["state"] == "installed" and detail["active"] is False
+
+    await view.toggleCollection()
+    assert set(view._ctx.active_uuids) == {
+        steamcmd,
+        dependency,
+        outside.uuid,
+        local.uuid,
+    }
+    assert cast("dict[str, Any]", view.detail)["active"] is True
+
+    await view.toggleCollection()
+    assert set(view._ctx.active_uuids) == {outside.uuid, local.uuid}
+
+    await view.activateOnlyCollection()
+    assert set(view._ctx.active_uuids) == {steamcmd, dependency, local.uuid}
+
+
+async def test_partly_downloaded_collection_has_no_activation(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, _, _ = panel
+    steamcmd, _, _ = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+    await view.open_item("picked:test", "collection")
+    assert cast("dict[str, Any]", view.detail)["state"] == "missing"
+    await view.toggleCollection()
+    await view.activateOnlyCollection()
+    assert view._ctx.active_uuids == []

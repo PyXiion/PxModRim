@@ -25,7 +25,7 @@ from pxmodrim.core.workshop import (
 )
 from pxmodrim.core.workshop.catalog import FRESH_SECONDS
 from pxmodrim.ui.components.dialogs import await_dialog
-from pxmodrim.ui.components.mod_activation import toggle_mods
+from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.plugins.workshop.details import (
     Detail,
@@ -92,6 +92,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._items: dict[str, CatalogMod | CatalogCollection] = {}
         self._known_tags: set[str] = set()
         self._active_ids: set[str] = set()
+        self._pack_ids: frozenset[str] = frozenset()
         self._refresh_active_ids()
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
         self._qml.setObjectName("workshopView")
@@ -183,6 +184,12 @@ class WorkshopViewPanel(BaseViewPanel):
                 for member in detail.members
             )
             row["actionLabel"] = "Complete download" if started else "Download all"
+            copies = self._pack_copies()
+            if copies is not None:
+                active = set(self._ctx.active_uuids)
+                row["state"] = "installed"
+                row["actionLabel"] = "Installed"
+                row["active"] = all(uuid in active for uuid in copies)
         return row
 
     def _refresh_rows(self) -> None:
@@ -193,6 +200,42 @@ class WorkshopViewPanel(BaseViewPanel):
 
     def _clear_detail(self) -> None:
         self._detail, self._detail_data = {}, None
+        self._pack_ids = frozenset()
+
+    def _pack_copies(self) -> list[str] | None:
+        """One installed copy per collection mod, or None until all are downloaded."""
+        if self._torn_down or not self._pack_ids:
+            return None
+        installed: dict[str, list[str]] = {}
+        for uuid, mod in self._ctx.all_mods.items():
+            published_id = mod.published_file_id
+            if published_id is not None and published_id in self._pack_ids:
+                installed.setdefault(published_id, []).append(uuid)
+        if len(installed) < len(self._pack_ids):
+            return None
+        active = set(self._ctx.active_uuids)
+        return [
+            next((uuid for uuid in uuids if uuid in active), uuids[0])
+            for uuids in installed.values()
+        ]
+
+    async def _load_pack(self) -> None:
+        """Resolve the collection's mods and dependencies for the activation buttons."""
+        detail, generation = self._detail_data, self._generation
+        if detail is None:
+            return
+        try:
+            plan = await self._catalog.plan([], [detail.item.id])
+        except _FAILURES as exc:
+            logger.warning(
+                "[workshop] cannot resolve collection mods: {}", _message(exc)
+            )
+            return
+        if generation != self._generation:
+            return
+        self._pack_ids = frozenset((*plan.to_download, *plan.already_current))
+        self._refresh_rows()
+        self.changed.emit()
 
     # -- running fetches --------------------------------------------------
 
@@ -397,6 +440,8 @@ class WorkshopViewPanel(BaseViewPanel):
         await self.open_item(item_id, kind)
 
     async def open_item(self, item_id: str, kind: str) -> None:
+        self._pack_ids = frozenset()
+
         def apply(detail: Detail) -> None:
             members = self._rows(detail.members)
             self._detail_data = detail
@@ -409,6 +454,8 @@ class WorkshopViewPanel(BaseViewPanel):
             Detail,
             apply,
         )
+        if kind == "collection":
+            await self._load_pack()
 
     @Slot()
     def back(self) -> None:
@@ -438,6 +485,33 @@ class WorkshopViewPanel(BaseViewPanel):
         active = set(self._ctx.active_uuids)
         uuid = next((uuid for uuid in installed if uuid in active), installed[0])
         await toggle_mods(self._ctx, self, [uuid])
+
+    @asyncSlot()
+    async def toggleCollection(self) -> None:
+        copies = self._pack_copies()
+        if copies is None:
+            return
+        active = set(self._ctx.active_uuids)
+        if all(uuid in active for uuid in copies):
+            await apply_activation(self._ctx, self, disable=copies)
+        else:
+            await apply_activation(self._ctx, self, enable=copies)
+
+    @asyncSlot()
+    async def activateOnlyCollection(self) -> None:
+        copies = self._pack_copies()
+        if copies is None:
+            return
+        keep = set(copies)
+        mods = self._ctx.all_mods
+        others = [
+            uuid
+            for uuid in self._ctx.active_uuids
+            if uuid not in keep
+            and (mod := mods.get(uuid)) is not None
+            and mod.published_file_id is not None
+        ]
+        await apply_activation(self._ctx, self, enable=copies, disable=others)
 
     @asyncSlot()
     async def updateAll(self) -> None:

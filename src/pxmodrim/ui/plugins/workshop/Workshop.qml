@@ -62,7 +62,7 @@ Rectangle {
                 enabled: workshopPanel.configured
                 onAccepted: root.applyFilters()
             }
-            PxButton { text: "Search"; enabled: workshopPanel.configured; onClicked: root.applyFilters() }
+            PxButton { text: "Search"; variant: "primary"; enabled: workshopPanel.configured; onClicked: root.applyFilters() }
             PxProgressBar {
                 Layout.preferredWidth: 48
                 Layout.alignment: Qt.AlignVCenter
@@ -124,7 +124,7 @@ Rectangle {
                 PxButton {
                     visible: workshopPanel.tab === "Installed"
                     text: "Update all (" + workshopPanel.updateCount + ")"
-                    variant: "primary"
+                    variant: "warning"
                     enabled: workshopPanel.updateCount > 0 && !workshopPanel.planning
                     onClicked: workshopPanel.updateAll()
                 }
@@ -326,7 +326,7 @@ Rectangle {
                                 Layout.fillWidth: true
                                 spacing: 6
                                 PxBadge { text: (root.detail.sourceLabel || "").toUpperCase(); textColor: Theme.textMuted }
-                                PxBadge { visible: root.detail.kind === "mod" && root.detail.state !== "missing"; text: "INSTALLED"; textColor: Theme.success }
+                                PxBadge { visible: root.detail.state !== "missing"; text: "INSTALLED"; textColor: Theme.success }
                                 PxBadge { visible: root.detail.state === "outdated"; text: "UPDATE AVAILABLE" }
                                 PxBadge { visible: !!root.detail.incompatible; text: "INCOMPATIBLE"; textColor: Theme.warning }
                             }
@@ -336,17 +336,27 @@ Rectangle {
                             Copy { Layout.fillWidth: true; visible: !!root.detail.tags; text: root.detail.tags || "" }
                             Copy { Layout.fillWidth: true; visible: !!root.detail.incompatible; text: "Does not list your game version. Downloading does not make it compatible."; color: Theme.warning }
                             Copy { Layout.fillWidth: true; visible: !!root.detail.warning; text: root.detail.warning || ""; color: Theme.warning }
-                            RowLayout {
+                            Flow {
+                                Layout.fillWidth: true
                                 spacing: 8
                                 PxButton {
-                                    visible: root.detail.kind === "mod" && root.detail.state !== "missing"
-                                    text: root.detail.active ? "Deactivate" : "Activate"
-                                    onClicked: workshopPanel.toggleActivation(root.detail.itemId)
+                                    readonly property bool pack: root.detail.kind === "collection"
+                                    visible: root.detail.state !== "missing"
+                                    text: (root.detail.active ? "Deactivate" : "Activate") + (pack ? " all" : "")
+                                    variant: root.detail.active ? "danger" : "success"
+                                    onClicked: pack ? workshopPanel.toggleCollection() : workshopPanel.toggleActivation(root.detail.itemId)
+                                }
+                                PxButton {
+                                    visible: root.detail.kind === "collection" && root.detail.state === "installed"
+                                    text: "Activate only this pack"
+                                    variant: "warning"
+                                    ToolTip.text: "Activate this collection and its dependencies, deactivate every other Workshop mod"
+                                    onClicked: workshopPanel.activateOnlyCollection()
                                 }
                                 PxButton {
                                     visible: root.detail.state !== "installed"
                                     text: root.detail.actionLabel || "Download"
-                                    variant: root.detail.state === "outdated" ? "primary" : "secondary"
+                                    variant: root.detail.state === "outdated" ? "warning" : "primary"
                                     enabled: root.detail.state !== "installed" && !root.detail.queued
                                     onClicked: workshopPanel.downloadItem(root.detail.itemId, root.detail.kind)
                                 }
@@ -451,7 +461,7 @@ Rectangle {
                                                 Copy { text: member.stateLabel + (member.incompatible ? " · incompatible" : ""); font.pixelSize: Theme.fontSizeSm; color: member.incompatible ? Theme.warning : Theme.textMuted }
                                             }
                                             PxButton { text: "Details"; variant: "ghost"; onClicked: workshopPanel.openItem(member.itemId, member.kind) }
-                                            PxButton { visible: member.state !== "installed"; text: member.actionLabel; variant: member.state === "outdated" ? "primary" : "secondary"; enabled: !member.queued; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
+                                            PxButton { visible: member.state !== "installed"; text: member.actionLabel; variant: member.state === "outdated" ? "warning" : "primary"; enabled: !member.queued; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
                                         }
                                     }
                                 }

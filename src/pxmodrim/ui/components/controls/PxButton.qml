@@ -4,8 +4,8 @@ import QtQuick.Controls
 Button {
     id: control
 
-    // "secondary" | "primary" | "success" | "danger" (soft, fills on hover) |
-    // "dangerSolid" | "ghost"
+    // "secondary" | "primary" | "success" | "warning" | "danger" (soft, fills on
+    // hover) | "dangerSolid" | "ghost"
     property string variant: "secondary"
     // Name from the image://icons provider; icon-only when text is empty.
     property string iconName: ""
@@ -15,6 +15,7 @@ Button {
     readonly property bool isSuccess: variant === "success"
     readonly property bool isDangerSolid: variant === "dangerSolid"
     readonly property bool isDanger: variant === "danger"
+    readonly property bool isWarning: variant === "warning"
     readonly property bool isGhost: variant === "ghost"
     readonly property bool isSolid: isPrimary || isSuccess || isDangerSolid
     readonly property bool iconOnly: text.length === 0 && iconName.length > 0
@@ -39,8 +40,9 @@ Button {
 
     readonly property color foreground: iconColor.a > 0 ? iconColor
         : isSolid ? Theme.onAccent
-        : isDanger && hovered ? Theme.onAccent
+        : (isDanger || isWarning) && hovered ? Theme.onAccent
         : isDanger ? Theme.danger
+        : isWarning ? Theme.warning
         : hovered ? Theme.textMain
         : Theme.textMuted
 
@@ -96,6 +98,8 @@ Button {
                 return control.down || control.hovered ? Theme.dangerHover : Theme.danger
             if (control.isDanger)
                 return control.down || control.hovered ? Theme.danger : Theme.dangerBg
+            if (control.isWarning)
+                return control.down || control.hovered ? Theme.warning : Theme.warningBg
             if (control.isGhost)
                 return control.down || control.hovered ? Theme.elevate3 : "transparent"
             return control.down || control.hovered ? Theme.elevate4 : Theme.elevate3
@@ -112,6 +116,8 @@ Button {
                 return control.hovered ? Theme.dangerHover : Theme.danger
             if (control.isDanger)
                 return Theme.danger
+            if (control.isWarning)
+                return Theme.warning
             if (control.isGhost)
                 return control.hovered ? Theme.border : "transparent"
             return control.hovered ? Theme.elevate4 : Theme.border

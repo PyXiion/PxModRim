@@ -171,12 +171,13 @@ Rectangle {
             PxButton {
                 visible: card.kind === "mod" && card.state !== "missing"
                 text: card.active ? "Deactivate" : "Activate"
+                variant: card.active ? "danger" : "success"
                 onClicked: workshopPanel.toggleActivation(card.itemId)
             }
             PxButton {
                 visible: card.state !== "installed"
                 text: card.actionLabel
-                variant: card.state === "outdated" ? "primary" : "secondary"
+                variant: card.state === "outdated" ? "warning" : "primary"
                 enabled: !card.queued
                 onClicked: workshopPanel.downloadItem(card.itemId, card.kind)
             }
