@@ -308,8 +308,10 @@ Rectangle {
                     PxButton {
                         variant: "success"
                         iconName: "play"
-                        text: "Play"
-                        ToolTip.text: "Launch game"
+                        text: root.controller.launchState === "launching" ? "Launching\u2026"
+                            : root.controller.launchState === "running" ? "Running" : "Play"
+                        enabled: root.controller.launchState === "idle"
+                        ToolTip.text: root.controller.launchState === "running" ? "Game is running" : "Launch game"
                         onClicked: root.controller.launch()
                     }
 

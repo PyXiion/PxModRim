@@ -25,6 +25,12 @@ Rectangle {
             proxy: proxy.text.trim(),
             connectTimeout: connectTimeout.value,
             stallTimeout: stallTimeout.value,
+            launchArgs: launchArgs.text.trim(),
+            launchWrapper: launchWrapper.text.trim(),
+            afterLaunch: afterLaunch.currentValue,
+            confirmErrors: confirmErrors.checked,
+            confirmUnsaved: confirmUnsaved.checked,
+            confirmRunning: confirmRunning.checked,
             useAltIds: useAltIds.checked,
             checkMissing: checkMissing.checked,
             useCommunity: useCommunity.checked
@@ -191,6 +197,103 @@ Rectangle {
                         PxButton {
                             text: "Auto-detect"
                             onClicked: settings.autoDetect()
+                        }
+                    }
+
+                    Group {
+                        title: "Launch"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Arguments"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxTextField {
+                                id: launchArgs
+                                Layout.fillWidth: true
+                                monospace: true
+                                text: root.initial.launchArgs
+                                placeholderText: "e.g. -popupwindow -logfile"
+                                Accessible.name: "Game launch arguments"
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Passed to the game. With the Steam strategy they go through steam://run."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Wrapper"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxTextField {
+                                id: launchWrapper
+                                Layout.fillWidth: true
+                                monospace: true
+                                text: root.initial.launchWrapper
+                                placeholderText: "e.g. gamemoderun %command%"
+                                Accessible.name: "Launch wrapper command"
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Direct launch only. Leading KEY=VALUE tokens set environment variables; %command% marks where the game goes, otherwise the wrapper is a prefix."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "After launch"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxComboBox {
+                                id: afterLaunch
+                                Layout.preferredWidth: 220
+                                Accessible.name: "Window behaviour after launch"
+                                textRole: "text"
+                                valueRole: "value"
+                                model: [
+                                    { text: "Keep PxModRim open", value: 0 },
+                                    { text: "Minimize while the game runs", value: 1 },
+                                    { text: "Close PxModRim", value: 2 }
+                                ]
+                                Component.onCompleted: currentIndex = Math.max(0, indexOfValue(root.initial.afterLaunch))
+                            }
+                        }
+                        PxCheckBox {
+                            id: confirmErrors
+                            text: "Confirm launch when the mod list has errors"
+                            checked: root.initial.confirmErrors
+                        }
+                        PxCheckBox {
+                            id: confirmUnsaved
+                            text: "Confirm launch when the mod list is unsaved"
+                            checked: root.initial.confirmUnsaved
+                        }
+                        PxCheckBox {
+                            id: confirmRunning
+                            text: "Confirm launch when the game is already running"
+                            checked: root.initial.confirmRunning
                         }
                     }
 

@@ -10,6 +10,12 @@ class LaunchStrategy(IntEnum):
     STEAM = 1
 
 
+class AfterLaunch(IntEnum):
+    STAY = 0
+    MINIMIZE = 1
+    CLOSE = 2
+
+
 DEFAULT_MISSING_PACKAGEID = "missing.packageid"
 
 RIMWORLD_DLC_METADATA: dict[str, dict[str, str]] = {

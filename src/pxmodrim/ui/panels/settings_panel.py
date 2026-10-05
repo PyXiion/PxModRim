@@ -17,6 +17,7 @@ from pxmodrim.core.config import (
     community_rules_file,
     detect_game_paths,
 )
+from pxmodrim.core.constants import AfterLaunch
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
@@ -67,6 +68,12 @@ class _SettingsBackend(QObject):
             "proxy": cfg.workshop_proxy,
             "connectTimeout": cfg.workshop_connect_timeout,
             "stallTimeout": cfg.workshop_stall_timeout,
+            "launchArgs": cfg.launch_args,
+            "launchWrapper": cfg.launch_wrapper,
+            "afterLaunch": int(cfg.after_launch),
+            "confirmErrors": cfg.launch_confirm_errors,
+            "confirmUnsaved": cfg.launch_confirm_unsaved,
+            "confirmRunning": cfg.launch_confirm_running,
             "steamAvailable": ctx.plugins.get("steam_downloader") is not None,
             "useAltIds": cfg.sort.use_alternative_package_ids,
             "checkMissing": cfg.sort.check_missing_dependencies,
@@ -233,6 +240,12 @@ class SettingsPanel(QDialog):
             workshop_proxy=values["proxy"].strip(),
             workshop_connect_timeout=int(values["connectTimeout"]),
             workshop_stall_timeout=int(values["stallTimeout"]),
+            launch_args=values["launchArgs"].strip(),
+            launch_wrapper=values["launchWrapper"].strip(),
+            after_launch=AfterLaunch(int(values["afterLaunch"])),
+            launch_confirm_errors=bool(values["confirmErrors"]),
+            launch_confirm_unsaved=bool(values["confirmUnsaved"]),
+            launch_confirm_running=bool(values["confirmRunning"]),
         )
         self.accept()
 

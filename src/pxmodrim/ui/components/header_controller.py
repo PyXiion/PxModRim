@@ -27,6 +27,7 @@ class HeaderController(QObject):
     downloads_progress_shown_changed = Signal()
     downloads_requested = Signal()
     task_text_changed = Signal()
+    launch_state_changed = Signal()
 
     def __init__(
         self,
@@ -42,6 +43,7 @@ class HeaderController(QObject):
         self._maximized = False
         self._strategy_index: int = initial_strategy
         self._unsaved_changes = False
+        self._launch_state = "idle"
         self._app_version = app_version
         self._tooltips = tooltips or {}
         self._downloads_available = downloads_available
@@ -132,6 +134,18 @@ class HeaderController(QObject):
 
     def _get_unsaved_changes(self) -> bool:
         return self._unsaved_changes
+
+    def set_launch_state(self, value: str) -> None:
+        if self._launch_state != value:
+            self._launch_state = value
+            self.launch_state_changed.emit()
+
+    launchState = Property(
+        str,
+        lambda self: self._launch_state,
+        set_launch_state,
+        notify=launch_state_changed,
+    )
 
     @Slot(bool)
     def set_unsaved_changes(self, value: bool) -> None:

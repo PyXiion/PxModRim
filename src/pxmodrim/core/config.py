@@ -11,7 +11,7 @@ from typing import Any, TypeVar
 import msgspec
 from loguru import logger
 
-from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID
+from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID, AfterLaunch
 from pxmodrim.core.msgspec_hooks import dec_hook, enc_hook
 from pxmodrim.core.sort.config import SortSettings, TierConfig
 
@@ -73,6 +73,12 @@ class AppConfig(msgspec.Struct):
     workshop_connect_timeout: int = 10
     workshop_stall_timeout: int = 30
     log_upload_endpoint: str = "https://paste.rs/"
+    launch_args: str = ""
+    launch_wrapper: str = ""
+    after_launch: AfterLaunch = AfterLaunch.STAY
+    launch_confirm_errors: bool = True
+    launch_confirm_unsaved: bool = True
+    launch_confirm_running: bool = True
 
 
 def _migrate_json(data: dict[str, Any], current: int) -> None:

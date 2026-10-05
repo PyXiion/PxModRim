@@ -285,6 +285,10 @@ class DiagnosticsService:
 
     # ── Status ──────────────────────────────────────────────────
 
+    def active_error_count(self) -> int:
+        diagnostics = self._checker.active_mod_diagnostics()
+        return sum(1 for d in diagnostics.values() if d.has_errors)
+
     def _format_status(self) -> str:
         """Build a human-readable status string showing active/error/warning counts."""
         active = self._last_active_uuids

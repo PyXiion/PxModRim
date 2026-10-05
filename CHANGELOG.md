@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Settings and Help are pinned to the bottom of the left rail (the header no longer has a Settings button). The Help menu has Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.
 - Settings > Steam Workshop: `Proxy` (empty uses `https_proxy`/`all_proxy` from the environment), `Connect timeout` and `Stall timeout` for Workshop downloads. Changing them logs in to Steam again before the next download.
+- Launch workflow: Play shows `Launching…` then `Running` and is disabled while RimWorld runs (tracked by process, for Steam launches too); a toast reports when the game closes or exits with a non-zero code.
+- Settings > Launch: game arguments (also passed through `steam://run` for the Steam strategy), a wrapper command for direct launch (`KEY=VALUE` env vars, `%command%` placeholder, e.g. `gamemoderun %command%`), and what the window does after launch (stay open, minimize while the game runs, close).
+- Pre-launch prompts for a mod list with errors, unsaved changes (saved before launch), and a game that is already running. Each has a "Don't ask again" checkbox and a Settings toggle.
 
 ### Changed
 - Updated PxSteamDL to 0.3.0: failed updates keep the previous item installed, concurrent downloads of one item are serialized by a lock, transient network failures are retried, and a failed item-details request fails only its batch instead of the whole download. Download progress uses the unpacked byte counters and cancellation uses `Result.cancelled`.

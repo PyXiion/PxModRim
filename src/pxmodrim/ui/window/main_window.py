@@ -5,6 +5,7 @@ from collections.abc import Callable
 from importlib.resources import files as resource_files
 from typing import TYPE_CHECKING
 
+import msgspec
 from loguru import logger
 from PySide6.QtCore import QEvent, QObject, Qt, QUrl
 from PySide6.QtGui import (
@@ -19,6 +20,7 @@ from PySide6.QtGui import (
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QDialog,
     QLineEdit,
     QMainWindow,
@@ -31,7 +33,7 @@ from PySide6.QtWidgets import (
 from qasync import asyncSlot
 
 from pxmodrim.core.config import config_dir
-from pxmodrim.core.constants import LaunchStrategy
+from pxmodrim.core.constants import AfterLaunch, LaunchStrategy
 from pxmodrim.core.downloads import DownloadProgress, DownloadResult, download_manager
 from pxmodrim.core.models.view.sidebar import SidebarEntry
 from pxmodrim.core.services.update_service import UpdateCheckError, UpdateService
@@ -110,6 +112,25 @@ class UnsavedChangesDialog(QMessageBox):
         self.setDefaultButton(QMessageBox.StandardButton.Save)
 
 
+class LaunchConfirmDialog(QMessageBox):
+    def __init__(self, parent: QWidget, title: str, text: str, info: str, accept: str):
+        super().__init__(parent)
+        self.setIcon(QMessageBox.Icon.Warning)
+        self.setWindowTitle(title)
+        self.setText(text)
+        self.setInformativeText(info)
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        )
+        self.button(QMessageBox.StandardButton.Ok).setText(accept)
+        self.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        self.setCheckBox(QCheckBox("Don't ask again", self))
+
+    def dont_ask_again(self) -> bool:
+        box = self.checkBox()
+        return box is not None and box.isChecked()
+
+
 class MainWindow(QMainWindow):
     def __init__(self, app_ctx: AppContext) -> None:
         """Initialize the main application window."""
@@ -130,6 +151,7 @@ class MainWindow(QMainWindow):
         self._close_task: asyncio.Task[None] | None = None
         self._update_service = UpdateService(get_app_version())
         self._update_task: asyncio.Task[None] | None = None
+        self._launch_task: asyncio.Task[None] | None = None
 
         self._setup_window_basics()
         self._setup_qml()
@@ -433,6 +455,8 @@ class MainWindow(QMainWindow):
         logger.info("main_window: shutting down")
         if self._update_task is not None:
             self._update_task.cancel()
+        if self._launch_task is not None:
+            self._launch_task.cancel()
         # Release WebEngine views (their dedicated profiles) before the
         # Qt widget tree is torn down. Then disconnect aboutToQuit: on this
         # Chromium/Qt build, WebEngine registers an aboutToQuit handler
@@ -679,7 +703,70 @@ class MainWindow(QMainWindow):
 
     @asyncSlot()
     async def _launch_game(self) -> None:
+        if self._header_controller.launchState != "idle":
+            return
         logger.info("Launch requested")
+        self._header_controller.set_launch_state("launching")
+        tracking = False
+        try:
+            tracking = await self._start_game()
+        finally:
+            if not tracking:
+                self._header_controller.set_launch_state("idle")
+
+    async def _confirm_launch(
+        self, setting: str, title: str, text: str, info: str, accept: str
+    ) -> bool:
+        result, dialog = await await_dialog(
+            LaunchConfirmDialog, self, title, text, info, accept
+        )
+        if result != QMessageBox.StandardButton.Ok:
+            return False
+        if dialog.dont_ask_again():
+            cfg = msgspec.structs.replace(self._ctx.config, **{setting: False})
+            self._ctx.config_service.save("config.json", cfg)
+            self._ctx.update_config(cfg)
+        return True
+
+    async def _start_game(self) -> bool:
+        launcher = self._ctx.game_launcher
+
+        cfg = self._ctx.config
+        running = cfg.launch_confirm_running and await asyncio.to_thread(
+            launcher.is_running
+        )
+        errors = self._ctx.diagnostics_service.active_error_count()
+        prompts = [
+            (
+                running,
+                "launch_confirm_running",
+                "Game Already Running",
+                "RimWorld is already running.",
+                "A second copy can overwrite the first one's saves and settings.",
+                "Launch Anyway",
+            ),
+            (
+                cfg.launch_confirm_errors and errors > 0,
+                "launch_confirm_errors",
+                "Mod List Has Errors",
+                f"{errors} active mod(s) have errors.",
+                "Missing dependencies or wrong load order can crash the game.",
+                "Launch Anyway",
+            ),
+            (
+                cfg.launch_confirm_unsaved and self._unsaved_changes,
+                "launch_confirm_unsaved",
+                "Unsaved Changes",
+                "The active mod list has unsaved changes.",
+                "The list is saved to ModsConfig.xml before the game starts.",
+                "Save and Launch",
+            ),
+        ]
+        for needed, setting, title, text, info, accept in prompts:
+            if needed and not await self._confirm_launch(
+                setting, title, text, info, accept
+            ):
+                return False
 
         if await self._write_active_layout() is None:
             logger.warning("Config folder not set — mod list not saved before launch")
@@ -687,15 +774,42 @@ class MainWindow(QMainWindow):
                 "Config folder not set — mod list won't be saved"
             )
 
-        success, msg = await self._ctx.game_launcher.launch(
-            self._ui_prefs.launch_strategy
-        )
-        if success:
-            logger.info(msg)
-            self._toast_manager.success(msg)
-        else:
+        success, msg = await launcher.launch(self._ui_prefs.launch_strategy)
+        if not success:
             logger.warning(msg)
             self._toast_manager.warning(msg)
+            return False
+
+        logger.info(msg)
+        self._toast_manager.success(msg)
+        self._launch_task = asyncio.create_task(self._track_game())
+        return True
+
+    async def _track_game(self) -> None:
+        launcher = self._ctx.game_launcher
+        after = self._ctx.config.after_launch
+        try:
+            if not await launcher.wait_for_start():
+                self._toast_manager.warning("Game did not start")
+                return
+            self._header_controller.set_launch_state("running")
+            if after == AfterLaunch.CLOSE and not self._unsaved_changes:
+                self._close_confirmed = True
+                self.close()
+                return
+            if after == AfterLaunch.MINIMIZE:
+                self.showMinimized()
+            code = await launcher.wait_for_exit()
+            if code:
+                logger.warning("Game exited with code {}", code)
+                self._toast_manager.warning(f"Game exited with code {code}")
+            else:
+                self._toast_manager.info("Game closed")
+            if after == AfterLaunch.MINIMIZE:
+                self.showNormal()
+                self.activateWindow()
+        finally:
+            self._header_controller.set_launch_state("idle")
 
     def _on_strategy_changed(self, index: int) -> None:
         new_strategy = LaunchStrategy(index)
