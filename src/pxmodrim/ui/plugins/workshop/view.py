@@ -230,18 +230,7 @@ class WorkshopViewPanel(BaseViewPanel):
             def apply_installed(items: list[CatalogMod]) -> None:
                 self._installed = items
                 self._recount()
-                needle = self._query.casefold()
-                self._installed_view = [
-                    item
-                    for item in items
-                    if not needle or needle in item.title.casefold()
-                ]
-                shown = self._installed_view[: self._installed_shown]
-                self.mods_model.set_page(
-                    [self._row(item) for item in shown],
-                    len(self._installed_view),
-                    "more" if len(shown) < len(self._installed_view) else None,
-                )
+                self._render_installed()
 
             await self._run_stream(
                 lambda: self._catalog.cached(
@@ -273,6 +262,24 @@ class WorkshopViewPanel(BaseViewPanel):
                     ),
                     apply_page,
                 )
+
+    def _render_installed(self) -> None:
+        needle = self._query.casefold()
+        self._installed_view = [
+            item
+            for item in self._installed
+            if not needle
+            or needle
+            in " ".join(
+                (item.title, item.author.name or "", item.id, *item.tags)
+            ).casefold()
+        ]
+        shown = self._installed_view[: self._installed_shown]
+        self.mods_model.set_page(
+            [self._row(item) for item in shown],
+            len(self._installed_view),
+            "more" if len(shown) < len(self._installed_view) else None,
+        )
 
     def _show_more_installed(self) -> None:
         start = self.mods_model.rowCount()
@@ -307,6 +314,11 @@ class WorkshopViewPanel(BaseViewPanel):
             sort,
             tag,
         )
+        if self._tab == "Installed" and self._installed:
+            self._detail = {}
+            self._render_installed()
+            self.changed.emit()
+            return
         if self._tab == "Discover":
             self._tab = "Mods"
         await self.load()

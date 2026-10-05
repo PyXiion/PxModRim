@@ -35,6 +35,7 @@ const files: Record<string, SteamFile> = {
 };
 
 let flakyCalls = 0;
+let queryCalls = 0;
 
 async function upstream(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -53,6 +54,7 @@ async function upstream(request: Request): Promise<Response> {
     return Response.json({ response: { publishedfiledetails: (input.publishedfileids ?? []).flatMap(id => files[id] ? [files[id]] : []) } });
   }
   if (url.pathname.includes('QueryFiles')) {
+    queryCalls++;
     if (input.search_text === 'upstream-rate-limit') return new Response('Rate limited', { status: 429 });
     if (input.search_text === 'upstream-flaky' && flakyCalls++ === 0) return new Response('Hiccup', { status: 500 });
     const candidateIds = input.filetype === 1 ? (input.search_text === 'no-thumb' ? ['102'] : ['100', '101']) : ['10', '11', '12', '13', '14'];
@@ -82,7 +84,7 @@ function statements(sql: string): string[] {
 }
 
 async function migrate(database: D1Database): Promise<void> {
-  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql']) {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql']) {
     const sql = await readFile(resolvePath('migrations', file), 'utf8');
     await database.batch(statements(sql).map(statement => database.prepare(statement)));
   }
@@ -397,4 +399,35 @@ test('expired detail reads answer from storage immediately and refresh in the ba
   await expire();
   const checked = await (await request('/catalog/mods/batch', 'POST', { ids: ['13'] })).json() as { items: CatalogMod[] };
   assert.equal(checked.items[0]?.title, 'RimHUD');
+});
+
+test('query pages are remembered in D1: repeats do not call Steam, and expired pages are served first then refreshed', async () => {
+  const path = '/catalog/collections?source=steam&q=no-thumb&limit=7';
+  const before = queryCalls;
+  const first = await (await request(path)).json() as CatalogPage<CatalogCollection>;
+  assert.equal(queryCalls, before + 1);
+  await request(path);
+  assert.equal(queryCalls, before + 1);
+
+  await db.prepare('UPDATE query_cache SET fetched_at = 1').run();
+  const served = await (await request(path)).json() as CatalogPage<CatalogCollection>;
+  assert.deepEqual(served.items.map(item => item.id), first.items.map(item => item.id));
+  let refreshedAt = 1;
+  for (let attempt = 0; attempt < 50 && refreshedAt === 1; attempt++) {
+    await new Promise(done => setTimeout(done, 20));
+    refreshedAt = (await db.prepare('SELECT max(fetched_at) AS at FROM query_cache').first<{ at: number }>())?.at ?? 1;
+  }
+  assert.ok(refreshedAt > 1 && queryCalls === before + 2);
+});
+
+test('once the index is ready, mod browsing without text comes from it, except trending which needs Steam', async () => {
+  const calls = queryCalls;
+  const newest = await (await request('/catalog/mods?sort=newest&limit=2')).json() as CatalogPage<CatalogMod>;
+  assert.equal(newest.items.length, 2);
+  assert.ok(newest.total >= 5);
+  const popular = await (await request('/catalog/mods?version=1.5&limit=5')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(popular.items.map(item => item.id), ['14']);
+  assert.equal(queryCalls, calls);
+  await request('/catalog/mods?sort=trending&limit=3');
+  assert.equal(queryCalls, calls + 1);
 });

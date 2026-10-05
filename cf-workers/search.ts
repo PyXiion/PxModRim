@@ -74,20 +74,21 @@ const ORDER: Record<string, string> = {
 /** Returns null when the index cannot answer this query and Steam should. */
 export async function searchMods(db: D1Database, query: SteamQuery): Promise<CatalogPage<CatalogMod> | null> {
   const order = ORDER[query.sort];
-  const match = matchExpression(query.query);
+  const match = query.query ? matchExpression(query.query) : null;
   const resumed = CURSOR.exec(query.cursor);
-  if (!order || !match || (query.cursor !== '*' && !resumed)) return null;
+  if (!order || (query.query && !match) || (query.sort === 'relevance' && !match) || (query.cursor !== '*' && !resumed)) return null;
   if (!(await indexStatus(db)).ready) return null;
   const offset = resumed ? Number(resumed[1]) : 0;
 
   const filters: string[] = [];
-  const params: (string | number)[] = [match];
+  const params: (string | number)[] = match ? [match] : [];
   for (const tag of new Set([query.tag, query.version].filter((value): value is string => value !== null))) {
     filters.push('AND EXISTS (SELECT 1 FROM json_each(catalog_index.tags) WHERE json_each.value = ?)');
     params.push(tag);
   }
-  const from = `FROM catalog_fts JOIN catalog_index ON catalog_index.rowid = catalog_fts.rowid
-    WHERE catalog_fts MATCH ? ${filters.join(' ')}`;
+  const from = match
+    ? `FROM catalog_fts JOIN catalog_index ON catalog_index.rowid = catalog_fts.rowid WHERE catalog_fts MATCH ? ${filters.join(' ')}`
+    : `FROM catalog_index WHERE 1 = 1 ${filters.join(' ')}`;
   try {
     const total = await db.prepare(`SELECT count(*) AS n ${from}`).bind(...params).first<{ n: number }>();
     const rows = await db.prepare(`SELECT catalog_index.data AS data ${from} ORDER BY ${order} LIMIT ? OFFSET ?`)

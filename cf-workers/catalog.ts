@@ -117,6 +117,10 @@ function decodeCursor(value: string, key: string): CollectionCursor {
   return cursor as CollectionCursor;
 }
 
+async function modPage(env: Env, ctx: ExecutionContext, query: SteamQuery): Promise<CatalogPage<CatalogMod>> {
+  return await searchMods(env.DB, query) ?? await querySteam(env, ctx, 'mod', query);
+}
+
 async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: SteamQuery): Promise<CatalogPage<CatalogCollection>> {
   const source = url.searchParams.get('source') ?? 'all';
   if (!['all', 'steam', 'picked'].includes(source)) throw new HttpError(400, 'Source must be all, steam or picked');
@@ -135,7 +139,7 @@ async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: 
   const steamLimit = query.limit - pickedItems.length;
   let steam: CatalogPage<CatalogCollection> = { items: [], total: cursor.steam_total, next_cursor: cursor.steam };
   if (cursor.steam !== null && steamLimit > 0) {
-    steam = await querySteam(env, ctx, url.origin, 'collection', { ...query, limit: steamLimit, cursor: cursor.steam });
+    steam = await querySteam(env, ctx, 'collection', { ...query, limit: steamLimit, cursor: cursor.steam });
   }
   const next: CollectionCursor = {
     key, steam: steam.next_cursor, picked: cursor.picked === null ? null : picked.next_offset, steam_total: steam.total,
@@ -222,7 +226,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const query = queryOptions(url);
     if (query.cursor !== '*') throw new HttpError(400, 'Use the browsing endpoints for pagination');
     const [mods, collections] = await Promise.all([
-      querySteam(env, ctx, url.origin, 'mod', { ...query, limit: 4 }),
+      modPage(env, ctx, { ...query, limit: 4 }),
       collectionPage(env, ctx, url, { ...query, limit: 3 }),
     ]);
     return json({ mods, collections });
@@ -230,7 +234,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   if (url.pathname === '/catalog/mods') {
     requireMethod(request, ['GET']);
     const query = queryOptions(url);
-    return json(await searchMods(env.DB, query) ?? await querySteam(env, ctx, url.origin, 'mod', query));
+    return json(await modPage(env, ctx, query));
   }
   if (url.pathname === '/catalog/index') {
     requireMethod(request, ['GET']);

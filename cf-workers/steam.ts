@@ -340,30 +340,51 @@ export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind:
   } as FilesPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
 }
 
-const QUERY_STALE_SECONDS = 24 * 60 * 60;
+const QUERY_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
-export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: ExecutionContext, origin: string, kind: K, query: SteamQuery): Promise<CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
+async function storedItems(db: D1Database, ids: string[]): Promise<Map<string, CatalogItem>> {
+  const stored = new Map<string, CatalogItem>();
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const chunk = ids.slice(offset, offset + 90);
+    const rows = await db.prepare(`SELECT id, data FROM catalog_items WHERE id IN (${chunk.map(() => '?').join(',')})`)
+      .bind(...chunk).all<{ id: string; data: string }>();
+    for (const row of rows.results) stored.set(row.id, JSON.parse(row.data) as CatalogItem);
+  }
+  return stored;
+}
+
+/**
+ * Query pages are remembered in D1 as ordered IDs. A remembered page is returned at once,
+ * however old, and refreshed in the background once it is older than five minutes.
+ */
+export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: ExecutionContext, kind: K, query: SteamQuery): Promise<CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
   type Page = CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
-  const cacheUrl = new URL(`/__catalog_cache/${kind}`, origin);
-  cacheUrl.searchParams.set('query', JSON.stringify(query));
-  const cacheKey = new Request(cacheUrl);
+  const key = JSON.stringify([kind, query]);
 
   const refresh = async (): Promise<Page> => {
     const { items, total, next_cursor } = await queryFiles(env, kind, query);
-    const page = { items, total, next_cursor } as Page;
-    await caches.default.put(cacheKey, Response.json(page, {
-      headers: { 'Cache-Control': `public, max-age=${QUERY_STALE_SECONDS}`, 'X-Cached-At': String(Date.now()) },
-    }));
-    return page;
+    const ids = items.map(item => item.kind === 'collection' ? item.steam_id! : item.id);
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO query_cache (key, ids, total, next_cursor, fetched_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET ids = excluded.ids, total = excluded.total, next_cursor = excluded.next_cursor, fetched_at = excluded.fetched_at`,
+      ).bind(key, JSON.stringify(ids), total, next_cursor, Date.now()),
+      env.DB.prepare('DELETE FROM query_cache WHERE fetched_at < ?').bind(Date.now() - QUERY_KEEP_MS),
+    ]);
+    return { items, total, next_cursor } as Page;
   };
 
-  const cached = await caches.default.match(cacheKey);
-  if (cached) {
-    const age = Date.now() - Number(cached.headers.get('X-Cached-At') ?? 0);
-    if (age > QUERY_TTL_SECONDS * 1000) {
-      ctx.waitUntil(refresh().catch(error => console.error('Background refresh failed', error instanceof Error ? error.message : error)));
+  const row = await env.DB.prepare('SELECT ids, total, next_cursor, fetched_at FROM query_cache WHERE key = ? AND fetched_at > ?')
+    .bind(key, Date.now() - QUERY_KEEP_MS).first<{ ids: string; total: number; next_cursor: string | null; fetched_at: number }>();
+  if (row) {
+    const ids = JSON.parse(row.ids) as string[];
+    const stored = await storedItems(env.DB, ids);
+    if (ids.every(id => stored.has(id))) {
+      if (Date.now() - row.fetched_at > QUERY_TTL_SECONDS * 1000) {
+        ctx.waitUntil(refresh().catch(error => console.error('Background refresh failed', error instanceof Error ? error.message : error)));
+      }
+      return { items: ids.map(id => stored.get(id)!), total: row.total, next_cursor: row.next_cursor } as Page;
     }
-    return await cached.json();
   }
   return await refresh();
 }
