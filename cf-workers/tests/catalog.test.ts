@@ -70,10 +70,21 @@ async function upstream(request: Request): Promise<Response> {
 let worker: Miniflare;
 let db: D1Database;
 
+function statements(sql: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  for (const line of sql.split('\n')) {
+    current += `${line}\n`;
+    const inTrigger = /CREATE TRIGGER/i.test(current) && !/^END;$/m.test(current);
+    if (line.trimEnd().endsWith(';') && !inTrigger) { result.push(current.trim()); current = ''; }
+  }
+  return result.filter(statement => statement && statement !== ';');
+}
+
 async function migrate(database: D1Database): Promise<void> {
-  for (const file of ['0001_dependencies.sql', '0002_catalog.sql']) {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql']) {
     const sql = await readFile(resolvePath('migrations', file), 'utf8');
-    await database.batch(sql.split(';').map(statement => statement.trim()).filter(Boolean).map(statement => database.prepare(statement)));
+    await database.batch(statements(sql).map(statement => database.prepare(statement)));
   }
 }
 
@@ -333,4 +344,38 @@ test('collections without a Steam image get a collage from their member mods, sk
   assert.equal(response.status, 200);
   assert.equal(page.items[0]?.preview_url, null);
   assert.deepEqual(page.items[0]?.member_previews, Array(2).fill('https://images.example.test/preview.png'));
+});
+
+test('text search is answered by the local index only after a full crawl cycle, and filters by tag and version', async () => {
+  assert.equal((await (await request('/catalog/index')).json() as { ready: boolean }).ready, false);
+  const before = await request('/catalog/mods?q=upstream-rate-limit');
+  assert.equal(before.status, 503);
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const status = await (await request('/catalog/index')).json() as { ready: boolean; indexed: number; cycle_in_progress: boolean };
+  assert.equal(status.ready, true);
+  assert.equal(status.cycle_in_progress, false);
+  assert.ok(status.indexed >= 5);
+
+  const local = await request('/catalog/mods?q=upstream-rate-limit');
+  assert.equal(local.status, 200);
+  assert.deepEqual((await local.json() as CatalogPage<CatalogMod>).items, []);
+
+  const prefix = await (await request('/catalog/mods?q=harm')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(prefix.items.map(item => item.id), ['11']);
+  assert.equal(prefix.items[0]?.previews.length, 0);
+
+  const old = await (await request('/catalog/mods?q=camera&version=1.5')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(old.items.map(item => item.id), ['14']);
+  const none = await (await request('/catalog/mods?q=camera&version=1.6')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(none.items, []);
+
+  const first = await (await request('/catalog/mods?q=h&limit=1&sort=updated')).json() as CatalogPage<CatalogMod>;
+  assert.equal(first.items.length, 1);
+  assert.ok(first.total >= 2 && first.next_cursor?.startsWith('ix:'));
+  const second = await (await request(`/catalog/mods?q=h&limit=1&sort=updated&cursor=${first.next_cursor}`)).json() as CatalogPage<CatalogMod>;
+  assert.notEqual(second.items[0]?.id, first.items[0]?.id);
+
+  const hostile = await request('/catalog/mods?q=%22%20OR%20*%20NEAR(');
+  assert.equal(hostile.status, 200);
 });

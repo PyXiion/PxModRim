@@ -1,3 +1,4 @@
+import { indexMods } from './search';
 import { HttpError } from './types';
 import type { Author, CatalogCollection, CatalogItem, CatalogMod, CatalogPage, Env, Preview, SteamFile } from './types';
 
@@ -208,6 +209,8 @@ async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
       'INSERT INTO catalog_items (id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at',
     ).bind(item.kind === 'collection' ? item.steam_id : item.id, JSON.stringify(item), now)));
   }
+  await indexMods(db, items.filter((item): item is CatalogMod => item.kind === 'mod')).catch(error =>
+    console.error('Search index update failed', error instanceof Error ? error.message : error));
 }
 
 export async function getSteamItems(env: Env, requestedIds: string[]): Promise<{ items: Map<string, CatalogItem>; unavailable_ids: string[] }> {
@@ -267,13 +270,15 @@ export async function attachMemberPreviews(env: Env, collections: CatalogCollect
   });
 }
 
-export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: ExecutionContext, origin: string, kind: K, query: SteamQuery): Promise<CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
-  const cacheUrl = new URL(`/__catalog_cache/${kind}`, origin);
-  cacheUrl.searchParams.set('query', JSON.stringify(query));
-  const cacheKey = new Request(cacheUrl);
-  const cached = await caches.default.match(cacheKey);
-  if (cached) return await cached.json();
+export interface FilesPage<T extends CatalogItem> {
+  items: T[];
+  total: number;
+  next_cursor: string | null;
+  /** Steam update times (seconds) of every file returned, including non-public ones. */
+  times_updated: number[];
+}
 
+export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind: K, query: SteamQuery): Promise<FilesPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
   const queryTypes: Record<SteamSort, number> = { popular: 9, updated: 21, newest: 1, trending: 3, relevance: 12 };
   const requiredTags = [...new Set([query.tag, query.version].filter((tag): tag is string => tag !== null))];
   const url = steamUrl(env, 'IPublishedFileService', 'QueryFiles');
@@ -309,11 +314,23 @@ export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: 
   const items = files.map(file => normalized(file, authors));
   await saveItems(env.DB, items);
   const cursor = typeof response.next_cursor === 'string' ? response.next_cursor : '';
-  const page = {
+  return {
     items,
     total: response.total,
     next_cursor: details.length && cursor && cursor !== query.cursor ? cursor : null,
-  };
+    times_updated: details.map(file => file.time_updated ?? 0),
+  } as FilesPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
+}
+
+export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: ExecutionContext, origin: string, kind: K, query: SteamQuery): Promise<CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
+  const cacheUrl = new URL(`/__catalog_cache/${kind}`, origin);
+  cacheUrl.searchParams.set('query', JSON.stringify(query));
+  const cacheKey = new Request(cacheUrl);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return await cached.json();
+
+  const { items, total, next_cursor } = await queryFiles(env, kind, query);
+  const page = { items, total, next_cursor };
   ctx.waitUntil(caches.default.put(cacheKey, Response.json(page, { headers: { 'Cache-Control': `public, max-age=${QUERY_TTL_SECONDS}` } })));
   return page as CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
 }

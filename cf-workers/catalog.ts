@@ -1,4 +1,5 @@
 import { deletePick, getPick, listPicks, parsePickInput, putPick, validatePickSlug } from './picks';
+import { indexStatus, searchMods } from './search';
 import { attachMemberPreviews, getSteamItems, querySteam, validateSteamId } from './steam';
 import type { SteamQuery, SteamSort } from './steam';
 import { HttpError } from './types';
@@ -228,7 +229,12 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   }
   if (url.pathname === '/catalog/mods') {
     requireMethod(request, ['GET']);
-    return json(await querySteam(env, ctx, url.origin, 'mod', queryOptions(url)));
+    const query = queryOptions(url);
+    return json(await searchMods(env.DB, query) ?? await querySteam(env, ctx, url.origin, 'mod', query));
+  }
+  if (url.pathname === '/catalog/index') {
+    requireMethod(request, ['GET']);
+    return json(await indexStatus(env.DB));
   }
   if (url.pathname === '/catalog/collections') {
     requireMethod(request, ['GET']);

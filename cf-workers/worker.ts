@@ -1,4 +1,5 @@
 import { handleCatalogRequest } from './catalog';
+import { indexTick } from './indexer';
 import type { DependencyMessage, Env, SteamFile } from './types';
 
 interface DependencyItem {
@@ -857,6 +858,7 @@ export default {
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(crawlTick(env));
+    ctx.waitUntil(indexTick(env).catch(error => console.error('[INDEX] Tick failed', error instanceof Error ? error.message : error)));
   },
 
   async queue(batch: MessageBatch<DependencyMessage>, env: Env): Promise<void> {
