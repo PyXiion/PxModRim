@@ -10,6 +10,7 @@ Rectangle {
     required property string title
     required property string author
     required property string previewUrl
+    required property var collage
     required property string sourceLabel
     required property string versions
     required property string stateLabel
@@ -43,11 +44,31 @@ Rectangle {
                 sourceSize.width: 480
                 sourceSize.height: 240
             }
+            Grid {
+                id: collageGrid
+                anchors.fill: parent
+                visible: card.previewUrl === "" && card.collage.length > 0
+                columns: card.collage.length === 1 ? 1 : 2
+                readonly property int rowCount: card.collage.length > 2 ? 2 : 1
+                Repeater {
+                    model: card.collage
+                    Image {
+                        required property string modelData
+                        width: collageGrid.width / collageGrid.columns
+                        height: collageGrid.height / collageGrid.rowCount
+                        source: modelData
+                        asynchronous: true
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize.width: 240
+                        sourceSize.height: 120
+                    }
+                }
+            }
             Image {
                 anchors.centerIn: parent
                 width: 32
                 height: 32
-                visible: preview.status !== Image.Ready
+                visible: preview.status !== Image.Ready && !collageGrid.visible
                 source: "image://icons/grid?color=" + encodeURIComponent(Theme.textDim)
             }
             TapHandler { onTapped: workshopPanel.openItem(card.itemId, card.kind) }

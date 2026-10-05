@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import QModelIndex, QObject, Qt
 
-from pxmodrim.core.workshop import Author, CatalogMod
+from pxmodrim.core.workshop import Author, CatalogCollection, CatalogMod, Preview
 from pxmodrim.ui.plugins.workshop.models import (
     CatalogListModel,
     description_rich_text,
@@ -135,3 +135,31 @@ def test_row_shows_update_and_game_incompatibility() -> None:
     row = item_row(_mod("1"), lambda _: "outdated", "1.6")
     assert row["actionLabel"] == "Update" and row["incompatible"]
     assert row["fileSize"] == "1.0 MB"
+
+
+def test_collection_image_prefers_own_then_first_image_then_member_collage() -> None:
+    bare = CatalogCollection(
+        id="steam:1",
+        source="steam",
+        steam_id="1",
+        title="C",
+        author=Author("1", "A", None),
+        description="",
+        description_format="bbcode",
+        preview_url=None,
+        previews=[
+            Preview("video", "https://youtube.test/v"),
+            Preview("image", "https://images.test/own.png"),
+        ],
+        workshop_url=None,
+        tags=[],
+        supported_versions=[],
+        created_at=None,
+        updated_at=None,
+        member_ids=["10"],
+        member_count=1,
+        member_previews=["https://images.test/m.png", "javascript:alert(1)"],
+    )
+    row = item_row(bare, lambda _: "missing", "1.6")
+    assert row["previewUrl"] == "https://images.test/own.png"
+    assert row["collage"] == ["https://images.test/m.png"]

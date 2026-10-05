@@ -35,6 +35,7 @@ async def test_decodes_every_endpoint(
         "workshop_url": "https://steamcommunity.com/sharedfiles/filedetails/?id=123",
         "member_ids": ["2009463077", "456", "99"],
         "member_count": 3,
+        "member_previews": ["https://images.example.test/a.png"],
     }
     nested_collection = {
         **steam_collection,
@@ -42,6 +43,7 @@ async def test_decodes_every_endpoint(
         "steam_id": "456",
         "member_ids": ["2009463077"],
         "member_count": 1,
+        "member_previews": [],
     }
     steam_detail = {
         **detail,

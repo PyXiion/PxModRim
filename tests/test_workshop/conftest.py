@@ -58,4 +58,5 @@ def collection_payload() -> dict[str, Any]:
         "updated_at": 1700000000,
         "member_ids": ["2009463077"],
         "member_count": 1,
+        "member_previews": [],
     }

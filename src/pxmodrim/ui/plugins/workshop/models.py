@@ -120,7 +120,20 @@ def item_row(
         "kind": item.kind,
         "title": item.title,
         "author": item.author.name or item.author.id or "Unknown author",
-        "previewUrl": safe_url(item.preview_url or ""),
+        "previewUrl": safe_url(
+            item.preview_url
+            or next((p.url for p in item.previews if p.type == "image"), "")
+        ),
+        "collage": [
+            url
+            for url in (
+                safe_url(u)
+                for u in (
+                    item.member_previews if isinstance(item, CatalogCollection) else []
+                )
+            )
+            if url
+        ],
         "sourceLabel": source_label,
         "versions": ", ".join(item.supported_versions) or "Not specified",
         "tags": " · ".join(item.tags),
@@ -148,6 +161,7 @@ class CatalogListModel(QAbstractListModel):
         "title",
         "author",
         "previewUrl",
+        "collage",
         "sourceLabel",
         "versions",
         "tags",

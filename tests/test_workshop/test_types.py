@@ -51,6 +51,7 @@ def test_steam_collection_and_empty_page(collection_payload: dict[str, Any]) -> 
             "workshop_url": "https://steamcommunity.com/sharedfiles/filedetails/?id=123",
             "member_ids": ["2009463077", "steam:456"],
             "member_count": 2,
+            "member_previews": ["https://images.example.test/a.png"],
         }
     )
     collection = msgspec.json.decode(

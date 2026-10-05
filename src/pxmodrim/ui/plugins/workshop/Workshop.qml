@@ -63,6 +63,14 @@ Rectangle {
                 onAccepted: root.applyFilters()
             }
             PxButton { text: "Search"; enabled: workshopPanel.configured && !workshopPanel.busy; onClicked: root.applyFilters() }
+            PxProgressBar {
+                Layout.preferredWidth: 48
+                Layout.alignment: Qt.AlignVCenter
+                thickness: 3
+                indeterminate: true
+                opacity: workshopPanel.busy ? 1 : 0
+                Accessible.name: "Loading"
+            }
             Copy {
                 Layout.fillWidth: false
                 visible: root.width > 1000
@@ -161,7 +169,6 @@ Rectangle {
                 onActivated: root.applyFilters()
             }
         }
-        PxProgressBar { Layout.fillWidth: true; visible: workshopPanel.busy; indeterminate: true }
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: errorRow.implicitHeight + 24
