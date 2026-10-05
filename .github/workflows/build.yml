@@ -50,9 +50,11 @@ jobs:
 
       - name: Verify glibc floor
         run: |
+          set -euo pipefail
           max=$(find dist/entrypoint.dist -type f \( -name '*.so*' -o -perm -u+x \) -exec objdump -T {} + 2>/dev/null \
-            | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
-          echo "Highest GLIBC symbol: $max"
+            | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1 || true)
+          echo "Highest GLIBC symbol: ${max:-none}"
+          test -n "$max"
           test "$(printf '%s\nGLIBC_2.35\n' "$max" | sort -V | tail -1)" = "GLIBC_2.35"
 
       - name: Package tar.gz

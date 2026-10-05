@@ -5,10 +5,14 @@ All notable changes to PxModRim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-10-05
 ### Added
 - Settings > Steam Workshop: `Parallel mods` (1-8) and `Threads per mod` (1-16) control pxsteamdl download concurrency, with tooltips. Defaults are 8 and 1.
 
 ### Changed
+- Linux release builds (AppImage, tar, deb, rpm) are built on Ubuntu 22.04 so they run on systems with glibc 2.35 or newer; the previous AppImage required glibc 2.38. CI fails the build if a bundled binary needs a newer glibc.
+- `LICENSE` is now the unmodified LGPL-3.0 text so license detectors recognise it; the copyright header and RimSort MIT attribution moved to `NOTICE`.
 - No Version Warning and Use This Instead databases load from cache instantly and refresh in the background (progress shown in the header) when missing or older than 1 day, instead of blocking startup.
 - Organizer is the first view; its left navigation and right mod-info sidebar match Mods in width. Its search, folder actions, selection controls, and tree layout follow the #37 mockup while retaining the existing mod-info sidebar.
 - Auto-folder rules show first-match and newly assignable mod counts without blocking the editor; folder expansion controls persist their state.
