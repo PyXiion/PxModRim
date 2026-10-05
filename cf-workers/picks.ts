@@ -145,6 +145,7 @@ function toCollection(row: PickRow): CatalogCollection {
     updated_at: row.updated_at,
     member_ids: memberIds,
     member_count: memberIds.length,
+    member_previews: [],
   };
 }
 

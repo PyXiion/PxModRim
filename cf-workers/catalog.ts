@@ -1,5 +1,5 @@
 import { deletePick, getPick, listPicks, parsePickInput, putPick, validatePickSlug } from './picks';
-import { getSteamItems, querySteam, validateSteamId } from './steam';
+import { attachMemberPreviews, getSteamItems, querySteam, validateSteamId } from './steam';
 import type { SteamQuery, SteamSort } from './steam';
 import { HttpError } from './types';
 import type { CatalogCollection, CatalogItem, CatalogMod, CatalogPage, Env } from './types';
@@ -140,7 +140,7 @@ async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: 
     key, steam: steam.next_cursor, picked: cursor.picked === null ? null : picked.next_offset, steam_total: steam.total,
   };
   return {
-    items: [...pickedItems, ...steam.items],
+    items: await attachMemberPreviews(env, [...pickedItems, ...steam.items]),
     total: (source === 'steam' ? 0 : picked.total) + steam.total,
     next_cursor: next.steam === null && next.picked === null ? null : encodeCursor(next),
   };

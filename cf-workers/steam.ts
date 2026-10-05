@@ -30,16 +30,38 @@ function steamUrl(env: Env, service: string, method: string, version = 1): URL {
   return url;
 }
 
+const STEAM_ATTEMPTS = 3;
+const STEAM_ATTEMPT_TIMEOUT_MS = 4_000;
+
 async function steamJson(url: URL): Promise<unknown> {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    if (response.status === 429) throw new HttpError(503, 'Steam API rate limit reached');
-    if (response.status === 401 || response.status === 403) throw new HttpError(503, 'Steam API credentials were rejected');
-    if (!response.ok) throw new HttpError(502, 'Steam API request failed');
-    return await response.json();
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new HttpError(502, 'Steam API is unavailable or returned invalid JSON');
+  for (let attempt = 1; ; attempt++) {
+    const started = Date.now();
+    let stage = 'headers';
+    let status: number | null = null;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(STEAM_ATTEMPT_TIMEOUT_MS) });
+      status = response.status;
+      if (response.status === 429) throw new HttpError(503, 'Steam API rate limit reached');
+      if (response.status === 401 || response.status === 403) throw new HttpError(503, 'Steam API credentials were rejected');
+      if (!response.ok) {
+        stage = 'error-body';
+        console.error(`Steam ${url.pathname} HTTP ${status} body: ${(await response.text()).slice(0, 300)}`);
+        throw new HttpError(502, 'Steam API request failed');
+      }
+      stage = 'body';
+      return await response.json();
+    } catch (error) {
+      const retryable = !(error instanceof HttpError) || error.status === 502;
+      if (!(error instanceof HttpError)) {
+        const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.error(`Steam ${url.pathname} attempt ${attempt}/${STEAM_ATTEMPTS} failed at ${stage} after ${Date.now() - started}ms (status ${status ?? 'none'}): ${reason}`);
+      }
+      if (!retryable) throw error;
+      if (attempt === STEAM_ATTEMPTS) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError(502, 'Steam API is unavailable or returned invalid JSON');
+      }
+    }
   }
 }
 
@@ -160,6 +182,7 @@ function normalized(file: SteamFile, authors: Map<string, Author>): CatalogItem 
       steam_id: file.publishedfileid,
       member_ids: childIds,
       member_count: file.num_children ?? childIds.length,
+      member_previews: [],
     };
   }
   const votes = file.vote_data;
@@ -216,6 +239,32 @@ export async function getSteamItems(env: Env, requestedIds: string[]): Promise<{
     for (const item of fetched) items.set(item.kind === 'collection' ? item.steam_id! : item.id, item);
   }
   return { items, unavailable_ids: ids.filter(id => !items.has(id)) };
+}
+
+const COLLAGE_SIZE = 4;
+const COLLAGE_CANDIDATES = 8;
+
+// Steam gives collections no image; its site shows a collage of member previews.
+export async function attachMemberPreviews(env: Env, collections: CatalogCollection[]): Promise<CatalogCollection[]> {
+  const candidates = collections.map(collection => collection.preview_url ? [] : collection.member_ids.slice(0, COLLAGE_CANDIDATES));
+  const ids = [...new Set(candidates.flat())];
+  if (!ids.length) return collections;
+  let members: Map<string, CatalogItem>;
+  try {
+    members = (await getSteamItems(env, ids)).items;
+  } catch (error) {
+    console.error('Collection thumbnails unavailable:', error instanceof Error ? error.message : error);
+    return collections;
+  }
+  return collections.map((collection, index) => {
+    const previews: string[] = [];
+    for (const id of candidates[index]!) {
+      const member = members.get(id);
+      if (member?.kind === 'mod' && member.preview_url) previews.push(member.preview_url);
+      if (previews.length === COLLAGE_SIZE) break;
+    }
+    return previews.length ? { ...collection, member_previews: previews } : collection;
+  });
 }
 
 export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: ExecutionContext, origin: string, kind: K, query: SteamQuery): Promise<CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {

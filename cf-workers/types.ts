@@ -96,6 +96,7 @@ export interface CatalogCollection {
   updated_at: number | null;
   member_ids: string[];
   member_count: number;
+  member_previews: string[];
 }
 
 export type CatalogItem = CatalogMod | CatalogCollection;

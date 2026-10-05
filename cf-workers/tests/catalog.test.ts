@@ -30,8 +30,11 @@ const files: Record<string, SteamFile> = {
   '21': mod('21', 'Cycle B', ['20']),
   '100': { ...mod('100', 'Steam Collection'), file_type: 2, children: [{ publishedfileid: '101', sortorder: 1 }, { publishedfileid: '10', sortorder: 0 }], num_children: 2 },
   '101': { ...mod('101', 'Nested Collection'), file_type: 2, children: [{ publishedfileid: '13', sortorder: 0 }], num_children: 1 },
+  '102': { ...mod('102', 'no-thumb collection'), file_type: 2, preview_url: '', children: [{ publishedfileid: '13', sortorder: 0 }, { publishedfileid: '16', sortorder: 1 }, { publishedfileid: '101', sortorder: 2 }, { publishedfileid: '11', sortorder: 3 }], num_children: 4 },
   '18446744073709551615': { ...mod('18446744073709551615', 'Maximum ID'), file_size: '18446744073709551615', vote_data: { votes_up: 0, votes_down: 0 } },
 };
+
+let flakyCalls = 0;
 
 async function upstream(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -51,7 +54,8 @@ async function upstream(request: Request): Promise<Response> {
   }
   if (url.pathname.includes('QueryFiles')) {
     if (input.search_text === 'upstream-rate-limit') return new Response('Rate limited', { status: 429 });
-    const candidateIds = input.filetype === 1 ? ['100', '101'] : ['10', '11', '12', '13', '14'];
+    if (input.search_text === 'upstream-flaky' && flakyCalls++ === 0) return new Response('Hiccup', { status: 500 });
+    const candidateIds = input.filetype === 1 ? (input.search_text === 'no-thumb' ? ['102'] : ['100', '101']) : ['10', '11', '12', '13', '14'];
     const matching = candidateIds.map(id => files[id]!).filter(file =>
       (file.title ?? '').toLowerCase().includes((input.search_text ?? '').toLowerCase())
       && (input.requiredtags ?? []).every(tag => file.tags?.some(value => value.tag === tag)));
@@ -263,6 +267,12 @@ test('invalid input and malformed/rate-limited upstreams have explicit non-succe
   assert.equal((await limited.text()).includes('fixture-only-key'), false);
 });
 
+test('a transient Steam failure is retried instead of failing the browse request', async () => {
+  const response = await request('/catalog/mods?q=upstream-flaky');
+  assert.equal(response.status, 200);
+  assert.equal(flakyCalls, 2);
+});
+
 test('idempotent migrations and the existing /deps response preserve populated dependency data', async () => {
   const now = Date.now();
   await db.batch([
@@ -315,4 +325,12 @@ test('newest picks use creation time while recently updated picks use modificati
   } finally {
     for (const slug of slugs) await request(`/catalog/collections/picked/${slug}`, 'DELETE', undefined, 'test-admin');
   }
+});
+
+test('collections without a Steam image get a collage from their member mods, skipping unavailable and nested members', async () => {
+  const response = await request('/catalog/collections?source=steam&q=no-thumb');
+  const page = await response.json() as CatalogPage<CatalogCollection>;
+  assert.equal(response.status, 200);
+  assert.equal(page.items[0]?.preview_url, null);
+  assert.deepEqual(page.items[0]?.member_previews, Array(2).fill('https://images.example.test/preview.png'));
 });
