@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../../components/controls"
+import "thumbs.js" as Thumbs
 
 Rectangle {
     id: card
@@ -31,19 +32,22 @@ Rectangle {
         anchors.margins: 12
         spacing: 8
         Rectangle {
+            id: thumb
             Layout.fillWidth: true
             Layout.preferredHeight: 110
             color: Theme.elevate3
             radius: Theme.radiusMd
             clip: true
+            readonly property int pixelW: Thumbs.bucket(width * Screen.devicePixelRatio, 64)
+            readonly property int pixelH: Thumbs.bucket(height * Screen.devicePixelRatio, 32)
             Image {
                 id: preview
                 anchors.fill: parent
-                source: card.previewUrl
+                source: thumb.width > 0 ? Thumbs.sized(card.previewUrl, thumb.pixelW, thumb.pixelH) : ""
                 asynchronous: true
                 fillMode: Image.PreserveAspectCrop
-                sourceSize.width: 480
-                sourceSize.height: 240
+                sourceSize.width: thumb.pixelW
+                sourceSize.height: thumb.pixelH
             }
             Grid {
                 id: collageGrid
@@ -52,16 +56,16 @@ Rectangle {
                 columns: card.collage.length === 1 ? 1 : 2
                 readonly property int rowCount: card.collage.length > 2 ? 2 : 1
                 Repeater {
-                    model: card.collage
+                    model: collageGrid.visible ? card.collage : []
                     Image {
                         required property string modelData
                         width: collageGrid.width / collageGrid.columns
                         height: collageGrid.height / collageGrid.rowCount
-                        source: modelData
+                        source: Thumbs.sized(modelData, thumb.pixelW / collageGrid.columns, thumb.pixelH / collageGrid.rowCount)
                         asynchronous: true
                         fillMode: Image.PreserveAspectCrop
-                        sourceSize.width: 240
-                        sourceSize.height: 120
+                        sourceSize.width: thumb.pixelW / collageGrid.columns
+                        sourceSize.height: thumb.pixelH / collageGrid.rowCount
                     }
                 }
             }

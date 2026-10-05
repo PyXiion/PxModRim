@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../../components/controls"
+import "thumbs.js" as Thumbs
 
 Rectangle {
     id: root
@@ -259,10 +260,12 @@ Rectangle {
                             Image {
                                 id: detailImage
                                 anchors.fill: parent
-                                source: root.detail.previewUrl || ""
+                                readonly property int pixelW: Thumbs.bucket(width * Screen.devicePixelRatio, 128)
+                                readonly property int pixelH: Thumbs.bucket(height * Screen.devicePixelRatio, 64)
+                                source: width > 0 ? Thumbs.sized(root.detail.previewUrl || "", pixelW, pixelH) : ""
                                 asynchronous: true
-                                sourceSize.width: 1000
-                                sourceSize.height: 600
+                                sourceSize.width: pixelW
+                                sourceSize.height: pixelH
                                 fillMode: Image.PreserveAspectFit
                             }
                             Grid {
@@ -277,11 +280,11 @@ Rectangle {
                                         required property string modelData
                                         width: detailCollage.width / detailCollage.columns
                                         height: detailCollage.height / detailCollage.rowCount
-                                        source: modelData
+                                        source: Thumbs.sized(modelData, detailImage.pixelW / detailCollage.columns, detailImage.pixelH / detailCollage.rowCount)
                                         asynchronous: true
                                         fillMode: Image.PreserveAspectCrop
-                                        sourceSize.width: 480
-                                        sourceSize.height: 300
+                                        sourceSize.width: detailImage.pixelW / detailCollage.columns
+                                        sourceSize.height: detailImage.pixelH / detailCollage.rowCount
                                     }
                                 }
                             }
