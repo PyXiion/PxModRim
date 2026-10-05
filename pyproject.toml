@@ -17,14 +17,14 @@ dependencies = [
 
 [project.optional-dependencies]
 # Steam Workshop downloads; without it the app runs as a plain mod sorter.
-steam = ["pxsteamdl>=0.2.0"]
+steam = ["pxsteamdl>=0.3.0"]
 
 [project.gui-scripts]
 pxmodrim = "pxmodrim.__main__:main"
 
 [dependency-groups]
 dev = [
-    "pxsteamdl>=0.2.0",
+    "pxsteamdl>=0.3.0",
     "nuitka>=2.6.7",
     "pydeps>=3.0.7",
     "pyright>=1.1.411",

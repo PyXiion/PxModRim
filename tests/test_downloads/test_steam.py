@@ -48,7 +48,9 @@ class FakeClient:
                 )
             if on_progress is not None:
                 on_progress(
-                    SimpleNamespace(item_id=item_id, bytes_done=5, bytes_total=10)
+                    SimpleNamespace(
+                        item_id=item_id, unpacked_bytes=5, unpacked_total=10
+                    )
                 )
             gate = self.gates.get(item_id)
             if gate is not None:
@@ -56,7 +58,9 @@ class FakeClient:
             error = "cancelled" if self.stopped else self.errors.get(item_id, "")
             if not error:
                 (Path(root) / str(item_id)).mkdir(parents=True, exist_ok=True)
-            results.append(SimpleNamespace(item_id=item_id, error=error))
+            results.append(
+                SimpleNamespace(item_id=item_id, error=error, cancelled=self.stopped)
+            )
         return results
 
 

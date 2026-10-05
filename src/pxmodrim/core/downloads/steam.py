@@ -342,7 +342,11 @@ class SteamDownloader(Downloader):
 
         def on_progress(p: pxsteamdl.Progress) -> None:
             loop.call_soon_threadsafe(
-                self._on_progress, batch, str(p.item_id), p.bytes_done, p.bytes_total
+                self._on_progress,
+                batch,
+                str(p.item_id),
+                p.unpacked_bytes,
+                p.unpacked_total,
             )
 
         self.download_phase_changed.emit("query")
@@ -378,11 +382,13 @@ class SteamDownloader(Downloader):
 
         # Flush progress callbacks queued before the executor returned.
         await asyncio.sleep(0)
-        by_id = {str(r.item_id): r.error for r in results}
+        by_id = {str(r.item_id): r for r in results}
         for pid in ids:
-            error = by_id.get(pid, "no result")
-            if error != _CANCELLED:
-                self._finish_item(batch, pid, error=error)
+            result = by_id.get(pid)
+            if result is None:
+                self._finish_item(batch, pid, error="no result")
+            elif not result.cancelled:
+                self._finish_item(batch, pid, error=result.error)
 
     async def _ensure_client(self) -> WorkshopClient:
         if self._client is None:

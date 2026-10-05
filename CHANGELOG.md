@@ -5,6 +5,8 @@ All notable changes to PxModRim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- Updated PxSteamDL to 0.3.0: failed updates keep the previous item installed, concurrent downloads of one item are serialized by a lock, transient network failures are retried, and a failed item-details request fails only its batch instead of the whole download. Download progress uses the unpacked byte counters and cancellation uses `Result.cancelled`.
 
 ## [0.2.0] - 2026-10-05
 ### Added
