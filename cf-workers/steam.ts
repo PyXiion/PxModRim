@@ -213,18 +213,10 @@ async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
     console.error('Search index update failed', error instanceof Error ? error.message : error));
 }
 
-export async function getSteamItems(env: Env, requestedIds: string[]): Promise<{ items: Map<string, CatalogItem>; unavailable_ids: string[] }> {
-  const ids = [...new Set(requestedIds)];
-  const items = new Map<string, CatalogItem>();
-  for (let offset = 0; offset < ids.length; offset += 90) {
-    const chunk = ids.slice(offset, offset + 90);
-    const rows = await env.DB.prepare(`SELECT id, data FROM catalog_items WHERE id IN (${chunk.map(() => '?').join(',')}) AND updated_at > ?`)
-      .bind(...chunk, Date.now() - DETAIL_TTL_MS).all<{ id: string; data: string }>();
-    for (const row of rows.results) items.set(row.id, JSON.parse(row.data) as CatalogItem);
-  }
-  const missing = ids.filter(id => !items.has(id));
-  for (let offset = 0; offset < missing.length; offset += API_BATCH_SIZE) {
-    const chunk = missing.slice(offset, offset + API_BATCH_SIZE);
+async function fetchItems(env: Env, ids: string[]): Promise<Map<string, CatalogItem>> {
+  const fetched = new Map<string, CatalogItem>();
+  for (let offset = 0; offset < ids.length; offset += API_BATCH_SIZE) {
+    const chunk = ids.slice(offset, offset + API_BATCH_SIZE);
     const url = steamUrl(env, 'IPublishedFileService', 'GetDetails');
     url.searchParams.set('input_json', JSON.stringify({
       publishedfileids: chunk,
@@ -237,10 +229,36 @@ export async function getSteamItems(env: Env, requestedIds: string[]): Promise<{
     }));
     const files = fileDetails(responseObject(await steamJson(url))).filter(file => chunk.includes(file.publishedfileid) && publicFile(file));
     const authors = await authorsFor(env, files);
-    const fetched = files.map(file => normalized(file, authors));
-    await saveItems(env.DB, fetched);
-    for (const item of fetched) items.set(item.kind === 'collection' ? item.steam_id! : item.id, item);
+    const items = files.map(file => normalized(file, authors));
+    await saveItems(env.DB, items);
+    for (const item of items) fetched.set(item.kind === 'collection' ? item.steam_id! : item.id, item);
   }
+  return fetched;
+}
+
+/**
+ * With `ctx`, expired rows are returned as they are and refreshed in the background,
+ * so only IDs that were never stored wait for Steam. Without it expired rows are refetched first.
+ */
+export async function getSteamItems(env: Env, requestedIds: string[], ctx?: ExecutionContext): Promise<{ items: Map<string, CatalogItem>; unavailable_ids: string[] }> {
+  const ids = [...new Set(requestedIds)];
+  const items = new Map<string, CatalogItem>();
+  const stale: string[] = [];
+  const cutoff = Date.now() - DETAIL_TTL_MS;
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const chunk = ids.slice(offset, offset + 90);
+    const rows = await env.DB.prepare(`SELECT id, data, updated_at FROM catalog_items WHERE id IN (${chunk.map(() => '?').join(',')})`)
+      .bind(...chunk).all<{ id: string; data: string; updated_at: number }>();
+    for (const row of rows.results) {
+      if (row.updated_at > cutoff) items.set(row.id, JSON.parse(row.data) as CatalogItem);
+      else if (ctx) { items.set(row.id, JSON.parse(row.data) as CatalogItem); stale.push(row.id); }
+    }
+  }
+  if (ctx && stale.length) {
+    ctx.waitUntil(fetchItems(env, stale).then(() => undefined).catch(error => console.error('Background refresh failed', error instanceof Error ? error.message : error)));
+  }
+  const fetched = await fetchItems(env, ids.filter(id => !items.has(id)));
+  for (const [id, item] of fetched) items.set(id, item);
   return { items, unavailable_ids: ids.filter(id => !items.has(id)) };
 }
 
@@ -322,15 +340,30 @@ export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind:
   } as FilesPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
 }
 
+const QUERY_STALE_SECONDS = 24 * 60 * 60;
+
 export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: ExecutionContext, origin: string, kind: K, query: SteamQuery): Promise<CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
+  type Page = CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
   const cacheUrl = new URL(`/__catalog_cache/${kind}`, origin);
   cacheUrl.searchParams.set('query', JSON.stringify(query));
   const cacheKey = new Request(cacheUrl);
-  const cached = await caches.default.match(cacheKey);
-  if (cached) return await cached.json();
 
-  const { items, total, next_cursor } = await queryFiles(env, kind, query);
-  const page = { items, total, next_cursor };
-  ctx.waitUntil(caches.default.put(cacheKey, Response.json(page, { headers: { 'Cache-Control': `public, max-age=${QUERY_TTL_SECONDS}` } })));
-  return page as CatalogPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
+  const refresh = async (): Promise<Page> => {
+    const { items, total, next_cursor } = await queryFiles(env, kind, query);
+    const page = { items, total, next_cursor } as Page;
+    await caches.default.put(cacheKey, Response.json(page, {
+      headers: { 'Cache-Control': `public, max-age=${QUERY_STALE_SECONDS}`, 'X-Cached-At': String(Date.now()) },
+    }));
+    return page;
+  };
+
+  const cached = await caches.default.match(cacheKey);
+  if (cached) {
+    const age = Date.now() - Number(cached.headers.get('X-Cached-At') ?? 0);
+    if (age > QUERY_TTL_SECONDS * 1000) {
+      ctx.waitUntil(refresh().catch(error => console.error('Background refresh failed', error instanceof Error ? error.message : error)));
+    }
+    return await cached.json();
+  }
+  return await refresh();
 }

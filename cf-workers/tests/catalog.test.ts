@@ -379,3 +379,22 @@ test('text search is answered by the local index only after a full crawl cycle, 
   const hostile = await request('/catalog/mods?q=%22%20OR%20*%20NEAR(');
   assert.equal(hostile.status, 200);
 });
+
+test('expired detail reads answer from storage immediately and refresh in the background; update checks still wait', async () => {
+  const stale = { ...await (await request('/catalog/mods/13')).json() as CatalogMod, title: 'Old title' };
+  const expire = () => db.prepare('UPDATE catalog_items SET data = ?, updated_at = 0 WHERE id = ?').bind(JSON.stringify(stale), '13').run();
+
+  await expire();
+  const served = await (await request('/catalog/mods/13')).json() as CatalogMod;
+  assert.equal(served.title, 'Old title');
+  let refreshed = '';
+  for (let attempt = 0; attempt < 50 && refreshed !== 'RimHUD'; attempt++) {
+    await new Promise(done => setTimeout(done, 20));
+    refreshed = (await db.prepare('SELECT json_extract(data, "$.title") AS title FROM catalog_items WHERE id = ?').bind('13').first<{ title: string }>())?.title ?? '';
+  }
+  assert.equal(refreshed, 'RimHUD');
+
+  await expire();
+  const checked = await (await request('/catalog/mods/batch', 'POST', { ids: ['13'] })).json() as { items: CatalogMod[] };
+  assert.equal(checked.items[0]?.title, 'RimHUD');
+});

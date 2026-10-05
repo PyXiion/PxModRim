@@ -147,8 +147,8 @@ async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: 
   };
 }
 
-async function collectionDetails(env: Env, collection: CatalogCollection): Promise<Response> {
-  const { items, unavailable_ids } = await getSteamItems(env, collection.member_ids);
+async function collectionDetails(env: Env, ctx: ExecutionContext, collection: CatalogCollection): Promise<Response> {
+  const { items, unavailable_ids } = await getSteamItems(env, collection.member_ids, ctx);
   const members: CatalogItem[] = [];
   for (const id of collection.member_ids) {
     const item = items.get(id);
@@ -261,7 +261,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   if (modMatch) {
     requireMethod(request, ['GET']);
     const id = modMatch[1]!; validateSteamId(id);
-    const result = await getSteamItems(env, [id]);
+    const result = await getSteamItems(env, [id], ctx);
     const item = result.items.get(id);
     if (item?.kind !== 'mod') throw new HttpError(404, 'Public RimWorld mod not found');
     return json(item);
@@ -272,10 +272,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const id = collectionMatch[2]!;
     if (source === 'steam') {
       requireMethod(request, ['GET']); validateSteamId(id);
-      const result = await getSteamItems(env, [id]);
+      const result = await getSteamItems(env, [id], ctx);
       const item = result.items.get(id);
       if (item?.kind !== 'collection') throw new HttpError(404, 'Public RimWorld collection not found');
-      return await collectionDetails(env, item);
+      return await collectionDetails(env, ctx, item);
     }
     validatePickSlug(id);
     requireMethod(request, ['GET', 'PUT', 'DELETE']);
@@ -295,7 +295,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     }
     const collection = await getPick(env.DB, id);
     if (!collection) throw new HttpError(404, 'Picked collection not found');
-    return await collectionDetails(env, collection);
+    return await collectionDetails(env, ctx, collection);
   }
   throw new HttpError(404, 'Catalog endpoint not found');
 }

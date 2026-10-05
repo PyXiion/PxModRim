@@ -67,7 +67,7 @@ Exports remain `fetch`, `scheduled`, and `queue`. Catalog routes use Steam direc
 
 All Workshop IDs and file sizes are decimal **strings**, not JavaScript numbers. Mod IDs are bare Workshop IDs; collection IDs are namespaced as `steam:<Workshop-ID>` or `picked:<slug>`. Timestamps are Unix seconds. Public results exclude unavailable, private, banned, non-RimWorld, and non-mod/non-collection Steam files.
 
-Catalog responses are JSON with `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. Internally, Steam query pages are cached at the edge for five minutes, and rich metadata is cached in D1 for fifteen minutes. Curated listings are read from D1 on each request, so writes and deletes are not hidden by a public response cache.
+Catalog responses are JSON with `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. Steam query pages are cached at the edge and metadata in D1, and browsing never waits for a refresh: a query page older than five minutes and a mod or collection detail older than fifteen minutes are returned as stored while a background refresh runs (pages are kept up to a day). Only data that was never stored waits for Steam. Curated listings are read from D1 on each request, so writes and deletes are not hidden by a public response cache.
 
 ### Discovery and browsing
 
@@ -101,7 +101,7 @@ Discovery does not accept a continuation cursor. Start the browsing endpoints wi
 | GET | `/catalog/collections/steam/:id` | `{ collection, members, unavailable_ids, is_complete }` |
 | GET | `/catalog/collections/picked/:slug` | Same detail envelope |
 
-Batch request: `{ "ids": ["2009463077", "818773962"] }`, at most 100 IDs. Metadata uses the fifteen-minute cache; this endpoint does not promise an uncached Steam refresh. The client can compare each mod's `updated_at` against its installed copy.
+Batch request: `{ "ids": ["2009463077", "818773962"] }`, at most 100 IDs. Metadata older than fifteen minutes is refetched from Steam before answering, so the client can compare each mod's `updated_at` against its installed copy. `/catalog/resolve` behaves the same.
 
 Mods expose title, Steam author/profile, description, previews, Workshop URL, tags, supported versions, publication/update times, file size, subscription count, votes, dependency IDs, package ID when provided by Steam, and incompatibility status. Missing optional data remains `null`; unrated mods do not receive an invented approval percentage.
 
@@ -163,6 +163,7 @@ JSON requests require `application/json` and are bounded to 64 KiB, including st
 
 - `0001_dependencies.sql`: existing `items` and `crawl_state` tables, created only when absent. Existing dependency data is preserved.
 - `0002_catalog.sql`: `catalog_items` metadata cache and `picked_collections` with JSON-array constraints and browsing indexes. No sample rows are inserted.
+- `0003_search.sql`: `catalog_index` (mods seen by the catalog) with an FTS5 table, and `index_state` for the crawler. The scheduled handler walks the Workshop newest-updated first; `/catalog/index` reports `ready` once one full pass has finished. Until then, and for cursors that do not start with `ix:`, text searches go to Steam. Every mod the catalog fetches for any reason is indexed too.
 
 The catalog cache is separate from `items`: the legacy resolver intentionally strips nested collection children in some paths; catalog resolution retains them.
 
