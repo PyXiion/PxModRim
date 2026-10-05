@@ -78,6 +78,14 @@ from pxmodrim.ui.window.actions import (
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 _ISSUES_URL = "https://github.com/PyXiion/PxModRim/issues"
+_HELP_ACTIONS = (
+    ActionId.REPORT_ISSUE,
+    ActionId.UPLOAD_LOGS,
+    ActionId.OPEN_LOGS,
+    ActionId.SHORTCUTS,
+    ActionId.CHECK_UPDATES,
+    ActionId.ABOUT,
+)
 _WINDOW_TITLE = "PxModRim[*]"
 
 
@@ -172,6 +180,9 @@ class MainWindow(QMainWindow):
                 "update_mods": ACTIONS[ActionId.UPDATE_MODS].tooltip(),
             },
             downloads_available=self._downloads.available,
+            help_entries=[
+                {"id": str(aid), "label": ACTIONS[aid].label} for aid in _HELP_ACTIONS
+            ],
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
@@ -183,6 +194,9 @@ class MainWindow(QMainWindow):
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
+        self._header_controller.help_action_requested.connect(
+            lambda action_id: self._actions[ActionId(action_id)].trigger()
+        )
         self._header_controller.downloads_requested.connect(
             lambda: self._show_view("downloads")
         )

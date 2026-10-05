@@ -261,6 +261,14 @@ Rectangle {
                 spacing: 6
 
                 PxButton {
+                    id: helpBtn
+                    objectName: "helpButton"
+                    iconName: "help"
+                    ToolTip.text: "Help, logs and feedback"
+                    onClicked: helpMenu.popup(helpBtn, 0, helpBtn.height + 4)
+                }
+
+                PxButton {
                     iconName: "settings"
                     ToolTip.text: root.controller.tooltips.settings || "Settings"
                     onClicked: root.controller.openSettings()
@@ -346,6 +354,21 @@ Rectangle {
                 checkable: true
                 checked: root.controller.strategyIndex === modelData.index
                 onTriggered: root.controller.setStrategy(modelData.index)
+            }
+        }
+    }
+
+    PxMenu {
+        id: helpMenu
+        objectName: "helpMenu"
+
+        Repeater {
+            model: root.controller.helpEntries
+
+            PxMenuItem {
+                required property var modelData
+                text: modelData.label
+                onTriggered: root.controller.triggerHelp(modelData.id)
             }
         }
     }

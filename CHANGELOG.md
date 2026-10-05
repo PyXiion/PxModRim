@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- Header help button (`?`, beside Settings) with Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.
 - Settings > Steam Workshop: `Proxy` (empty uses `https_proxy`/`all_proxy` from the environment), `Connect timeout` and `Stall timeout` for Workshop downloads. Changing them logs in to Steam again before the next download.
 
 ### Changed

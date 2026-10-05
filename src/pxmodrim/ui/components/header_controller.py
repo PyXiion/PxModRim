@@ -27,6 +27,7 @@ class HeaderController(QObject):
     downloads_progress_changed = Signal()
     downloads_progress_shown_changed = Signal()
     downloads_requested = Signal()
+    help_action_requested = Signal(str)
     task_text_changed = Signal()
 
     def __init__(
@@ -37,6 +38,7 @@ class HeaderController(QObject):
         app_version: str = "",
         tooltips: dict[str, str] | None = None,
         downloads_available: bool = False,
+        help_entries: list[dict[str, str]] | None = None,
     ) -> None:
         super().__init__(parent)
         self._is_frameless = is_frameless
@@ -46,6 +48,7 @@ class HeaderController(QObject):
         self._app_version = app_version
         self._tooltips = tooltips or {}
         self._downloads_available = downloads_available
+        self._help_entries = help_entries or []
         self._downloads_busy = False
         self._task_text = ""
         self._downloads_text = ""
@@ -67,6 +70,14 @@ class HeaderController(QObject):
     @Property("QVariantList", constant=True)  # type: ignore[operator]
     def strategies(self) -> list[dict[str, object]]:
         return [{"index": int(s), "label": _STRATEGY_LABELS[s]} for s in LaunchStrategy]
+
+    @Property("QVariantList", constant=True)  # type: ignore[operator]
+    def helpEntries(self) -> list[dict[str, str]]:
+        return self._help_entries
+
+    @Slot(str)
+    def triggerHelp(self, action_id: str) -> None:
+        self.help_action_requested.emit(action_id)
 
     def set_maximized(self, value: bool) -> None:
         if self._maximized != value:
