@@ -54,7 +54,7 @@ class ModListPanel(QWidget):
     order_changed = Signal()
     selection_changed = Signal(list)
     compact_mode_changed = Signal(bool)
-    highlighted_uuids_changed = Signal()
+    highlighted_changed = Signal()
 
     @Property(bool, notify=compact_mode_changed)
     def compactMode(self) -> bool:
@@ -66,17 +66,13 @@ class ModListPanel(QWidget):
             self._compact_mode = enabled
             self.compact_mode_changed.emit(enabled)
 
-    @Property(list, notify=highlighted_uuids_changed)
-    def highlightedUuids(self) -> list[str]:
-        return self._highlighted_uuids
-
-    @Property(int, notify=highlighted_uuids_changed)
+    @Property(int, notify=highlighted_changed)
     def highlightRevision(self) -> int:
         return self._highlight_revision
 
     @Slot(str, result=bool)
     def isHighlighted(self, uuid: str) -> bool:
-        return uuid in self._highlighted_set
+        return uuid in self._highlighted
 
     def __init__(
         self,
@@ -90,8 +86,7 @@ class ModListPanel(QWidget):
         self._compact_mode: bool = (
             getattr(cfg, "compact_mod_list", False) if cfg else False
         )
-        self._highlighted_uuids: list[str] = []
-        self._highlighted_set: frozenset[str] = frozenset()
+        self._highlighted: frozenset[str] = frozenset()
         self._highlight_revision = 0
         self._highlight_generation = 0
         layout = QVBoxLayout(self)
@@ -280,10 +275,9 @@ class ModListPanel(QWidget):
         asyncio.create_task(self._clear_highlight(self._highlight_generation))
 
     def _set_highlighted(self, uuids: list[str]) -> None:
-        self._highlighted_uuids = uuids
-        self._highlighted_set = frozenset(uuids)
+        self._highlighted = frozenset(uuids)
         self._highlight_revision += 1
-        self.highlighted_uuids_changed.emit()
+        self.highlighted_changed.emit()
 
     async def _clear_highlight(self, generation: int) -> None:
         await asyncio.sleep(1.2)
