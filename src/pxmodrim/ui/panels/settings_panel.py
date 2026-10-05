@@ -21,6 +21,7 @@ from pxmodrim.core.constants import AfterLaunch
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
+from pxmodrim.core.workshop import WorkshopCatalog
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
 from pxmodrim.ui.theme.palette import PALETTE
@@ -66,6 +67,7 @@ class _SettingsBackend(QObject):
             "parallelItems": cfg.workshop_parallel_items,
             "threadsPerItem": cfg.workshop_threads_per_item,
             "proxy": cfg.workshop_proxy,
+            "catalogUrl": cfg.workshop_catalog_url,
             "connectTimeout": cfg.workshop_connect_timeout,
             "stallTimeout": cfg.workshop_stall_timeout,
             "launchArgs": cfg.launch_args,
@@ -238,6 +240,7 @@ class SettingsPanel(QDialog):
             workshop_parallel_items=int(values["parallelItems"]),
             workshop_threads_per_item=int(values["threadsPerItem"]),
             workshop_proxy=values["proxy"].strip(),
+            workshop_catalog_url=values["catalogUrl"].strip(),
             workshop_connect_timeout=int(values["connectTimeout"]),
             workshop_stall_timeout=int(values["stallTimeout"]),
             launch_args=values["launchArgs"].strip(),
@@ -247,6 +250,9 @@ class SettingsPanel(QDialog):
             launch_confirm_unsaved=bool(values["confirmUnsaved"]),
             launch_confirm_running=bool(values["confirmRunning"]),
         )
+        catalog = self._ctx.plugins.get("workshop_catalog")
+        if isinstance(catalog, WorkshopCatalog):
+            catalog.set_base_url(self._config.workshop_catalog_url)
         self.accept()
 
     def get_config(self) -> AppConfig:

@@ -210,6 +210,15 @@ class App:
 
             self._app_ctx.register_plugin(DownloadsUiPlugin())
 
+        if downloaders and "workshop_catalog" not in disabled:
+            from pxmodrim.core.workshop import WorkshopCatalog
+
+            self._ctx.register_plugin(WorkshopCatalog(lambda: ctx.config))
+            if "workshop_ui" not in disabled:
+                from pxmodrim.ui.plugins.workshop import WorkshopUiPlugin
+
+                self._app_ctx.register_plugin(WorkshopUiPlugin())
+
         self._app_ctx.setup_all()
         self.main_window = MainWindow(self._app_ctx)
         return ctx

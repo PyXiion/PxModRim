@@ -23,6 +23,7 @@ Rectangle {
             parallelItems: parallelItems.value,
             threadsPerItem: threadsPerItem.value,
             proxy: proxy.text.trim(),
+            catalogUrl: catalogUrl.text.trim(),
             connectTimeout: connectTimeout.value,
             stallTimeout: stallTimeout.value,
             launchArgs: launchArgs.text.trim(),
@@ -303,6 +304,35 @@ Rectangle {
                             id: compact
                             text: "Compact mod list"
                             checked: root.initial.compact
+                        }
+                    }
+
+                    Group {
+                        title: "Workshop catalog"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Workshop catalog URL"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxTextField {
+                                id: catalogUrl
+                                Layout.fillWidth: true
+                                text: root.initial.catalogUrl
+                                placeholderText: "https://api.modrim.pyxiion.dev"
+                                Accessible.name: "Workshop catalog URL"
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Catalog service used by the native Workshop browser. Leave empty to disable catalog network requests. Applies on Save."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
                         }
                     }
 
