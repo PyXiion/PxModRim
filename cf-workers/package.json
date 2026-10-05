@@ -1,0 +1,28 @@
+{
+  "name": "pxmodrim-workshop-backend",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dev": "wrangler dev --config wrangler.local.jsonc --local",
+    "build": "wrangler deploy --dry-run --config wrangler.local.jsonc --outdir dist",
+    "db:migrate": "wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",
+    "pretest": "npm run build",
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261005.1",
+    "@types/node": "22.20.5",
+    "miniflare": "5.20261001.0-alpha",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "wrangler": "4.147.0"
+  },
+  "allowScripts": {
+    "workerd": true,
+    "esbuild": true
+  }
+}

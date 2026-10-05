@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pxmodrim-workshop-local",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-05",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pxmodrim-workshop-local",
+      "database_id": "local-only",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

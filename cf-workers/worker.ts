@@ -1,13 +1,77 @@
+import { handleCatalogRequest } from './catalog';
+import type { DependencyMessage, Env, SteamFile } from './types';
+
+interface DependencyItem {
+  id: string;
+  title: string;
+  is_collection?: boolean;
+  is_available: boolean;
+  status: string;
+  deps: string[];
+  package_id?: string;
+  error_details?: string;
+}
+
+interface ApiDependencyItem extends DependencyItem {
+  is_collection: boolean;
+  package_id: string;
+}
+
+interface DependencyCacheEntry {
+  data: DependencyItem;
+  timestamp: number;
+  status: string;
+}
+
+interface DependencyRow {
+  id: string;
+  title: string;
+  is_collection: number;
+  status: string;
+  updated_at: number;
+  package_id: string;
+  deps: string;
+}
+
+interface SteamDetailsEnvelope {
+  response?: { publishedfiledetails?: SteamFile[] };
+}
+
+interface SteamQueryEnvelope {
+  response?: {
+    publishedfiledetails?: Array<Pick<SteamFile, 'publishedfileid'>>;
+    next_cursor?: string;
+  };
+}
+
+interface CrawlState {
+  cursor: string;
+  todo_ids: string[];
+  total_processed: number;
+}
+
+interface CrawlStateRow {
+  cursor: string;
+  todo_ids: string;
+  total_processed: number;
+}
+
+type ScrapeResult =
+  | { isRateLimited: true }
+  | { isRateLimited?: false; data: DependencyItem; nextTasks: string[] };
+
 // ============================================================================
 // GLOBAL RUNTIME CACHE & CONFIG
 // ============================================================================
 
 class LRUMap {
+  private readonly _max: number;
+  private readonly _map: Map<string, DependencyCacheEntry>;
   constructor(maxSize = 10000) {
     this._max = maxSize;
-    this._map = new Map();
+    this._map = new Map<string, DependencyCacheEntry>();
   }
-  get(key) {
+  get(key: string): DependencyCacheEntry | undefined {
     const val = this._map.get(key);
     if (val !== undefined) {
       this._map.delete(key);
@@ -15,14 +79,17 @@ class LRUMap {
     }
     return val;
   }
-  set(key, value) {
+  set(key: string, value: DependencyCacheEntry): void {
     if (this._map.has(key)) this._map.delete(key);
-    else if (this._map.size >= this._max) this._map.delete(this._map.keys().next().value);
+    else if (this._map.size >= this._max) {
+      const oldest = this._map.keys().next();
+      if (!oldest.done) this._map.delete(oldest.value);
+    }
     this._map.set(key, value);
   }
-  has(key) { return this._map.has(key); }
-  delete(key) { return this._map.delete(key); }
-  get size() { return this._map.size; }
+  has(key: string): boolean { return this._map.has(key); }
+  delete(key: string): boolean { return this._map.delete(key); }
+  get size(): number { return this._map.size; }
 }
 
 const GLOBAL_RAM_CACHE = new LRUMap(10000);
@@ -36,9 +103,9 @@ const STEAM_API_BATCH_SIZE = 200;
 const QUERY_MODS_PAGE_SIZE = 3000;
 const CRAWL_BATCH_SIZE = 200;
 
-const RECENTLY_QUEUED = new Map();
+const RECENTLY_QUEUED = new Map<string, number>();
 
-function sweepRecentlyQueued() {
+function sweepRecentlyQueued(): void {
   const cutoff = Date.now() - QUEUE_DEDUP_TTL_MS;
   for (const [id, ts] of RECENTLY_QUEUED) {
     if (ts < cutoff) RECENTLY_QUEUED.delete(id);
@@ -49,14 +116,14 @@ function sweepRecentlyQueued() {
 // 1. PARSERS
 // ============================================================================
 
-function parseRequiredDeps(htmlBlock) {
-  const deps = [];
-  const seenIds = new Set();
+function parseRequiredDeps(htmlBlock: string): string[] {
+  const deps: string[] = [];
+  const seenIds = new Set<string>();
   const reqContainerMatch = htmlBlock.match(/<div[^>]*id=["']RequiredItems["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
   if (!reqContainerMatch) return deps;
 
   const regex = /href=["'][^"']*filedetails\/\?id=(\d+)[^"']*/gi;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = regex.exec(reqContainerMatch[1])) !== null) {
     if (!seenIds.has(match[1])) {
@@ -71,7 +138,11 @@ function parseRequiredDeps(htmlBlock) {
 // 2. NETWORK & D1 DATABASE
 // ============================================================================
 
-async function fetchSteamPageHtml(apiKey, modId) {
+async function fetchSteamPageHtml(
+  apiKey: string | undefined,
+  modId: string
+): Promise<{ html: string | null; httpStatus: number; error: string | null }> {
+  if (!apiKey) return { html: null, httpStatus: 0, error: 'SCRAPI not configured' };
   const targetUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${modId}`;
   const apiUrl = `https://api.scrapingant.com/v2/general?url=${encodeURIComponent(targetUrl)}&browser=false`;
 
@@ -95,12 +166,22 @@ async function fetchSteamPageHtml(apiKey, modId) {
     const html = await response.text();
     return { html, httpStatus: 200, error: null };
   } catch (err) {
-    console.error(`[NETWORK EXCEPTION] ID ${modId}:`, err.message || err);
-    return { html: null, httpStatus: 0, error: err.message };
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[NETWORK EXCEPTION] ID ${modId}:`, message);
+    return { html: null, httpStatus: 0, error: message };
   }
 }
 
-async function saveToDB(db, modId, title, isCollection, status, deps, timestamp, packageId = '') {
+async function saveToDB(
+  db: D1Database,
+  modId: string,
+  title: string,
+  isCollection: boolean,
+  status: string,
+  deps: string[],
+  timestamp: number,
+  packageId = ''
+): Promise<void> {
   try {
     const depsStr = Array.isArray(deps) ? deps.join(',') : '';
     await db.prepare(
@@ -115,13 +196,13 @@ async function saveToDB(db, modId, title, isCollection, status, deps, timestamp,
          deps = excluded.deps`
     ).bind(modId, title, isCollection ? 1 : 0, status, timestamp, packageId, depsStr).run();
   } catch (err) {
-    console.error(`[D1 SAVE ERROR] ID ${modId}:`, err.message || err);
+    console.error(`[D1 SAVE ERROR] ID ${modId}:`, err instanceof Error ? err.message : err);
   }
 }
 
-async function prewarmCacheFromD1(db, rootId) {
+async function prewarmCacheFromD1(db: D1Database, rootId: string): Promise<void> {
   const toLoad = new Set([rootId]);
-  const loaded = new Set();
+  const loaded = new Set<string>();
   let loadedCount = 0;
 
   while (toLoad.size > 0) {
@@ -137,7 +218,7 @@ async function prewarmCacheFromD1(db, rootId) {
       const { results } = await db.prepare(
         `SELECT id, title, is_collection, status, updated_at, package_id, deps
          FROM items WHERE id IN (${placeholders})`
-      ).bind(...chunk).all();
+      ).bind(...chunk).all<DependencyRow>();
 
       if (!results) continue;
 
@@ -174,20 +255,20 @@ async function prewarmCacheFromD1(db, rootId) {
   }
 }
 
-function buildTree(targetId) {
-  const itemsMap = {};
+function buildTree(targetId: string): { itemsMap: Record<string, DependencyItem>; missingIds: Set<string> } {
+  const itemsMap: Record<string, DependencyItem> = {};
   const queue = [targetId];
-  const visited = new Set();
-  const missingIds = new Set();
+  const visited = new Set<string>();
+  const missingIds = new Set<string>();
   const now = Date.now();
 
   while (queue.length > 0) {
-    const currentId = queue.shift();
+    const currentId = queue.shift()!;
     if (visited.has(currentId)) continue;
     visited.add(currentId);
 
-    if (GLOBAL_RAM_CACHE.has(currentId)) {
-      const cached = GLOBAL_RAM_CACHE.get(currentId);
+    const cached = GLOBAL_RAM_CACHE.get(currentId);
+    if (cached) {
       const ttl = cached.status === 'OK'
         ? (cached.data.is_collection ? CACHE_TTL_OK_COLLECTION : CACHE_TTL_OK_MOD)
         : CACHE_TTL_ERROR;
@@ -213,7 +294,8 @@ function buildTree(targetId) {
   return { itemsMap, missingIds };
 }
 
-async function fetchSteamApiDetails(apiKey, modIds) {
+async function fetchSteamApiDetails(apiKey: string | undefined, modIds: string[]): Promise<SteamFile[] | null> {
+  if (!apiKey) return null;
   const jsonPayload = {
     publishedfileids: modIds,
     includechildren: true,
@@ -237,7 +319,7 @@ async function fetchSteamApiDetails(apiKey, modIds) {
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json<SteamDetailsEnvelope>();
     const details = data?.response?.publishedfiledetails;
     if (!Array.isArray(details)) {
       console.error(`[STEAM API FAIL] Unexpected response shape`);
@@ -246,17 +328,17 @@ async function fetchSteamApiDetails(apiKey, modIds) {
 
     return details;
   } catch (err) {
-    console.error(`[STEAM API EXCEPTION] Batch of ${modIds.length}:`, err.message || err);
+    console.error(`[STEAM API EXCEPTION] Batch of ${modIds.length}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }
 
-function processApiResults(details) {
-  const processed = [];
+function processApiResults(details: SteamFile[]): { processed: ApiDependencyItem[] } {
+  const processed: ApiDependencyItem[] = [];
 
   for (const detail of details) {
     const id = detail.publishedfileid;
-    let status, title, isCollection, deps, packageId;
+    let status: string, title: string, isCollection: boolean, deps: string[], packageId: string;
 
     if (detail.result !== 1) {
       status = detail.result === 15 ? 'PRIVATE' : `ERROR_RESULT_${detail.result}`;
@@ -267,7 +349,7 @@ function processApiResults(details) {
     } else {
       status = 'OK';
       title = detail.title || 'Untitled';
-      isCollection = (detail.file_type && detail.file_type !== 0);
+      isCollection = detail.file_type === 2;
       deps = (detail.children || []).map(c => c.publishedfileid).filter(Boolean);
       const kvTag = (detail.kvtags || []).find(t => t.key === 'packageId');
       packageId = kvTag ? kvTag.value : '';
@@ -285,7 +367,7 @@ function processApiResults(details) {
 // 4. CRAWL — STALE MOD DISCOVERY VIA QueryFiles
 // ============================================================================
 
-async function queryMods(apiKey, cursor) {
+async function queryMods(apiKey: string, cursor: string): Promise<{ ids: string[]; next_cursor: string }> {
   const params = new URLSearchParams({
     key: apiKey,
     query_type: '1',
@@ -313,7 +395,7 @@ async function queryMods(apiKey, cursor) {
     return { ids: [], next_cursor: '' };
   }
 
-  const data = await response.json();
+  const data = await response.json<SteamQueryEnvelope>();
   const details = data?.response?.publishedfiledetails;
   const nextCursor = data?.response?.next_cursor || '';
 
@@ -322,8 +404,8 @@ async function queryMods(apiKey, cursor) {
   return { ids, next_cursor: nextCursor };
 }
 
-async function findStaleIds(db, ids) {
-  const stale = [];
+async function findStaleIds(db: D1Database, ids: string[]): Promise<string[]> {
+  const stale: string[] = [];
   const now = Date.now();
 
   for (let i = 0; i < ids.length; i += 99) {
@@ -331,7 +413,7 @@ async function findStaleIds(db, ids) {
     const placeholders = batch.map(() => '?').join(',');
     const { results } = await db.prepare(
       `SELECT id, is_collection, updated_at FROM items WHERE id IN (${placeholders})`
-    ).bind(...batch).all();
+    ).bind(...batch).all<Pick<DependencyRow, 'id' | 'is_collection' | 'updated_at'>>();
 
     const found = new Map((results || []).map(r => [r.id, r]));
 
@@ -351,10 +433,10 @@ async function findStaleIds(db, ids) {
   return stale;
 }
 
-async function getCrawlState(db) {
+async function getCrawlState(db: D1Database): Promise<CrawlState> {
   const { results } = await db.prepare(
     'SELECT cursor, todo_ids, total_processed FROM crawl_state WHERE id = 1'
-  ).all();
+  ).all<CrawlStateRow>();
 
   if (!results || results.length === 0) {
     await db.prepare(
@@ -370,7 +452,7 @@ async function getCrawlState(db) {
   };
 }
 
-async function saveCrawlState(db, state) {
+async function saveCrawlState(db: D1Database, state: CrawlState): Promise<void> {
   await db.prepare(
     'UPDATE crawl_state SET cursor = ?, todo_ids = ?, total_processed = ?, updated_at = ? WHERE id = 1'
   ).bind(
@@ -381,7 +463,7 @@ async function saveCrawlState(db, state) {
   ).run();
 }
 
-async function crawlTick(env) {
+async function crawlTick(env: Env): Promise<void> {
   if (!env.STEAM_API_KEY) {
     console.warn('[CRAWL] No STEAM_API_KEY, skipping tick');
     return;
@@ -435,7 +517,7 @@ async function crawlTick(env) {
   await saveCrawlState(env.DB, state);
 }
 
-async function ensureCollectionRootDeps(env, rootId) {
+async function ensureCollectionRootDeps(env: Env, rootId: string): Promise<boolean> {
   const cached = GLOBAL_RAM_CACHE.get(rootId);
   if (!cached || !cached.data.is_collection) return false;
 
@@ -466,7 +548,7 @@ async function ensureCollectionRootDeps(env, rootId) {
   return true;
 }
 
-async function scrapeViaScrapingAnt(env, modId) {
+async function scrapeViaScrapingAnt(env: Env, modId: string): Promise<ScrapeResult> {
   const now = Date.now();
   console.log(`[SCRAPINGANT FALLBACK] Scraping Steam page for ID: ${modId}...`);
 
@@ -478,7 +560,7 @@ async function scrapeViaScrapingAnt(env, modId) {
   }
 
   let resultStatus = 'OK';
-  let resultData = null;
+  let resultData: DependencyItem;
 
   if (!html) {
     resultStatus = `SCRAPE_ERROR_HTTP_${httpStatus}`;
@@ -530,16 +612,16 @@ async function scrapeViaScrapingAnt(env, modId) {
   return { data: resultData, nextTasks: resultData.deps || [] };
 }
 
-async function scrapeInline(env, missingIds, rootId = null) {
+async function scrapeInline(env: Env, missingIds: Set<string>, rootId: string | null = null): Promise<Set<string>> {
   const toScrape = [...missingIds];
   const inQueue = new Set(missingIds);
-  const scraped = new Set();
+  const scraped = new Set<string>();
   let scrapedCount = 0;
 
   while (toScrape.length > 0 && scrapedCount < MAX_INLINE_SCRAPE) {
-    const batch = [];
+    const batch: string[] = [];
     while (batch.length < STEAM_API_BATCH_SIZE && toScrape.length > 0 && scrapedCount + batch.length < MAX_INLINE_SCRAPE) {
-      const id = toScrape.shift();
+      const id = toScrape.shift()!;
       if (!scraped.has(id)) batch.push(id);
     }
     if (batch.length === 0) break;
@@ -618,7 +700,7 @@ async function scrapeInline(env, missingIds, rootId = null) {
     }
   }
 
-  const stillMissing = new Set();
+  const stillMissing = new Set<string>();
   for (const id of missingIds) {
     if (!scraped.has(id)) stillMissing.add(id);
   }
@@ -630,9 +712,13 @@ async function scrapeInline(env, missingIds, rootId = null) {
 // ============================================================================
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
+
+      if (url.pathname === '/catalog' || url.pathname.startsWith('/catalog/')) {
+        return await handleCatalogRequest(request, env, ctx);
+      }
 
       if (url.pathname === '/') {
         return new Response('ok', {
@@ -643,7 +729,7 @@ export default {
 
       if (url.pathname === '/purge') {
         const key = url.searchParams.get('key');
-        let validKeys = [];
+        let validKeys: unknown = [];
         try { validKeys = env.CONTROL_KEYS ? JSON.parse(env.CONTROL_KEYS) : []; } catch {}
         if (!key || !Array.isArray(validKeys) || !validKeys.includes(key)) {
           return new Response('Unauthorized', { status: 401 });
@@ -684,14 +770,14 @@ export default {
           await prewarmCacheFromD1(env.DB, targetId);
           await ensureCollectionRootDeps(env, targetId);
 
-          const useQueue = env.SCRAPE_QUEUE && env.USE_QUEUE === 'true';
+          const scrapeQueue = env.USE_QUEUE === 'true' ? env.SCRAPE_QUEUE : undefined;
 
           if (!env.STEAM_API_KEY) {
             console.warn('[CONFIG] STEAM_API_KEY not set — Steam API calls will fall back to ScrapingAnt');
           }
 
-          let result = buildTree(targetId);
-          let itemsMap = result.itemsMap;
+          const result = buildTree(targetId);
+          const itemsMap = result.itemsMap;
           let missingIds = result.missingIds;
 
           if (missingIds.size > 0) {
@@ -708,15 +794,15 @@ export default {
               missingIds = rebased.missingIds;
             }
 
-            if (useQueue && missingIds.size > 0) {
+            if (scrapeQueue && missingIds.size > 0) {
               try {
                 if (!RECENTLY_QUEUED.has(targetId)) {
-                  await env.SCRAPE_QUEUE.send({ body: { rootId: targetId } });
+                  await scrapeQueue.send({ rootId: targetId });
                   RECENTLY_QUEUED.set(targetId, Date.now());
                   console.log(`[QUEUE BG] Enqueued root ${targetId} (${missingIds.size} IDs remaining)`);
                 }
               } catch (queueErr) {
-                console.warn(`[QUEUE FAIL] ${queueErr.message}`);
+                console.warn(`[QUEUE FAIL] ${queueErr instanceof Error ? queueErr.message : String(queueErr)}`);
               }
             }
           }
@@ -748,8 +834,8 @@ export default {
           });
 
         } catch (err) {
-          console.error(`[FATAL ERROR]`, err.stack || err);
-          return new Response(JSON.stringify({ error: 'Internal Server Error', message: err.message }), {
+          console.error(`[FATAL ERROR]`, err instanceof Error ? err.stack : err);
+          return new Response(JSON.stringify({ error: 'Internal Server Error', message: err instanceof Error ? err.message : String(err) }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
           });
@@ -758,10 +844,10 @@ export default {
 
       return new Response('Not Found', { status: 404 });
     } catch (err) {
-      console.error('[CRITICAL WORKER ERROR]', err.stack || err);
+      console.error('[CRITICAL WORKER ERROR]', err instanceof Error ? err.stack : err);
       return new Response(JSON.stringify({
         error: 'Worker Execution Error',
-        message: err.message
+        message: err instanceof Error ? err.message : String(err)
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
@@ -769,11 +855,11 @@ export default {
     }
   },
 
-  async scheduled(event, env, ctx) {
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(crawlTick(env));
   },
 
-  async queue(batch, env) {
+  async queue(batch: MessageBatch<DependencyMessage>, env: Env): Promise<void> {
     console.log(`[QUEUE CONSUMER] Received batch of ${batch.messages.length} items`);
     sweepRecentlyQueued();
 
@@ -803,16 +889,17 @@ export default {
           message.ack();
         } else {
           console.log(`[QUEUE CONTINUE] Root ${rootId}: ${check.missingIds.size} still missing, re-scheduling`);
+          if (!env.SCRAPE_QUEUE) throw new Error('SCRAPE_QUEUE not configured');
           message.ack();
           await env.SCRAPE_QUEUE.send(
-            { body: { rootId } },
-            { deliveryDelay: 30 }
+            { rootId },
+            { delaySeconds: 30 }
           );
         }
       } catch (err) {
-        console.error(`[QUEUE ERROR] Root ${rootId}:`, err.message || err);
+        console.error(`[QUEUE ERROR] Root ${rootId}:`, err instanceof Error ? err.message : err);
         message.retry();
       }
     }
   }
-};
+} satisfies ExportedHandler<Env, DependencyMessage>;

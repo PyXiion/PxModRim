@@ -58,3 +58,22 @@ jobs:
             export QT_QPA_PLATFORM=offscreen
           fi
           just test
+
+  workshop-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cf-workers
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cf-workers/package-lock.json
+      - name: Install Worker dependencies
+        run: npm ci
+      - name: Check TypeScript
+        run: npm run check
+      - name: Exercise bundled Worker with D1
+        run: npm test
