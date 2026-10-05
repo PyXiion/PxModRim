@@ -307,7 +307,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         name.setProperty("text", "Favorites")
         color.setProperty("text", "not-a-color")
         _click_quick(view._qml, add_tag)
-        await asyncio.sleep(0.03)
+        await _until(lambda: "valid color" in str(error.property("text")))
         assert "valid color" in error.property("text")
         assert name.property("text") == "Favorites"
         assert color.property("text") == "not-a-color"
@@ -315,7 +315,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
 
         color.setProperty("text", "#3399aa")
         _click_quick(view._qml, add_tag)
-        await asyncio.sleep(0.03)
+        await _until(lambda: bool(service.state.tags))
         assert [(tag.name, tag.color) for tag in service.state.tags.values()] == [
             ("Favorites", "#3399aa")
         ]
@@ -336,7 +336,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         assert assignment is not None and assignment.isVisible()
         assert assignment.property("checkState") == Qt.CheckState.Unchecked
         _click_quick(view._qml, assignment)
-        await asyncio.sleep(0.03)
+        await _until(lambda: "example.mod" in service.state.mod_tags)
         tag_id = next(iter(service.state.tags))
         assert service.state.mod_tags["example.mod"] == frozenset({tag_id})
         assert assignment.property("checkState") == Qt.CheckState.Checked
@@ -396,7 +396,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         assert delete_confirm is not None
         qtbot.waitUntil(lambda: delete_confirm.property("visible"))
         QMetaObject.invokeMethod(delete_confirm, "accept")
-        await asyncio.sleep(0.03)
+        await _until(lambda: not service.state.tags)
         assert not service.state.tags
         persisted = await db.load()
         assert not persisted.tags
