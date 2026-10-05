@@ -18,10 +18,11 @@ Rectangle {
     required property bool incompatible
     required property int memberCount
 
-    color: Theme.elevate2
+    color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
     radius: Theme.radiusMd
-    border.color: Theme.border
+    border.color: hover.hovered ? Theme.elevate4 : Theme.border
     clip: true
+    HoverHandler { id: hover }
 
     ColumnLayout {
         anchors.fill: parent
@@ -66,22 +67,53 @@ Rectangle {
             text: card.author
             textFormat: Text.PlainText
             color: Theme.textMuted
+            font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSm
             elide: Text.ElideRight
         }
-        Text {
+        Flow {
             Layout.fillWidth: true
-            text: card.kind === "collection" ? card.sourceLabel + " · " + card.memberCount + " members" : card.stateLabel
-            textFormat: Text.PlainText
-            color: card.state === "outdated" ? Theme.primary : Theme.textDim
-            font.pixelSize: Theme.fontSizeSm
-            elide: Text.ElideRight
+            spacing: 6
+            PxBadge {
+                visible: card.kind === "collection"
+                compact: true
+                text: card.sourceLabel.toUpperCase()
+                textColor: card.sourceLabel.indexOf("pick") >= 0 ? Theme.warning : Theme.textMuted
+                fillColor: card.sourceLabel.indexOf("pick") >= 0 ? Theme.warningBg : Theme.elevate3
+            }
+            PxBadge {
+                visible: card.kind === "collection"
+                compact: true
+                text: card.memberCount + " MODS"
+                textColor: Theme.textMuted
+                fillColor: Theme.elevate3
+            }
+            PxBadge {
+                visible: card.kind === "mod" && card.state === "installed"
+                compact: true
+                text: "INSTALLED"
+                textColor: Theme.success
+                fillColor: Theme.successBg
+            }
+            PxBadge {
+                visible: card.kind === "mod" && card.state === "outdated"
+                compact: true
+                text: "UPDATE AVAILABLE"
+            }
+            PxBadge {
+                visible: card.incompatible
+                compact: true
+                text: "INCOMPATIBLE"
+                textColor: Theme.warning
+                fillColor: Theme.warningBg
+            }
         }
         Text {
             Layout.fillWidth: true
-            text: card.incompatible ? "⚠ Incompatible with your game" : "Versions: " + card.versions
+            text: "Versions: " + card.versions
             textFormat: Text.PlainText
-            color: card.incompatible ? Theme.warning : Theme.textDim
+            color: Theme.textDim
+            font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeXs
             elide: Text.ElideRight
         }
@@ -96,7 +128,7 @@ Rectangle {
             Item { Layout.fillWidth: true }
             PxButton {
                 text: card.actionLabel
-                variant: "primary"
+                variant: card.state === "outdated" ? "primary" : "secondary"
                 enabled: !workshopPanel.busy && !workshopPanel.downloading && card.state !== "installed"
                 onClicked: workshopPanel.downloadItem(card.itemId, card.kind)
             }

@@ -70,25 +70,53 @@ Rectangle {
                 font.pixelSize: Theme.fontSizeSm
             }
         }
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true
-            Repeater {
-                model: ["Discover", "Mods", "Collections", "Installed"]
+            spacing: 0
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+                Repeater {
+                    model: ["Discover", "Mods", "Collections", "Installed"]
+                    Item {
+                        id: tabItem
+                        required property string modelData
+                        readonly property bool current: workshopPanel.tab === modelData
+                        implicitWidth: tabLabel.implicitWidth + 32
+                        implicitHeight: 36
+                        opacity: workshopPanel.busy && !current ? Theme.disabledOpacity : 1
+                        Text {
+                            id: tabLabel
+                            anchors.centerIn: parent
+                            text: tabItem.modelData
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeMd
+                            font.weight: tabItem.current ? Font.DemiBold : Font.Medium
+                            color: tabItem.current ? Theme.primary : tabHover.hovered ? Theme.textMain : Theme.textMuted
+                        }
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: 2
+                            color: tabItem.current ? Theme.primary : "transparent"
+                        }
+                        HoverHandler { id: tabHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { enabled: !workshopPanel.busy; onTapped: workshopPanel.selectTab(tabItem.modelData) }
+                        Accessible.role: Accessible.PageTab
+                        Accessible.name: modelData
+                    }
+                }
+                Item { Layout.fillWidth: true }
                 PxButton {
-                    required property string modelData
-                    text: modelData
-                    variant: workshopPanel.tab === modelData ? "primary" : "ghost"
-                    enabled: !workshopPanel.busy
-                    onClicked: workshopPanel.selectTab(modelData)
+                    visible: workshopPanel.tab === "Installed"
+                    text: "Update all (" + workshopPanel.updateCount + ")"
+                    variant: "primary"
+                    enabled: !workshopPanel.busy && !workshopPanel.downloading && workshopPanel.updateCount > 0
+                    onClicked: workshopPanel.updateAll()
                 }
             }
-            Item { Layout.fillWidth: true }
-            PxButton {
-                visible: workshopPanel.tab === "Installed"
-                text: "Update all (" + workshopPanel.updateCount + ")"
-                enabled: !workshopPanel.busy && !workshopPanel.downloading && workshopPanel.updateCount > 0
-                onClicked: workshopPanel.updateAll()
-            }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
         }
         RowLayout {
             Layout.fillWidth: true
