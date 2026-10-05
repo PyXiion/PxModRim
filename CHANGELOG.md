@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Launch workflow: Play shows `Launching…` then `Running` and is disabled while RimWorld runs (tracked by process, for Steam launches too); a toast reports when the game closes or exits with a non-zero code.
 - Settings > Launch: game arguments (also passed through `steam://run` for the Steam strategy), a wrapper command for direct launch (`KEY=VALUE` env vars, `%command%` placeholder, e.g. `gamemoderun %command%`), and what the window does after launch (stay open, minimize while the game runs, close).
 - Pre-launch prompts for a mod list with errors, unsaved changes (saved before launch), and a game that is already running. Each has a "Don't ask again" checkbox and a Settings toggle.
+- The left rail's collapsed/expanded state is remembered between sessions.
 
 ### Changed
 - Updated PxSteamDL to 0.3.0: failed updates keep the previous item installed, concurrent downloads of one item are serialized by a lock, transient network failures are retried, and a failed item-details request fails only its batch instead of the whole download. Download progress uses the unpacked byte counters and cancellation uses `Result.cancelled`.

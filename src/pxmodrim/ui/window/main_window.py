@@ -344,7 +344,8 @@ class MainWindow(QMainWindow):
         self._splitter.setStretchFactor(1, 1)
         self._splitter.setCollapsible(0, False)
         self._splitter.setCollapsible(1, False)
-        self._splitter.setSizes([RAIL_MAX_WIDTH, self.width() - RAIL_MAX_WIDTH])
+        rail_width = RAIL_MIN_WIDTH if self._ui_prefs.rail_collapsed else RAIL_MAX_WIDTH
+        self._splitter.setSizes([rail_width, self.width() - rail_width])
         self._rail.currentChanged.connect(self._on_rail_tab_changed)
         self._rail.hovered.connect(self._on_rail_hovered)
         self._rail.settings_requested.connect(self._open_settings)
@@ -883,6 +884,10 @@ class MainWindow(QMainWindow):
             else RAIL_MIN_WIDTH
         )
         self._splitter.setSizes([target, self._splitter.width() - target])
+        collapsed = target == RAIL_MIN_WIDTH
+        if self._ui_prefs.rail_collapsed != collapsed:
+            self._ui_prefs.rail_collapsed = collapsed
+            save_ui_prefs(self._ui_prefs, self._ctx.config_service)
 
     # ── Diagnostics summary callback ─────────────────────────
 
