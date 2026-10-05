@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Fixed
 - QML menus, combo box dropdowns and tooltips open in their own window, so they are no longer clipped by the widget that hosts them (the header's launch-strategy menu and help menu).
+- Workshop thumbnails and detail previews request display-sized Steam CDN images, avoid loading hidden previews and collages, and preserve existing URL queries and fragments when resizing.
 
 ### Added
 - Native QML Workshop browser: Discover, Mods, Collections and Installed views, catalog filters and detail pages, dependency-aware mod/collection downloads into Local mods, compatibility warnings and updates for downloader-managed copies. Downloads queue in the background (progress in the header, results in Downloads) so browsing stays usable, pages show remembered results immediately and refresh in the background, and the Installed tab loads 48 mods at a time. Catalog URL defaults to `https://api.modrim.pyxiion.dev` and can be changed or emptied to disable network requests; no catalog descriptions execute as HTML and downloads never activate mods.

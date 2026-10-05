@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../../components/controls"
-import "thumbs.js" as Thumbs
 
 Rectangle {
     id: card
@@ -38,16 +37,10 @@ Rectangle {
             color: Theme.elevate3
             radius: Theme.radiusMd
             clip: true
-            readonly property int pixelW: Thumbs.bucket(width * Screen.devicePixelRatio, 64)
-            readonly property int pixelH: Thumbs.bucket(height * Screen.devicePixelRatio, 32)
-            Image {
+            CatalogImage {
                 id: preview
                 anchors.fill: parent
-                source: thumb.width > 0 ? Thumbs.sized(card.previewUrl, thumb.pixelW, thumb.pixelH) : ""
-                asynchronous: true
-                fillMode: Image.PreserveAspectCrop
-                sourceSize.width: thumb.pixelW
-                sourceSize.height: thumb.pixelH
+                previewUrl: card.previewUrl
             }
             Grid {
                 id: collageGrid
@@ -57,15 +50,11 @@ Rectangle {
                 readonly property int rowCount: card.collage.length > 2 ? 2 : 1
                 Repeater {
                     model: collageGrid.visible ? card.collage : []
-                    Image {
+                    CatalogImage {
                         required property string modelData
                         width: collageGrid.width / collageGrid.columns
                         height: collageGrid.height / collageGrid.rowCount
-                        source: Thumbs.sized(modelData, thumb.pixelW / collageGrid.columns, thumb.pixelH / collageGrid.rowCount)
-                        asynchronous: true
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize.width: thumb.pixelW / collageGrid.columns
-                        sourceSize.height: thumb.pixelH / collageGrid.rowCount
+                        previewUrl: modelData
                     }
                 }
             }

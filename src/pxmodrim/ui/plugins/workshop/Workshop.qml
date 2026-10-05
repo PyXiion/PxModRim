@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../../components/controls"
-import "thumbs.js" as Thumbs
 
 Rectangle {
     id: root
@@ -257,15 +256,12 @@ Rectangle {
                             border.color: Theme.border
                             radius: Theme.radiusMd
                             clip: true
-                            Image {
+                            CatalogImage {
                                 id: detailImage
                                 anchors.fill: parent
-                                readonly property int pixelW: Thumbs.bucket(width * Screen.devicePixelRatio, 128)
-                                readonly property int pixelH: Thumbs.bucket(height * Screen.devicePixelRatio, 64)
-                                source: width > 0 ? Thumbs.sized(root.detail.previewUrl || "", pixelW, pixelH) : ""
-                                asynchronous: true
-                                sourceSize.width: pixelW
-                                sourceSize.height: pixelH
+                                previewUrl: root.detail.previewUrl || ""
+                                widthStep: 128
+                                heightStep: 64
                                 fillMode: Image.PreserveAspectFit
                             }
                             Grid {
@@ -275,16 +271,12 @@ Rectangle {
                                 columns: (root.detail.collage || []).length === 1 ? 1 : 2
                                 readonly property int rowCount: (root.detail.collage || []).length > 2 ? 2 : 1
                                 Repeater {
-                                    model: root.detail.collage || []
-                                    Image {
+                                    model: detailCollage.visible ? root.detail.collage : []
+                                    CatalogImage {
                                         required property string modelData
                                         width: detailCollage.width / detailCollage.columns
                                         height: detailCollage.height / detailCollage.rowCount
-                                        source: Thumbs.sized(modelData, detailImage.pixelW / detailCollage.columns, detailImage.pixelH / detailCollage.rowCount)
-                                        asynchronous: true
-                                        fillMode: Image.PreserveAspectCrop
-                                        sourceSize.width: detailImage.pixelW / detailCollage.columns
-                                        sourceSize.height: detailImage.pixelH / detailCollage.rowCount
+                                        previewUrl: modelData
                                     }
                                 }
                             }
