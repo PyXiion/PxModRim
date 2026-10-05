@@ -203,8 +203,8 @@ class TestBuildReport:
 
         # Verify game version and paths are redacted
         assert "Game Version: 1.5.4243" in report
-        assert "~/Games/RimWorld" in report
-        assert "~/.config/unity3d" in report
+        assert "~/Games/RimWorld" in report.replace("\\", "/")
+        assert "~/.config/unity3d" in report.replace("\\", "/")
         assert str(home) not in report
 
         # Verify mod counts

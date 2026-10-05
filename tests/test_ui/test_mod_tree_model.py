@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -249,6 +249,13 @@ def _find_quick_item(root_item: QQuickItem, name: str) -> QQuickItem | None:
     return None
 
 
+async def _until(predicate: Callable[[], object], timeout: float = 3.0) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not predicate() and asyncio.get_running_loop().time() < deadline:
+        await asyncio.sleep(0.02)
+        QTest.qWait(5)
+
+
 @pytest.mark.asyncio
 async def test_qml_tag_editor_persists_assignments_and_edits(
     tmp_path: Path, qapp: QApplication, qtbot: QtBot
@@ -340,11 +347,11 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         QTest.qWait(10)
         assert assignment.property("checkState") == Qt.CheckState.PartiallyChecked
         _click_quick(view._qml, assignment)
-        await asyncio.sleep(0.03)
+        await _until(lambda: "second.mod" in service.state.mod_tags)
         assert service.state.mod_tags["second.mod"] == frozenset({tag_id})
         assert assignment.property("checkState") == Qt.CheckState.Checked
         _click_quick(view._qml, assignment)
-        await asyncio.sleep(0.03)
+        await _until(lambda: not service.state.mod_tags.get("example.mod"))
         assert not service.state.mod_tags.get("example.mod")
         assert not service.state.mod_tags.get("second.mod")
         assert assignment.property("checkState") == Qt.CheckState.Unchecked
@@ -473,6 +480,10 @@ async def test_organizer_sidebar_geometry_matches_mods_after_dismissing_hint(
     mods.show()
     try:
         QTest.qWait(10)
+        for _ in range(100):
+            if organizer.mod_info.width() == mods.mod_info.width():
+                break
+            QTest.qWait(10)
         assert organizer._sidebar.width() == mods.sidebar.width()
         assert (
             organizer._sidebar.rootObject().childItems()[0].width()
