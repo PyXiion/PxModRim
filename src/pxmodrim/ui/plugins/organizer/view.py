@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QMessageBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -122,6 +123,7 @@ class OrganizerViewPanel(BaseViewPanel):
         main_layout = QVBoxLayout(main)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
+        main.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         toolbar = QWidget(main)
         toolbar.setObjectName("searchBox")
         toolbar.setFixedHeight(56)

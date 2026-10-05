@@ -365,7 +365,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
         tag_name.setProperty("text", "Best")
         tag_color.setProperty("text", "bad")
         _click_quick(view._qml, edit)
-        await asyncio.sleep(0.03)
+        await _until(lambda: "valid color" in str(error.property("text")))
         assert "valid color" in error.property("text")
         assert tag_name.property("text") == "Best"
         assert tag_color.property("text") == "bad"
@@ -374,7 +374,7 @@ async def test_qml_tag_editor_persists_assignments_and_edits(
 
         tag_color.setProperty("text", "#123456")
         _click_quick(view._qml, edit)
-        await asyncio.sleep(0.03)
+        await _until(lambda: service.state.tags[tag_id].name == "Best")
         assert (service.state.tags[tag_id].name, service.state.tags[tag_id].color) == (
             "Best",
             "#123456",
