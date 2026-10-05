@@ -115,6 +115,7 @@ def item_row(
         )
         action_label = "Download all"
         member_count = item.member_count
+    versions = set(item.supported_versions)
     return {
         "itemId": item.id,
         "kind": item.kind,
@@ -135,8 +136,11 @@ def item_row(
             if url
         ],
         "sourceLabel": source_label,
-        "versions": ", ".join(item.supported_versions) or "Not specified",
-        "tags": " · ".join(item.tags),
+        "versions": ", ".join(
+            sorted(versions, key=lambda version: tuple(map(int, version.split("."))))
+        )
+        or "Not specified",
+        "tags": " · ".join(tag for tag in item.tags if tag not in versions),
         "state": state,
         "queued": False,
         "stateLabel": {

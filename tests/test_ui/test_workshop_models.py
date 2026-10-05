@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import msgspec
 import pytest
 from PySide6.QtCore import QModelIndex, QObject, Qt
 
@@ -135,6 +136,18 @@ def test_row_shows_update_and_game_incompatibility() -> None:
     row = item_row(_mod("1"), lambda _: "outdated", "1.6")
     assert row["actionLabel"] == "Update" and row["incompatible"]
     assert row["fileSize"] == "1.0 MB"
+
+
+def test_versions_are_unique_numeric_sorted_and_not_repeated_in_tags() -> None:
+    mod = _mod("1")
+    mod = msgspec.structs.replace(
+        mod,
+        supported_versions=["1.5", "1.10", "1.2", "1.5", "1.2.1"],
+        tags=["Mod", "1.5", "Utility", "1.10", "1.2", "1.2.1"],
+    )
+    row = item_row(mod, lambda _: "missing", "1.5")
+    assert row["versions"] == "1.2, 1.2.1, 1.5, 1.10"
+    assert row["tags"] == "Mod · Utility"
 
 
 def test_collection_image_prefers_own_then_first_image_then_member_collage() -> None:

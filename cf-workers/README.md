@@ -107,6 +107,8 @@ Mods expose title, Steam author/profile, description, previews, Workshop URL, ta
 
 Collections expose source, author, description, preview, tags, supported versions, ordered direct member IDs, member count, and timestamps. A Steam member may itself be a collection. Detail responses hydrate available direct members only; download resolution expands the complete nested graph. A member-count mismatch or unavailable member makes `is_complete` false.
 
+Collections without a primary preview include up to four `member_previews` in both listing and detail responses. Detail thumbnails reuse the already hydrated direct members rather than fetching them again.
+
 Steam descriptions have `description_format: "bbcode"`; picked descriptions use `"text"`. Treat both as untrusted content in clients, not executable HTML. Author names come from `ISteamUser/GetPlayerSummaries`; missing names are `null`, with the Steam ID retained. Do not infer local installed status from any catalog field.
 
 ### Download resolution

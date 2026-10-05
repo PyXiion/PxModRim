@@ -133,6 +133,20 @@ class WorkshopViewPanel(BaseViewPanel):
         row = self._row(detail.item)
         row["complete"], row["warning"] = detail.complete, detail.warning
         if isinstance(detail.item, CatalogCollection):
+            if not row["previewUrl"] and not row["collage"]:
+                for member in detail.members:
+                    if not isinstance(member, CatalogMod):
+                        continue
+                    preview = safe_url(
+                        member.preview_url
+                        or next(
+                            (p.url for p in member.previews if p.type == "image"), ""
+                        )
+                    )
+                    if preview:
+                        row["collage"].append(preview)
+                    if len(row["collage"]) == 4:
+                        break
             started = any(
                 isinstance(member, CatalogMod)
                 and self._catalog.install_state(member) != "missing"

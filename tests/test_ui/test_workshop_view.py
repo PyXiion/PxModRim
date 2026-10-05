@@ -24,6 +24,7 @@ from pxmodrim.core.workshop import (
     Discover,
     DownloadPlan,
     InstallState,
+    Preview,
     WorkshopCatalog,
 )
 from pxmodrim.ui.components import create_qml_engine
@@ -211,6 +212,20 @@ async def test_incomplete_collection_requires_explicit_partial_download(
     await view.downloadAvailable()
     assert catalog.downloaded == ["2", "1"] and not view.pendingPlan
     assert not warnings, [warning.toString() for warning in warnings]
+
+
+async def test_collection_detail_uses_member_images_when_preview_metadata_is_absent(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    catalog.mod_item = msgspec.structs.replace(
+        catalog.mod_item,
+        preview_url=None,
+        previews=[Preview("image", "https://images.test/member.png")],
+    )
+    await view.open_item("picked:test", "collection")
+    detail = cast("dict[str, Any]", view.detail)
+    assert detail["collage"] == ["https://images.test/member.png"]
 
 
 async def test_unset_catalog_never_fetches(

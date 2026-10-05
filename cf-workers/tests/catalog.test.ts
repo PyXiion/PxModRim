@@ -348,6 +348,17 @@ test('collections without a Steam image get a collage from their member mods, sk
   assert.deepEqual(page.items[0]?.member_previews, Array(2).fill('https://images.example.test/preview.png'));
 });
 
+test('Steam and picked collection details include member collages without their own preview', async () => {
+  await createPick('thumbnail-detail', ['13', '11']);
+  for (const path of ['/catalog/collections/steam/102', '/catalog/collections/picked/thumbnail-detail']) {
+    const response = await request(path);
+    const detail = await response.json() as { collection: CatalogCollection; members: CatalogItem[] };
+    assert.equal(response.status, 200);
+    assert.equal(detail.collection.preview_url, null);
+    assert.deepEqual(detail.collection.member_previews, Array(2).fill('https://images.example.test/preview.png'));
+  }
+});
+
 test('text search is answered by the local index only after a full crawl cycle, and filters by tag and version', async () => {
   assert.equal((await (await request('/catalog/index')).json() as { ready: boolean }).ready, false);
   const before = await request('/catalog/mods?q=upstream-rate-limit');

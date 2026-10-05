@@ -158,7 +158,8 @@ async function collectionDetails(env: Env, ctx: ExecutionContext, collection: Ca
     const item = items.get(id);
     if (item) members.push(item);
   }
-  return json({ collection, members, unavailable_ids, is_complete: unavailable_ids.length === 0 && collection.member_count === collection.member_ids.length });
+  const [withPreviews] = await attachMemberPreviews(env, [collection], items);
+  return json({ collection: withPreviews!, members, unavailable_ids, is_complete: unavailable_ids.length === 0 && collection.member_count === collection.member_ids.length });
 }
 
 async function resolve(env: Env, body: Record<string, unknown>): Promise<Response> {

@@ -266,16 +266,17 @@ const COLLAGE_SIZE = 4;
 const COLLAGE_CANDIDATES = 8;
 
 // Steam gives collections no image; its site shows a collage of member previews.
-export async function attachMemberPreviews(env: Env, collections: CatalogCollection[]): Promise<CatalogCollection[]> {
+export async function attachMemberPreviews(env: Env, collections: CatalogCollection[], members?: Map<string, CatalogItem>): Promise<CatalogCollection[]> {
   const candidates = collections.map(collection => collection.preview_url ? [] : collection.member_ids.slice(0, COLLAGE_CANDIDATES));
   const ids = [...new Set(candidates.flat())];
   if (!ids.length) return collections;
-  let members: Map<string, CatalogItem>;
-  try {
-    members = (await getSteamItems(env, ids)).items;
-  } catch (error) {
-    console.error('Collection thumbnails unavailable:', error instanceof Error ? error.message : error);
-    return collections;
+  if (!members) {
+    try {
+      members = (await getSteamItems(env, ids)).items;
+    } catch (error) {
+      console.error('Collection thumbnails unavailable:', error instanceof Error ? error.message : error);
+      return collections;
+    }
   }
   return collections.map((collection, index) => {
     const previews: string[] = [];
