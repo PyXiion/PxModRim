@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -25,6 +26,7 @@ _PROCESS_NAMES = frozenset(
     }
 )
 _COMMAND_TOKEN = "%command%"
+_ENV_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _POLL_START = 0.5
 _POLL_EXIT = 2.0
 
@@ -44,7 +46,7 @@ def build_direct_command(
     game = [exe, *_split(args)]
     tokens = _split(wrapper)
     env: dict[str, str] = {}
-    while tokens and "=" in tokens[0] and not tokens[0].startswith("="):
+    while tokens and _ENV_ASSIGNMENT.match(tokens[0]):
         key, _, value = tokens.pop(0).partition("=")
         env[key] = value
     if _COMMAND_TOKEN in tokens:

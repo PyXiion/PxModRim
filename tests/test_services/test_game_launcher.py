@@ -35,6 +35,12 @@ def test_quoted_args_stay_single_token() -> None:
     assert argv == ["/g/rw", "-savedatafolder=/tmp/my saves"]
 
 
+def test_option_with_equals_is_not_an_env_var() -> None:
+    argv, env = build_direct_command("/g/rw", "--cfg=/p wrap", "")
+    assert argv == ["--cfg=/p", "wrap", "/g/rw"]
+    assert env == {}
+
+
 def test_unbalanced_quotes_raise() -> None:
     with pytest.raises(ValueError):
         build_direct_command("/g/rw", "", '"oops')
@@ -89,3 +95,43 @@ async def test_steam_launch_passes_encoded_args(
     assert opened == [
         f"steam://run/{RIMWORLD_STEAM_APP_ID}//-savedatafolder%3D%2Fa%20b/"
     ]
+
+
+class _Popen:
+    def __init__(self, code: int | None) -> None:
+        self.code = code
+
+    def poll(self) -> int | None:
+        return self.code
+
+
+@pytest.mark.asyncio
+async def test_wait_for_exit_returns_spawned_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pxmodrim.core.services.game_launcher._POLL_EXIT", 0)
+    _patch_procs(monkeypatch, [[_Proc("RimWorldLinux")], []])
+    launcher = GameLauncher(types.SimpleNamespace(config=AppConfig()))  # type: ignore[arg-type]
+    launcher._proc = _Popen(7)  # type: ignore[assignment]
+    assert await launcher.wait_for_exit() == 7
+
+
+@pytest.mark.asyncio
+async def test_wait_for_start_true_once_process_appears(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pxmodrim.core.services.game_launcher._POLL_START", 0)
+    _patch_procs(monkeypatch, [[], [], [_Proc("RimWorldLinux")]])
+    launcher = GameLauncher(types.SimpleNamespace(config=AppConfig()))  # type: ignore[arg-type]
+    assert await launcher.wait_for_start(5) is True
+
+
+@pytest.mark.asyncio
+async def test_wait_for_start_false_when_spawned_process_died(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pxmodrim.core.services.game_launcher._POLL_START", 0)
+    _patch_procs(monkeypatch, [[]])
+    launcher = GameLauncher(types.SimpleNamespace(config=AppConfig()))  # type: ignore[arg-type]
+    launcher._proc = _Popen(1)  # type: ignore[assignment]
+    assert await launcher.wait_for_start(5) is False
