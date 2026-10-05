@@ -22,7 +22,6 @@ from pxmodrim.core.workshop import (
 )
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
-from pxmodrim.ui.plugins.downloads.model import DownloadsModel
 from pxmodrim.ui.plugins.workshop.models import CatalogListModel, item_row, safe_url
 from pxmodrim.ui.theme.palette import PALETTE
 from pxmodrim.ui.views.base import BaseViewPanel
@@ -32,7 +31,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from pxmodrim.core.context import CoreContext
-    from pxmodrim.core.downloads import DownloadProgress, DownloadResult
+    from pxmodrim.core.downloads import DownloadProgress
     from pxmodrim.ui.context import AppContext
 
 
@@ -60,7 +59,6 @@ class WorkshopViewPanel(BaseViewPanel):
         self.mods_model = CatalogListModel(self)
         self.collections_model = CatalogListModel(self)
         self.members_model = CatalogListModel(self)
-        self.queue_model = DownloadsModel(self)
         self._tab = "Discover"
         self._busy = False
         self._error = ""
@@ -77,8 +75,9 @@ class WorkshopViewPanel(BaseViewPanel):
         self._pending: DownloadPlan | None = None
         self._titles: dict[str, str] = {}
         self._items: dict[str, CatalogMod | CatalogCollection] = {}
+        self._downloading = self._downloads.is_downloading
         self._queue_progress = 0.0
-        self._queue_summary = "No downloads yet"
+        self._queue_summary = ""
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
         self._qml.setObjectName("workshopView")
         self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
@@ -89,21 +88,14 @@ class WorkshopViewPanel(BaseViewPanel):
             ("catalogMods", self.mods_model),
             ("catalogCollections", self.collections_model),
             ("catalogMembers", self.members_model),
-            ("workshopQueue", self.queue_model),
         ):
             qml_ctx.setContextProperty(name, value)
         self._qml.setSource(
             QUrl.fromLocalFile(str(Path(__file__).with_name("Workshop.qml")))
         )
         self._root.addWidget(self._qml, 1)
-        self.queue_model.set_busy(self._downloads.is_downloading)
-        self._downloads.batch_started.connect(self._on_batch_started)
+        self._downloads.busy_changed.connect(self._on_busy)
         self._downloads.download_progress.connect(self._on_progress)
-        self._downloads.download_item_status_changed.connect(self.queue_model.apply)
-        self._downloads.download_item_titled.connect(self.queue_model.set_title)
-        self._downloads.download_phase_changed.connect(self.queue_model.set_phase)
-        self._downloads.download_finished.connect(self._on_finished)
-        self._downloads.busy_changed.connect(self.queue_model.set_busy)
         self._catalog.catalog_url_changed.connect(self._on_url_changed)
         self._catalog.installed_changed.connect(self._on_installed_changed)
 
@@ -390,11 +382,10 @@ class WorkshopViewPanel(BaseViewPanel):
     def stop(self) -> None:
         self._downloads.cancel()
 
-    def _on_batch_started(self, ids: list[str]) -> None:
-        titles = self._downloads.names_by_id(self._ctx.all_mods.values()) | self._titles
-        self.queue_model.begin(ids, titles)
-        self._queue_progress = 0.0
-        self._queue_summary = f"Downloading {len(ids)} mods"
+    def _on_busy(self, busy: bool) -> None:
+        self._downloading = busy
+        if busy:
+            self._queue_progress, self._queue_summary = 0.0, "Starting…"
         self.queueChanged.emit()
 
     def _on_progress(self, progress: DownloadProgress) -> None:
@@ -402,13 +393,6 @@ class WorkshopViewPanel(BaseViewPanel):
             progress.completed / progress.total if progress.total else 0.0
         )
         self._queue_summary = f"{progress.completed} / {progress.total} mods"
-        self.queueChanged.emit()
-
-    def _on_finished(self, result: DownloadResult) -> None:
-        self.queue_model.finish(result)
-        self._queue_summary = (
-            f"{len(result.succeeded)} completed · {len(result.failed)} failed"
-        )
         self.queueChanged.emit()
 
     @asyncSlot(str)
@@ -504,6 +488,10 @@ class WorkshopViewPanel(BaseViewPanel):
         return sum(
             self._catalog.install_state(item) == "outdated" for item in self._installed
         )
+
+    @Property(bool, notify=queueChanged)  # type: ignore[arg-type]
+    def downloading(self) -> bool:
+        return self._downloading
 
     @Property(float, notify=queueChanged)  # type: ignore[arg-type]
     def queueProgress(self) -> float:

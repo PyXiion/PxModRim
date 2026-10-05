@@ -6,7 +6,7 @@ import "../../components/controls"
 Rectangle {
     id: root
     color: Theme.elevate0
-    property bool queueExpanded: false
+
     readonly property var detail: workshopPanel.detail
 
     function applyFilters() {
@@ -86,7 +86,7 @@ Rectangle {
             PxButton {
                 visible: workshopPanel.tab === "Installed"
                 text: "Update all (" + workshopPanel.updateCount + ")"
-                enabled: !workshopPanel.busy && !workshopQueue.busy && workshopPanel.updateCount > 0
+                enabled: !workshopPanel.busy && !workshopPanel.downloading && workshopPanel.updateCount > 0
                 onClicked: workshopPanel.updateAll()
             }
         }
@@ -161,7 +161,7 @@ Rectangle {
                 Copy { text: workshopPanel.notice; color: workshopPanel.pendingPlan ? Theme.warning : Theme.textMuted }
                 RowLayout {
                     visible: workshopPanel.pendingPlan
-                    PxButton { text: "Download available mods"; enabled: workshopPanel.canDownloadAvailable && !workshopPanel.busy && !workshopQueue.busy; onClicked: workshopPanel.downloadAvailable() }
+                    PxButton { text: "Download available mods"; enabled: workshopPanel.canDownloadAvailable && !workshopPanel.busy && !workshopPanel.downloading; onClicked: workshopPanel.downloadAvailable() }
                     PxButton { text: "Cancel"; variant: "ghost"; onClicked: workshopPanel.dismissPlan() }
                 }
             }
@@ -251,7 +251,7 @@ Rectangle {
                         PxButton {
                             text: root.detail.actionLabel || "Download"
                             variant: "primary"
-                            enabled: !workshopPanel.busy && !workshopQueue.busy && root.detail.state !== "installed"
+                            enabled: !workshopPanel.busy && !workshopPanel.downloading && root.detail.state !== "installed"
                             onClicked: workshopPanel.downloadItem(root.detail.itemId, root.detail.kind)
                         }
                         PxButton { visible: !!root.detail.workshopUrl; text: "View on Steam"; onClicked: workshopPanel.openLink(root.detail.workshopUrl) }
@@ -299,7 +299,7 @@ Rectangle {
                                     Copy { visible: member.incompatible; text: "⚠ Incompatible with your game"; color: Theme.warning; font.pixelSize: Theme.fontSizeSm }
                                 }
                                 PxButton { text: "Details"; variant: "ghost"; onClicked: workshopPanel.openItem(member.itemId, member.kind) }
-                                PxButton { text: member.actionLabel; enabled: !workshopPanel.busy && !workshopQueue.busy && member.state !== "installed"; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
+                                PxButton { text: member.actionLabel; enabled: !workshopPanel.busy && !workshopPanel.downloading && member.state !== "installed"; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
                             }
                         }
                     }
@@ -308,38 +308,21 @@ Rectangle {
         }
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: queueColumn.implicitHeight + 24
+            visible: workshopPanel.downloading
+            implicitHeight: downloadRow.implicitHeight + 24
             color: Theme.elevate2
             radius: Theme.radiusMd
             ColumnLayout {
-                id: queueColumn
+                id: downloadRow
                 anchors.fill: parent
                 anchors.margins: 12
                 RowLayout {
                     Layout.fillWidth: true
-                    PxButton { text: root.queueExpanded ? "Hide queue" : "Download queue"; iconName: "download"; variant: "ghost"; onClicked: root.queueExpanded = !root.queueExpanded }
-                    Copy { text: workshopPanel.queueSummary + (workshopQueue.phase ? " · " + workshopQueue.phase : ""); font.pixelSize: Theme.fontSizeSm }
-                    PxButton { visible: workshopQueue.busy; text: "Stop"; variant: "danger"; onClicked: workshopPanel.stop() }
+                    Copy { Layout.fillWidth: true; text: "Downloading · " + workshopPanel.queueSummary; font.pixelSize: Theme.fontSizeSm }
+                    PxButton { text: "Stop"; variant: "danger"; onClicked: workshopPanel.stop() }
                     PxButton { text: "Open Downloads"; variant: "ghost"; onClicked: workshopPanel.openDownloads() }
                 }
-                PxProgressBar { Layout.fillWidth: true; visible: workshopQueue.busy; value: workshopPanel.queueProgress }
-                ListView {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(count * 46, 138)
-                    visible: root.queueExpanded
-                    model: workshopQueue
-                    clip: true
-                    delegate: ColumnLayout {
-                        required property string title
-                        required property string state
-                        required property real progress
-                        required property string error
-                        width: ListView.view.width
-                        height: 46
-                        Copy { text: parent.title + " · " + parent.state + (parent.error ? " · " + parent.error : ""); color: parent.state === "failed" ? Theme.danger : Theme.textMuted; font.pixelSize: Theme.fontSizeSm; maximumLineCount: 1; elide: Text.ElideRight }
-                        PxProgressBar { Layout.fillWidth: true; value: parent.progress }
-                    }
-                }
+                PxProgressBar { Layout.fillWidth: true; value: workshopPanel.queueProgress }
             }
         }
     }

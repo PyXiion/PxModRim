@@ -97,7 +97,7 @@ Rectangle {
             PxButton {
                 text: card.actionLabel
                 variant: "primary"
-                enabled: !workshopPanel.busy && !workshopQueue.busy && card.state !== "installed"
+                enabled: !workshopPanel.busy && !workshopPanel.downloading && card.state !== "installed"
                 onClicked: workshopPanel.downloadItem(card.itemId, card.kind)
             }
         }
