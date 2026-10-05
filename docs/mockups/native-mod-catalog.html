@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PxModRim — Native Workshop browser · UX prototype</title>
+<style>
+  :root { color-scheme:dark; --e0:#0b0d10; --e1:#121418; --e2:#1a1d21; --e3:#22262b; --e4:#2c3036; --border:#2f333a; --text:#f2f3f5; --muted:#a1a8b2; --blue:#66c0f4; --bluebg:#66c0f414; --green:#90d5aa; --yellow:#f1bf69; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--e0); color:var(--text); font:13px/1.5 "Segoe UI",Inter,system-ui,sans-serif; }
+  button,input,select { font:inherit; color:inherit; }
+  button,a,input,select { -webkit-tap-highlight-color:transparent; }
+  button { cursor:pointer; }
+  button:disabled { cursor:default; opacity:.65; }
+  button,a,input,select,summary { outline-offset:3px; }
+  :focus-visible { outline:2px solid var(--blue); }
+  button { border:1px solid var(--border); background:var(--e3); border-radius:5px; padding:7px 12px; }
+  button:hover:not(:disabled) { background:var(--e4); }
+  a { color:var(--blue); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  svg.icon { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .muted { color:var(--muted); } .small { font-size:11px; } .mono { font-family:ui-monospace,monospace; }
+  .primary { color:var(--e0); background:var(--blue); border-color:var(--blue); font-weight:650; }
+  .primary:hover:not(:disabled) { background:#8ed1f9; }
+  .quiet { background:transparent; border-color:transparent; color:var(--muted); }
+  .link { padding:0; background:none; border:0; color:var(--blue); text-align:left; }
+  .link:hover:not(:disabled) { background:none; text-decoration:underline; }
+  .skip { position:fixed; top:-70px; left:12px; z-index:10; padding:10px; background:var(--e3); }
+  .skip:focus { top:8px; }
+  .app { height:100dvh; min-height:540px; display:grid; grid-template-rows:33px minmax(0,1fr) 29px; }
+  .titlebar { display:flex; align-items:center; gap:10px; padding:0 14px; border-bottom:1px solid var(--border); font-size:11px; color:var(--muted); }
+  .app-mark { color:var(--blue); font-weight:800; } .titlebar strong { color:var(--text); font-weight:600; }
+  .prototype { margin-left:auto; font-size:10px; letter-spacing:.08em; text-transform:uppercase; border:1px solid #3e4955; border-radius:4px; padding:1px 7px; }
+  .shell { min-height:0; display:grid; grid-template-columns:58px 188px minmax(0,1fr); }
+  .rail { display:flex; align-items:center; flex-direction:column; gap:8px; padding:14px 6px; background:var(--e2); border-right:1px solid var(--border); }
+  .rail-logo { display:grid; place-items:center; height:34px; width:34px; border-radius:8px; background:var(--bluebg); color:var(--blue); font-weight:800; margin-bottom:14px; }
+  .rail-item { width:42px; height:42px; display:grid; place-items:center; color:var(--muted); border-radius:6px; position:relative; }
+  .rail-item.active { background:var(--e4); color:var(--blue); }
+  .rail-item.active::before { content:""; position:absolute; left:0; width:3px; height:20px; background:var(--blue); border-radius:3px; }
+  .rail-item.bottom { margin-top:auto; } .rail button { padding:0; border:0; background:none; }
+  .sidebar { padding:24px 12px 16px; background:var(--e2); border-right:1px solid var(--border); overflow:auto; }
+  .sidebar h1 { font-size:17px; margin:0 10px 2px; letter-spacing:-.02em; }
+  .sidebar .source { margin:0 10px 28px; font-size:11px; color:var(--muted); }
+  .nav-label { margin:24px 10px 8px; color:var(--muted); font-size:10px; font-weight:650; letter-spacing:.09em; text-transform:uppercase; }
+  .scope,.category { width:100%; border:0; background:none; display:flex; align-items:center; gap:8px; text-align:left; padding:8px 10px; margin:3px 0; color:var(--muted); }
+  .scope[aria-pressed="true"],.category[aria-pressed="true"] { background:var(--e4); color:var(--text); }
+  .scope[aria-pressed="true"] svg { color:var(--blue); }
+  .category .count { margin-left:auto; font-size:11px; color:var(--muted); }
+  .sidebar hr { border:0; border-top:1px solid var(--border); margin:22px 10px; }
+  .version-control { display:block; margin:0 10px; }
+  .version-control span { display:block; font-size:11px; color:var(--muted); margin-bottom:7px; }
+  select { min-height:33px; padding:4px 8px; border:1px solid var(--border); background:var(--e1); border-radius:5px; }
+  .version-control select { width:100%; }
+  .check { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; margin:16px 10px; cursor:pointer; }
+  input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; margin:0; }
+  .design-notes { border-top:1px solid var(--border); padding-top:14px; margin:28px 10px 0; color:var(--muted); font-size:11px; }
+  .design-notes summary { cursor:pointer; color:var(--blue); }
+  .design-notes ul { padding-left:16px; } .design-notes li { margin:8px 0; }
+  .workspace { min-width:0; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr) auto; }
+  .toolbar { display:flex; align-items:center; gap:16px; padding:17px 24px; border-bottom:1px solid var(--border); }
+  .search { display:flex; align-items:center; gap:10px; flex:1; max-width:650px; background:var(--e0); border:1px solid #414750; border-radius:6px; padding:0 12px; height:38px; color:var(--muted); }
+  .search:focus-within { border-color:var(--blue); }
+  .search input { width:100%; background:none; border:0; min-width:0; outline:0; }
+  .search input::placeholder { color:var(--muted); }
+  kbd { border:1px solid var(--border); border-radius:3px; padding:1px 5px; white-space:nowrap; font-size:10px; }
+  .toolbar-note { margin-left:auto; font-size:11px; white-space:nowrap; color:var(--muted); }
+  .toolbar-note b { color:var(--text); font-weight:500; }
+  .browser { display:grid; grid-template-columns:minmax(330px,.95fr) minmax(370px,1.1fr); min-height:0; min-width:0; }
+  .catalog { display:flex; flex-direction:column; min-width:0; min-height:0; border-right:1px solid var(--border); }
+  .list-header { display:flex; align-items:center; gap:12px; padding:18px 20px 12px; }
+  .list-header h2 { margin:0; font-size:14px; font-weight:600; }
+  .list-header select { margin-left:auto; font-size:11px; background:transparent; border-color:transparent; max-width:145px; }
+  .filter-summary { display:flex; align-items:center; gap:7px; padding:0 20px 13px; font-size:11px; color:var(--muted); }
+  .filter-summary .link { margin-left:auto; font-size:11px; }
+  .chip { display:inline-flex; align-items:center; gap:5px; font-size:10px; border-radius:4px; padding:2px 6px; border:1px solid var(--border); color:var(--muted); white-space:nowrap; }
+  .chip.compatible { color:var(--green); border-color:#90d5aa30; background:#90d5aa09; }
+  .chip.warning { color:var(--yellow); background:#f1bf6910; border-color:#f1bf6935; }
+  .chip.installed { color:var(--blue); background:var(--bluebg); border-color:#66c0f430; }
+  .results { list-style:none; margin:0; padding:0 10px 18px; overflow:auto; min-height:0; scrollbar-color:var(--e4) transparent; }
+  .mod-row { display:flex; gap:13px; align-items:center; width:100%; text-align:left; padding:13px 10px; background:none; border:1px solid transparent; border-radius:6px; margin:2px 0; }
+  .mod-row:hover { background:var(--e2)!important; }
+  .mod-row[aria-current="true"] { background:#66c0f40d; border-color:#66c0f447; }
+  .mod-row[aria-current="true"]:hover { background:#66c0f415!important; }
+  .thumb { width:67px; height:67px; flex:none; border-radius:5px; overflow:hidden; border:1px solid #ffffff18; }
+  .art { width:100%; height:100%; display:block; }
+  .row-copy { min-width:0; flex:1; } .row-title { display:block; font-size:13px; font-weight:600; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+  .row-author { font-size:11px; display:block; color:var(--muted); margin:2px 0 6px; }
+  .row-meta { display:flex; gap:6px; flex-wrap:wrap; }
+  .row-score { color:var(--muted); font-size:10px; white-space:nowrap; margin-left:auto; }
+  .empty { padding:48px 20px; text-align:center; color:var(--muted); }
+  .empty h3 { font-size:15px; color:var(--text); } .empty button { margin-top:14px; }
+  .details { min-height:0; overflow:auto; scrollbar-color:var(--e4) transparent; background:#15171b; }
+  .detail-content { padding:22px 26px 30px; max-width:760px; margin:auto; }
+  .detail-top { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:15px; color:var(--muted); font-size:11px; }
+  .back { display:flex; gap:5px; align-items:center; padding:0; font-size:11px; }
+  .mobile-back { display:none; }
+  .hero { position:relative; height:180px; border-radius:7px; overflow:hidden; border:1px solid #ffffff16; margin-bottom:21px; }
+  .hero .hero-label { position:absolute; left:20px; bottom:15px; font-size:10px; letter-spacing:.13em; color:#ffffffba; text-transform:uppercase; }
+  .detail-content h2 { margin:0; font-size:25px; letter-spacing:-.035em; line-height:1.2; }
+  .byline { margin:7px 0 14px; color:var(--muted); font-size:12px; }
+  .badges { display:flex; flex-wrap:wrap; gap:7px; }
+  .description { font-size:13px; line-height:1.75; color:#b7bec7; margin:19px 0; }
+  .warning-box { background:#f1bf6910; border:1px solid #f1bf6930; color:var(--yellow); padding:11px 13px; border-radius:5px; font-size:12px; margin:16px 0; }
+  .install-card { margin:20px 0 24px; padding:15px; border:1px solid var(--border); border-radius:6px; background:var(--e2); }
+  .install-card .primary { width:100%; min-height:38px; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .install-hint { margin:9px 0 0; font-size:11px; color:var(--muted); text-align:center; }
+  .detail-section { border-top:1px solid var(--border); padding-top:18px; margin-top:22px; }
+  .detail-section h3 { font-size:12px; margin:0 0 10px; font-weight:600; }
+  .section-caption { color:var(--muted); font-size:11px; margin:0 0 12px; }
+  .dependencies { padding:0; list-style:none; margin:0; }
+  .dependency { display:flex; align-items:center; gap:10px; padding:9px 0; }
+  .dep-mark { width:29px; height:29px; border:1px solid var(--border); border-radius:5px; display:grid; place-items:center; background:var(--e3); color:var(--blue); font-size:11px; font-weight:650; flex:none; }
+  .dependency .dep-copy { flex:1; } .dependency .dep-copy span { display:block; color:var(--muted); font-size:10px; }
+  .dependency .link { color:var(--text); font-size:12px; } .dependency .chip { margin-left:auto; }
+  .feature-list { color:var(--muted); padding-left:17px; font-size:12px; line-height:1.7; } .feature-list li { padding-left:3px; margin:7px 0; }
+  .facts { display:flex; gap:30px; margin-top:22px; padding-top:18px; border-top:1px solid var(--border); color:var(--muted); font-size:10px; }
+  .facts strong { display:block; font-size:12px; font-weight:500; color:var(--text); margin-top:4px; }
+  .queue { border-top:1px solid var(--border); background:var(--e2); }
+  .queue-toggle { display:flex; align-items:center; width:100%; gap:10px; border:0; border-radius:0; padding:12px 22px; background:none; text-align:left; }
+  .queue-toggle .icon { color:var(--blue); width:17px; height:17px; } .queue-summary { flex:1; font-size:12px; }
+  .queue-count { color:var(--muted); font-size:11px; }
+  .queue-list { padding:0 22px 10px; margin:0; list-style:none; max-height:190px; overflow:auto; }
+  .queue-row { display:flex; align-items:center; gap:14px; padding:10px 0; border-top:1px solid var(--border); }
+  .queue-copy { flex:1; min-width:0; } .queue-copy strong { font-size:12px; font-weight:500; } .queue-copy span { color:var(--muted); font-size:10px; margin-left:8px; }
+  progress { display:block; width:100%; height:4px; margin:6px 0 0; accent-color:var(--blue); border:0; border-radius:4px; overflow:hidden; }
+  progress::-webkit-progress-bar { background:var(--e4); } progress::-webkit-progress-value { background:var(--blue); }
+  .queue-row button { font-size:11px; } .queue-empty { font-size:12px; color:var(--muted); padding:5px 0 10px; }
+  .statusbar { display:flex; gap:14px; align-items:center; padding:0 13px; border-top:1px solid var(--border); color:var(--muted); font-size:10px; }
+  .statusbar .right { margin-left:auto; } .status-dot { width:5px; height:5px; border-radius:50%; background:var(--blue); }
+  dialog { width:min(470px,calc(100% - 32px)); max-height:calc(100dvh - 40px); overflow:auto; padding:24px; color:var(--text); background:var(--e2); border:1px solid #46505b; border-radius:10px; box-shadow:0 20px 100px #0008; }
+  dialog::backdrop { background:#0009; } dialog h2 { margin:0 0 8px; font-size:19px; letter-spacing:-.025em; }
+  dialog p { color:var(--muted); font-size:12px; } dialog .review-list { list-style:none; margin:20px 0; padding:0; }
+  dialog .review-list li { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  dialog .review-list small { color:var(--muted); } dialog label { display:block; font-size:12px; } dialog select { width:100%; margin:7px 0; }
+  .dialog-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:22px; }
+  .mobile-filters { display:none; }
+  [hidden] { display:none!important; }
+  @media(min-width:1600px) { .browser { grid-template-columns:minmax(440px,.9fr) minmax(500px,1.1fr); } .hero { height:220px; } }
+  @media(max-width:1150px) { .shell { grid-template-columns:54px 166px minmax(0,1fr); } .browser { grid-template-columns:minmax(290px,1fr) minmax(330px,1.08fr); } .sidebar { padding-inline:7px; } .detail-content { padding:20px; } .row-score { display:none; } .hero { height:150px; } .toolbar-note { display:none; } }
+  @media(max-width:950px) { .shell { grid-template-columns:50px minmax(0,1fr); } .sidebar { display:none; } .mobile-filters { display:flex; gap:8px; flex-wrap:wrap; padding:10px 18px; border-bottom:1px solid var(--border); } .workspace { grid-template-rows:auto auto minmax(0,1fr) auto; } .mobile-filters select { flex:1; min-width:90px; font-size:11px; } .mobile-filters .check { margin:0; } .toolbar { padding:14px 18px; } }
+  @media(max-width:720px) { .browser { display:block; overflow:hidden; } .catalog { height:100%; border:0; } .details { display:none; height:100%; } body.detail-open .catalog { display:none; } body.detail-open .details { display:block; } .mobile-back { display:flex; } .hero { height:170px; } .statusbar .right { display:none; } .search kbd { display:none; } .mobile-filters .check { font-size:11px; } .thumb { width:60px; height:60px; } .row-score { display:block; } .app { min-height:460px; } }
+  @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#results">Skip to mod results</a>
+<div class="app">
+  <header class="titlebar"><span class="app-mark">P</span><strong>PxModRim</strong><span>/ Workshop</span><span class="prototype">Interactive UX prototype</span></header>
+  <div class="shell">
+    <nav class="rail" aria-label="App sections">
+      <div class="rail-logo" aria-hidden="true">P</div>
+      <span class="rail-item" title="Mods — outside this prototype" aria-label="Mods — outside this prototype"><svg class="icon" viewBox="0 0 24 24"><path d="M3 7h18v13H3zM7 7V4h10v3M7 11h10M7 15h6"/></svg></span>
+      <span class="rail-item" title="Organiser — outside this prototype" aria-label="Organiser — outside this prototype"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h7l2 3h9v11H3zM3 13h18"/></svg></span>
+      <span class="rail-item active" aria-current="page" title="Workshop" aria-label="Workshop"><svg class="icon" viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span>
+      <button class="rail-item" data-action="queue" aria-label="Show download queue" title="Downloads"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 18v3h16v-3"/></svg></button>
+      <span class="rail-item bottom" title="Settings — outside this prototype" aria-label="Settings — outside this prototype"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/></svg></span>
+    </nav>
+    <aside class="sidebar" aria-label="Workshop filters">
+      <h1>Workshop</h1><p class="source">RimWorld · Steam Workshop</p>
+      <button class="scope" data-scope="browse" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m16 8-3 5-5 3 3-5z"/></svg>Browse mods</button>
+      <button class="scope" data-scope="installed" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>Installed locally</button>
+      <div class="nav-label">Categories</div><div id="categories"></div>
+      <hr>
+      <label class="version-control"><span>RimWorld version</span><select data-filter="version" aria-label="RimWorld version"><option value="1.6">1.6 · current game</option><option value="1.5">1.5</option><option value="all">All versions</option></select></label>
+      <label class="check"><input type="checkbox" data-filter="hideInstalled">Hide installed mods</label>
+      <details class="design-notes"><summary>Why this layout?</summary><ul><li>Browse and inspect without losing your search or scroll position.</li><li>Compatibility and local installation state come before popularity.</li><li>Review missing dependencies and destination before downloading.</li><li>Downloading never enables a mod or changes your active mod list.</li></ul><p>All metadata, artwork, compatibility and download progress are illustrative, not live Steam data. Reload to reset the demo.</p></details>
+    </aside>
+    <main class="workspace">
+      <header class="toolbar">
+        <label class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="query" type="search" aria-label="Search mods or authors" placeholder="Search mods or authors…" autocomplete="off"><kbd>Ctrl F</kbd></label>
+        <span class="toolbar-note">Downloading to <b>Local mods</b></span>
+      </header>
+      <div class="mobile-filters" aria-label="Workshop filters">
+        <select data-filter="scope" aria-label="Browse scope"><option value="browse">Browse mods</option><option value="installed">Installed locally</option></select>
+        <select data-filter="category" aria-label="Category" id="mobile-category"></select>
+        <select data-filter="version" aria-label="RimWorld version"><option value="1.6">RimWorld 1.6</option><option value="1.5">RimWorld 1.5</option><option value="all">All versions</option></select>
+        <label class="check"><input type="checkbox" data-filter="hideInstalled">Hide installed</label>
+      </div>
+      <div class="browser">
+        <section class="catalog" aria-label="Mod results">
+          <div class="list-header"><h2 id="result-title">Browse mods</h2><select id="sort" aria-label="Sort mods"><option value="popular">Most popular</option><option value="updated">Recently updated</option><option value="name">Name A–Z</option></select></div>
+          <div class="filter-summary"><span id="result-count" role="status"></span><span class="chip" id="version-chip">RimWorld 1.6</span><button class="link" data-action="reset" hidden id="reset">Reset filters</button></div>
+          <ul class="results" id="results" tabindex="-1"></ul>
+        </section>
+        <section class="details" id="details" aria-label="Selected mod details" tabindex="-1"></section>
+      </div>
+      <section class="queue" aria-label="Download queue">
+        <button class="queue-toggle" id="queue-toggle" data-action="queue" aria-expanded="false" aria-controls="queue-list"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 18v3h16v-3"/></svg><span class="queue-summary" id="queue-summary">Downloads</span><span class="queue-count" id="queue-count">Queue is empty</span><span id="queue-chevron" aria-hidden="true">⌃</span></button>
+        <ul class="queue-list" id="queue-list" hidden></ul>
+      </section>
+    </main>
+  </div>
+  <footer class="statusbar"><span class="status-dot" aria-hidden="true"></span><span>Demo catalog · no Steam connection</span><span id="installed-count"></span><span class="right">Simulated downloads only · active mod list unchanged</span></footer>
+</div>
+<dialog id="download-dialog" aria-labelledby="dialog-title"><form id="download-form"><div id="review"></div><div class="dialog-actions"><button type="button" data-action="close-dialog">Cancel</button><button class="primary" type="submit" id="confirm-download">Download</button></div></form></dialog>
+<div role="status" id="announcement" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>
+<script>
+  const mods = [
+    {id:'allow', title:'Allow Tool', author:'UnlimitedHugs', category:'Quality of life', versions:['1.6','1.5'], updated:'2026-09-22', rating:98, size:2.4, deps:['hugs'], mark:'AT', color:'#855947', art:'tools', workshop:'761421485', description:'Less busywork. More colony. A set of small tools for selecting, hauling and managing items, right where you already give orders.', features:['Select similar items across the map without dragging dozens of selection boxes.','Haul urgently when a delivery cannot wait for the normal hauling routine.','Allow or forbid items in bulk, with contextual orders instead of extra menus.']},
+    {id:'harmony', title:'Harmony', author:'pardeike', category:'Libraries', versions:['1.6','1.5'], updated:'2026-09-18', rating:99, size:1.8, deps:[], mark:'H', color:'#3e577a', art:'library', workshop:'2009463077', description:'The patching library that many RimWorld mods build on. A shared foundation, rather than a gameplay change.', features:['Required by mods that patch game behaviour.','Should load before mods that depend on it.']},
+    {id:'hugs', title:'HugsLib', author:'UnlimitedHugs', category:'Libraries', versions:['1.6','1.5'], updated:'2026-09-12', rating:97, size:1.2, deps:['harmony'], mark:'H+', color:'#655780', art:'library', workshop:'818773962', description:'A shared library of settings and utilities used by many mods. Install it once for every mod that needs it.', features:['Shared mod settings and utilities.','Includes Harmony as a required dependency.']},
+    {id:'haul', title:'Pick Up And Haul', author:'Mehni', category:'Quality of life', versions:['1.6','1.5'], updated:'2026-09-20', rating:97, size:0.9, deps:['harmony'], mark:'PH', color:'#78694a', art:'boxes', workshop:'1279012058', description:'Colonists use their inventory to haul several items in one trip, instead of carrying one stack at a time.', features:['Fewer trips between the field and your stockpiles.','Hauling behaviour stays part of normal colonist work.']},
+    {id:'replace', title:'Replace Stuff', author:'Uuugggg', category:'Building', versions:['1.6','1.5'], updated:'2026-09-26', rating:96, size:0.6, deps:['harmony'], mark:'RS', color:'#4f7375', art:'building', workshop:'1372003680', description:'Upgrade your colony without tearing it down first. Replace walls and structures while keeping your rooms usable.', features:['Change wall materials without manually demolishing each wall.','Build replacements while the existing structure remains in place.']},
+    {id:'rimhud', title:'RimHUD', author:'Jaxe', category:'Interface', versions:['1.6','1.5'], updated:'2026-09-24', rating:98, size:3.1, deps:['harmony'], mark:'HUD', color:'#42677b', art:'interface', workshop:'1508850027', description:'A more informative colonist panel. See skills, needs and current activity without opening several different tabs.', features:['Important pawn information together in one panel.','Customisable layout for the information you check most often.']},
+    {id:'sense', title:'Common Sense', author:'avil', category:'Quality of life', versions:['1.6'], updated:'2026-09-15', rating:96, size:0.8, deps:['harmony'], mark:'CS', color:'#697550', art:'tools', workshop:'1561769193', description:'Small improvements to everyday colonist decisions, so you spend less time correcting avoidable busywork.', features:['Colonists consider useful preparation before work.','Adjust behaviours to fit the way you play.']},
+    {id:'furniture', title:'Vanilla Furniture Expanded', author:'Oskar Potocki & team', category:'Building', versions:['1.6','1.5'], updated:'2026-09-08', rating:95, size:24.8, deps:[], mark:'VFE', color:'#876449', art:'building', workshop:'1718190143', description:'More furniture for lived-in colonies, designed to sit comfortably alongside the base game’s visual style.', features:['Additional furniture for recreation and daily colony life.','A visual style built around vanilla RimWorld.']},
+    {id:'landforms', title:'Geological Landforms', author:'m00nl1ght', category:'World & gameplay', versions:['1.6'], updated:'2026-09-27', rating:97, size:8.6, deps:['harmony'], mark:'GL', color:'#4c7665', art:'landscape', workshop:'2773943594', description:'Give your next settlement a sense of place. Distinct terrain formations create new spaces to build and defend.', features:['Terrain formations that change the shape of your starting map.','Choose a location for its geography, not just its resources.']},
+    {id:'performance', title:'Performance Optimizer', author:'Taranchuk', category:'Performance', versions:['1.6','1.5'], updated:'2026-09-25', rating:94, size:0.7, deps:['harmony'], mark:'PO', color:'#526c82', art:'interface', workshop:'2664723367', description:'Adjusts how often selected background calculations run. Intended for colonies where simulation speed matters.', features:['Configurable optimisation settings.','Actual performance depends on the colony and the rest of the mod list.']},
+    {id:'menus', title:'Dubs Mint Menus', author:'Dubwise', category:'Interface', versions:['1.6','1.5'], updated:'2026-09-11', rating:95, size:1.5, deps:['harmony'], mark:'DM', color:'#6e597b', art:'interface', workshop:'1446523594', description:'Searchable, more readable menus for a modded colony with a long list of recipes and building options.', features:['Find recipes and options without scrolling through long menus.','More information close to the decision you are making.']},
+    {id:'camera', title:'Camera+', author:'Brrainz', category:'Interface', versions:['1.5'], updated:'2026-06-18', rating:93, size:0.5, deps:['harmony'], mark:'C+', color:'#52677e', art:'landscape', workshop:'867467808', description:'A wider range of camera zoom and more freedom to inspect the colony. This demo entry deliberately illustrates an older-version mod.', features:['Zoom further out for an overview of your colony.','Demo compatibility warning: this entry only declares RimWorld 1.5.']}
+  ];
+  const byId = Object.fromEntries(mods.map(mod => [mod.id, mod]));
+  const categories = ['All categories','Quality of life','Interface','Building','World & gameplay','Performance','Libraries'];
+  const state = {query:'', scope:'browse', category:'All categories', version:'1.6', hideInstalled:false, sort:'popular', selected:'allow', installed:new Set(['harmony','rimhud']), downloads:[], queueOpen:false, history:[], reviewId:null};
+  const $ = selector => document.querySelector(selector);
+  const esc = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const downloadIcon = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 18v3h16v-3"/></svg>';
+  function artwork(mod) {
+    const shapes = {
+      tools:'<path d="M190 37h66v66h-66zM267 37h66v66h-66zM190 114h66v66h-66zM267 114h66v66h-66z" fill="none" stroke="#edc098" stroke-width="2"/><path d="m210 72 9 9 18-24m51 15h25m-12-12v24M209 144h30m-15-15v30m66-20 20 20m-20 0 20-20" stroke="#ffe0b8" stroke-width="4" fill="none"/>',
+      library:'<path d="m258 29 87 50-87 50-87-50z" fill="#b9c6e9" opacity=".5"/><path d="m171 99 87 50 87-50m-174 20 87 50 87-50" fill="none" stroke="#dde5fc" stroke-width="3"/>',
+      boxes:'<path d="m211 50 47-26 47 26-47 26zM211 50v60l47 26 47-26V50m-47 26v60m-75-25 47 26v39l-47-26z" fill="none" stroke="#ebd7a7" stroke-width="3"/>',
+      building:'<path d="M163 177V99l49-31 47 31v78m-47-109V36l49-29 48 29v125m-96-62 48-30 48 29m-49-91v62m-74 47h25v36h-25m99-108h23v26h-23" fill="none" stroke="#dce2cf" stroke-width="3"/>',
+      interface:'<rect x="161" y="34" width="169" height="135" rx="6" fill="none" stroke="#d1ddea" stroke-width="2"/><path d="M161 62h169m-110 0v107m17-84h76m-76 20h54m-54 20h66m-66 20h37" stroke="#d1ddea" stroke-width="3"/><circle cx="190" cy="94" r="13" fill="#d1ddea" opacity=".65"/><path d="M175 122h31m-31 14h23" stroke="#d1ddea" stroke-width="3"/>',
+      landscape:'<path d="m117 181 97-126 45 61 35-43 94 108z" fill="#b8d5c4" opacity=".5"/><path d="m214 55-25 63 25-14 22 18z" fill="#e0ede4" opacity=".6"/><circle cx="319" cy="45" r="18" fill="#e0ede4" opacity=".5"/>'
+    };
+    return `<svg class="art" viewBox="0 0 400 210" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="210" fill="${mod.color}"/><path d="M0 0h150L70 210H0z" fill="#000" opacity=".12"/><path d="M355 0h45v210H275z" fill="#000" opacity=".08"/>${shapes[mod.art]}<text x="24" y="111" fill="#fff" font-family="system-ui,sans-serif" font-weight="750" font-size="${mod.mark.length > 2 ? 35 : 49}">${mod.mark}</text></svg>`;
+  }
+  function closure(id, seen = new Set()) {
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [...byId[id].deps.flatMap(dep => closure(dep, seen)), id];
+  }
+  const pending = id => state.downloads.some(item => item.id === id && item.progress < 100);
+  const missing = id => closure(id).filter(key => !state.installed.has(key) && !pending(key));
+  const compatible = mod => mod.versions.includes('1.6');
+  function filtered(ignoreCategory = false) {
+    return mods.filter(mod => (ignoreCategory || state.category === 'All categories' || mod.category === state.category)
+      && (state.version === 'all' || mod.versions.includes(state.version))
+      && (state.scope !== 'installed' || state.installed.has(mod.id))
+      && (!state.hideInstalled || !state.installed.has(mod.id))
+      && `${mod.title} ${mod.author}`.toLowerCase().includes(state.query.trim().toLowerCase()))
+      .sort((a,b) => state.sort === 'name' ? a.title.localeCompare(b.title) : state.sort === 'updated' ? b.updated.localeCompare(a.updated) : b.rating - a.rating);
+  }
+  function statusChip(mod) {
+    if (pending(mod.id)) return '<span class="chip installed">Downloading</span>';
+    if (state.installed.has(mod.id)) return '<span class="chip installed">Installed</span>';
+    return compatible(mod) ? '<span class="chip compatible">1.6 compatible</span>' : '<span class="chip warning">1.5 only</span>';
+  }
+  function renderFilters() {
+    const available = filtered(true);
+    $('#categories').innerHTML = categories.map(category => `<button class="category" data-category="${esc(category)}" aria-pressed="${state.category === category}">${esc(category)}<span class="count">${available.filter(mod => category === 'All categories' || mod.category === category).length}</span></button>`).join('');
+    $('#mobile-category').innerHTML = categories.map(category => `<option ${state.category === category ? 'selected' : ''}>${esc(category)}</option>`).join('');
+    document.querySelectorAll('[data-scope]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.scope === state.scope)));
+    document.querySelectorAll('[data-filter]').forEach(control => { if (control.type === 'checkbox') control.checked = state[control.dataset.filter]; else control.value = state[control.dataset.filter]; });
+    $('#result-title').textContent = state.query.trim() ? 'Search results' : state.scope === 'installed' ? 'Installed locally' : 'Browse mods';
+    $('#version-chip').textContent = state.version === 'all' ? 'All versions' : `RimWorld ${state.version}`;
+    $('#reset').hidden = !state.query && state.category === 'All categories' && state.version === '1.6' && !state.hideInstalled && state.scope === 'browse';
+  }
+  function renderResults() {
+    const list = filtered();
+    $('#result-count').textContent = `${list.length} ${list.length === 1 ? 'mod' : 'mods'}`;
+    $('#results').innerHTML = list.length ? list.map(mod => `<li><button class="mod-row" data-mod="${mod.id}" aria-current="${mod.id === state.selected}" aria-label="${esc(mod.title)}, by ${esc(mod.author)}${state.installed.has(mod.id) ? ', installed' : ''}"><span class="thumb">${artwork(mod)}</span><span class="row-copy"><span class="row-title">${esc(mod.title)}</span><span class="row-author">${esc(mod.author)}</span><span class="row-meta">${statusChip(mod)}<span class="row-score" title="Illustrative positive rating">${mod.rating}% positive</span></span></span></button></li>`).join('') : '<li class="empty"><h3>No mods match these filters</h3><p>Try another name, version or category.</p><button data-action="reset">Clear search & filters</button></li>';
+  }
+  function renderDetail() {
+    const mod = byId[state.selected];
+    if (!mod) { $('#details').innerHTML = '<div class="empty"><h3>Choose a mod to inspect</h3><p>Its description, compatibility and dependencies appear here.</p></div>'; return; }
+    const deps = closure(mod.id).filter(id => id !== mod.id);
+    const planned = missing(mod.id);
+    const installed = state.installed.has(mod.id);
+    const downloading = pending(mod.id);
+    const date = new Date(`${mod.updated}T12:00:00`).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+    $('#details').innerHTML = `<div class="detail-content"><div class="detail-top">${state.history.length ? '<button class="link back" data-action="back">← Back to previous mod</button>' : '<button class="link back mobile-back" data-action="list">← Back to results</button><span class="desktop-source">Steam Workshop / '+esc(mod.category)+'</span>'}<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshop}" target="_blank" rel="noreferrer">Workshop page ↗</a></div>
+      <div class="hero">${artwork(mod)}<span class="hero-label">Illustrative artwork · ${esc(mod.category)}</span></div>
+      <h2>${esc(mod.title)}</h2><p class="byline">by ${esc(mod.author)}</p>
+      <div class="badges"><span class="chip ${compatible(mod) ? 'compatible' : 'warning'}">${compatible(mod) ? '✓ Compatible with your game · 1.6' : 'Not listed for your game · 1.6'}</span>${installed ? '<span class="chip installed">✓ Installed locally</span>' : ''}</div>
+      <p class="description">${esc(mod.description)}</p>
+      ${!compatible(mod) ? '<div class="warning-box">Only RimWorld 1.5 is declared in this demo entry. Compatibility with your 1.6 game is unconfirmed.</div>' : ''}
+      <div class="install-card"><button class="primary" data-action="review" ${installed || downloading ? 'disabled' : ''}>${downloadIcon}${installed ? 'Already installed' : downloading ? 'Download queued' : `Download${planned.length > 1 ? ` · ${planned.length} mods` : ''}`}</button><p class="install-hint">${installed ? 'Available in Mods. Your active mod list is unchanged.' : downloading ? 'Continue browsing while the demo download runs.' : `${planned.length > 1 ? `Includes ${planned.length - 1} missing ${planned.length === 2 ? 'dependency' : 'dependencies'}. ` : ''}Downloads only — does not enable mods.`}</p></div>
+      <section class="detail-section"><h3>Required mods <span class="muted">· ${deps.length}</span></h3><p class="section-caption">${deps.length ? 'Includes dependencies of dependencies. Installed mods are not downloaded again.' : 'No required mods declared in this demo.'}</p><ul class="dependencies">${deps.map(id => `<li class="dependency"><span class="dep-mark">${esc(byId[id].mark)}</span><span class="dep-copy"><button class="link" data-dependency="${id}">${esc(byId[id].title)} ↗</button><span>${mod.deps.includes(id) ? 'Required by this mod' : 'Required by '+esc(byId[mod.deps[0]].title)}</span></span><span class="chip ${state.installed.has(id) ? 'installed' : ''}">${state.installed.has(id) ? 'Installed' : pending(id) ? 'Queued' : 'Included in download'}</span></li>`).join('')}</ul></section>
+      <section class="detail-section"><h3>What it changes</h3><ul class="feature-list">${mod.features.map(feature => `<li>${esc(feature)}</li>`).join('')}</ul></section>
+      <div class="facts"><span>Updated<strong>${date}</strong></span><span>Download size<strong>${mod.size} MB</strong></span><span>Positive ratings<strong>${mod.rating}% · demo</strong></span></div></div>`;
+  }
+  function renderQueue() {
+    const active = state.downloads.filter(item => item.progress < 100);
+    const done = state.downloads.length - active.length;
+    $('#queue-toggle').setAttribute('aria-expanded', String(state.queueOpen));
+    $('#queue-list').hidden = !state.queueOpen;
+    $('#queue-chevron').textContent = state.queueOpen ? '⌄' : '⌃';
+    $('#queue-summary').textContent = active.length ? `Downloading ${byId[active[0].id].title}` : done ? 'Downloads complete · available in Mods' : 'Downloads';
+    $('#queue-count').textContent = active.length ? `${active.length} remaining · simulated` : done ? `${done} completed` : 'Queue is empty';
+    $('#queue-list').innerHTML = state.downloads.length ? state.downloads.map(item => `<li class="queue-row"><div class="queue-copy"><strong>${esc(byId[item.id].title)}</strong><span>${item.progress === 100 ? `Complete · ${esc(item.folder)}` : item === active[0] ? `${item.progress}% · simulated` : 'Waiting'}</span><progress value="${item.progress}" max="100" aria-label="${esc(byId[item.id].title)} download progress"></progress></div>${item.progress < 100 ? `<button class="quiet" data-cancel="${item.id}" aria-label="Cancel ${esc(byId[item.id].title)} download">Cancel</button>` : '<span class="chip installed">Installed</span>'}</li>`).join('') : '<li class="queue-empty">No downloads yet. Choose a mod to review its download.</li>';
+    $('#installed-count').textContent = `${state.installed.size} installed locally`;
+  }
+  function refreshCatalog() {
+    state.history = [];
+    const list = filtered();
+    if (!list.some(mod => mod.id === state.selected)) state.selected = list[0]?.id ?? null;
+    renderFilters(); renderResults(); renderDetail();
+  }
+  function selectMod(id, dependency = false) {
+    if (dependency) state.history.push(state.selected); else state.history = [];
+    state.selected = id;
+    document.body.classList.add('detail-open');
+    renderResults(); renderDetail();
+    $('#details').scrollTop = 0;
+    if (matchMedia('(max-width:720px)').matches || dependency) $('#details').focus();
+  }
+  function reviewDownload() {
+    const mod = byId[state.selected];
+    state.reviewId = mod.id;
+    const ids = missing(mod.id);
+    const existing = closure(mod.id).filter(id => state.installed.has(id) || pending(id));
+    $('#review').innerHTML = `<h2 id="dialog-title">Download ${esc(mod.title)}</h2><p>Review what will be added to your local mod library.</p>${!compatible(mod) ? '<div class="warning-box">Compatibility with RimWorld 1.6 is unconfirmed. This mod only declares 1.5 in the demo.</div>' : ''}<ul class="review-list">${ids.map(id => `<li><span>${esc(byId[id].title)} <small>${id === mod.id ? 'Selected mod' : 'Required dependency'}</small></span><span class="muted">${byId[id].size} MB</span></li>`).join('')}</ul>${existing.length ? `<p>Already installed or queued: ${existing.map(id => esc(byId[id].title)).join(', ')}. These will be skipped.</p>` : ''}<label for="destination">Download destination</label><select id="destination"><option>Local mods</option><option>Workshop imports</option></select><p>${ids.length} ${ids.length === 1 ? 'mod' : 'mods'} · ${ids.reduce((sum,id) => sum + byId[id].size, 0).toFixed(1)} MB<br>No mods will be enabled. Downloads are simulated.</p>`;
+    $('#confirm-download').textContent = compatible(mod) ? `Download ${ids.length} ${ids.length === 1 ? 'mod' : 'mods'}` : 'Download anyway';
+    $('#download-dialog').showModal();
+  }
+  function reset() {
+    Object.assign(state, {query:'', scope:'browse', category:'All categories', version:'1.6', hideInstalled:false});
+    $('#query').value = '';
+    document.body.classList.remove('detail-open');
+    refreshCatalog();
+  }
+  document.addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if (button.dataset.mod) selectMod(button.dataset.mod);
+    else if (button.dataset.dependency) selectMod(button.dataset.dependency, true);
+    else if (button.dataset.category) { state.category = button.dataset.category; refreshCatalog(); }
+    else if (button.dataset.scope) { state.scope = button.dataset.scope; state.hideInstalled = false; refreshCatalog(); }
+    else if (button.dataset.cancel) {
+      const id = button.dataset.cancel;
+      const cancelled = state.downloads.filter(item => item.progress < 100 && closure(item.id).includes(id)).map(item => item.id);
+      state.downloads = state.downloads.filter(item => !cancelled.includes(item.id));
+      $('#announcement').textContent = `Cancelled ${cancelled.map(key => byId[key].title).join(' and ')}. Dependent downloads are cancelled together.`;
+      renderQueue(); renderResults(); renderDetail();
+      $('#queue-toggle').focus();
+    } else if (button.dataset.action === 'queue') { state.queueOpen = !state.queueOpen; renderQueue(); }
+    else if (button.dataset.action === 'review') reviewDownload();
+    else if (button.dataset.action === 'close-dialog') $('#download-dialog').close();
+    else if (button.dataset.action === 'reset') reset();
+    else if (button.dataset.action === 'list') { document.body.classList.remove('detail-open'); $(`[data-mod="${state.selected}"]`)?.focus(); }
+    else if (button.dataset.action === 'back') { state.selected = state.history.pop(); renderResults(); renderDetail(); $('#details').scrollTop = 0; $('#details').focus(); }
+  });
+  $('#query').addEventListener('input', event => { state.query = event.target.value; refreshCatalog(); });
+  document.addEventListener('change', event => {
+    const key = event.target.dataset.filter;
+    if (key) { state[key] = event.target.type === 'checkbox' ? event.target.checked : event.target.value; if (key === 'scope') state.hideInstalled = false; refreshCatalog(); }
+    if (event.target.id === 'sort') { state.sort = event.target.value; renderResults(); }
+  });
+  document.addEventListener('keydown', event => {
+    if ($('#download-dialog').open) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); $('#query').focus(); $('#query').select(); }
+    const row = event.target.closest('[data-mod]');
+    if (row && ['ArrowDown','ArrowUp'].includes(event.key)) {
+      event.preventDefault();
+      const rows = [...document.querySelectorAll('[data-mod]')];
+      const next = rows[Math.max(0,Math.min(rows.length-1,rows.indexOf(row)+(event.key === 'ArrowDown' ? 1 : -1)))];
+      selectMod(next.dataset.mod); $(`[data-mod="${next.dataset.mod}"]`).focus();
+    }
+    if (event.key === 'Escape' && document.body.classList.contains('detail-open')) { document.body.classList.remove('detail-open'); $(`[data-mod="${state.selected}"]`)?.focus(); }
+  });
+  $('#download-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const ids = missing(state.reviewId);
+    const folder = $('#destination').value;
+    ids.forEach(id => state.downloads.push({id, progress:0, folder}));
+    $('#download-dialog').close();
+    state.queueOpen = true;
+    $('#announcement').textContent = `${ids.length} mods queued. Active mod list unchanged.`;
+    renderQueue(); renderResults(); renderDetail();
+    $('#queue-toggle').focus();
+  });
+  setInterval(() => {
+    const item = state.downloads.find(download => download.progress < 100);
+    if (!item) return;
+    item.progress = Math.min(100,item.progress+10);
+    if (item.progress === 100) {
+      state.installed.add(item.id);
+      $('#announcement').textContent = `${byId[item.id].title} downloaded to ${item.folder}. Not enabled.`;
+      refreshCatalog();
+    }
+    renderQueue();
+  }, 650);
+  renderFilters(); renderResults(); renderDetail(); renderQueue();
+</script>
+</body>
+</html>
