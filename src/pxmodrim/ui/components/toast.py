@@ -37,6 +37,7 @@ class Toast(QWidget):
         super().__init__(parent)
         self.setObjectName("toast")
         self.setFixedWidth(320)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
         icon_name, accent = _TOAST_LEVELS[level]
