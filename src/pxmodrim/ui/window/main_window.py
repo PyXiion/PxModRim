@@ -176,27 +176,19 @@ class MainWindow(QMainWindow):
                 "refresh": ACTIONS[ActionId.REFRESH].tooltip(),
                 "sort": ACTIONS[ActionId.AUTO_SORT].tooltip(),
                 "save": ACTIONS[ActionId.SAVE].tooltip(),
-                "settings": ACTIONS[ActionId.SETTINGS].tooltip(),
                 "update_mods": ACTIONS[ActionId.UPDATE_MODS].tooltip(),
             },
             downloads_available=self._downloads.available,
-            help_entries=[
-                {"id": str(aid), "label": ACTIONS[aid].label} for aid in _HELP_ACTIONS
-            ],
         )
         self._header_controller.refresh_requested.connect(self._refresh_mods)
         self._header_controller.sort_requested.connect(self._auto_sort)
         self._header_controller.save_requested.connect(self._save_mods_config)
-        self._header_controller.settings_requested.connect(self._open_settings)
         self._header_controller.launch_requested.connect(self._launch_game)
         self._header_controller.strategy_changed.connect(self._on_strategy_changed)
         self._header_controller.minimize_requested.connect(self.showMinimized)
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
-        self._header_controller.help_action_requested.connect(
-            lambda action_id: self._actions[ActionId(action_id)].trigger()
-        )
         self._header_controller.downloads_requested.connect(
             lambda: self._show_view("downloads")
         )
@@ -310,7 +302,11 @@ class MainWindow(QMainWindow):
             {"viewId": v.view_id, "icon": v.icon_name, "label": v.label}
             for v in rail_views
         ]
-        self._rail = ViewRailPanel(rail_tabs, self._qml_engine)
+        self._rail = ViewRailPanel(
+            rail_tabs,
+            [{"id": str(aid), "label": ACTIONS[aid].label} for aid in _HELP_ACTIONS],
+            self._qml_engine,
+        )
         self._rail.setObjectName("viewRail")
         self._rail.setMinimumWidth(RAIL_MIN_WIDTH)
         self._rail.setMaximumWidth(RAIL_MAX_WIDTH)
@@ -329,6 +325,10 @@ class MainWindow(QMainWindow):
         self._splitter.setSizes([RAIL_MAX_WIDTH, self.width() - RAIL_MAX_WIDTH])
         self._rail.currentChanged.connect(self._on_rail_tab_changed)
         self._rail.hovered.connect(self._on_rail_hovered)
+        self._rail.settings_requested.connect(self._open_settings)
+        self._rail.help_action_requested.connect(
+            lambda action_id: self._actions[ActionId(action_id)].trigger()
+        )
         self._splitter.splitterMoved.connect(self._snap_rail)
 
         self._views: list = []

@@ -13,6 +13,76 @@ Rectangle {
 
     signal tabSelected(int index)
     signal tabHovered(int index)
+    signal settingsRequested()
+    signal helpActionRequested(string actionId)
+
+    component RailButton: Item {
+        id: button
+        property string iconName
+        property string label
+        property bool collapsed
+        signal clicked()
+
+        width: parent ? parent.width : 0
+        height: 44
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 4
+            radius: Theme.radiusMd
+            color: area.containsMouse ? Theme.elevate3 : "transparent"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: button.collapsed ? 0 : 12
+                anchors.rightMargin: button.collapsed ? 0 : 8
+                spacing: 10
+
+                Item {
+                    Layout.preferredWidth: 18
+                    Layout.preferredHeight: 18
+                    Layout.alignment: button.collapsed ? Qt.AlignCenter : Qt.AlignVCenter
+                    Layout.fillWidth: button.collapsed
+
+                    Image {
+                        anchors.centerIn: parent
+                        source: "image://icons/" + button.iconName + "?color=" + encodeURIComponent(Theme.textMuted)
+                        sourceSize.width: 18; sourceSize.height: 18
+                        fillMode: Image.PreserveAspectFit
+                    }
+                }
+
+                Text {
+                    visible: !button.collapsed
+                    Layout.fillWidth: true
+                    text: button.label
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeMd
+                    elide: Text.ElideRight
+                }
+            }
+
+            MouseArea {
+                id: area
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: button.clicked()
+            }
+
+            Loader {
+                active: button.collapsed && area.containsMouse
+                sourceComponent: PxToolTip {
+                    visible: true
+                    text: button.label
+                }
+            }
+        }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: button.label
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -129,6 +199,47 @@ Rectangle {
                         ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
                     }
                 }
+            }
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: Theme.border
+        }
+
+        Column {
+            Layout.fillWidth: true
+            Layout.topMargin: 4
+            Layout.bottomMargin: 4
+
+            RailButton {
+                iconName: "settings"
+                label: "Settings"
+                collapsed: root.collapsed
+                onClicked: root.settingsRequested()
+            }
+
+            RailButton {
+                id: helpButton
+                iconName: "help"
+                label: "Help"
+                collapsed: root.collapsed
+                onClicked: helpMenu.popup(helpButton, helpButton.width, helpButton.height - helpMenu.implicitHeight)
+            }
+        }
+    }
+
+    PxMenu {
+        id: helpMenu
+        objectName: "helpMenu"
+
+        Repeater {
+            model: railHelpEntries
+
+            PxMenuItem {
+                required property var modelData
+                text: modelData.label
+                onTriggered: root.helpActionRequested(modelData.id)
             }
         }
     }

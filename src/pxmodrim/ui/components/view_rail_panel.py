@@ -17,10 +17,13 @@ _RAIL_QML = _QML_DIR / "IconRail.qml"
 class ViewRailPanel(QQuickWidget):
     currentChanged = Signal(int)
     hovered = Signal(int)
+    settings_requested = Signal()
+    help_action_requested = Signal(str)
 
     def __init__(
         self,
         tabs: list[dict],
+        help_entries: list[dict[str, str]],
         qml_engine: QQmlEngine | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -35,12 +38,15 @@ class ViewRailPanel(QQuickWidget):
         qml_ctx = self.rootContext()
         qml_ctx.setContextProperty("railPanel", self)
         qml_ctx.setContextProperty("railModel", tabs)
+        qml_ctx.setContextProperty("railHelpEntries", help_entries)
         self.setSource(QUrl.fromLocalFile(str(_RAIL_QML)))
 
         root = self.rootObject()
         if root is not None:
             root.tabSelected.connect(self._on_tab_selected)  # type: ignore[attr-defined]
             root.tabHovered.connect(self._on_tab_hovered)  # type: ignore[attr-defined]
+            root.settingsRequested.connect(self.settings_requested)  # type: ignore[attr-defined]
+            root.helpActionRequested.connect(self.help_action_requested)  # type: ignore[attr-defined]
 
     @Slot(int)
     def _on_tab_selected(self, index: int) -> None:

@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - QML menus, combo box dropdowns and tooltips open in their own window, so they are no longer clipped by the widget that hosts them (the header's launch-strategy menu and help menu).
 
 ### Added
-- Header help button (`?`, beside Settings) with Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.
+- Settings and Help are pinned to the bottom of the left rail (the header no longer has a Settings button). The Help menu has Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.
 - Settings > Steam Workshop: `Proxy` (empty uses `https_proxy`/`all_proxy` from the environment), `Connect timeout` and `Stall timeout` for Workshop downloads. Changing them logs in to Steam again before the next download.
 
 ### Changed
