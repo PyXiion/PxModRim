@@ -8,12 +8,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pxsteamdl
 import pytest
 
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.downloads import DownloadItemStatus, DownloadResult
-from pxmodrim.core.downloads.steam import SteamDownloader, WorkshopSyncState
+from pxmodrim.core.downloads.steam import (
+    ClientOptions,
+    SteamDownloader,
+    WorkshopSyncState,
+)
 from pxmodrim.core.models.metadata.structures import ListedMod
 
 
@@ -22,9 +27,11 @@ class FakeClient:
         self,
         errors: dict[int, str] | None = None,
         gates: dict[int, threading.Event] | None = None,
+        network_failures: frozenset[int] = frozenset(),
     ) -> None:
         self.errors = errors or {}
         self.gates = gates or {}
+        self.network_failures = network_failures
         self.stopped = False
         self.calls: list[tuple[list[int], Path, int]] = []
 
@@ -59,7 +66,16 @@ class FakeClient:
             if not error:
                 (Path(root) / str(item_id)).mkdir(parents=True, exist_ok=True)
             results.append(
-                SimpleNamespace(item_id=item_id, error=error, cancelled=self.stopped)
+                SimpleNamespace(
+                    item_id=item_id,
+                    error=error,
+                    cancelled=self.stopped,
+                    error_kind=(
+                        pxsteamdl.ErrorKind.NETWORK
+                        if item_id in self.network_failures
+                        else pxsteamdl.ErrorKind.NONE
+                    ),
+                )
             )
         return results
 
@@ -73,12 +89,12 @@ def _cfg(tmp_path: Path, *, local: bool = True) -> AppConfig:
 
 def _service(
     tmp_path: Path, client: FakeClient | None = None, *, local: bool = True
-) -> tuple[SteamDownloader, list[int]]:
+) -> tuple[SteamDownloader, list[ClientOptions]]:
     cfg = _cfg(tmp_path, local=local)
-    logins: list[int] = []
+    logins: list[ClientOptions] = []
 
-    async def factory() -> FakeClient:
-        logins.append(1)
+    async def factory(options: ClientOptions) -> FakeClient:
+        logins.append(options)
         if client is None:
             raise RuntimeError("logon denied")
         return client
@@ -87,6 +103,24 @@ def _service(
     ctx = CoreContext(cfg, ConfigService(tmp_path))
     svc.setup(ctx)
     return svc, logins
+
+
+async def test_login_uses_configured_proxy_and_timeouts(tmp_path: Path) -> None:
+    svc, logins = _service(tmp_path, FakeClient())
+    assert svc._ctx is not None
+    await svc.download_mods(["111"])
+    svc._ctx.config.workshop_proxy = " socks5h://host:1080 "
+    svc._ctx.config.workshop_connect_timeout = 3
+    svc._ctx.config.workshop_stall_timeout = 7
+    await svc.download_mods(["222"])
+    assert logins == [(None, 10, 30), ("socks5h://host:1080", 3, 7)]
+
+
+async def test_network_failure_triggers_new_login(tmp_path: Path) -> None:
+    svc, logins = _service(tmp_path, FakeClient(network_failures=frozenset({111})))
+    await svc.download_mods(["111"])
+    await svc.download_mods(["222"])
+    assert len(logins) == 2
 
 
 async def test_downloads_into_local_mods_and_splits_results(tmp_path: Path) -> None:
@@ -358,7 +392,7 @@ async def test_client_is_relogged_after_download_raises(tmp_path: Path) -> None:
     clients: list[FakeClient] = [Dying(), FakeClient()]
     logins: list[int] = []
 
-    async def factory() -> FakeClient:
+    async def factory(_options: ClientOptions) -> FakeClient:
         logins.append(1)
         return clients[len(logins) - 1]
 

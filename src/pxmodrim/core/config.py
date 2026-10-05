@@ -69,6 +69,9 @@ class AppConfig(msgspec.Struct):
     workshop_auto_update_hours: int = 0
     workshop_parallel_items: int = 8
     workshop_threads_per_item: int = 1
+    workshop_proxy: str = ""
+    workshop_connect_timeout: int = 10
+    workshop_stall_timeout: int = 30
     log_upload_endpoint: str = "https://paste.rs/"
 
 

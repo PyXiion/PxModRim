@@ -64,6 +64,9 @@ class _SettingsBackend(QObject):
             "autoUpdateHours": cfg.workshop_auto_update_hours,
             "parallelItems": cfg.workshop_parallel_items,
             "threadsPerItem": cfg.workshop_threads_per_item,
+            "proxy": cfg.workshop_proxy,
+            "connectTimeout": cfg.workshop_connect_timeout,
+            "stallTimeout": cfg.workshop_stall_timeout,
             "steamAvailable": ctx.plugins.get("steam_downloader") is not None,
             "useAltIds": cfg.sort.use_alternative_package_ids,
             "checkMissing": cfg.sort.check_missing_dependencies,
@@ -227,6 +230,9 @@ class SettingsPanel(QDialog):
             workshop_auto_update_hours=int(values["autoUpdateHours"]),
             workshop_parallel_items=int(values["parallelItems"]),
             workshop_threads_per_item=int(values["threadsPerItem"]),
+            workshop_proxy=values["proxy"].strip(),
+            workshop_connect_timeout=int(values["connectTimeout"]),
+            workshop_stall_timeout=int(values["stallTimeout"]),
         )
         self.accept()
 

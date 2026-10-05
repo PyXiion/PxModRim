@@ -30,7 +30,6 @@ if TYPE_CHECKING:
 MAX_PARALLEL_ITEMS = 8
 MAX_THREADS_PER_ITEM = 16
 
-_CANCELLED = "cancelled"
 _PROGRESS_LOG_INTERVAL_S = 15.0
 _PROGRESS_EMIT_INTERVAL_S = 0.1
 _SYNC_FILE = "workshop_sync.json"
@@ -54,11 +53,18 @@ class WorkshopClient(Protocol):
     ) -> list[pxsteamdl.Result]: ...
 
 
-ClientFactory = Callable[[], Awaitable[WorkshopClient]]
+ClientOptions = tuple[str | None, int, int]
+ClientFactory = Callable[[ClientOptions], Awaitable[WorkshopClient]]
 
 
-async def _login() -> WorkshopClient:
-    return await asyncio.to_thread(pxsteamdl.Client)
+async def _login(options: ClientOptions) -> WorkshopClient:
+    proxy, connect_timeout, stall_timeout = options
+    return await asyncio.to_thread(
+        pxsteamdl.Client,
+        proxy=proxy,
+        connect_timeout=connect_timeout,
+        stall_timeout=stall_timeout,
+    )
 
 
 def _validate_published_file_ids(publishedfileids: list[str]) -> None:
@@ -133,6 +139,7 @@ class SteamDownloader(Downloader):
         self._ctx: CoreContext | None = None
         self._client_factory: ClientFactory = client_factory or _login
         self._client: WorkshopClient | None = None
+        self._client_options: ClientOptions | None = None
         self._token: pxsteamdl.CancelToken | None = None
         self._active_ids: frozenset[str] = frozenset()
         self._sync = WorkshopSyncState()
@@ -380,6 +387,10 @@ class SteamDownloader(Downloader):
         finally:
             self._running = None
 
+        # A network failure leaves the Steam session suspect; log in again next time.
+        if any(r.error_kind == pxsteamdl.ErrorKind.NETWORK for r in results):
+            self._client = None
+
         # Flush progress callbacks queued before the executor returned.
         await asyncio.sleep(0)
         by_id = {str(r.item_id): r for r in results}
@@ -390,10 +401,25 @@ class SteamDownloader(Downloader):
             elif not result.cancelled:
                 self._finish_item(batch, pid, error=result.error)
 
+    def _wanted_options(self) -> ClientOptions:
+        cfg = self._ctx.config if self._ctx is not None else None
+        if cfg is None:
+            return (None, 10, 30)
+        return (
+            cfg.workshop_proxy.strip() or None,
+            max(1, cfg.workshop_connect_timeout),
+            max(1, cfg.workshop_stall_timeout),
+        )
+
     async def _ensure_client(self) -> WorkshopClient:
+        options = self._wanted_options()
+        if self._client is not None and options != self._client_options:
+            self._client = None
         if self._client is None:
             self.status_message_changed.emit("Logging in to Steam\u2026")
-            self._client = await self._client_factory()
+            self._client = await self._client_factory(options)
+            self._client_options = options
+            logger.debug("[workshop] pxsteamdl {} logged in", pxsteamdl.__version__)
         return self._client
 
     def _on_resolved(self, batch: _Batch, pid: str, title: str) -> None:

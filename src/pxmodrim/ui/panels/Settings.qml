@@ -22,6 +22,9 @@ Rectangle {
             autoUpdateHours: autoUpdate.currentValue,
             parallelItems: parallelItems.value,
             threadsPerItem: threadsPerItem.value,
+            proxy: proxy.text.trim(),
+            connectTimeout: connectTimeout.value,
+            stallTimeout: stallTimeout.value,
             useAltIds: useAltIds.checked,
             checkMissing: checkMissing.checked,
             useCommunity: useCommunity.checked
@@ -283,6 +286,71 @@ Rectangle {
                             color: Theme.textDim
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Proxy"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxTextField {
+                                id: proxy
+                                Layout.fillWidth: true
+                                monospace: true
+                                text: root.initial.proxy
+                                placeholderText: "Use system proxy"
+                                Accessible.name: "Workshop download proxy"
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "URL such as http://host:3128 or socks5h://host:1080. Empty uses https_proxy / all_proxy from the environment."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Connect timeout (s)"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxSpinBox {
+                                id: connectTimeout
+                                from: 1
+                                to: 120
+                                value: root.initial.connectTimeout
+                                Accessible.name: "Workshop connect timeout in seconds"
+                                toolTipText: "How long to wait for a connection before trying another server."
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Stall timeout (s)"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxSpinBox {
+                                id: stallTimeout
+                                from: 1
+                                to: 300
+                                value: root.initial.stallTimeout
+                                Accessible.name: "Workshop stall timeout in seconds"
+                                toolTipText: "How long a transfer may stay below 1 byte/s before it is abandoned and retried."
+                            }
                         }
                     }
                 }
