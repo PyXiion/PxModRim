@@ -360,7 +360,6 @@ Rectangle {
 
     PxMenu {
         id: helpMenu
-        popupType: Popup.Window
         objectName: "helpMenu"
 
         Repeater {

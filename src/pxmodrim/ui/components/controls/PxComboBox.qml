@@ -68,6 +68,7 @@ ComboBox {
     }
 
     popup: Popup {
+        popupType: Popup.Window
         y: control.height + 4
         width: control.width
         implicitHeight: Math.min(contentItem.implicitHeight + 8, 280)

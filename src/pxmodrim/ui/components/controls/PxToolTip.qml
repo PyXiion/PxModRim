@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 ToolTip {
     id: control
+    popupType: Popup.Window
 
     delay: Theme.tooltipDelay
     padding: 6

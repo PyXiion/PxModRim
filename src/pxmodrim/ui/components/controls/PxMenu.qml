@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Menu {
     id: control
+    popupType: Popup.Window
 
     implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset,
                             contentItem.implicitWidth + leftPadding + rightPadding)
