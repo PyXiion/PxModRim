@@ -339,3 +339,28 @@ class TestDependentsOf:
 
     def test_mod_without_dependents(self, activation: ActivationService) -> None:
         assert activation.dependents_of(["uuid-d", "uuid-missing"]) == []
+
+
+def test_sidebar_entries_are_published_before_summary(
+    ctx: CoreContext, activation: ActivationService
+) -> None:
+    """The summary handler re-applies the sidebar filter, so entries must be fresh."""
+    diagnostics = ctx.diagnostics_service
+    inactive: set[str] = set()
+    seen_at_summary: list[set[str]] = []
+
+    def on_entries(entries: list) -> None:
+        inactive.clear()
+        inactive.update(next(e for e in entries if e.label == "Inactive").visible_uuids)
+
+    diagnostics.sidebar_entries_changed.connect(on_entries)
+    diagnostics.diagnostics_summary_changed.connect(
+        lambda _: seen_at_summary.append(set(inactive))
+    )
+
+    diagnostics.rebuild(ctx.active_uuids)
+    seen_at_summary.clear()
+    activation.apply(enable=["uuid-f"])
+
+    assert seen_at_summary
+    assert "uuid-f" not in seen_at_summary[-1]
