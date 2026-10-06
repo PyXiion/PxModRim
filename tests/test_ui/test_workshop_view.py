@@ -7,9 +7,11 @@ from typing import Any, cast
 
 import msgspec
 import pytest
-from PySide6.QtCore import QObject, QPoint, QUrl
+from PySide6.QtCore import QObject, QPoint, Qt, QUrl
 from PySide6.QtGui import QAccessible
+from PySide6.QtQuick import QQuickItem
 from PySide6.QtQuickWidgets import QQuickWidget
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 from pytestqt.qtbot import QtBot
 from shiboken6 import delete, isValid
@@ -500,6 +502,44 @@ async def test_download_never_activates_installed_copies(
     await view.downloadItem("1", "mod")
     assert catalog.downloaded == ["2", "1"]
     assert view._ctx.active_uuids == []
+
+
+def _find_item(item: QQuickItem, name: str) -> QQuickItem | None:
+    if item.objectName() == name:
+        return item
+    for child in item.childItems():
+        found = _find_item(child, name)
+        if found is not None:
+            return found
+    return None
+
+
+async def test_installed_checkbox_click_toggles_activation_without_opening_details(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, catalog, _ = panel
+    catalog._ctx = view._ctx
+    steamcmd, _, _ = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+    view.window().resize(1100, 800)
+    view.window().show()
+    await view.selectTab("Installed")
+    await asyncio.sleep(0.5)
+    view._qml.grabFramebuffer()
+    await asyncio.sleep(0.2)
+
+    root = view._qml.rootObject()
+    assert root is not None
+    box = _find_item(cast("QQuickItem", root), "activeToggle")
+    assert box is not None
+    center = box.mapToScene(box.boundingRect().center()).toPoint()
+    QTest.mouseClick(view._qml, Qt.MouseButton.LeftButton, pos=center)
+    async with asyncio.timeout(3):
+        while not view._ctx.active_uuids:
+            await asyncio.sleep(0.02)
+    assert view._ctx.active_uuids == [steamcmd]
+    assert not view.hasDetail
 
 
 async def test_activation_does_nothing_without_an_installed_copy(

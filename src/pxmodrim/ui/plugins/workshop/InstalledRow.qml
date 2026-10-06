@@ -34,6 +34,7 @@ Rectangle {
         spacing: 10
         PxCheckBox {
             id: activeBox
+            objectName: "activeToggle"
             checked: row.active
             Accessible.name: "Active"
             Accessible.description: "Enable or disable " + row.title
