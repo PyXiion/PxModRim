@@ -491,22 +491,42 @@ async def test_known_tag_options_accumulate_loaded_tags_but_not_version_tags(
 async def test_back_preserves_scroll_position_and_active_filters(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
 ) -> None:
-    view, _, _ = panel
-    view._qml.resize(800, 600)
+    view, catalog, _ = panel
+    many = [
+        msgspec.structs.replace(catalog.mod_item, id=str(number))
+        for number in range(40)
+    ]
+
+    async def long_listing(query: CatalogQuery) -> CatalogPage[CatalogMod]:
+        return CatalogPage(many, len(many), None)
+
+    catalog.mods = long_listing  # type: ignore[method-assign]
+    view.window().resize(800, 600)
+    view.window().show()
     await view.load()
+    await asyncio.sleep(0.2)
+    view._qml.grab()
     await view.filter("test search", "1.5", "all", "popular", "Utility")
+    await asyncio.sleep(0.2)
+    view._qml.grab()
     assert view.searchQuery == "test search"
 
     root = view._qml.rootObject()
     assert root is not None
     listing_scroll = root.findChild(QObject, "listingScroll")
     assert listing_scroll is not None
+    listing_scroll.setProperty("width", 800)
+    listing_scroll.setProperty("height", 600)
     listing_scroll.setProperty("contentY", 184)
+    view._qml.grab()
+    assert listing_scroll.property("contentY") == 184
 
     await view.open_item("1", "mod")
     assert view.hasDetail
 
     view.back()
+    await asyncio.sleep(0.2)
+    view._qml.grab()
     assert not view.hasDetail
     assert view.tab == "Mods"
     assert view.searchQuery == "test search"

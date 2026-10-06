@@ -202,8 +202,8 @@ Rectangle {
         }
         ScrollView {
             id: contentScroll
-            objectName: "listingScroll"
-            visible: !workshopPanel.hasDetail
+            objectName: "discoverScroll"
+            visible: !workshopPanel.hasDetail && (!workshopPanel.configured || workshopPanel.tab === "Discover")
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -221,34 +221,61 @@ Rectangle {
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: workshopPanel.configured
-                    Heading { text: workshopPanel.tab === "Discover" ? "Discover your next colony" : workshopPanel.tab }
-                    Copy { visible: workshopPanel.tab === "Discover"; text: "Explore Steam mods and collections alongside PxModRim picks. Downloads include required dependencies, without activating mods." }
+                    Heading { text: "Discover your next colony" }
+                    Copy { text: "Explore Steam mods and collections alongside PxModRim picks. Downloads include required dependencies, without activating mods." }
                     RowLayout {
-                        visible: workshopPanel.tab === "Discover"
                         Heading { text: "Collections" }
                         PxButton { text: "Browse all"; variant: "ghost"; onClicked: workshopPanel.selectTab("Collections") }
                     }
-                    CatalogGrid {
-                        visible: workshopPanel.tab === "Discover" || workshopPanel.tab === "Collections"
-                        model: catalogCollections
-                    }
+                    CatalogGrid { model: visible ? catalogCollections : null }
                     RowLayout {
-                        visible: workshopPanel.tab === "Discover"
                         Heading { text: "Popular mods" }
                         PxButton { text: "Browse all"; variant: "ghost"; onClicked: workshopPanel.selectTab("Mods") }
                     }
-                    CatalogGrid { visible: workshopPanel.tab !== "Collections"; model: catalogMods }
-                    Copy {
-                        visible: !workshopPanel.busy && !workshopPanel.error && (workshopPanel.tab === "Collections" ? catalogCollections.count === 0 : catalogMods.count === 0)
-                        text: workshopPanel.tab === "Installed" ? "No installed Workshop mods were found." : "No matching items. Try another search or filter."
-                    }
-                    PxButton {
-                        text: "Load more"
-                        visible: workshopPanel.tab === "Collections" ? catalogCollections.hasMore : (workshopPanel.tab === "Mods" || workshopPanel.tab === "Installed") && catalogMods.hasMore
-                        enabled: !workshopPanel.busy
-                        onClicked: workshopPanel.loadMore()
-                    }
+                    CatalogGrid { model: visible ? catalogMods : null }
                 }
+            }
+        }
+        GridView {
+            id: listingGrid
+            objectName: "listingScroll"
+            readonly property bool collections: workshopPanel.tab === "Collections"
+            readonly property var listing: collections ? catalogCollections : catalogMods
+            property int columns: Math.max(1, Math.floor(width / 250))
+            readonly property bool listingTab: workshopPanel.configured && workshopPanel.tab !== "Discover"
+            visible: !workshopPanel.hasDetail && listingTab
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            cellWidth: width / columns
+            cellHeight: 382
+            model: listingTab ? listing : null
+            ScrollBar.vertical: PxScrollBar {}
+            header: Item {
+                width: listingGrid.width
+                height: pageHeading.implicitHeight + 16
+                Heading { id: pageHeading; width: parent.width; text: workshopPanel.tab }
+            }
+            footer: ColumnLayout {
+                width: listingGrid.width
+                height: implicitHeight
+                spacing: 12
+                Copy {
+                    visible: !workshopPanel.busy && !workshopPanel.error && listingGrid.listing.count === 0
+                    text: workshopPanel.tab === "Installed" ? "No installed Workshop mods were found." : "No matching items. Try another search or filter."
+                }
+                PxButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Load more"
+                    visible: listingGrid.listing.hasMore
+                    enabled: !workshopPanel.busy
+                    onClicked: workshopPanel.loadMore()
+                }
+                Item { implicitHeight: 12 }
+            }
+            delegate: CatalogCard {
+                width: GridView.view.cellWidth - 12
+                height: GridView.view.cellHeight - 12
             }
         }
         ScrollView {
