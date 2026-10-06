@@ -28,6 +28,9 @@ class RailView(QWidget):
     icon_name: ClassVar[str]
     label: ClassVar[str]
 
+    def open_route(self, path: tuple[str, ...]) -> None:
+        """Handle the part of a ``pxmodrim://<view_id>/…`` link after the view id."""
+
     def __init__(
         self,
         ctx: CoreContext,
@@ -91,10 +94,10 @@ class AppContext:
 
     # ── Navigation ────────────────────────────────────
 
-    def navigate(self, view_id: str) -> None:
-        """Switch the main window to the rail view *view_id* (no-op if unknown)."""
+    def navigate(self, url: str) -> None:
+        """Open a ``pxmodrim://<view_id>[/…]`` link (no-op if the view is unknown)."""
         if self._navigate is not None:
-            self._navigate(view_id)
+            self._navigate(url)
 
     def set_navigator(self, navigate: Callable[[str], None] | None) -> None:
         self._navigate = navigate

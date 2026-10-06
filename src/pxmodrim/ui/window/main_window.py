@@ -52,6 +52,7 @@ from pxmodrim.ui.components.mod_updates import (
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
+from pxmodrim.ui.navigation import build_route, parse_route
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.keyboard_shortcuts_dialog import (
     QML_SHORTCUTS,
@@ -212,9 +213,9 @@ class MainWindow(QMainWindow):
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
         self._header_controller.downloads_requested.connect(
-            lambda: self._show_view("downloads")
+            lambda: self._app_ctx.navigate(build_route("downloads"))
         )
-        self._app_ctx.set_navigator(self._show_view)
+        self._app_ctx.set_navigator(self._open_route)
         self._header_controller.update_mods_requested.connect(self._update_mods)
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
@@ -265,10 +266,14 @@ class MainWindow(QMainWindow):
         else:
             self.showFullScreen()
 
-    def _show_view(self, view_id: str) -> None:
+    def _open_route(self, url: str) -> None:
+        route = parse_route(url)
+        if route is None:
+            return
         for index, view in enumerate(self._views):
-            if view.view_id == view_id:
+            if view.view_id == route.view_id:
                 self._select_view(index)
+                view.open_route(route.path)
                 return
 
     def _select_view(self, index: int) -> None:

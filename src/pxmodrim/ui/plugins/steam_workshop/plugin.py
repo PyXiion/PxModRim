@@ -8,6 +8,7 @@ from loguru import logger
 
 from pxmodrim.core.events import Event
 from pxmodrim.core.plugin import Plugin
+from pxmodrim.ui.navigation import build_route
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
@@ -173,7 +174,7 @@ class SteamWorkshopUiPlugin(Plugin):
 
         self._own_download = True
         if self._app_ctx is not None:
-            self._app_ctx.navigate("downloads")
+            self._app_ctx.navigate(build_route("downloads"))
         try:
             for mod_id in ids:
                 self._download_statuses[mod_id] = "queued"

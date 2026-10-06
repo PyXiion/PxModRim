@@ -295,9 +295,9 @@ Rectangle {
                     visible: workshopPanel.configured && workshopPanel.hasDetail
                     spacing: 16
                     PxButton {
-                        text: "Back to " + workshopPanel.tab
+                        text: workshopPanel.backLabel
                         iconName: "chevron-left"
-                        Accessible.description: "Return to the listing with the same scroll position and filters"
+                        Accessible.description: "Return to the previous page, keeping the listing's scroll position and filters"
                         onClicked: workshopPanel.back()
                     }
                     RowLayout {

@@ -557,6 +557,45 @@ async def test_known_tag_options_accumulate_loaded_tags_but_not_version_tags(
     assert view.searchQuery == "utility"
 
 
+async def test_back_walks_detail_history_before_returning_to_listing(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    await view.selectTab("Mods")
+    await view.open_item("1", "mod")
+    await view.open_item("2", "mod")
+    assert view.url == "pxmodrim://workshop/mod/2"
+    assert view.backLabel == f"Back to {catalog.mod_item.title}"
+
+    await view.back()
+    assert cast("dict[str, Any]", view.detail)["itemId"] == "1"
+    assert view.url == "pxmodrim://workshop/mod/1"
+    assert view.backLabel == "Back to Mods"
+
+    await view.back()
+    assert not view.hasDetail
+    assert view.url == "pxmodrim://workshop/mods"
+
+
+async def test_routes_open_tabs_and_items_and_reset_history(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, _, _ = panel
+    await view.open_item("1", "mod")
+    await view.open_item("2", "mod")
+
+    view.open_route(("collection", "picked:test"))
+    await asyncio.sleep(0.2)
+    assert view.url == "pxmodrim://workshop/collection/picked%3Atest"
+    await view.back()
+    assert not view.hasDetail
+
+    view.open_route(("installed",))
+    await asyncio.sleep(0.2)
+    assert view.tab == "Installed"
+    assert view.url == "pxmodrim://workshop/installed"
+
+
 async def test_back_preserves_scroll_position_and_active_filters(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
 ) -> None:

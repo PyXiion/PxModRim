@@ -27,6 +27,7 @@ from pxmodrim.core.workshop import (
 from pxmodrim.core.workshop.catalog import FRESH_SECONDS
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.mod_activation import apply_activation
+from pxmodrim.ui.navigation import build_route
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.plugins.workshop.details import (
     Detail,
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
 
 _FAILURES = (CatalogError, RuntimeError, ValueError)
+_TABS = ("Discover", "Mods", "Collections", "Installed")
 
 
 def _message(exc: Exception) -> str:
@@ -88,6 +90,8 @@ class WorkshopViewPanel(BaseViewPanel):
         self._detail_data: Detail | None = None
         self._installed = InstalledList()
         self._installed_dirty = False
+        self._current: tuple[str, str] | None = None
+        self._trail: list[tuple[str, str, str]] = []
         self._update_count = 0
         self._pending: DownloadPlan | None = None
         self._planning = 0
@@ -206,6 +210,8 @@ class WorkshopViewPanel(BaseViewPanel):
 
     def _clear_detail(self) -> None:
         self._detail, self._detail_data = {}, None
+        self._current = None
+        self._trail.clear()
         self._pack_ids = frozenset()
 
     def _pack_copies(self) -> list[str] | None:
@@ -430,6 +436,7 @@ class WorkshopViewPanel(BaseViewPanel):
     @asyncSlot(str)
     async def selectTab(self, tab: str) -> None:
         self._tab, self._notice, self._pending = tab, "", None
+        self._clear_detail()
         self._installed.reset_paging()
         await self.load()
 
@@ -465,10 +472,18 @@ class WorkshopViewPanel(BaseViewPanel):
     async def openItem(self, item_id: str, kind: str) -> None:
         await self.open_item(item_id, kind)
 
-    async def open_item(self, item_id: str, kind: str) -> None:
+    async def open_item(self, item_id: str, kind: str, *, record: bool = True) -> None:
         self._pack_ids = frozenset()
 
         def apply(detail: Detail) -> None:
+            ref = (kind, item_id)
+            if self._current != ref:
+                if not self._detail:
+                    self._trail.clear()
+                elif record and self._current is not None:
+                    title = str(self._detail.get("title", ""))
+                    self._trail.append((*self._current, title))
+            self._current = ref
             members = self._rows(detail.members)
             self._detail_data = detail
             self._detail = self._detail_row(detail)
@@ -483,9 +498,22 @@ class WorkshopViewPanel(BaseViewPanel):
         if kind == "collection":
             await self._load_pack()
 
+    def open_route(self, path: tuple[str, ...]) -> None:
+        if self._torn_down:
+            return
+        if len(path) == 1 and path[0].title() in _TABS:
+            self.selectTab(path[0].title())
+        elif len(path) == 2 and path[0] in ("mod", "collection"):
+            self._clear_detail()
+            self.openItem(path[1], path[0])
+
     @asyncSlot()
     async def back(self) -> None:
         if self._torn_down:
+            return
+        if self._trail:
+            kind, item_id, _ = self._trail.pop()
+            await self.open_item(item_id, kind, record=False)
             return
         self._generation += 1
         self._clear_detail()
@@ -667,6 +695,18 @@ class WorkshopViewPanel(BaseViewPanel):
     @Property(str, notify=changed)  # type: ignore[arg-type]
     def tab(self) -> str:
         return self._tab
+
+    @Property(str, notify=changed)  # type: ignore[arg-type]
+    def url(self) -> str:
+        if self._current is not None:
+            return build_route(self.view_id, *self._current)
+        return build_route(self.view_id, self._tab.lower())
+
+    @Property(str, notify=changed)  # type: ignore[arg-type]
+    def backLabel(self) -> str:
+        if self._trail:
+            return f"Back to {self._trail[-1][2]}"
+        return f"Back to {self._tab}"
 
     @Property(bool, notify=changed)  # type: ignore[arg-type]
     def configured(self) -> bool:
