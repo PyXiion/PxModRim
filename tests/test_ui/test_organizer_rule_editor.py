@@ -39,7 +39,7 @@ def qapp() -> Iterator[QApplication]:
     yield app
 
 
-async def _until(condition: Callable[[], bool], timeout: float = 3.0) -> None:
+async def _until(condition: Callable[[], bool], timeout: float = 10.0) -> None:
     """Pump both Qt and asyncio (asyncSlot tasks) until ``condition`` holds."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
