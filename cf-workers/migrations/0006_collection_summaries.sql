@@ -1,3 +1,11 @@
+-- Remove objects of the earlier, renamed 0006_collection_sizes migration, whose triggers would otherwise
+-- keep firing on catalog_items after its table is gone.
+DROP TRIGGER IF EXISTS collection_sizes_pick_au;
+DROP TRIGGER IF EXISTS collection_sizes_pick_ad;
+DROP TRIGGER IF EXISTS collection_sizes_item_au;
+DROP TRIGGER IF EXISTS collection_sizes_item_ad;
+DROP TABLE IF EXISTS collection_sizes;
+
 -- Denormalised facts derived from a collection's members, written when its details are read.
 -- total_size is decimal bytes (TEXT keeps full 64-bit precision) and NULL when any member size is unknown.
 CREATE TABLE IF NOT EXISTS collection_summaries (

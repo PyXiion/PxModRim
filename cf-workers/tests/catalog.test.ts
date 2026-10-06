@@ -683,3 +683,15 @@ test('a collection supports only the game versions every member supports', async
     await request('/catalog/collections/picked/versions', 'DELETE', undefined, 'test-admin');
   }
 });
+
+test('migration 0006 removes the objects of the earlier collection_sizes migration', async () => {
+  await db.batch([
+    db.prepare('CREATE TABLE IF NOT EXISTS collection_sizes (id TEXT PRIMARY KEY, total_size INTEGER NOT NULL)'),
+    db.prepare("CREATE TRIGGER IF NOT EXISTS collection_sizes_item_ad AFTER DELETE ON catalog_items BEGIN DELETE FROM collection_sizes WHERE id = 'steam:' || old.id; END"),
+    db.prepare('DROP TABLE collection_sizes'),
+  ]);
+  await db.prepare("INSERT INTO catalog_items (id, data, updated_at) VALUES ('old-trigger', '{}', 0)").run();
+  await assert.rejects(db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run());
+  await migrate(db);
+  await db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run();
+});
