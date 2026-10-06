@@ -36,6 +36,7 @@ const files: Record<string, SteamFile> = {
 
 let flakyCalls = 0;
 let queryCalls = 0;
+const detailFailures = new Map<string, 'http' | 'partial' | 'metadata'>();
 
 async function upstream(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -48,10 +49,16 @@ async function upstream(request: Request): Promise<Response> {
     publishedfileids?: string[]; filetype?: number; search_text?: string; cursor?: string; numperpage?: number; requiredtags?: string[];
   };
   if (url.pathname.includes('GetDetails')) {
-    if (input.publishedfileids?.includes('999')) {
+    const ids = input.publishedfileids ?? [];
+    if (ids.some(id => detailFailures.get(id) === 'http')) return new Response('Steam unavailable', { status: 503 });
+    if (ids.some(id => detailFailures.get(id) === 'metadata')) {
+      return Response.json({ response: { publishedfiledetails: ids.map(publishedfileid => ({ publishedfileid, result: 1 })) } });
+    }
+    if (ids.includes('999')) {
       return Response.json({ response: { publishedfiledetails: [{ ...mod('999', 'Malformed upstream'), tags: 'not-an-array' }] } });
     }
-    return Response.json({ response: { publishedfiledetails: (input.publishedfileids ?? []).flatMap(id => files[id] ? [files[id]] : []) } });
+    return Response.json({ response: { publishedfiledetails: ids.filter(id => detailFailures.get(id) !== 'partial')
+      .map(id => files[id] ?? { publishedfileid: id, result: 9 }) } });
   }
   if (url.pathname.includes('QueryFiles')) {
     queryCalls++;
@@ -84,7 +91,7 @@ function statements(sql: string): string[] {
 }
 
 async function migrate(database: D1Database): Promise<void> {
-  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql']) {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql']) {
     const sql = await readFile(resolvePath('migrations', file), 'utf8');
     await database.batch(statements(sql).map(statement => database.prepare(statement)));
   }
@@ -441,4 +448,98 @@ test('once the index is ready, mod browsing without text comes from it, except t
   assert.equal(queryCalls, calls);
   await request('/catalog/mods?sort=trending&limit=3');
   assert.equal(queryCalls, calls + 1);
+});
+
+test('a cached mod removed by Steam disappears after background refresh, including from local search and batch', async () => {
+  const id = '800';
+  files[id] = mod(id, 'Evictionfixture');
+  assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+  const search = () => request('/catalog/mods?q=Evictionfixture');
+  assert.deepEqual((await (await search()).json() as CatalogPage<CatalogMod>).items.map(item => item.id), [id]);
+  delete files[id];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind(id).run();
+  assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+  let cached: { id: string } | null = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    cached = await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind(id).first<{ id: string }>();
+    if (!cached) break;
+    await new Promise(done => setTimeout(done, 20));
+  }
+  assert.equal(cached, null);
+  assert.equal((await request(`/catalog/mods/${id}`)).status, 404);
+  assert.deepEqual((await (await search()).json() as CatalogPage<CatalogMod>).items, []);
+  const batch = await (await request('/catalog/mods/batch', 'POST', { ids: [id] })).json() as { items: CatalogMod[]; unavailable_ids: string[] };
+  assert.deepEqual(batch, { items: [], unavailable_ids: [id] });
+});
+
+test('batch and resolve evict cached files that become non-public rather than leaving them searchable', async () => {
+  const changes: Partial<SteamFile>[] = [
+    { result: 9 }, { visibility: 1 }, { visibility: 2 }, { visibility: 3 },
+    { banned: true }, { consumer_appid: 730 }, { file_type: 3 },
+  ];
+  for (const [index, change] of changes.entries()) {
+    const id = String(810 + index);
+    files[id] = mod(id, 'Withdrawnfixture');
+    assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+    files[id] = { ...files[id]!, ...change };
+    await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind(id).run();
+    const path = index % 2 ? '/catalog/resolve' : '/catalog/mods/batch';
+    const response = await request(path, 'POST', { ids: [id] });
+    assert.equal(response.status, 200);
+    const value = await response.json() as { unavailable_ids: string[] };
+    assert.deepEqual(value.unavailable_ids, [id]);
+    assert.equal((await request(`/catalog/mods/${id}`)).status, 404);
+  }
+  const search = await (await request('/catalog/mods?q=Withdrawnfixture')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(search.items, []);
+});
+
+test('evicted collection members are unavailable while Steam collection eviction never removes picked collections', async () => {
+  files['820'] = mod('820', 'Collectionmemberfixture');
+  files['821'] = { ...mod('821', 'Withdrawn collection', ['820']), file_type: 2, num_children: 1, preview_url: '' };
+  await createPick('evictionfixture', ['820']);
+  assert.equal((await request('/catalog/collections/steam/821')).status, 200);
+  delete files['820'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind('820').run();
+  const batch = await (await request('/catalog/mods/batch', 'POST', { ids: ['820'] })).json() as { unavailable_ids: string[] };
+  assert.deepEqual(batch.unavailable_ids, ['820']);
+  for (const path of ['/catalog/collections/steam/821', '/catalog/collections/picked/evictionfixture']) {
+    const detail = await (await request(path)).json() as { members: CatalogItem[]; unavailable_ids: string[]; is_complete: boolean; collection: CatalogCollection };
+    assert.deepEqual(detail.members, []);
+    assert.deepEqual(detail.unavailable_ids, ['820']);
+    assert.equal(detail.is_complete, false);
+    assert.deepEqual(detail.collection.member_previews, []);
+  }
+  delete files['821'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind('821').run();
+  const resolved = await (await request('/catalog/resolve', 'POST', { collection_ids: ['steam:821', 'picked:evictionfixture'] })).json() as { items: Record<string, CatalogItem>; unavailable_ids: string[] };
+  assert.deepEqual(resolved.unavailable_ids, ['821', '820']);
+  assert.ok(resolved.items['picked:evictionfixture']);
+  assert.equal((await request('/catalog/collections/steam/821')).status, 404);
+  assert.equal((await request('/catalog/collections/picked/evictionfixture')).status, 200);
+});
+
+test('failed and partial Steam refreshes retain cached metadata and search entries', async () => {
+  for (const [index, failure] of (['http', 'partial', 'metadata'] as const).entries()) {
+    const id = String(830 + index);
+    const companion = String(840 + index);
+    files[id] = mod(id, 'Retainedfixture');
+    files[companion] = mod(companion, 'Retainedfixture companion');
+    assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+    assert.equal((await request(`/catalog/mods/${companion}`)).status, 200);
+    delete files[companion];
+    detailFailures.set(id, failure);
+    await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind(id, companion).run();
+    try {
+      assert.equal((await request('/catalog/mods/batch', 'POST', { ids: [id, companion] })).status, 502);
+      const rows = await db.prepare('SELECT id FROM catalog_items WHERE id IN (?, ?) ORDER BY id').bind(id, companion).all<{ id: string }>();
+      assert.deepEqual(rows.results.map(row => row.id), [id, companion]);
+      const search = await (await request('/catalog/mods?q=Retainedfixture')).json() as CatalogPage<CatalogMod>;
+      assert.ok(search.items.some(item => item.id === id));
+      assert.ok(search.items.some(item => item.id === companion));
+      assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+    } finally {
+      detailFailures.delete(id);
+    }
+  }
 });

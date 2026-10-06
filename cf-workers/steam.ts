@@ -144,7 +144,7 @@ async function authorsFor(env: Env, details: SteamFile[]): Promise<Map<string, A
 
 function publicFile(file: SteamFile): boolean {
   return file.result === 1 && file.consumer_appid === APP_ID && !file.banned
-    && file.visibility !== 1 && file.visibility !== 2 && (file.file_type === 0 || file.file_type === 2);
+    && (file.visibility === undefined || file.visibility === 0) && (file.file_type === 0 || file.file_type === 2);
 }
 
 function normalized(file: SteamFile, authors: Map<string, Author>): CatalogItem {
@@ -215,6 +215,7 @@ async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
 
 async function fetchItems(env: Env, ids: string[]): Promise<Map<string, CatalogItem>> {
   const fetched = new Map<string, CatalogItem>();
+  const unavailable: string[] = [];
   for (let offset = 0; offset < ids.length; offset += API_BATCH_SIZE) {
     const chunk = ids.slice(offset, offset + API_BATCH_SIZE);
     const url = steamUrl(env, 'IPublishedFileService', 'GetDetails');
@@ -227,11 +228,28 @@ async function fetchItems(env: Env, ids: string[]): Promise<Map<string, CatalogI
       includeadditionalpreviews: true,
       short_description: false,
     }));
-    const files = fileDetails(responseObject(await steamJson(url))).filter(file => chunk.includes(file.publishedfileid) && publicFile(file));
+    const response = responseObject(await steamJson(url));
+    const details = fileDetails(response);
+    const returned = new Set(details.map(file => file.publishedfileid));
+    if ((response.result !== undefined && response.result !== 1) || details.length !== chunk.length
+      || returned.size !== chunk.length || chunk.some(id => !returned.has(id))) {
+      throw new HttpError(502, 'Steam API returned incomplete file details');
+    }
+    for (const file of details) {
+      if (file.result === 1 && (file.consumer_appid === undefined || file.file_type === undefined)) invalidMetadata();
+    }
+    const files = details.filter(publicFile);
     const authors = await authorsFor(env, files);
     const items = files.map(file => normalized(file, authors));
-    await saveItems(env.DB, items);
+    unavailable.push(...details.filter(file => !publicFile(file)).map(file => file.publishedfileid));
     for (const item of items) fetched.set(item.kind === 'collection' ? item.steam_id! : item.id, item);
+  }
+  // Do not evict anything if a later Steam batch or creator lookup fails.
+  await saveItems(env.DB, [...fetched.values()]);
+  for (let offset = 0; offset < unavailable.length; offset += API_BATCH_SIZE) {
+    await env.DB.batch(unavailable.slice(offset, offset + API_BATCH_SIZE).map(id => env.DB.prepare(
+      "DELETE FROM catalog_items WHERE id = ? AND json_extract(data, '$.source') = 'steam'",
+    ).bind(id)));
   }
   return fetched;
 }

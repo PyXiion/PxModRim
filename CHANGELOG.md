@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Fixed
+- Workshop catalog refreshes remove deleted, private, banned and other non-public Steam items from cached details and search, while failed refreshes preserve cached items and picked collections.
 - Organizer rule-editor UI tests wait for the modal window to become active before clicking its controls, avoiding lost initial clicks on macOS.
 - QML menus, combo box dropdowns and tooltips open in their own window, so they are no longer clipped by the widget that hosts them (the header's launch-strategy menu and help menu).
 - Workshop thumbnails and detail previews request display-sized Steam CDN images, avoid loading hidden previews and collages, and preserve existing URL queries and fragments when resizing.

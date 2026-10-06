@@ -69,6 +69,8 @@ All Workshop IDs and file sizes are decimal **strings**, not JavaScript numbers.
 
 Catalog responses are JSON with `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. Steam query pages (`query_cache`) and metadata (`catalog_items`) are stored in D1, and browsing never waits for a refresh: a query page older than five minutes and a mod or collection detail older than fifteen minutes are returned as stored while a background refresh runs (pages are kept for a week). Only data that was never stored waits for Steam. Curated listings are read from D1 on each request, so writes and deletes are not hidden by a public response cache.
 
+Successful, complete Steam detail refreshes evict cached files that are no longer public, including their local search entries. Subsequent detail reads return 404, and batch/resolve and collection member responses include the evicted IDs in `unavailable_ids`. Failed or incomplete upstream responses retain cached records; PxModRim-picked collections are never evicted by Steam refreshes. Migration `0005_catalog_eviction.sql` connects metadata deletion to the existing search-index/FTS deletion triggers.
+
 ### Discovery and browsing
 
 | Method | Path | Response |
