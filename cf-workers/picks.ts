@@ -141,6 +141,7 @@ function toCollection(row: PickRow): CatalogCollection {
     workshop_url: null,
     tags: JSON.parse(row.tags) as string[],
     supported_versions: JSON.parse(row.supported_versions) as string[],
+    featured_rank: row.featured_rank,
     created_at: row.created_at,
     updated_at: row.updated_at,
     member_ids: memberIds,

@@ -155,6 +155,8 @@ The client downloads `mod_ids` and decides how to present an incomplete plan. Re
 
 Required: title (1–200 characters), author (1–120), description (up to 20,000), and 1–500 member IDs. Optional: HTTPS preview URL, up to 30 tags (100 characters each), up to 20 numeric version tags, and integer rank 0–1,000,000 (lower ranks first). Duplicate members are removed while retaining their first position. Every member must resolve to an available public RimWorld **mod**, not a collection. Unknown fields are rejected.
 
+Picked collection JSON includes the stored numeric `featured_rank` in browsing/discovery lists, detail responses, and successful PUT responses; Steam collections omit it. Metadata editors should load and resend that value when replacing an existing pick. Omitting `featured_rank` from a PUT defaults it to `0`, including when replacing a collection. This response field needs no new D1 migration: the rank is already stored in `picked_collections`.
+
 Successful PUT returns the stored collection with HTTP 200 and preserves its original `created_at`; DELETE returns 204, or 404 for an absent slug. There is no public write or client-embedded admin token.
 
 ### Errors and request limits

@@ -92,6 +92,8 @@ export interface CatalogCollection {
   workshop_url: string | null;
   tags: string[];
   supported_versions: string[];
+  /** Stored ordering rank for picked collections; omitted for Steam collections. */
+  featured_rank?: number;
   created_at: number | null;
   updated_at: number | null;
   member_ids: string[];

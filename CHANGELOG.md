@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workshop detail pages: no boxes around the description and member lists; collections show the description first, with small "Jump to mods" / "Back to top" links when the description is long. The "Supports …" line is gone (versions join the tag line, e.g. "Mod · 1.6") and the incompatibility warning is just "Does not list your game version."
 
 ### Fixed
+- Picked collection API responses now expose the stored `featured_rank` in lists, details and PUT results, so metadata editors can preserve the collection's existing featured ordering.
 - On Wayland, QML tooltips, menus and combo box lists open again: every QML surface's window gets its top-level window as transient parent.
 - Closing Settings no longer logs a burst of `Cannot read property … of null` QML errors.
 - Collection download buttons show `Preparing…`, `Queued` or `Downloading` while the collection's mods are being planned or downloaded, instead of offering the download again.

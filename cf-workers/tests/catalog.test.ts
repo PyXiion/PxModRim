@@ -178,6 +178,7 @@ test('Steam collection details retain ordered members, including nested collecti
   const value = await response.json() as { collection: CatalogCollection; members: CatalogItem[] };
   assert.equal(response.status, 200);
   assert.equal(value.collection.id, 'steam:100');
+  assert.equal(Object.hasOwn(value.collection, 'featured_rank'), false);
   assert.deepEqual(value.collection.member_ids, ['10', '101']);
   assert.deepEqual(value.members.map(item => item.id), ['10', 'steam:101']);
   assert.equal(value.members[1]?.kind, 'collection');
@@ -196,6 +197,7 @@ test('picked collection mutations require authentication and validate members be
   assert.deepEqual(value.collection.member_ids, ['10', '13']);
   assert.equal(value.collection.source, 'picked');
   assert.equal(value.collection.workshop_url, null);
+  assert.equal(value.collection.featured_rank, 0);
   assert.equal((await request('/catalog/collections/picked/protected', 'DELETE')).status, 401);
   assert.equal((await request('/catalog/collections/picked/protected', 'DELETE', undefined, 'test-admin')).status, 204);
   assert.equal((await request('/catalog/collections/picked/protected')).status, 404);
@@ -214,6 +216,49 @@ test('picked search treats wildcard text literally, combines tag/version filters
   assert.equal((await (await request('/catalog/collections?source=picked&q=%25&version=1.5')).json() as CatalogPage<CatalogCollection>).total, 0);
 });
 
+test('picked ranks round-trip through PUT, detail and ordered lists when editing metadata', async () => {
+  const slugs = ['rank-first', 'rank-second'];
+  const body = {
+    title: 'Ranked collection', author: 'Curator', description: 'Original metadata.',
+    tags: ['rank-roundtrip'], supported_versions: ['1.6'], member_ids: ['10'], featured_rank: 42,
+  };
+  try {
+    const createdResponse = await request('/catalog/collections/picked/rank-first', 'PUT', body, 'test-admin');
+    assert.equal(createdResponse.status, 200);
+    const created = await createdResponse.json() as CatalogCollection;
+    assert.equal(created.featured_rank, 42);
+    await createPick('rank-second', ['13'], 'Other ranked collection', { tags: ['rank-roundtrip'], featured_rank: 7 });
+    for (const sort of ['popular', 'trending', 'relevance']) {
+      const response = await request(`/catalog/collections?source=picked&tag=rank-roundtrip&q=ranked&sort=${sort}`);
+      assert.equal(response.status, 200);
+      const page = await response.json() as CatalogPage<CatalogCollection>;
+      assert.deepEqual(page.items.map(item => [item.id, item.featured_rank]), [['picked:rank-second', 7], ['picked:rank-first', 42]]);
+    }
+
+    const detailResponse = await request('/catalog/collections/picked/rank-first');
+    assert.equal(detailResponse.status, 200);
+    const detail = await detailResponse.json() as { collection: CatalogCollection };
+    assert.equal(detail.collection.featured_rank, 42);
+    const updatedResponse = await request('/catalog/collections/picked/rank-first', 'PUT', {
+      ...body, title: 'Edited collection', description: 'Edited metadata.', featured_rank: detail.collection.featured_rank,
+    }, 'test-admin');
+    assert.equal(updatedResponse.status, 200);
+    const updated = await updatedResponse.json() as CatalogCollection;
+    assert.equal(updated.featured_rank, 42);
+    assert.equal(updated.created_at, created.created_at);
+    assert.equal(updated.title, 'Edited collection');
+    assert.equal(updated.description, 'Edited metadata.');
+
+    const reloaded = await (await request('/catalog/collections/picked/rank-first')).json() as { collection: CatalogCollection };
+    assert.equal(reloaded.collection.featured_rank, 42);
+    assert.equal(reloaded.collection.description, 'Edited metadata.');
+    const page = await (await request('/catalog/collections?source=picked&tag=rank-roundtrip')).json() as CatalogPage<CatalogCollection>;
+    assert.deepEqual(page.items.map(item => [item.id, item.featured_rank]), [['picked:rank-second', 7], ['picked:rank-first', 42]]);
+  } finally {
+    for (const slug of slugs) await request(`/catalog/collections/picked/${slug}`, 'DELETE', undefined, 'test-admin');
+  }
+});
+
 test('mixed collection pagination retains both sources without duplicates or query-mismatched cursors', async () => {
   await createPick('starter', ['10'], 'Starter colony', { featured_rank: 10 });
   await createPick('tools', ['13'], 'Useful tools', { featured_rank: 20 });
@@ -226,6 +271,10 @@ test('mixed collection pagination retains both sources without duplicates or que
     all.push(...page.items); cursor = page.next_cursor;
   }
   assert.deepEqual(all.map(item => item.id).sort(), ['picked:literal', 'picked:starter', 'picked:tools', 'steam:100', 'steam:101'].sort());
+  assert.deepEqual(all.filter(item => item.source === 'picked').map(item => [item.id, item.featured_rank]), [
+    ['picked:literal', 1], ['picked:starter', 10], ['picked:tools', 20],
+  ]);
+  assert.ok(all.filter(item => item.source === 'steam').every(item => !Object.hasOwn(item, 'featured_rank')));
   assert.equal(firstPage.total, 5);
   assert.equal((await request(`/catalog/collections?limit=3&version=1.5&cursor=${encodeURIComponent(firstPage.next_cursor!)}`)).status, 400);
 });
