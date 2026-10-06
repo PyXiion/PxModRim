@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from urllib.parse import quote, unquote, urlsplit
 
 SCHEME = "modrim"
+SETTINGS_VIEW_ID = "settings"
 
 
 @dataclass(frozen=True, slots=True)

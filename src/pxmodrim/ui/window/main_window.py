@@ -52,7 +52,7 @@ from pxmodrim.ui.components.mod_updates import (
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
-from pxmodrim.ui.navigation import build_route, parse_route
+from pxmodrim.ui.navigation import SETTINGS_VIEW_ID, build_route, parse_route
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.keyboard_shortcuts_dialog import (
     QML_SHORTCUTS,
@@ -224,7 +224,9 @@ class MainWindow(QMainWindow):
         handlers = {
             ActionId.SAVE: self._save_mods_config,
             ActionId.RESTORE: self._restore_snapshot,
-            ActionId.SETTINGS: self._open_settings,
+            ActionId.SETTINGS: lambda: self._app_ctx.navigate(
+                build_route(SETTINGS_VIEW_ID)
+            ),
             ActionId.QUIT: self.close,
             ActionId.REFRESH: self._refresh_mods,
             ActionId.FULL_RESCAN: self._full_rescan,
@@ -270,16 +272,22 @@ class MainWindow(QMainWindow):
         route = parse_route(url)
         if route is None:
             return
+        if route.view_id == SETTINGS_VIEW_ID:
+            self._open_settings()  # pyright: ignore[reportUnusedCoroutine]
+            return
         for index, view in enumerate(self._views):
             if view.view_id == route.view_id:
-                self._select_view(index)
+                self._show_view(index)
                 view.open_route(route.path)
                 return
 
     def _select_view(self, index: int) -> None:
         if 0 <= index < self._stack.count():
-            self._rail.set_current(index)
-            self._on_rail_tab_changed(index)
+            self._app_ctx.navigate(build_route(self._views[index].view_id))
+
+    def _show_view(self, index: int) -> None:
+        self._rail.set_current(index)
+        self._on_rail_tab_changed(index)
 
     def _cycle_view(self, direction: int) -> None:
         count = self._stack.count()
@@ -351,9 +359,11 @@ class MainWindow(QMainWindow):
         self._splitter.setCollapsible(1, False)
         rail_width = RAIL_MIN_WIDTH if self._ui_prefs.rail_collapsed else RAIL_MAX_WIDTH
         self._splitter.setSizes([rail_width, self.width() - rail_width])
-        self._rail.currentChanged.connect(self._on_rail_tab_changed)
+        self._rail.currentChanged.connect(self._select_view)
         self._rail.hovered.connect(self._on_rail_hovered)
-        self._rail.settings_requested.connect(self._open_settings)
+        self._rail.settings_requested.connect(
+            lambda: self._app_ctx.navigate(build_route(SETTINGS_VIEW_ID))
+        )
         self._rail.help_action_requested.connect(
             lambda action_id: self._actions[ActionId(action_id)].trigger()
         )
