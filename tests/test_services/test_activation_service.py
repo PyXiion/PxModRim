@@ -340,6 +340,29 @@ class TestDependentsOf:
     def test_mod_without_dependents(self, activation: ActivationService) -> None:
         assert activation.dependents_of(["uuid-d", "uuid-missing"]) == []
 
+    def test_removing_duplicate_copy_keeps_dependents(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        mods = {**_MODS, "uuid-a-copy": _mod("Copy A", "mod.a")}
+        ctx.load(mods, ["uuid-a", "uuid-a-copy", "uuid-b", "uuid-c"])
+        ctx.diagnostics_service.rebuild()
+
+        assert activation.dependents_of(["uuid-a-copy"]) == []
+        assert activation.apply(disable=["uuid-a-copy"])
+        assert ctx.active_uuids == ["uuid-a", "uuid-b", "uuid-c"]
+        assert activation.dependents_of(["uuid-a"]) == ["uuid-b", "uuid-c"]
+
+    def test_enabling_replacement_copy_keeps_dependents(
+        self, ctx: CoreContext, activation: ActivationService
+    ) -> None:
+        mods = {**_MODS, "uuid-a-copy": _mod("Copy A", "mod.a")}
+        ctx.load(mods, ["uuid-a", "uuid-b", "uuid-c"])
+        ctx.diagnostics_service.rebuild()
+
+        assert activation.dependents_of(["uuid-a"], enable=["uuid-a-copy"]) == []
+        assert activation.apply(enable=["uuid-a-copy"], disable=["uuid-a"])
+        assert ctx.active_uuids == ["uuid-a-copy", "uuid-b", "uuid-c"]
+
 
 def test_sidebar_entries_are_published_before_summary(
     ctx: CoreContext, activation: ActivationService

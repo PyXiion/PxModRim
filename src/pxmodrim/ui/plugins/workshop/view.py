@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -25,7 +26,7 @@ from pxmodrim.core.workshop import (
 )
 from pxmodrim.core.workshop.catalog import FRESH_SECONDS
 from pxmodrim.ui.components.dialogs import await_dialog
-from pxmodrim.ui.components.mod_activation import apply_activation, toggle_mods
+from pxmodrim.ui.components.mod_activation import apply_activation
 from pxmodrim.ui.panels.settings_panel import SettingsPanel
 from pxmodrim.ui.plugins.workshop.details import (
     Detail,
@@ -373,8 +374,15 @@ class WorkshopViewPanel(BaseViewPanel):
             self._recount()
             self._show_installed()
 
+        installed_ids = {
+            mod.published_file_id
+            for mod in self._ctx.all_mods.values()
+            if mod.published_file_id is not None
+        }
+        fingerprint = sha256(",".join(sorted(installed_ids)).encode()).hexdigest()
+
         await self._run_cached(
-            "installed",
+            f"installed|{fingerprint}",
             self._catalog.installed_with_updates,
             list[CatalogMod],
             apply,
@@ -486,8 +494,11 @@ class WorkshopViewPanel(BaseViewPanel):
         if not installed:
             return
         active = set(self._ctx.active_uuids)
-        uuid = next((uuid for uuid in installed if uuid in active), installed[0])
-        await toggle_mods(self._ctx, self, [uuid])
+        active_copies = [uuid for uuid in installed if uuid in active]
+        if active_copies:
+            await apply_activation(self._ctx, self, disable=active_copies)
+        else:
+            await apply_activation(self._ctx, self, enable=[installed[0]])
 
     @asyncSlot()
     async def toggleCollection(self) -> None:
@@ -496,7 +507,16 @@ class WorkshopViewPanel(BaseViewPanel):
             return
         active = set(self._ctx.active_uuids)
         if all(uuid in active for uuid in copies):
-            await apply_activation(self._ctx, self, disable=copies)
+            await apply_activation(
+                self._ctx,
+                self,
+                disable=[
+                    uuid
+                    for uuid in self._ctx.active_uuids
+                    if (mod := self._ctx.all_mods.get(uuid)) is not None
+                    and mod.published_file_id in self._pack_ids
+                ],
+            )
         else:
             await apply_activation(self._ctx, self, enable=copies)
 

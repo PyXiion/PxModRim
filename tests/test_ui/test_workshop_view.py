@@ -19,7 +19,9 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.downloads import DownloadManager
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
+    BaseRules,
     CaseInsensitiveStr,
+    DependencyMod,
     ListedMod,
 )
 from pxmodrim.core.workshop import (
@@ -374,17 +376,67 @@ async def test_installed_search_filters_loaded_mods_without_refetching(
     assert view.searchQuery == ""
 
 
+async def test_installed_set_changes_refresh_the_cached_list(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    tmp_path: Path,
+) -> None:
+    view, catalog, _ = panel
+    catalog._ctx = view._ctx
+    catalog._cache_dir = tmp_path / "cache"
+    steamcmd, _, dependency = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+    fetches = 0
+
+    async def installed() -> list[CatalogMod]:
+        nonlocal fetches
+        fetches += 1
+        items = {"1": catalog.mod_item, "2": catalog.dependency}
+        return [items[pid] for pid in catalog._installed()]
+
+    catalog.installed_with_updates = installed  # type: ignore[method-assign]
+    await view.selectTab("Installed")
+    await view.selectTab("Mods")
+    await view.selectTab("Installed")
+    assert fetches == 1 and view.mods_model.count == 1
+
+    catalog.installed_changed.disconnect(view._on_installed_changed)
+    view._ctx.load(installed_mods, [])
+    catalog._on_installed_changed(None)
+    catalog.installed_changed.connect(view._on_installed_changed)
+    await view._on_installed_changed(None)
+    assert fetches == 2 and view.mods_model.count == 2
+    assert {row["itemId"] for row in view.mods_model._rows} == {"1", "2"}
+
+    catalog.installed_changed.disconnect(view._on_installed_changed)
+    view._ctx.load({dependency: installed_mods[dependency]}, [])
+    catalog._on_installed_changed(None)
+    catalog.installed_changed.connect(view._on_installed_changed)
+    await view._on_installed_changed(None)
+    assert fetches == 3 and view.mods_model.count == 1
+    assert view.mods_model._rows[0]["itemId"] == "2"
+
+    catalog._responses.clear()
+    await view.selectTab("Mods")
+    await view.selectTab("Installed")
+    assert fetches == 3 and view.mods_model._rows[0]["itemId"] == "2"
+
+
 @pytest.mark.parametrize("state", ["installed", "outdated"])
+@pytest.mark.parametrize("duplicate_active", [False, True])
 async def test_activation_toggles_one_installed_copy_and_prefers_active_steam_copy(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
     installed_mods: dict[str, ListedMod],
     monkeypatch: pytest.MonkeyPatch,
     state: InstallState,
+    duplicate_active: bool,
 ) -> None:
     view, catalog, _ = panel
     steamcmd, steam, unrelated = installed_mods
     view._ctx.load(installed_mods, [])
-    view._ctx.set_active([steam, unrelated])
+    view._ctx.set_active(
+        [steamcmd, steam, unrelated] if duplicate_active else [steam, unrelated]
+    )
     monkeypatch.setattr(catalog, "install_state", lambda _: state)
     await view.load()
     await view.open_item("1", "mod")
@@ -582,6 +634,57 @@ async def test_downloaded_collection_activates_all_or_only_its_pack(
 
     await view.activateOnlyCollection()
     assert set(view._ctx.active_uuids) == {steamcmd, dependency, local.uuid}
+
+
+async def test_collection_deactivation_removes_every_active_copy(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, _, _ = panel
+    view._ctx.load(installed_mods, list(installed_mods))
+    await view.open_item("picked:test", "collection")
+    assert cast("dict[str, Any]", view.detail)["active"] is True
+
+    await view.toggleCollection()
+
+    assert view._ctx.active_uuids == []
+    assert cast("dict[str, Any]", view.detail)["active"] is False
+
+
+async def test_activate_only_collection_keeps_dependents_of_retained_duplicate(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    view, _, _ = panel
+    steamcmd, steam, dependent = installed_mods
+    mod = cast("AboutXmlMod", installed_mods[dependent])
+    mod.about_rules = BaseRules(
+        dependencies={
+            CaseInsensitiveStr("test.mod1"): DependencyMod(
+                name="Dependency", package_id=CaseInsensitiveStr("test.mod1")
+            )
+        }
+    )
+    view._ctx.load(installed_mods, [steamcmd, steam, dependent])
+    view._ctx.diagnostics_service.rebuild()
+    prompts: list[object] = []
+
+    async def accept_dependents(*args: object) -> tuple[int, None]:
+        prompts.append(args)
+        return QMessageBox.StandardButton.Yes, None
+
+    monkeypatch.setattr(
+        "pxmodrim.ui.components.mod_activation.await_dialog", accept_dependents
+    )
+    await view.open_item("picked:test", "collection")
+    await view.activateOnlyCollection()
+
+    assert not prompts
+    assert set(view._ctx.active_uuids) == {steamcmd, dependent}
+    assert cast("dict[str, Any]", view.detail)["active"] is True
 
 
 async def test_partly_downloaded_collection_has_no_activation(

@@ -147,7 +147,7 @@ async def test_folder_toggle_applies_once_for_descendants(
     calls: list[tuple[list[str], list[str]]] = []
 
     class Activation:
-        def dependents_of(self, uuids: list[str]) -> list[str]:
+        def dependents_of(self, uuids: list[str], *, enable: list[str]) -> list[str]:
             return []
 
         def apply(self, enable: list[str], disable: list[str]) -> bool:
