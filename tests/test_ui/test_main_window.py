@@ -96,7 +96,7 @@ def test_settings_route_opens_settings_without_switching_views() -> None:
         SimpleNamespace(
             _views=[],
             _show_view=shown.append,
-            _open_settings=lambda: opened.append(True),
+            _start_settings=lambda: opened.append(True),
         ),
     )
     MainWindow._open_route(window, "modrim://settings")

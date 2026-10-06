@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
         self._close_task: asyncio.Task[None] | None = None
         self._update_service = UpdateService(get_app_version())
         self._update_task: asyncio.Task[None] | None = None
+        self._settings_task: asyncio.Task[None] | None = None
         self._launch_task: asyncio.Task[None] | None = None
 
         self._setup_window_basics()
@@ -273,7 +274,7 @@ class MainWindow(QMainWindow):
         if route is None:
             return
         if route.view_id == SETTINGS_VIEW_ID:
-            self._open_settings()  # pyright: ignore[reportUnusedCoroutine]
+            self._start_settings()
             return
         for index, view in enumerate(self._views):
             if view.view_id == route.view_id:
@@ -591,7 +592,11 @@ class MainWindow(QMainWindow):
                 self._app_ctx.refresh_mods()
             )
 
-    @asyncSlot()
+    def _start_settings(self) -> None:
+        if self._settings_task is not None and not self._settings_task.done():
+            return
+        self._settings_task = asyncio.create_task(self._open_settings())
+
     async def _open_settings(self) -> None:
         result, dialog = await await_dialog(
             SettingsPanel, self._ctx, self._qml_engine, self
