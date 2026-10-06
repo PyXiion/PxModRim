@@ -284,3 +284,40 @@ def test_collection_without_a_common_version_is_incompatible_not_unstated() -> N
     )
     assert unknown["compatLabel"] == "Version not stated"
     assert unknown["incompatible"] is False
+
+
+@pytest.mark.parametrize(
+    ("supported_versions", "tags"),
+    [
+        ([], ["Mod", "1.6"]),
+        (["1.5"], ["Mod", "1.6"]),
+        (["1.6"], ["Mod"]),
+    ],
+)
+def test_collection_declarations_override_conflicting_member_summary(
+    supported_versions: list[str], tags: list[str]
+) -> None:
+    collection = CatalogCollection(
+        id="steam:3814118422",
+        source="steam",
+        steam_id="3814118422",
+        title="12",
+        author=Author(None, "Milka", None),
+        description="",
+        description_format="bbcode",
+        preview_url=None,
+        previews=[],
+        workshop_url=None,
+        tags=tags,
+        supported_versions=supported_versions,
+        created_at=None,
+        updated_at=None,
+        member_ids=["1", "2"],
+        member_count=2,
+        no_common_version=True,
+    )
+    row = item_row(collection, lambda _: "missing", "1.6")
+    assert row["incompatible"] is False
+    assert row["compatLabel"] == "Works with 1.6"
+    assert "1.6" in row["versions"]
+    assert row["tags"] == "Mod"

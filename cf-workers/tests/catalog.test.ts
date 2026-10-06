@@ -91,7 +91,7 @@ function statements(sql: string): string[] {
 }
 
 async function migrate(database: D1Database): Promise<void> {
-  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql', '0006_collection_summaries.sql']) {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql', '0006_collection_summaries.sql', '0007_collection_compatibility.sql']) {
     const sql = await readFile(resolvePath('migrations', file), 'utf8');
     await database.batch(statements(sql).map(statement => database.prepare(statement)));
   }
@@ -293,13 +293,14 @@ test('a transient Steam failure is retried instead of failing the browse request
   assert.equal(flakyCalls, 2);
 });
 
-test('idempotent migrations and the existing /deps response preserve populated dependency data', async () => {
+test('the idempotent dependency migration and existing /deps response preserve populated dependency data', async () => {
   const now = Date.now();
   await db.batch([
     db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind('777', 'Existing mod', 0, 'OK', now, 'existing.mod', '778'),
     db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind('778', 'Existing dependency', 0, 'OK', now, 'existing.dependency', ''),
   ]);
-  await migrate(db);
+  const sql = await readFile(resolvePath('migrations', '0001_dependencies.sql'), 'utf8');
+  await db.batch(statements(sql).map(statement => db.prepare(statement)));
   const response = await request('/deps?id=777');
   const value = await response.json() as { rootId: string; totalItemsLoaded: number; isComplete: boolean; items: Record<string, { deps: string[]; package_id: string }> };
   assert.equal(response.status, 200);
@@ -672,8 +673,8 @@ test('collections whose total exceeds a safe integer have no stored size', async
   }
 });
 
-test('a collection supports only the game versions every member supports', async () => {
-  await createPick('versions', ['10', '14']);
+test('undeclared collections with conflicting member versions have no common version', async () => {
+  await createPick('versions', ['10', '14'], 'Conflicting versions', { supported_versions: [] });
   try {
     const detail = await (await request('/catalog/collections/picked/versions')).json() as { collection: CatalogCollection };
     assert.deepEqual(detail.collection.supported_versions, []);
@@ -681,6 +682,46 @@ test('a collection supports only the game versions every member supports', async
     assert.equal(detail.collection.total_size, '8192');
   } finally {
     await request('/catalog/collections/picked/versions', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('members with unknown versions do not erase known compatible versions', async () => {
+  files['880'] = mod('880', 'Unversioned member', [], []);
+  await createPick('unknown-member', ['10', '880'], 'Unknown member versions', { supported_versions: [] });
+  try {
+    const detail = await (await request('/catalog/collections/picked/unknown-member')).json() as { collection: CatalogCollection };
+    assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+    assert.equal(detail.collection.no_common_version, false);
+  } finally {
+    await request('/catalog/collections/picked/unknown-member', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collections with only unknown member versions are unstated rather than conflicting', async () => {
+  files['881'] = mod('881', 'Another unversioned member', [], []);
+  await createPick('unknown-versions', ['881'], 'Unknown versions', { supported_versions: [] });
+  try {
+    const detail = await (await request('/catalog/collections/picked/unknown-versions')).json() as { collection: CatalogCollection };
+    assert.deepEqual(detail.collection.supported_versions, []);
+    assert.equal(detail.collection.no_common_version, false);
+  } finally {
+    await request('/catalog/collections/picked/unknown-versions', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collection declarations remain compatible despite conflicting member versions in details and listings', async () => {
+  for (const declaration of [{ supported_versions: ['1.6'], tags: [] }, { supported_versions: [], tags: ['Mod', '1.6'] }]) {
+    await createPick('declared-version', ['10', '14'], 'Declared version fixture', declaration);
+    try {
+      const detail = await (await request('/catalog/collections/picked/declared-version')).json() as { collection: CatalogCollection };
+      assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+      assert.equal(detail.collection.no_common_version, false);
+      const listing = await (await request('/catalog/collections?source=picked&q=Declared')).json() as CatalogPage<CatalogCollection>;
+      assert.deepEqual(listing.items[0]?.supported_versions, ['1.6']);
+      assert.equal(listing.items[0]?.no_common_version, false);
+    } finally {
+      await request('/catalog/collections/picked/declared-version', 'DELETE', undefined, 'test-admin');
+    }
   }
 });
 
@@ -692,6 +733,7 @@ test('migration 0006 removes the objects of the earlier collection_sizes migrati
   ]);
   await db.prepare("INSERT INTO catalog_items (id, data, updated_at) VALUES ('old-trigger', '{}', 0)").run();
   await assert.rejects(db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run());
-  await migrate(db);
+  const sql = await readFile(resolvePath('migrations', '0006_collection_summaries.sql'), 'utf8');
+  await db.batch(statements(sql).map(statement => db.prepare(statement)));
   await db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run();
 });

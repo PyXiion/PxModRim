@@ -99,7 +99,7 @@ export interface CatalogCollection {
   member_previews: string[];
   /** Total download size in bytes; null until every member is known. */
   total_size: string | null;
-  /** True when every member is known and no game version is supported by all of them. */
+  /** True when declared member versions conflict and the collection declares no supported version itself. */
   no_common_version: boolean;
 }
 

@@ -154,7 +154,7 @@ async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: 
 const SUMMARY_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_SIZE = 2n ** 63n - 1n;
 
-interface SummaryRow { id: string; total_size: string | null; supported_versions: string }
+interface SummaryRow { id: string; total_size: string | null; supported_versions: string; no_common_version: number }
 
 // Totals and versions are denormalised from the members; they expire so a member update cannot leave them wrong for long.
 async function attachCollectionSummaries(db: D1Database, collections: CatalogCollection[]): Promise<CatalogCollection[]> {
@@ -163,20 +163,20 @@ async function attachCollectionSummaries(db: D1Database, collections: CatalogCol
   for (let offset = 0; offset < collections.length; offset += 90) {
     const chunk = collections.slice(offset, offset + 90);
     const rows = await db.prepare(
-      `SELECT id, total_size, supported_versions FROM collection_summaries WHERE computed_at > ? AND id IN (${chunk.map(() => '?').join(',')})`,
+      `SELECT id, total_size, supported_versions, no_common_version FROM collection_summaries WHERE computed_at > ? AND id IN (${chunk.map(() => '?').join(',')})`,
     ).bind(cutoff, ...chunk.map(collection => collection.id)).all<SummaryRow>();
     for (const row of rows.results) summaries.set(row.id, row);
   }
   return collections.map(collection => {
+    const declared = [...new Set([...collection.supported_versions, ...collection.tags.filter(tag => /^\d+\.\d+(?:\.\d+)?$/.test(tag))])];
     const summary = summaries.get(collection.id);
-    if (!summary) return { ...collection, total_size: null, no_common_version: false };
-    const versions = JSON.parse(summary.supported_versions) as string[];
-    return { ...collection, total_size: summary.total_size, supported_versions: versions, no_common_version: versions.length === 0 };
+    if (!summary) return { ...collection, supported_versions: declared, total_size: null, no_common_version: false };
+    const versions = [...new Set([...declared, ...JSON.parse(summary.supported_versions) as string[]])];
+    return { ...collection, total_size: summary.total_size, supported_versions: versions, no_common_version: declared.length === 0 && Boolean(summary.no_common_version) };
   });
 }
 
-// Stored only once every member is a known mod. The size stays null if any member size is unknown;
-// the versions are those every member supports.
+// Stored only once every member is a known mod. Undeclared member versions cannot disprove compatibility.
 async function recordCollectionSummary(db: D1Database, collection: CatalogCollection, members: CatalogItem[], complete: boolean): Promise<void> {
   const mods = members.filter((member): member is CatalogMod => member.kind === 'mod');
   if (!complete || mods.length !== members.length || mods.length !== collection.member_count) {
@@ -188,13 +188,15 @@ async function recordCollectionSummary(db: D1Database, collection: CatalogCollec
     total = total === null || mod.file_size === null || !/^\d+$/.test(mod.file_size) ? null : total + BigInt(mod.file_size);
   }
   if (total !== null && total > MAX_SIZE) total = null;
-  const versions = mods.length
-    ? mods.map(mod => mod.supported_versions).reduce((common, next) => common.filter(version => next.includes(version)))
+  const declaredVersions = mods.map(mod => mod.supported_versions).filter(versions => versions.length > 0);
+  const versions = declaredVersions.length
+    ? declaredVersions.reduce((common, next) => common.filter(version => next.includes(version)))
     : [];
+  const noCommonVersion = declaredVersions.length > 0 && versions.length === 0;
   await db.prepare(
-    `INSERT INTO collection_summaries (id, total_size, supported_versions, computed_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET total_size = excluded.total_size, supported_versions = excluded.supported_versions, computed_at = excluded.computed_at`,
-  ).bind(collection.id, total === null ? null : total.toString(), JSON.stringify(versions), Date.now()).run();
+    `INSERT INTO collection_summaries (id, total_size, supported_versions, no_common_version, computed_at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET total_size = excluded.total_size, supported_versions = excluded.supported_versions, no_common_version = excluded.no_common_version, computed_at = excluded.computed_at`,
+  ).bind(collection.id, total === null ? null : total.toString(), JSON.stringify(versions), Number(noCommonVersion), Date.now()).run();
 }
 
 async function collectionDetails(env: Env, ctx: ExecutionContext, collection: CatalogCollection): Promise<Response> {

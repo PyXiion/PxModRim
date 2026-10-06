@@ -49,7 +49,7 @@ def summarize(text: str, description_format: str = "bbcode") -> str:
 
 
 def _compat_label(
-    supported: list[str], game_version: str, incompatible: bool, no_common: bool
+    supported: set[str], game_version: str, incompatible: bool, no_common: bool
 ) -> str:
     if not game_version:
         return ""
@@ -69,11 +69,12 @@ def item_row(
     *,
     detail: bool = False,
 ) -> dict[str, Any]:
-    incompatible = bool(
-        game_version
-        and item.supported_versions
-        and game_version not in item.supported_versions
-    )
+    versions = set(item.supported_versions)
+    if isinstance(item, CatalogCollection):
+        versions.update(
+            tag for tag in item.tags if re.fullmatch(r"\d+\.\d+(?:\.\d+)?", tag)
+        )
+    incompatible = bool(game_version and versions and game_version not in versions)
     file_size, votes, member_count = "Unknown", "Unrated", 0
     votes_up = votes_down = "0"
     if isinstance(item, CatalogMod):
@@ -101,8 +102,9 @@ def item_row(
         member_count = item.member_count
         if item.total_size is not None:
             file_size = f"{int(item.total_size) / 1048576:.1f} MB"
-    versions = set(item.supported_versions)
-    no_common = isinstance(item, CatalogCollection) and item.no_common_version
+    no_common = (
+        isinstance(item, CatalogCollection) and item.no_common_version and not versions
+    )
     incompatible = incompatible or no_common
     return {
         "itemId": item.id,
@@ -150,9 +152,7 @@ def item_row(
         "votesUp": votes_up,
         "votesDown": votes_down,
         "summary": summarize(item.description, item.description_format),
-        "compatLabel": _compat_label(
-            item.supported_versions, game_version, incompatible, no_common
-        ),
+        "compatLabel": _compat_label(versions, game_version, incompatible, no_common),
     }
 
 
