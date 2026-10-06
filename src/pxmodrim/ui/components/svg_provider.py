@@ -6,6 +6,7 @@ from PySide6.QtCore import QByteArray, QObject, QSize, Qt
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuick import QQuickImageProvider
+from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtSvg import QSvgRenderer
 
 from pxmodrim.ui.components.icons import svg_str
@@ -56,6 +57,8 @@ def create_qml_engine(parent: QObject | None = None) -> QQmlEngine:
     caller can no longer forget the registration the way a bare
     ``QQmlEngine()`` call would.
     """
+    if not QQuickStyle.name():
+        QQuickStyle.setStyle("Basic")
     engine = QQmlEngine(parent)
     engine.addImageProvider("icons", SvgIconProvider())
     return engine

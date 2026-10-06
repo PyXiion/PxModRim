@@ -19,6 +19,7 @@ from qasync import QEventLoop
 # this matches the workaround used by Anki and qutebrowser for QTBUG-113574.
 os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "RoundPreferFloor")
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
 _we_verbose = os.environ.get("PX_WEBENGINE_VERBOSE")
 if _we_verbose is not None:

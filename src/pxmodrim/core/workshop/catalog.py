@@ -208,10 +208,16 @@ class WorkshopCatalog(Plugin):
                 _read_stored, _cache_file(directory, key), value_type
             )
         if entry is not None:
+            self._responses[key] = entry
+            while len(self._responses) > _CACHE_LIMIT:
+                del self._responses[next(iter(self._responses))]
             yield entry[1]
             if time.time() - entry[0] < fresh_for:
                 return
         value = await produce()
+        changed = entry is None or value != entry[1]
+        if entry is not None and not changed:
+            value = entry[1]
         remembered = (time.time(), value)
         self._responses.pop(key, None)
         self._responses[key] = remembered
@@ -224,7 +230,7 @@ class WorkshopCatalog(Plugin):
                 )
             except OSError as exc:
                 logger.warning("[workshop] cannot write cache: {}", exc)
-        if entry is None or value != entry[1]:
+        if changed:
             yield value
 
     def _install_state(

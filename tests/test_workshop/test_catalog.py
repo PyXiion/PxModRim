@@ -332,3 +332,59 @@ async def test_cached_values_survive_a_restart_and_corrupt_files_are_ignored(
     assert [v async for v in third.cached("k", produce, value_type=list[int])] == [
         [1, 2]
     ]
+
+
+async def test_equal_cache_refresh_keeps_the_displayed_mods_and_refreshes_age(
+    tmp_path: Path, mod_payload: dict[str, Any]
+) -> None:
+    ctx, _ = make_context(tmp_path)
+    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog.setup(ctx)
+    calls = 0
+
+    async def produce() -> list[CatalogMod]:
+        nonlocal calls
+        calls += 1
+        return [decode_mod(mod_payload, "1")]
+
+    try:
+        initial = await anext(catalog.cached("installed", produce))
+        refreshed = [
+            value async for value in catalog.cached("installed", produce, fresh_for=0)
+        ]
+        assert len(refreshed) == 1 and refreshed[0] is initial
+        current = await anext(catalog.cached("installed", produce))
+        assert current is initial and calls == 2
+    finally:
+        await catalog.shutdown()
+
+
+async def test_disk_cache_is_reused_in_memory_after_first_paint(
+    tmp_path: Path, mod_payload: dict[str, Any]
+) -> None:
+    ctx, _ = make_context(tmp_path)
+
+    async def produce() -> list[CatalogMod]:
+        return [decode_mod(mod_payload, "1")]
+
+    async def must_not_run() -> list[CatalogMod]:
+        raise AssertionError("A fresh cached response must not hit the catalog")
+
+    first = WorkshopCatalog(lambda: ctx.config)
+    first.setup(ctx)
+    second = WorkshopCatalog(lambda: ctx.config)
+    second.setup(ctx)
+    try:
+        await anext(first.cached("installed", produce, value_type=list[CatalogMod]))
+        displayed = await anext(
+            second.cached("installed", must_not_run, value_type=list[CatalogMod])
+        )
+        for file in (tmp_path / "workshop-cache").glob("*.json"):
+            file.write_text("{not json")
+        current = await anext(
+            second.cached("installed", must_not_run, value_type=list[CatalogMod])
+        )
+        assert current is displayed
+    finally:
+        await first.shutdown()
+        await second.shutdown()

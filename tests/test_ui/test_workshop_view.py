@@ -152,7 +152,15 @@ async def panel(
     theme = Theme(engine)
     engine.rootContext().setContextProperty("Theme", theme)
     warnings: list[Any] = []
-    engine.warnings.connect(warnings.extend)
+
+    def _on_warning(qml_warnings: list[Any]) -> None:
+        for w in qml_warnings:
+            msg = w.toString() if hasattr(w, "toString") else str(w)
+            if "The current style does not support customization" in msg:
+                continue
+            warnings.append(w)
+
+    engine.warnings.connect(_on_warning)
     view = WorkshopViewPanel(ctx, engine, owner, catalog=catalog)
     view.resize(1100, 800)
     yield view, catalog, warnings
