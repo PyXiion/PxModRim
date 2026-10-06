@@ -276,9 +276,11 @@ class DiagnosticsService:
                 summary[uuid] = self._to_view(diag)
         self._last_summary = summary
         self._last_summary_sources = diagnostics
+        # Sidebar first: the summary handler re-applies the current sidebar
+        # filter and must see the entries for this state, not the previous one.
+        self.sidebar_entries_changed.emit(self._build_sidebar_entries())
         self.diagnostics_summary_changed.emit(self._last_summary)
         self.status_message_changed.emit(self._format_status())
-        self.sidebar_entries_changed.emit(self._build_sidebar_entries())
 
     def summary_for(self, uuid: str) -> ModDiagnosticsView | None:
         return self._last_summary.get(uuid)

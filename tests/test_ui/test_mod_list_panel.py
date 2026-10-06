@@ -134,7 +134,8 @@ def _panel(qapp: QApplication) -> ModListPanel:
     )
 
     panel = ModListPanel.__new__(ModListPanel)
-    panel._highlighted_uuids = []
+    panel._highlighted = frozenset()
+    panel._highlight_revision = 0
     panel._highlight_generation = 0
     panel._qml = cast(QQuickWidget, SimpleNamespace(rootObject=lambda: None))
     panel._ctx = cast(CoreContext, ctx)
@@ -313,7 +314,8 @@ async def test_highlighting_enabled_mod_keeps_user_selection(
     panel.set_search_filter("Mod")
     panel.set_search_filter("")
 
-    assert panel.property("highlightedUuids") == ["uuid-c"]
+    assert panel.isHighlighted("uuid-c") is True
+    assert panel.isHighlighted("uuid-a") is False
     assert _qml_list_property(list_view, "selectedUuids") == ["uuid-a"]
     assert list_view.property("currentUuid") == "uuid-a"
 
