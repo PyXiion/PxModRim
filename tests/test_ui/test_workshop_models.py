@@ -10,6 +10,7 @@ from pxmodrim.ui.plugins.workshop.models import (
     CatalogListModel,
     item_row,
     safe_url,
+    summarize,
 )
 
 
@@ -159,3 +160,36 @@ def test_collection_image_prefers_own_then_first_image_then_member_collage() -> 
     assert row["collage"] == ["https://images.test/m.png"]
     assert (row["votes"], row["votesUp"], row["votesDown"]) == ("Unrated", "0", "0")
     assert row["active"] is False
+
+
+def test_summary_is_plain_text_without_bbcode_or_media() -> None:
+    text = (
+        "[h1]Title[/h1] [img]https://x.test/a.png[/img] "
+        "Adds [url=https://x.test]a thing[/url]"
+    )
+    assert summarize(text) == "Title Adds a thing"
+    assert summarize("[b]x[/b] <b>kept</b>", "text") == "[b]x[/b] <b>kept</b>"
+
+
+def test_summary_truncates_on_a_word_boundary() -> None:
+    summary = summarize("word " * 100)
+    assert summary.endswith("word…")
+    assert len(summary) <= 141
+
+
+@pytest.mark.parametrize(
+    ("supported", "game", "incompatible", "label"),
+    [
+        (["1.5"], "1.5", False, "Works with 1.5"),
+        (["1.4"], "1.5", True, "Not for 1.5"),
+        ([], "1.5", False, "Version not stated"),
+        (["1.5"], "", False, ""),
+    ],
+)
+def test_compat_label(
+    supported: list[str], game: str, incompatible: bool, label: str
+) -> None:
+    mod = msgspec.structs.replace(
+        _mod("1"), supported_versions=supported, incompatible=incompatible
+    )
+    assert item_row(mod, lambda _: "missing", game)["compatLabel"] == label

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from typing import Any
 from urllib.parse import urlsplit
@@ -27,6 +28,34 @@ def safe_url(value: str) -> str:
     except ValueError:
         return ""
     return value if parsed.scheme.lower() in {"http", "https"} and parsed.netloc else ""
+
+
+_BBCODE_TAG = re.compile(r"\[/?[a-zA-Z*][^\]]*\]")
+_BBCODE_MEDIA = re.compile(
+    r"\[(img|video|previewimage)[^\]]*\].*?\[/\1\]", re.IGNORECASE | re.DOTALL
+)
+_SUMMARY_LENGTH = 140
+
+
+def summarize(text: str, description_format: str = "bbcode") -> str:
+    """First sentence-ish of a description as plain text, for card blurbs."""
+    if description_format == "bbcode":
+        text = _BBCODE_TAG.sub(" ", _BBCODE_MEDIA.sub(" ", text))
+    text = " ".join(text.split())
+    if len(text) <= _SUMMARY_LENGTH:
+        return text
+    cut = text[:_SUMMARY_LENGTH].rsplit(" ", 1)[0].rstrip(".,;:-–— ")
+    return f"{cut}…"
+
+
+def _compat_label(supported: list[str], game_version: str, incompatible: bool) -> str:
+    if not game_version:
+        return ""
+    if incompatible:
+        return f"Not for {game_version}"
+    if not supported:
+        return "Version not stated"
+    return f"Works with {game_version}"
 
 
 def item_row(
@@ -111,6 +140,10 @@ def item_row(
         "votes": votes,
         "votesUp": votes_up,
         "votesDown": votes_down,
+        "summary": summarize(item.description, item.description_format),
+        "compatLabel": _compat_label(
+            item.supported_versions, game_version, incompatible
+        ),
     }
 
 
@@ -139,6 +172,8 @@ class CatalogListModel(QAbstractListModel):
         "votesUp",
         "votesDown",
         "queued",
+        "summary",
+        "compatLabel",
     )
 
     def __init__(self, parent: QObject) -> None:
