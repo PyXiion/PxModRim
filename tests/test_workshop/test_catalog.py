@@ -226,8 +226,8 @@ async def test_configuration_and_installed_events(
     await catalog.mod("2009463077")
     catalog.set_base_url(" https://other.example/ ")
     assert catalog.settings.value.url == "https://other.example"
-    stored = ConfigService(tmp_path).load_toml(
-        "plugins/workshop_catalog.toml", CatalogSettings
+    stored = ConfigService(tmp_path).load_existing(
+        "plugins/workshop_catalog.json", CatalogSettings
     )
     assert stored == CatalogSettings("https://other.example")
     await catalog.mod("2009463077")
@@ -399,7 +399,7 @@ def test_catalog_url_moves_out_of_the_old_shared_config(tmp_path: Path) -> None:
     catalog = WorkshopCatalog()
     catalog.setup(ctx)
     assert catalog.settings.value.url == "http://localhost:8787"
-    stored = ConfigService(tmp_path).load_toml(
-        "plugins/workshop_catalog.toml", CatalogSettings
+    stored = ConfigService(tmp_path).load_existing(
+        "plugins/workshop_catalog.json", CatalogSettings
     )
     assert stored == CatalogSettings("http://localhost:8787")

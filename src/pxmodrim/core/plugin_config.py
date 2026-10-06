@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class PluginConfig[T: msgspec.Struct]:
-    """A plugin's own settings, kept in ``plugins/<name>.toml``.
+    """A plugin's own settings, kept in ``plugins/<name>.json``.
 
     *legacy* maps keys of the old shared ``config.json`` to fields of *settings_type*;
     they seed the file the first time it is created. Without a *service* the
@@ -31,11 +31,11 @@ class PluginConfig[T: msgspec.Struct]:
     ) -> None:
         self.changed: Event[T] = Event()
         self._service = service
-        self._filename = f"plugins/{name}.toml"
+        self._filename = f"plugins/{name}.json"
         stored = (
             None
             if service is None
-            else service.load_toml(self._filename, settings_type)
+            else service.load_existing(self._filename, settings_type)
         )
         if stored is None:
             stored = self._seed(settings_type, legacy or {})
@@ -70,6 +70,6 @@ class PluginConfig[T: msgspec.Struct]:
         if self._service is None:
             return
         try:
-            self._service.save_toml(self._filename, value)
+            self._service.save(self._filename, value)
         except OSError as exc:
             logger.warning("Cannot save {}: {}", self._filename, exc)

@@ -9,7 +9,6 @@ from time import time
 from typing import Any, TypeVar
 
 import msgspec
-import msgspec.toml
 from loguru import logger
 
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID, AfterLaunch
@@ -151,23 +150,13 @@ class ConfigService:
             encoded = msgspec.json.encode(raw)
         self._write(path, encoded)
 
-    def load_toml(self, filename: str, struct_type: type[StructT]) -> StructT | None:
-        """Decode *filename*; ``None`` if it does not exist or cannot be read."""
-        path = self._config_dir / filename
-        try:
-            return msgspec.toml.decode(path.read_bytes(), type=struct_type)
-        except FileNotFoundError:
+    def load_existing(
+        self, filename: str, struct_type: type[StructT]
+    ) -> StructT | None:
+        """Like ``load``, but ``None`` when *filename* does not exist yet."""
+        if not (self._config_dir / filename).exists():
             return None
-        except (OSError, msgspec.DecodeError) as e:
-            logger.warning(f"Failed to load {filename}: {e}")
-            return None
-
-    def save_toml(self, filename: str, data: msgspec.Struct) -> None:
-        path = self._config_dir / filename
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_bytes(msgspec.toml.encode(data))
-        os.replace(tmp, path)
+        return self.load(filename, struct_type)
 
     def load_raw(self, filename: str) -> dict[str, Any]:
         """The undecoded top-level JSON object in *filename*, or ``{}``."""

@@ -37,7 +37,7 @@ Downloads are plugins; the UI only talks to `core/downloads/manager.py` (`Downlo
 
 ## Plugin API
 Core and the shell (`ui/window`, `ui/panels`) never name a concrete plugin; only `_app.py` (composition root) does.
-- Settings: `PluginConfig(ctx.config_service, name, Struct, legacy={old_config_json_key: field})` in `setup()` → `plugins/<name>.toml`; subscribe to `.changed`.
+- Settings: `PluginConfig(ctx.config_service, name, Struct, legacy={old_config_json_key: field})` in `setup()` → `plugins/<name>.json`; subscribe to `.changed`.
 - Settings UI: a UI plugin calls `app_ctx.add_settings_section(factory)`; subclass `ui.settings_section.PluginConfigSection` with `title` + `source` (QML whose root has `required property QtObject section`, reading `section.initial` and calling `section.set(key, value)`). Edits apply on Save only.
 - Views: `RailView` subclasses on `app_ctx.add_rail_view`; `open_route(path)` handles `modrim://<view_id>/…`; `lists_downloads = True` marks the download queue.
 - `steam_downloader_ui` holds the Steam download settings section.
