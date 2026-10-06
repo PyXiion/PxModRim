@@ -16,6 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
+    env:
+      UV_NO_SYNC: '1'
     steps:
       - uses: actions/checkout@v7
 
@@ -138,6 +140,8 @@ jobs:
       fail-fast: false
       matrix:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
+    env:
+      UV_NO_SYNC: '1'
     steps:
       - uses: actions/checkout@v7
 
@@ -201,6 +205,7 @@ jobs:
       matrix:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     env:
+      UV_NO_SYNC: '1'
       MACOS_SIGNING_CONFIGURED: >-
         ${{ secrets.MACOS_CERT != '' &&
             secrets.MACOS_CERT_PASSWORD != '' &&
