@@ -33,6 +33,8 @@ def item_row(
     item: CatalogMod | CatalogCollection,
     install_state: Callable[[CatalogMod], InstallState],
     game_version: str,
+    *,
+    detail: bool = False,
 ) -> dict[str, Any]:
     incompatible = bool(
         game_version
@@ -101,7 +103,9 @@ def item_row(
         "actionLabel": action_label,
         "incompatible": incompatible,
         "memberCount": member_count,
-        "description": description_to_html(item.description, item.description_format),
+        "description": description_to_html(item.description, item.description_format)
+        if detail
+        else "",
         "workshopUrl": safe_url(item.workshop_url or ""),
         "fileSize": file_size,
         "votes": votes,

@@ -113,7 +113,7 @@ def test_vote_approval_and_counts(
 @pytest.mark.parametrize("description_format", ["bbcode", "text"])
 def test_descriptions_use_shared_mod_info_renderer(description_format: str) -> None:
     mod = msgspec.structs.replace(_mod("1"), description_format=description_format)
-    row = item_row(mod, lambda _: "missing", "1.5")
+    row = item_row(mod, lambda _: "missing", "1.5", detail=True)
     assert row["description"] == description_to_html(
         mod.description, description_format
     )

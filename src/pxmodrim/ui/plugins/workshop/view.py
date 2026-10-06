@@ -145,10 +145,14 @@ class WorkshopViewPanel(BaseViewPanel):
             and (published_id := mods[uuid].published_file_id) is not None
         }
 
-    def _row(self, item: CatalogMod | CatalogCollection) -> dict[str, Any]:
+    def _row(
+        self, item: CatalogMod | CatalogCollection, *, detail: bool = False
+    ) -> dict[str, Any]:
         self._items[item.id] = item
         self._known_tags.update(set(item.tags) - set(item.supported_versions))
-        row = item_row(item, self._catalog.install_state, self._game_version)
+        row = item_row(
+            item, self._catalog.install_state, self._game_version, detail=detail
+        )
         row["active"] = isinstance(item, CatalogMod) and item.id in self._active_ids
         if isinstance(item, CatalogMod) and row["state"] != "installed":
             running = item.id in self._downloads.active_ids
@@ -161,7 +165,7 @@ class WorkshopViewPanel(BaseViewPanel):
         return [self._row(item) for item in items]
 
     def _detail_row(self, detail: Detail) -> dict[str, Any]:
-        row = self._row(detail.item)
+        row = self._row(detail.item, detail=True)
         row["complete"], row["warning"] = detail.complete, detail.warning
         if isinstance(detail.item, CatalogCollection):
             if not row["previewUrl"] and not row["collage"]:
@@ -374,7 +378,6 @@ class WorkshopViewPanel(BaseViewPanel):
             self._catalog.installed_with_updates,
             list[CatalogMod],
             apply,
-            fresh_for=0,
         )
 
     def _installed_cursor(self) -> str | None:

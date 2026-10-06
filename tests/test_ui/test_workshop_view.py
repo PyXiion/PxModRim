@@ -586,3 +586,22 @@ async def test_partly_downloaded_collection_has_no_activation(
     await view.toggleCollection()
     await view.activateOnlyCollection()
     assert view._ctx.active_uuids == []
+
+
+async def test_revisiting_installed_within_freshness_does_not_refetch(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, catalog, _ = panel
+    await asyncio.sleep(0)
+    fetches = 0
+    mods = [catalog.mod_item]
+
+    async def installed() -> list[CatalogMod]:
+        nonlocal fetches
+        fetches += 1
+        return mods
+
+    catalog.installed_with_updates = installed  # type: ignore[method-assign]
+    for tab in ("Installed", "Mods", "Installed"):
+        await view.selectTab(tab)
+    assert fetches == 1 and view.mods_model.count == 1
