@@ -698,6 +698,9 @@ async def test_routes_open_tabs_and_items_like_links(
     assert view.tab == "Installed"
     assert view.url == "modrim://workshop/installed"
 
+    await view.follow_route(())
+    assert view.url == "modrim://workshop/installed"
+
 
 async def test_back_preserves_scroll_position_and_active_filters(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],

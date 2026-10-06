@@ -512,7 +512,7 @@ class WorkshopViewPanel(BaseViewPanel):
         task.add_done_callback(self._route_tasks.discard)
 
     async def follow_route(self, path: tuple[str, ...]) -> None:
-        if self._torn_down:
+        if self._torn_down or not path:
             return
         if len(path) == 1 and path[0].title() in _TABS:
             await self.select_tab(path[0].title())

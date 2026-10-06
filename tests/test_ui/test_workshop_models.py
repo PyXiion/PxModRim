@@ -85,6 +85,36 @@ def test_roles_paging_append_and_reset(qapp: object) -> None:
     assert model.count == 0 and model.total == 0
 
 
+def test_refreshing_the_same_page_updates_changed_rows_without_reset(
+    qapp: object,
+) -> None:
+    owner = QObject()
+    model = CatalogListModel(owner)
+    mods = [_mod(pid) for pid in ["1", "2", "3"]]
+
+    def show(items: list[CatalogMod]) -> None:
+        rows = [item_row(m, lambda _: "missing", "1.5") for m in items]
+        model.set_page(rows, 3, None)
+
+    show(mods)
+    resets: list[bool] = []
+    changed: list[int] = []
+    model.modelReset.connect(lambda: resets.append(True))
+    model.dataChanged.connect(lambda first, _last: changed.append(first.row()))
+
+    mods[0] = msgspec.structs.replace(mods[0], subscriptions=500)
+    mods[1] = msgspec.structs.replace(mods[1], title="Renamed")
+    show(mods)
+    assert resets == [] and changed == [1]
+    title = next(r for r, n in model.roleNames().items() if bytes(n.data()) == b"title")
+    assert model.data(model.index(1), title) == "Renamed"
+
+    model.set_page(
+        [item_row(m, lambda _: "missing", "1.5") for m in mods[::-1]], 3, None
+    )
+    assert resets == [True]
+
+
 def test_row_shows_update_and_game_incompatibility() -> None:
     row = item_row(_mod("1"), lambda _: "outdated", "1.6")
     assert row["actionLabel"] == "Update" and row["incompatible"]

@@ -211,6 +211,13 @@ class CatalogListModel(QAbstractListModel):
                 )
                 self._rows.extend(additions)
                 self.endInsertRows()
+        elif [row["itemId"] for row in rows] == [row["itemId"] for row in self._rows]:
+            # A background refresh of the same page: resetting would rebuild every
+            # delegate and reload its thumbnail, so only changed rows are updated.
+            for index, row in enumerate(rows):
+                if row != self._rows[index]:
+                    self._rows[index] = row
+                    self.dataChanged.emit(self.index(index), self.index(index))
         else:
             self.beginResetModel()
             self._rows = list(rows)
