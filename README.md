@@ -13,6 +13,18 @@ No frozen UI. No guessing where your mods came from. Just scan, sort, and play.
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20win%20%7C%20macOS-lightgrey" alt="Platforms" />
 </p>
 
+## Downloads
+
+Choose a version, then download it for your system:
+
+| Version | What you get | Windows | Linux | macOS |
+|---|---|---|---|---|
+| **NativeWorkshop** | Mod manager with a native Workshop browser and mod downloader. | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-NativeWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-NativeWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-NativeWorkshop.dmg) |
+| **SteamWorkshop** | Mod manager with the familiar Steam web browser and mod downloader. | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-SteamWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-SteamWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-SteamWorkshop.dmg) |
+| **NoWorkshop** | Just sorting and organizing mods, without Workshop browsing or downloading. | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-NoWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-NoWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-NoWorkshop.dmg) |
+
+[All downloads](https://github.com/PyXiion/PxModRim/releases/latest), including portable ZIPs, Linux packages and Flatpak.
+
 ---
 
 ![Screenshot](screenshot.png)
