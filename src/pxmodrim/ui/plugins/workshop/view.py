@@ -94,6 +94,8 @@ class WorkshopViewPanel(BaseViewPanel):
         self._update_count = 0
         self._pending: DownloadPlan | None = None
         self._planning = 0
+        self._preparing: set[str] = set()
+        self._collection_mods: dict[str, frozenset[str]] = {}
         self._items: dict[str, CatalogMod | CatalogCollection] = {}
         self._known_tags: set[str] = set()
         self._active_ids: set[str] = set()
@@ -159,12 +161,26 @@ class WorkshopViewPanel(BaseViewPanel):
             item, self._catalog.install_state, self._game_version, detail=detail
         )
         row["active"] = isinstance(item, CatalogMod) and item.id in self._active_ids
-        if isinstance(item, CatalogMod) and row["state"] != "installed":
-            running = item.id in self._downloads.active_ids
-            if running or item.id in self._catalog.queued_ids:
-                row["queued"] = True
-                row["actionLabel"] = "Downloading" if running else "Queued"
+        if row["state"] != "installed":
+            self._mark_progress(item, row)
         return row
+
+    def _mark_progress(
+        self, item: CatalogMod | CatalogCollection, row: dict[str, Any]
+    ) -> None:
+        if item.id in self._preparing:
+            row["queued"], row["actionLabel"] = True, "Preparing…"
+            return
+        if isinstance(item, CatalogMod):
+            ids: frozenset[str] = frozenset((item.id,))
+        else:
+            ids = self._collection_mods.get(item.id, frozenset())
+            if self._detail_data is not None and self._detail_data.item.id == item.id:
+                ids |= self._pack_ids
+        if not ids.isdisjoint(self._downloads.active_ids):
+            row["queued"], row["actionLabel"] = True, "Downloading"
+        elif not ids.isdisjoint(self._catalog.queued_ids):
+            row["queued"], row["actionLabel"] = True, "Queued"
 
     def _rows(self, items: Iterable[CatalogMod | CatalogCollection]) -> list[Any]:
         return [self._row(item) for item in items]
@@ -192,7 +208,8 @@ class WorkshopViewPanel(BaseViewPanel):
                 and self._catalog.install_state(member) != "missing"
                 for member in detail.members
             )
-            row["actionLabel"] = "Complete download" if started else "Download all"
+            if not row["queued"]:
+                row["actionLabel"] = "Complete download" if started else "Download all"
             copies = self._pack_copies()
             if copies is not None:
                 active = set(self._ctx.active_uuids)
@@ -647,6 +664,9 @@ class WorkshopViewPanel(BaseViewPanel):
             return
         self._notice, self._pending = "Preparing download…", None
         self._planning += 1
+        requested = {*ids, *collections}
+        self._preparing |= requested
+        self._refresh_rows()
         self.changed.emit()
         try:
             plan = await self._catalog.plan(ids, collections)
@@ -656,8 +676,12 @@ class WorkshopViewPanel(BaseViewPanel):
             return
         finally:
             self._planning -= 1
+            self._preparing -= requested
             if not self._torn_down:
+                self._refresh_rows()
                 self.changed.emit()
+        for collection in collections:
+            self._collection_mods[collection] = frozenset(plan.to_download)
         if self._torn_down:
             return
         if not plan.is_complete:

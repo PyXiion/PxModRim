@@ -153,6 +153,8 @@ class FakeCatalog(WorkshopCatalog):
 
     def enqueue(self, plan: DownloadPlan) -> None:
         self.downloaded.extend(plan.to_download)
+        self._queued.update(plan.to_download)
+        self.queue_changed.emit(None)
 
 
 @pytest.fixture
@@ -331,6 +333,44 @@ async def test_collection_detail_uses_member_images_when_preview_metadata_is_abs
     await view.open_item("picked:test", "collection")
     detail = cast("dict[str, Any]", view.detail)
     assert detail["collage"] == ["https://images.test/member.png"]
+
+
+async def test_collection_download_button_tracks_its_queued_mods(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, catalog, _ = panel
+    catalog.collection_complete = True
+    await view.load()
+    await view.open_item("picked:test", "collection")
+    detail = cast("dict[str, Any]", view.detail)
+    assert not detail["queued"]
+    release = asyncio.Event()
+    plan = catalog.plan
+
+    async def gated_plan(mod_ids: list[str], collection_ids: list[str]) -> DownloadPlan:
+        await release.wait()
+        return await plan(mod_ids, collection_ids)
+
+    monkeypatch.setattr(catalog, "plan", gated_plan)
+    planning = asyncio.ensure_future(view._download([], ["picked:test"]))
+    await asyncio.sleep(0)
+    detail = cast("dict[str, Any]", view.detail)
+    assert detail["queued"] and detail["actionLabel"] == "Preparing…"
+    release.set()
+    await planning
+    detail = cast("dict[str, Any]", view.detail)
+    assert detail["queued"] and detail["actionLabel"] == "Queued"
+    model = view.collections_model
+    queued = next(
+        role
+        for role, name in model.roleNames().items()
+        if bytes(name.data()) == b"queued"
+    )
+    assert model.data(model.index(0), queued) is True
+    catalog.cancel_queue()
+    detail = cast("dict[str, Any]", view.detail)
+    assert not detail["queued"] and detail["actionLabel"] == "Complete download"
 
 
 async def test_unset_catalog_never_fetches(
