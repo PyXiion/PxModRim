@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import quote, unquote, urlsplit
 
-SCHEME = "pxmodrim"
+SCHEME = "modrim"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +22,7 @@ def build_route(view_id: str, *path: str) -> str:
 
 
 def parse_route(url: str) -> Route | None:
-    """Parse ``pxmodrim://<view>[/<part>…]``; anything else is not a route."""
+    """Parse ``modrim://<view>[/<part>…]``; anything else is not a route."""
     try:
         parts = urlsplit(url)
     except ValueError:

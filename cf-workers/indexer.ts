@@ -1,5 +1,5 @@
 import { queryFiles, refreshSteamItems } from './steam';
-import type { Env } from './types';
+import { HttpError, type Env } from './types';
 
 const PAGES_PER_TICK = 4;
 const PAGE_SIZE = 100;
@@ -28,20 +28,33 @@ async function saveState(db: D1Database, state: IndexState): Promise<void> {
   ).bind(state.cursor, state.cycle_started_at, state.since, state.last_started_at, state.full_at, state.indexed, Date.now()).run();
 }
 
-/** Refreshes `ids`, bisecting on failure so one bad file cannot block its neighbours. */
-async function refreshIsolating(env: Env, ids: string[]): Promise<boolean> {
+const ISOLATION_BUDGET = 16;
+
+function isPerFileFailure(error: unknown): boolean {
+  return error instanceof HttpError && /incomplete file details|invalid file metadata/.test(error.message);
+}
+
+/**
+ * Refreshes `ids`. A response that is malformed for some files is bisected so one bad
+ * file cannot block its neighbours; outages and rate limits propagate instead, and
+ * bisection stops after `budget.left` requests.
+ */
+async function refreshIsolating(env: Env, ids: string[], budget: { left: number }): Promise<boolean> {
+  if (budget.left <= 0) return false;
+  budget.left--;
   try {
     await refreshSteamItems(env, ids);
     return true;
   } catch (error) {
+    if (!isPerFileFailure(error)) throw error;
     if (ids.length === 1) {
-      console.error(`[INDEX] Verification of ${ids[0]} failed`, error instanceof Error ? error.message : error);
+      console.error(`[INDEX] Verification of ${ids[0]} failed`, (error as Error).message);
       return false;
     }
   }
   const middle = ids.length >> 1;
-  const left = await refreshIsolating(env, ids.slice(0, middle));
-  const right = await refreshIsolating(env, ids.slice(middle));
+  const left = await refreshIsolating(env, ids.slice(0, middle), budget);
+  const right = await refreshIsolating(env, ids.slice(middle), budget);
   return left && right;
 }
 
@@ -63,7 +76,7 @@ async function verifyUnseenMods(env: Env, state: IndexState): Promise<boolean> {
      WHERE c.updated_at < ? AND i.id > ? ORDER BY i.id LIMIT ?`,
   ).bind(state.cycle_started_at, after, PAGE_SIZE).all<{ id: string }>();
   const ids = rows.results.map(row => row.id);
-  const ok = ids.length === 0 || await refreshIsolating(env, ids);
+  const ok = ids.length === 0 || await refreshIsolating(env, ids, { left: ISOLATION_BUDGET });
   const hasFailure = failed || !ok;
   if (ids.length === PAGE_SIZE) {
     state.cursor = `${VERIFY_PREFIX}${hasFailure ? 1 : 0}:${ids[ids.length - 1]}`;

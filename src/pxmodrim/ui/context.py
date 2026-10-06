@@ -29,7 +29,7 @@ class RailView(QWidget):
     label: ClassVar[str]
 
     def open_route(self, path: tuple[str, ...]) -> None:
-        """Handle the part of a ``pxmodrim://<view_id>/…`` link after the view id."""
+        """Handle the part of a ``modrim://<view_id>/…`` link after the view id."""
 
     def __init__(
         self,
@@ -95,7 +95,7 @@ class AppContext:
     # ── Navigation ────────────────────────────────────
 
     def navigate(self, url: str) -> None:
-        """Open a ``pxmodrim://<view_id>[/…]`` link (no-op if the view is unknown)."""
+        """Open a ``modrim://<view_id>[/…]`` link (no-op if the view is unknown)."""
         if self._navigate is not None:
             self._navigate(url)
 

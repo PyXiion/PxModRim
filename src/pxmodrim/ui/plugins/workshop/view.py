@@ -519,8 +519,11 @@ class WorkshopViewPanel(BaseViewPanel):
         if self._torn_down:
             return
         if self._trail:
-            kind, item_id, _ = self._trail.pop()
+            kind, item_id, _ = self._trail[-1]
             await self.open_item(item_id, kind, record=False)
+            if self._current == (kind, item_id) and self._trail:
+                self._trail.pop()
+                self.changed.emit()
             return
         self._generation += 1
         self._clear_detail()

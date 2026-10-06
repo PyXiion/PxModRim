@@ -67,8 +67,8 @@ def test_route_selects_the_view_then_hands_it_the_path() -> None:
             _views=[view("mods"), view("workshop")], _select_view=selected.append
         ),
     )
-    MainWindow._open_route(window, "pxmodrim://workshop/mod/42")
-    MainWindow._open_route(window, "pxmodrim://missing/x")
+    MainWindow._open_route(window, "modrim://workshop/mod/42")
+    MainWindow._open_route(window, "modrim://missing/x")
     MainWindow._open_route(window, "workshop")
     assert selected == [1]
     assert opened == [("workshop", "mod", "42")]

@@ -594,7 +594,7 @@ test('a persistently failing omitted file does not starve later ones or complete
   delete files['871'];
   await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind('870', '871').run();
   await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
-  detailFailures.set('870', 'http');
+  detailFailures.set('870', 'metadata');
   try {
     for (let tick = 0; tick < 3; tick++) await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
     assert.equal(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('871').first(), null);

@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Changed
 - Workshop cards are shorter and show a two-line title, a plain-text summary, game-version compatibility and a single primary action; Discover shows wide collection banners above compact popular mods, and Installed is a compact row list with Activate and Update actions.
-- Workshop Back walks the detail history (a dependency's Back returns to the mod you came from) and is labelled with the previous page. Workshop pages and the rail views are addressable with `pxmodrim://` links, e.g. `pxmodrim://workshop/mod/<id>` and `pxmodrim://downloads`.
+- Workshop Back walks the detail history (a dependency's Back returns to the mod you came from) and is labelled with the previous page. Workshop pages and the rail views are addressable with `modrim://` links, e.g. `modrim://workshop/mod/<id>` and `modrim://downloads`.
 
 ### Fixed
 - Workshop catalog refreshes remove deleted, private, banned and other non-public Steam items from cached details and search, while failed refreshes preserve cached items and picked collections.

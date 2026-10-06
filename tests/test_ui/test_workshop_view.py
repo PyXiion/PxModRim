@@ -564,17 +564,40 @@ async def test_back_walks_detail_history_before_returning_to_listing(
     await view.selectTab("Mods")
     await view.open_item("1", "mod")
     await view.open_item("2", "mod")
-    assert view.url == "pxmodrim://workshop/mod/2"
+    assert view.url == "modrim://workshop/mod/2"
     assert view.backLabel == f"Back to {catalog.mod_item.title}"
 
     await view.back()
     assert cast("dict[str, Any]", view.detail)["itemId"] == "1"
-    assert view.url == "pxmodrim://workshop/mod/1"
+    assert view.url == "modrim://workshop/mod/1"
     assert view.backLabel == "Back to Mods"
 
     await view.back()
     assert not view.hasDetail
-    assert view.url == "pxmodrim://workshop/mods"
+    assert view.url == "modrim://workshop/mods"
+
+
+async def test_failed_back_keeps_the_previous_page_for_retry(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, catalog, _ = panel
+    await view.open_item("1", "mod")
+    await view.open_item("2", "mod")
+    catalog._responses.clear()
+    working = catalog.mod
+
+    async def unavailable(id: str) -> CatalogMod | None:
+        raise CatalogError("Catalog unavailable", 503)
+
+    monkeypatch.setattr(catalog, "mod", unavailable)
+    await view.back()
+    assert view.url == "modrim://workshop/mod/2"
+    assert view.backLabel == f"Back to {catalog.mod_item.title}"
+
+    monkeypatch.setattr(catalog, "mod", working)
+    await view.back()
+    assert view.url == "modrim://workshop/mod/1"
 
 
 async def test_routes_open_tabs_and_items_and_reset_history(
@@ -585,13 +608,13 @@ async def test_routes_open_tabs_and_items_and_reset_history(
     await view.open_item("2", "mod")
 
     await view.follow_route(("collection", "picked:test"))
-    assert view.url == "pxmodrim://workshop/collection/picked%3Atest"
+    assert view.url == "modrim://workshop/collection/picked%3Atest"
     await view.back()
     assert not view.hasDetail
 
     await view.follow_route(("installed",))
     assert view.tab == "Installed"
-    assert view.url == "pxmodrim://workshop/installed"
+    assert view.url == "modrim://workshop/installed"
 
 
 async def test_back_preserves_scroll_position_and_active_filters(
