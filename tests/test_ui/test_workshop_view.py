@@ -371,8 +371,8 @@ async def test_settings_saves_and_applies_catalog_url(
     settings._save(dict(cast("dict[str, Any]", settings._backend.initial)))
     assert catalog.settings.value.url == "https://catalog.example.test/"
     assert catalog._base_url == "https://catalog.example.test"
+    delete(settings)
     assert warnings == []
-    settings.deleteLater()
 
 
 async def test_installed_search_filters_loaded_mods_without_refetching(

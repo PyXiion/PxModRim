@@ -41,6 +41,7 @@ from pxmodrim.core.config import (  # noqa: E402
 )
 from pxmodrim.core.context import CoreContext  # noqa: E402
 from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
+from pxmodrim.ui.components.popup_parent import QuickPopupParenting  # noqa: E402
 from pxmodrim.ui.config import UIPrefsService  # noqa: E402
 from pxmodrim.ui.context import AppContext  # noqa: E402
 from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
@@ -145,6 +146,7 @@ class App:
 
         self._ctx: CoreContext | None = None
         self.qt_app = QApplication(sys.argv)
+        self.qt_app.installEventFilter(QuickPopupParenting(self.qt_app))
         # async_run owns the exit: plugin shutdown awaits I/O after the window closes.
         self.qt_app.setQuitOnLastWindowClosed(False)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))

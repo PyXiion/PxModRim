@@ -109,8 +109,8 @@ Rectangle {
     component Tab: Item {
         id: tabItem
         property string label: ""
-        property int index: 0
-        readonly property bool current: root.tab === index
+        property int page: 0
+        readonly property bool current: root.tab === page
 
         implicitWidth: tabText.implicitWidth + 32
         implicitHeight: 40
@@ -139,7 +139,7 @@ Rectangle {
             cursorShape: Qt.PointingHandCursor
             Accessible.role: Accessible.PageTab
             Accessible.name: tabItem.label
-            onClicked: root.tab = tabItem.index
+            onClicked: root.tab = tabItem.page
         }
     }
 
@@ -154,8 +154,17 @@ Rectangle {
 
             Row {
                 x: 8
-                Tab { label: "General"; index: 0 }
-                Tab { label: "Sorting"; index: 1 }
+                Tab { label: "General"; page: 0 }
+                Tab { label: "Sorting"; page: 1 }
+                Repeater {
+                    model: settings.sections
+                    delegate: Tab {
+                        required property var modelData
+                        required property int index
+                        label: modelData.title
+                        page: index + 2
+                    }
+                }
             }
             Rectangle {
                 anchors.bottom: parent.bottom
@@ -299,18 +308,6 @@ Rectangle {
                             checked: root.initial.compact
                         }
                     }
-
-                    Repeater {
-                        model: settings.sections
-                        delegate: Group {
-                            required property var modelData
-                            title: modelData.title
-                            Loader {
-                                Layout.fillWidth: true
-                                Component.onCompleted: setSource(modelData.source, { section: modelData.section })
-                            }
-                        }
-                    }
                 }
             }
 
@@ -376,6 +373,32 @@ Rectangle {
                             text: "Clear cache"
                             enabled: settings.cacheAvailable && !settings.cacheBusy
                             onClicked: settings.clearCache()
+                        }
+                    }
+                }
+            }
+
+            Repeater {
+                model: settings.sections
+                delegate: ScrollView {
+                    id: sectionScroll
+                    required property var modelData
+                    clip: true
+                    contentWidth: availableWidth
+                    ScrollBar.vertical: PxScrollBar {}
+
+                    ColumnLayout {
+                        width: sectionScroll.availableWidth - 32
+                        x: 16
+                        y: 16
+                        spacing: 12
+
+                        Group {
+                            title: sectionScroll.modelData.title
+                            Loader {
+                                Layout.fillWidth: true
+                                Component.onCompleted: setSource(sectionScroll.modelData.source, { section: sectionScroll.modelData.section })
+                            }
                         }
                     }
                 }

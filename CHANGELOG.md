@@ -10,10 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workshop cards are shorter and show a two-line title, a plain-text summary, game-version compatibility and a single primary action; Discover shows wide collection banners above compact popular mods, and Installed is a multi-column grid of compact tiles with an active checkbox beside each title and an Update button.
 - Workshop Back walks the detail history (a dependency's Back returns to the mod you came from) and is labelled with the previous page. All navigation goes through `modrim://` links — rail views, view shortcuts, Settings (`modrim://settings`) and Workshop tabs and pages (e.g. `modrim://workshop/mod/<id>`); opening a Workshop page from another one keeps Back history like a browser.
 
-- Plugin settings live in each plugin's own `plugins/<name>.json` (`steam_downloader.json`, `workshop_catalog.json`), seeded once from the old `config.json` keys; plugins add their own Settings sections, so the Settings dialog and the main window no longer refer to specific plugins.
+- Plugin settings live in each plugin's own `plugins/<name>.json` (`steam_downloader.json`, `workshop_catalog.json`), seeded once from the old `config.json` keys; plugins add their own Settings tabs, so the Settings dialog and the main window no longer refer to specific plugins.
 - Workshop pages refresh in place when only item details change, instead of rebuilding every card.
 
 ### Fixed
+- On Wayland, QML tooltips, menus and combo box lists open again: every QML surface's window gets its top-level window as transient parent.
+- Closing Settings no longer logs a burst of `Cannot read property … of null` QML errors.
 - Workshop catalog refreshes remove deleted, private, banned and other non-public Steam items from cached details and search, while failed refreshes preserve cached items and picked collections.
 - Workshop Installed lists refresh immediately when the installed set changes while retaining the five-minute cache for unchanged sets; Deactivate removes every active copy, and Activate only this pack keeps dependents when a redundant copy is removed.
 - Workshop downloads queued during auto-update no longer disappear after an earlier cancellation, and unavailable dependencies show a warning without preventing public mod details from opening.

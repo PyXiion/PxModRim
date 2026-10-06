@@ -227,6 +227,12 @@ class SettingsPanel(QDialog):
         self._qml.rootContext().setContextProperty("settings", self._backend)
         self._qml.setSource(QUrl.fromLocalFile(str(_QML)))
         layout.addWidget(self._qml)
+        # Unload before the backend and sections (children of this dialog) are
+        # destroyed, or every binding to them re-evaluates against null.
+        self.finished.connect(self._unload)
+
+    def _unload(self) -> None:
+        self._qml.setSource(QUrl())
 
     def _save(self, values: dict[str, Any]) -> None:
         self._config = msgspec.structs.replace(
