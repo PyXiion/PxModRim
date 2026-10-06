@@ -12,10 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Plugin settings live in each plugin's own `plugins/<name>.json` (`steam_downloader.json`, `workshop_catalog.json`), seeded once from the old `config.json` keys; plugins add their own Settings tabs, so the Settings dialog and the main window no longer refer to specific plugins.
 - Workshop pages refresh in place when only item details change, instead of rebuilding every card.
+- Collection members and a mod's required mods use the same rows as the Installed tab (active checkbox, thumbnail, author and size, Download/Update); collection members fill a multi-column grid above the description.
 
 ### Fixed
 - On Wayland, QML tooltips, menus and combo box lists open again: every QML surface's window gets its top-level window as transient parent.
 - Closing Settings no longer logs a burst of `Cannot read property … of null` QML errors.
+- Collection download buttons show `Preparing…`, `Queued` or `Downloading` while the collection's mods are being planned or downloaded, instead of offering the download again.
 - Workshop catalog refreshes remove deleted, private, banned and other non-public Steam items from cached details and search, while failed refreshes preserve cached items and picked collections.
 - Workshop Installed lists refresh immediately when the installed set changes while retaining the five-minute cache for unchanged sets; Deactivate removes every active copy, and Activate only this pack keeps dependents when a redundant copy is removed.
 - Workshop downloads queued during auto-update no longer disappear after an earlier cancellation, and unavailable dependencies show a warning without preventing public mod details from opening.
@@ -34,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Native QML Workshop browser: Discover, Mods, Collections and Installed views, catalog filters and detail pages, dependency-aware mod/collection downloads into Local mods, compatibility warnings and updates for downloader-managed copies. Downloads queue in the background (progress in the header, results in Downloads) so browsing stays usable, pages show remembered results immediately and refresh in the background, and the Installed tab loads 48 mods at a time. Catalog URL defaults to `https://api.modrim.pyxiion.dev` and can be changed or emptied to disable network requests; no catalog descriptions execute as HTML and downloads never activate mods.
+- Favourite Workshop collections: a star on collection banners and pages adds the collection to the Workshop's Favourites tab (`modrim://workshop/favourites`, newest first, searchable). Favourites are stored locally in `plugins/workshop_favourites.json` with the last seen catalog details, so the tab works without a network round trip.
 - Settings and Help are pinned to the bottom of the left rail (the header no longer has a Settings button). The Help menu has Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.
 - Settings > Steam Workshop: `Proxy` (empty uses `https_proxy`/`all_proxy` from the environment), `Connect timeout` and `Stall timeout` for Workshop downloads. Changing them logs in to Steam again before the next download.
 - Launch workflow: Play shows `Launching…` then `Running` and is disabled while RimWorld runs (tracked by process, for Steam launches too); a toast reports when the game closes or exits with a non-zero code.

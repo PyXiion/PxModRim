@@ -63,7 +63,9 @@ Rectangle {
         spacing: 12
         Copy {
             visible: !workshopPanel.busy && !workshopPanel.error && listing.count === 0
-            text: workshopPanel.tab === "Installed" ? "No installed Workshop mods were found." : "No matching items. Try another search or filter."
+            text: workshopPanel.tab === "Installed" ? "No installed Workshop mods were found."
+                : workshopPanel.tab === "Favourites" ? (workshopPanel.searchQuery ? "No favourite matches this search." : "No favourites yet. Star a collection to keep it here.")
+                : "No matching items. Try another search or filter."
         }
         PxButton {
             Layout.alignment: Qt.AlignHCenter
@@ -113,7 +115,7 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 4
                 Repeater {
-                    model: ["Discover", "Mods", "Collections", "Installed"]
+                    model: ["Discover", "Mods", "Collections", "Favourites", "Installed"]
                     Item {
                         id: tabItem
                         required property string modelData
@@ -293,7 +295,7 @@ Rectangle {
         GridView {
             id: collectionsGrid
             objectName: "collectionsScroll"
-            readonly property bool listingTab: workshopPanel.configured && workshopPanel.tab === "Collections"
+            readonly property bool listingTab: workshopPanel.configured && (workshopPanel.tab === "Collections" || workshopPanel.tab === "Favourites")
             property int columns: Math.max(1, Math.floor(width / 400))
             visible: !workshopPanel.hasDetail && listingTab
             Layout.fillWidth: true
@@ -440,6 +442,15 @@ Rectangle {
                                     onClicked: workshopPanel.downloadItem(root.detail.itemId, root.detail.kind)
                                 }
                                 PxButton { visible: !!root.detail.workshopUrl; text: "View on Steam"; variant: "ghost"; onClicked: workshopPanel.openLink(root.detail.workshopUrl) }
+                                PxButton {
+                                    objectName: "detailFavourite"
+                                    visible: root.detail.kind === "collection"
+                                    text: root.detail.favourite ? "Favourited" : "Favourite"
+                                    variant: "ghost"
+                                    iconName: root.detail.favourite ? "star-filled" : "star"
+                                    iconColor: root.detail.favourite ? Theme.warning : "transparent"
+                                    onClicked: workshopPanel.toggleFavourite(root.detail.itemId)
+                                }
                             }
                             Copy { Layout.fillWidth: true; text: "Local mods · downloading does not enable or subscribe." }
                             RowLayout {

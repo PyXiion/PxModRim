@@ -19,6 +19,7 @@ Rectangle {
     required property int memberCount
     required property string fileSize
     required property string actionLabel
+    required property bool favourite
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
     radius: Theme.radiusMd
@@ -95,6 +96,14 @@ Rectangle {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSm
                     elide: Text.ElideRight
+                }
+                PxButton {
+                    objectName: "favouriteToggle"
+                    variant: "ghost"
+                    iconName: banner.favourite ? "star-filled" : "star"
+                    iconColor: banner.favourite ? Theme.warning : "transparent"
+                    ToolTip.text: banner.favourite ? "Remove from favourites" : "Add to favourites"
+                    onClicked: workshopPanel.toggleFavourite(banner.itemId)
                 }
                 PxButton {
                     text: banner.actionLabel

@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from pxmodrim.ui.context import AppContext
 
 _FAILURES = (CatalogError, RuntimeError, ValueError)
-_TABS = ("Discover", "Mods", "Collections", "Installed")
+_TABS = ("Discover", "Mods", "Collections", "Favourites", "Installed")
 
 
 def _message(exc: Exception) -> str:
@@ -121,6 +121,8 @@ class WorkshopViewPanel(BaseViewPanel):
         self._catalog.queue_changed.connect(self._on_queue_changed)
         self._catalog.catalog_url_changed.connect(self._on_url_changed)
         self._catalog.installed_changed.connect(self._on_installed_changed)
+        self._favourites = self._catalog.favourites
+        self._favourites.changed.connect(self._on_favourites_changed)
         self._ctx.active_state_changed.connect(self._on_active_state_changed)
         self.destroyed.connect(lambda: self.teardown())
 
@@ -134,6 +136,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._catalog.queue_changed.disconnect(self._on_queue_changed)
         self._catalog.catalog_url_changed.disconnect(self._on_url_changed)
         self._catalog.installed_changed.disconnect(self._on_installed_changed)
+        self._favourites.changed.disconnect(self._on_favourites_changed)
         self._ctx.active_state_changed.disconnect(self._on_active_state_changed)
 
     @property
@@ -161,6 +164,9 @@ class WorkshopViewPanel(BaseViewPanel):
             item, self._catalog.install_state, self._game_version, detail=detail
         )
         row["active"] = isinstance(item, CatalogMod) and item.id in self._active_ids
+        if isinstance(item, CatalogCollection) and item.id in self._favourites:
+            row["favourite"] = True
+            self._favourites.remember(item)
         if row["state"] != "installed":
             self._mark_progress(item, row)
         return row
@@ -357,6 +363,10 @@ class WorkshopViewPanel(BaseViewPanel):
                 await self._load_discover()
             case "Installed":
                 await self._load_installed(append)
+            case "Favourites":
+                self._generation += 1
+                self._busy, self._error = False, ""
+                self._show_favourites()
             case _:
                 await self._load_listing(append)
 
@@ -370,6 +380,14 @@ class WorkshopViewPanel(BaseViewPanel):
             )
 
         await self._run_cached("discover", self._catalog.discover, Discover, apply)
+
+    def _show_favourites(self) -> None:
+        query = self._criteria.query.casefold()
+        items = [
+            item for item in self._favourites.items if query in item.title.casefold()
+        ]
+        self.collections_model.set_page(self._rows(items), len(items), None)
+        self.changed.emit()
 
     async def _load_listing(self, append: bool) -> None:
         collections = self._tab == "Collections"
@@ -555,7 +573,9 @@ class WorkshopViewPanel(BaseViewPanel):
         self._clear_detail()
         self._error, self._busy = "", False
         self.changed.emit()
-        if self._tab == "Installed" and self._installed_dirty:
+        if self._tab == "Favourites":
+            self._show_favourites()
+        elif self._tab == "Installed" and self._installed_dirty:
             await self.load()
 
     @asyncSlot(str, str)
@@ -653,6 +673,12 @@ class WorkshopViewPanel(BaseViewPanel):
         if self._app_ctx is not None:
             self._app_ctx.navigate(build_route(SETTINGS_VIEW_ID))
 
+    @Slot(str)
+    def toggleFavourite(self, item_id: str) -> None:
+        item = self._items.get(item_id)
+        if isinstance(item, CatalogCollection):
+            self._favourites.set(item, item_id not in self._favourites)
+
     # -- downloads --------------------------------------------------------
 
     def _queue_plan(self, plan: DownloadPlan) -> None:
@@ -700,6 +726,13 @@ class WorkshopViewPanel(BaseViewPanel):
         self.changed.emit()
 
     def _on_queue_changed(self, *_: object) -> None:
+        self._refresh_rows()
+        self.changed.emit()
+
+    def _on_favourites_changed(self, _value: object) -> None:
+        if self._tab == "Favourites" and self._detail_data is None:
+            self._show_favourites()
+            return
         self._refresh_rows()
         self.changed.emit()
 

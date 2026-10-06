@@ -757,6 +757,44 @@ async def test_routes_open_tabs_and_items_like_links(
     assert view.url == "modrim://workshop/installed"
 
 
+async def test_starred_collection_is_listed_in_favourites_until_unstarred(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+) -> None:
+    view, _, warnings = panel
+    view.window().resize(1100, 800)
+    view.window().show()
+    await view.follow_route(("collections",))
+    await asyncio.sleep(0.5)
+    view._qml.grabFramebuffer()
+    await asyncio.sleep(0.2)
+    root = view._qml.rootObject()
+    assert root is not None
+    star = _find_item(cast("QQuickItem", root), "favouriteToggle")
+    assert star is not None
+    center = star.mapToScene(star.boundingRect().center()).toPoint()
+    QTest.mouseClick(view._qml, Qt.MouseButton.LeftButton, pos=center)
+    assert not view.hasDetail
+
+    await view.follow_route(("favourites",))
+    model = view.collections_model
+    assert view.url == "modrim://workshop/favourites"
+    assert model.count == 1
+    favourite = next(
+        role
+        for role, name in model.roleNames().items()
+        if bytes(name.data()) == b"favourite"
+    )
+    assert model.data(model.index(0), favourite) is True
+
+    await view.open_item("picked:test", "collection")
+    assert cast("dict[str, Any]", view.detail)["favourite"] is True
+    view.toggleFavourite("picked:test")
+    assert cast("dict[str, Any]", view.detail)["favourite"] is False
+    await view.back()
+    assert view.tab == "Favourites" and model.count == 0
+    assert not warnings, [warning.toString() for warning in warnings]
+
+
 async def test_back_preserves_scroll_position_and_active_filters(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
 ) -> None:
