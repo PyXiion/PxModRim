@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workshop tag filtering uses a searchable dropdown populated from known mod and collection tags, replacing free-text exact matching.
 - Navigating back from Workshop mod details preserves the current tab, search query, active filters, and scroll position.
 - Workshop and Mod Info share the same sanitized description pipeline and selectable rich-text description renderer.
-- CI release matrix builds separate `SteamWorkshop` and `NativeWorkshop` artifact packages across Linux, macOS, and Windows.
+- Release builds come in three variants across Linux, macOS and Windows (artifact names end in the variant): `NoWorkshop` (plain mod sorter without the Steam downloader, Downloads tab or any Workshop browser, and without building PxSteamDL), `SteamWorkshop` (downloader with the Steam web browser) and `NativeWorkshop` (downloader with the native browser, no WebEngine).
 - Fully downloaded Workshop collections show Activate all / Deactivate all and Activate only this pack (deactivates every other Workshop mod, keeps local mods), matching the Steam web integration. Workshop buttons are colour-coded: Download blue, Update orange, Activate green, Deactivate red.
 
 ### Changed

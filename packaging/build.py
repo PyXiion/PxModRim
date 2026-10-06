@@ -31,6 +31,47 @@ def debian_architecture(machine: str | None = None) -> str:
         ) from None
 
 
+_WITHOUT_WEBVIEW_BROWSER = [
+    (
+        "--nofollow-import-to=pxmodrim.ui.plugins.steam_workshop,"
+        "PySide6.QtWebEngine*,PySide6.QtWebChannel"
+    ),
+    "--noinclude-data-files=pxmodrim/ui/plugins/steam_workshop",
+    "--noinclude-data-files=PySide6/qml/QtWeb*/*",
+    "--noinclude-data-files=*qtwebengine*",
+    "--noinclude-dlls=PySide6/qml/QtWeb*/*",
+    "--noinclude-dlls=*WebEngine*",
+    "--noinclude-dlls=*WebChannel*",
+]
+_WITHOUT_NATIVE_BROWSER = [
+    "--nofollow-import-to=pxmodrim.ui.plugins.workshop",
+    "--noinclude-data-files=pxmodrim/ui/plugins/workshop",
+]
+_WITHOUT_DOWNLOADER = [
+    (
+        "--nofollow-import-to=pxsteamdl,pxmodrim.core.downloads.steam,"
+        "pxmodrim.ui.plugins.downloads"
+    ),
+    "--noinclude-data-files=pxmodrim/ui/plugins/downloads",
+]
+
+
+def _variant_exclusions(workshop: str) -> list[str]:
+    """Nuitka options that leave out what the Workshop variant does not ship."""
+    match workshop:
+        case "SteamWorkshop":
+            return _WITHOUT_NATIVE_BROWSER
+        case "NativeWorkshop":
+            return _WITHOUT_WEBVIEW_BROWSER
+        case "NoWorkshop":
+            return [
+                *_WITHOUT_WEBVIEW_BROWSER,
+                *_WITHOUT_NATIVE_BROWSER,
+                *_WITHOUT_DOWNLOADER,
+            ]
+    raise ValueError(f"Unknown Workshop variant: {workshop}")
+
+
 def get_standalone_args(
     release: bool = False, workshop: str = "NativeWorkshop"
 ) -> list[str]:
@@ -51,28 +92,7 @@ def get_standalone_args(
 
     args.append("--include-qt-plugins=qml")
 
-    if workshop == "NativeWorkshop":
-        args.extend(
-            [
-                (
-                    "--nofollow-import-to=pxmodrim.ui.plugins.steam_workshop,"
-                    "PySide6.QtWebEngine*,PySide6.QtWebChannel"
-                ),
-                "--noinclude-data-files=pxmodrim/ui/plugins/steam_workshop",
-                "--noinclude-data-files=PySide6/qml/QtWeb*/*",
-                "--noinclude-data-files=*qtwebengine*",
-                "--noinclude-dlls=PySide6/qml/QtWeb*/*",
-                "--noinclude-dlls=*WebEngine*",
-                "--noinclude-dlls=*WebChannel*",
-            ]
-        )
-    else:
-        args.extend(
-            [
-                "--nofollow-import-to=pxmodrim.ui.plugins.workshop",
-                "--noinclude-data-files=pxmodrim/ui/plugins/workshop",
-            ]
-        )
+    args.extend(_variant_exclusions(workshop))
 
     if release:
         args.extend(
@@ -572,7 +592,7 @@ def main() -> None:
     parser.add_argument("--bundle-qt", action="store_true")
     parser.add_argument(
         "--workshop",
-        choices=("SteamWorkshop", "NativeWorkshop"),
+        choices=("NoWorkshop", "SteamWorkshop", "NativeWorkshop"),
         default="NativeWorkshop",
     )
     options = parser.parse_args()

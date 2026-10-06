@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        workshop: [SteamWorkshop, NativeWorkshop]
+        workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     steps:
       - uses: actions/checkout@v7
 
@@ -47,7 +47,7 @@ jobs:
           chmod +x /usr/local/bin/appimagetool
 
       - name: Install Dependencies
-        run: uv sync --locked --dev --extra steam
+        run: uv sync --locked --dev ${{ matrix.workshop == 'NoWorkshop' && '--no-install-package pxsteamdl' || '--extra steam' }}
 
       - name: Build with Nuitka
         run: just build-release-bundled --workshop ${{ matrix.workshop }}
@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        workshop: [SteamWorkshop, NativeWorkshop]
+        workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
       options: --privileged
@@ -137,7 +137,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        workshop: [SteamWorkshop, NativeWorkshop]
+        workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     steps:
       - uses: actions/checkout@v7
 
@@ -162,7 +162,7 @@ jobs:
           tool: just@1.40.0
 
       - name: Install Dependencies
-        run: uv sync --locked --dev --extra steam
+        run: uv sync --locked --dev ${{ matrix.workshop == 'NoWorkshop' && '--no-install-package pxsteamdl' || '--extra steam' }}
       - name: Install NSIS
         shell: pwsh
         run: |
@@ -199,7 +199,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        workshop: [SteamWorkshop, NativeWorkshop]
+        workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     env:
       MACOS_SIGNING_CONFIGURED: >-
         ${{ secrets.MACOS_CERT != '' &&
@@ -232,7 +232,7 @@ jobs:
           tool: just@1.40.0
 
       - name: Install Dependencies
-        run: uv sync --locked --dev --extra steam
+        run: uv sync --locked --dev ${{ matrix.workshop == 'NoWorkshop' && '--no-install-package pxsteamdl' || '--extra steam' }}
 
       - name: Build with Nuitka
         run: just build-release-bundled --workshop ${{ matrix.workshop }}
@@ -319,7 +319,7 @@ jobs:
 
       - name: Package Windows release
         run: |
-          for variant in SteamWorkshop NativeWorkshop; do
+          for variant in NoWorkshop SteamWorkshop NativeWorkshop; do
             7z a "PxModRim-Windows-${variant}.zip" "./artifacts/PxModRim-Windows-${variant}/*"
           done
 

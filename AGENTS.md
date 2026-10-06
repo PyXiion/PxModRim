@@ -34,6 +34,7 @@ Downloads are plugins; the UI only talks to `core/downloads/manager.py` (`Downlo
 - Installed catalog state uses discovered mods' `published_file_id` (About/PublishedFileId.txt or numeric folder); only downloader-managed local copies have known sync times. Steam-client Workshop copies are installed, but cannot be marked outdated without a known sync timestamp. Downloading places mods in Local mods and never subscribes or activates them.
 - Catalog requests batch installed metadata by 100 IDs and resolution by 50 mod roots / 10 collection roots; large Update all selections retain dependency-first order and deduplicate shared dependencies across requests.
 - New source: subclass `Downloader`, register in `_app.py`, add its name to the `downloaders` list; UI needs no change.
+- Build variants: `packaging/build.py --workshop {NoWorkshop,SteamWorkshop,NativeWorkshop}` bakes `workshop-variant.txt` into the package, which `_app.py` turns into disabled plugins, and `_variant_exclusions` leaves the matching modules out of the Nuitka build. `NoWorkshop` omits PxSteamDL, the Downloads tab and both browsers (CI syncs it with `--no-install-package pxsteamdl`); `SteamWorkshop` omits the native browser; `NativeWorkshop` omits the web browser and WebEngine. CI builds all three on every OS.
 
 ## Key conventions
 - `from __future__ import annotations` in every `.py` file

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -126,3 +127,29 @@ class TestParseDisabledPlugins:
         with patch.dict(os.environ, {"PX_DISABLED_PLUGINS": ""}):
             os.environ.pop("PX_DISABLED_PLUGINS", None)
             assert _parse_disabled_plugins() == set()
+
+
+@pytest.mark.parametrize(
+    ("variant", "disabled"),
+    [
+        (
+            "NoWorkshop",
+            {
+                "steam_downloader",
+                "steamworkshop",
+                "downloads_ui",
+                "workshop_catalog",
+                "workshop_ui",
+            },
+        ),
+        ("SteamWorkshop", {"workshop_catalog", "workshop_ui"}),
+        ("NativeWorkshop", {"steamworkshop"}),
+    ],
+)
+def test_baked_workshop_variant_disables_the_plugins_it_omits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str, disabled: set[str]
+) -> None:
+    (tmp_path / "workshop-variant.txt").write_text(variant, encoding="utf-8")
+    monkeypatch.setattr("pxmodrim._app.resource_files", lambda _: tmp_path)
+    monkeypatch.delenv("PX_DISABLED_PLUGINS", raising=False)
+    assert _parse_disabled_plugins() == disabled

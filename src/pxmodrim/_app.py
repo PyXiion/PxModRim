@@ -103,6 +103,13 @@ def _parse_disabled_plugins() -> set[str]:
     manifest = resource_files("pxmodrim") / "workshop-variant.txt"
     if manifest.is_file():
         exclusions = {
+            "NoWorkshop": {
+                "steam_downloader",
+                "steamworkshop",
+                "downloads_ui",
+                "workshop_catalog",
+                "workshop_ui",
+            },
             "NativeWorkshop": {"steamworkshop"},
             "SteamWorkshop": {"workshop_catalog", "workshop_ui"},
         }
