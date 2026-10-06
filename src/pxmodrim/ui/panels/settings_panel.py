@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -21,9 +22,9 @@ from pxmodrim.core.constants import AfterLaunch
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
-from pxmodrim.core.workshop import WorkshopCatalog
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
+from pxmodrim.ui.settings_section import SettingsSection, SettingsSectionFactory
 from pxmodrim.ui.theme.palette import PALETTE
 
 _QML = Path(__file__).parent / "Settings.qml"
@@ -52,10 +53,20 @@ class _SettingsBackend(QObject):
     communityChanged = Signal()
     cacheChanged = Signal()
 
-    def __init__(self, ctx: CoreContext, dialog: QDialog) -> None:
+    def __init__(
+        self, ctx: CoreContext, dialog: QDialog, sections: Sequence[SettingsSection]
+    ) -> None:
         super().__init__(dialog)
         self._ctx = ctx
         self._dialog = dialog
+        self._sections = [
+            {
+                "title": section.title,
+                "source": QUrl.fromLocalFile(str(section.source)).toString(),
+                "section": section,
+            }
+            for section in sections
+        ]
         cfg = ctx.config
         self._initial: dict[str, Any] = {
             "game": cfg.paths.game,
@@ -63,20 +74,12 @@ class _SettingsBackend(QObject):
             "workshop": cfg.paths.workshop,
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
-            "autoUpdateHours": cfg.workshop_auto_update_hours,
-            "parallelItems": cfg.workshop_parallel_items,
-            "threadsPerItem": cfg.workshop_threads_per_item,
-            "proxy": cfg.workshop_proxy,
-            "catalogUrl": cfg.workshop_catalog_url,
-            "connectTimeout": cfg.workshop_connect_timeout,
-            "stallTimeout": cfg.workshop_stall_timeout,
             "launchArgs": cfg.launch_args,
             "launchWrapper": cfg.launch_wrapper,
             "afterLaunch": int(cfg.after_launch),
             "confirmErrors": cfg.launch_confirm_errors,
             "confirmUnsaved": cfg.launch_confirm_unsaved,
             "confirmRunning": cfg.launch_confirm_running,
-            "steamAvailable": ctx.plugins.get("steam_downloader") is not None,
             "useAltIds": cfg.sort.use_alternative_package_ids,
             "checkMissing": cfg.sort.check_missing_dependencies,
             "useCommunity": cfg.sort.use_community_rules,
@@ -97,6 +100,10 @@ class _SettingsBackend(QObject):
     @Property(dict, constant=True)  # type: ignore[arg-type]
     def initial(self) -> dict[str, Any]:
         return self._initial
+
+    @Property(list, constant=True)  # type: ignore[arg-type]
+    def sections(self) -> list[dict[str, Any]]:
+        return self._sections
 
     @Property(str, notify=communityChanged)  # type: ignore[arg-type]
     def communityStatus(self) -> str:
@@ -195,6 +202,7 @@ class SettingsPanel(QDialog):
         ctx: CoreContext,
         qml_engine: QQmlEngine,
         parent: QWidget,
+        sections: Sequence[SettingsSectionFactory] = (),
     ) -> None:
         super().__init__(parent)
         self.setObjectName("settingsPanel")
@@ -205,7 +213,8 @@ class SettingsPanel(QDialog):
         self._ctx = ctx
         self._config = ctx.config
 
-        self._backend = _SettingsBackend(ctx, self)
+        self._sections = [factory(self) for factory in sections]
+        self._backend = _SettingsBackend(ctx, self, self._sections)
         self._backend.saveRequested.connect(self._save)
         self._backend.cancelRequested.connect(self.reject)
 
@@ -236,13 +245,6 @@ class SettingsPanel(QDialog):
                 use_community_rules=bool(values["useCommunity"]),
             ),
             compact_mod_list=bool(values["compact"]),
-            workshop_auto_update_hours=int(values["autoUpdateHours"]),
-            workshop_parallel_items=int(values["parallelItems"]),
-            workshop_threads_per_item=int(values["threadsPerItem"]),
-            workshop_proxy=values["proxy"].strip(),
-            workshop_catalog_url=values["catalogUrl"].strip(),
-            workshop_connect_timeout=int(values["connectTimeout"]),
-            workshop_stall_timeout=int(values["stallTimeout"]),
             launch_args=values["launchArgs"].strip(),
             launch_wrapper=values["launchWrapper"].strip(),
             after_launch=AfterLaunch(int(values["afterLaunch"])),
@@ -250,9 +252,8 @@ class SettingsPanel(QDialog):
             launch_confirm_unsaved=bool(values["confirmUnsaved"]),
             launch_confirm_running=bool(values["confirmRunning"]),
         )
-        catalog = self._ctx.plugins.get("workshop_catalog")
-        if isinstance(catalog, WorkshopCatalog):
-            catalog.set_base_url(self._config.workshop_catalog_url)
+        for section in self._sections:
+            section.apply()
         self.accept()
 
     def get_config(self) -> AppConfig:

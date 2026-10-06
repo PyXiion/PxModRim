@@ -9,6 +9,7 @@ from time import time
 from typing import Any, TypeVar
 
 import msgspec
+import msgspec.toml
 from loguru import logger
 
 from pxmodrim.core.constants import RIMWORLD_STEAM_APP_ID, AfterLaunch
@@ -66,13 +67,6 @@ class AppConfig(msgspec.Struct):
     )
     max_snapshots: int = 10
     compact_mod_list: bool = False
-    workshop_auto_update_hours: int = 0
-    workshop_parallel_items: int = 8
-    workshop_threads_per_item: int = 1
-    workshop_proxy: str = ""
-    workshop_connect_timeout: int = 10
-    workshop_stall_timeout: int = 30
-    workshop_catalog_url: str = "https://api.modrim.pyxiion.dev"
     log_upload_endpoint: str = "https://paste.rs/"
     launch_args: str = ""
     launch_wrapper: str = ""
@@ -156,6 +150,33 @@ class ConfigService:
             raw[_JSON_SCHEMA_MARKER] = CURRENT_CONFIG_SCHEMA_VERSION
             encoded = msgspec.json.encode(raw)
         self._write(path, encoded)
+
+    def load_toml(self, filename: str, struct_type: type[StructT]) -> StructT | None:
+        """Decode *filename*; ``None`` if it does not exist or cannot be read."""
+        path = self._config_dir / filename
+        try:
+            return msgspec.toml.decode(path.read_bytes(), type=struct_type)
+        except FileNotFoundError:
+            return None
+        except (OSError, msgspec.DecodeError) as e:
+            logger.warning(f"Failed to load {filename}: {e}")
+            return None
+
+    def save_toml(self, filename: str, data: msgspec.Struct) -> None:
+        path = self._config_dir / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_bytes(msgspec.toml.encode(data))
+        os.replace(tmp, path)
+
+    def load_raw(self, filename: str) -> dict[str, Any]:
+        """The undecoded top-level JSON object in *filename*, or ``{}``."""
+        try:
+            return msgspec.json.decode(
+                (self._config_dir / filename).read_bytes(), type=dict[str, Any]
+            )
+        except (OSError, msgspec.DecodeError):
+            return {}
 
     @staticmethod
     def _write(path: Path, data: bytes | dict[str, Any]) -> None:

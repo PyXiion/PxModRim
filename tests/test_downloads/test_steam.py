@@ -18,6 +18,7 @@ from pxmodrim.core.downloads.manager import download_manager
 from pxmodrim.core.downloads.steam import (
     ClientOptions,
     SteamDownloader,
+    SteamSettings,
     WorkshopSyncState,
 )
 from pxmodrim.core.mod_service import ModService
@@ -114,9 +115,9 @@ async def test_login_uses_configured_proxy_and_timeouts(tmp_path: Path) -> None:
     svc, logins = _service(tmp_path, FakeClient())
     assert svc._ctx is not None
     await svc.download_mods(["111"])
-    svc._ctx.config.workshop_proxy = " socks5h://host:1080 "
-    svc._ctx.config.workshop_connect_timeout = 3
-    svc._ctx.config.workshop_stall_timeout = 7
+    svc.settings.update(
+        SteamSettings(proxy=" socks5h://host:1080 ", connect_timeout=3, stall_timeout=7)
+    )
     await svc.download_mods(["222"])
     assert logins == [(None, 10, 30), ("socks5h://host:1080", 3, 7)]
 
@@ -367,7 +368,7 @@ async def test_auto_update_only_syncs_stale_mods_when_enabled(tmp_path: Path) ->
     await svc._auto_update_once()
     assert _synced(tmp_path, svc, "1") is None
 
-    svc._ctx.config.workshop_auto_update_hours = 6
+    svc.settings.update(SteamSettings(auto_update_hours=6))
     await svc._auto_update_once()
     assert _synced(tmp_path, svc, "1") is not None
     synced = _synced(tmp_path, svc, "1")
@@ -388,9 +389,9 @@ async def test_cancelled_manual_batch_does_not_discard_queue_after_auto_update(
     ctx = svc._ctx
     ctx._mod_service = ModService(ctx, [])
     _load(svc, [_mod_at(tmp_path / "Mods" / "1", "1")])
-    ctx.config.workshop_auto_update_hours = 6
+    svc.settings.update(SteamSettings(auto_update_hours=6))
     manager = download_manager(ctx)
-    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog = WorkshopCatalog()
     catalog.setup(ctx)
     tasks: list[asyncio.Task[Any]] = []
     try:
@@ -498,10 +499,8 @@ async def test_download_uses_configured_parallelism_clamped(tmp_path: Path) -> N
     client = FakeClient()
     svc, _ = _service(tmp_path, client)
     assert svc._ctx is not None
-    svc._ctx.config.workshop_parallel_items = 3
-    svc._ctx.config.workshop_threads_per_item = 5
+    svc.settings.update(SteamSettings(parallel_items=3, threads_per_item=5))
     await svc.download_mods(["1"])
-    svc._ctx.config.workshop_parallel_items = 0
-    svc._ctx.config.workshop_threads_per_item = 999
+    svc.settings.update(SteamSettings(parallel_items=0, threads_per_item=999))
     await svc.download_mods(["2"])
     assert [c[2] for c in client.calls] == [15, 16]

@@ -6,7 +6,6 @@ import httpx
 import msgspec
 import pytest
 
-from pxmodrim.core.config import AppConfig
 from pxmodrim.core.workshop import (
     CatalogClient,
     CatalogCollection,
@@ -241,9 +240,7 @@ async def test_fetch_detail_preserves_parent_with_unavailable_dependency(
         assert request.url.path == "/catalog/mods/818773962"
         return httpx.Response(404, json={"error": {"message": "Item unavailable"}})
 
-    config = AppConfig()
     catalog = WorkshopCatalog(
-        lambda: config,
         lambda url: CatalogClient(url, httpx.MockTransport(handler)),
     )
     try:

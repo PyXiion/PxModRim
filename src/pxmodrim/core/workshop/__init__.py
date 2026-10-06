@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pxmodrim.core.workshop.catalog import WorkshopCatalog
+from pxmodrim.core.workshop.catalog import CatalogSettings, WorkshopCatalog
 from pxmodrim.core.workshop.client import CatalogClient, CatalogError
 from pxmodrim.core.workshop.types import (
     Author,
@@ -25,6 +25,7 @@ __all__ = [
     "CatalogMod",
     "CatalogPage",
     "CatalogQuery",
+    "CatalogSettings",
     "CollectionDetail",
     "Discover",
     "DownloadPlan",

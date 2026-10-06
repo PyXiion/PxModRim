@@ -213,9 +213,7 @@ class MainWindow(QMainWindow):
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
-        self._header_controller.downloads_requested.connect(
-            lambda: self._app_ctx.navigate(build_route("downloads"))
-        )
+        self._header_controller.downloads_requested.connect(self._open_downloads)
         self._app_ctx.set_navigator(self._open_route)
         self._header_controller.update_mods_requested.connect(self._update_mods)
 
@@ -284,6 +282,11 @@ class MainWindow(QMainWindow):
                 view.open_route(route.path)
                 return
         logger.warning("main_window: no view handles {}", url)
+
+    def _open_downloads(self) -> None:
+        view = next((v for v in self._views if v.lists_downloads), None)
+        if view is not None:
+            self._app_ctx.navigate(build_route(view.view_id))
 
     def _select_view(self, index: int) -> None:
         if 0 <= index < self._stack.count():
@@ -602,7 +605,11 @@ class MainWindow(QMainWindow):
 
     async def _open_settings(self) -> None:
         result, dialog = await await_dialog(
-            SettingsPanel, self._ctx, self._qml_engine, self
+            SettingsPanel,
+            self._ctx,
+            self._qml_engine,
+            self,
+            self._app_ctx.settings_sections,
         )
         if result != QDialog.DialogCode.Accepted:
             return
@@ -881,7 +888,7 @@ class MainWindow(QMainWindow):
         logger.debug("main_window: rail tab changed to {}", index)
         self._stack.setCurrentIndex(index)
         self._header_controller.set_downloads_progress_shown(
-            self._views[index].view_id != "downloads"
+            not self._views[index].lists_downloads
         )
         # Preload an adjacent tab (e.g. the Steam view next to Mods) so its
         # content is already warm when the user moves to it.

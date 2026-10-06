@@ -12,6 +12,7 @@ from loguru import logger
 from pxmodrim.core.downloads.manager import DownloadManager, download_manager
 from pxmodrim.core.events import Event
 from pxmodrim.core.plugin import Plugin
+from pxmodrim.core.plugin_config import PluginConfig
 from pxmodrim.core.workshop.client import CatalogClient, CatalogError
 from pxmodrim.core.workshop.types import (
     CatalogCollection,
@@ -67,13 +68,19 @@ def _write_stored(directory: Path, path: Path, entry: tuple[float, Any]) -> None
         stale.unlink(missing_ok=True)
 
 
+DEFAULT_CATALOG_URL = "https://api.modrim.pyxiion.dev"
+
+
+class CatalogSettings(msgspec.Struct, frozen=True):
+    url: str = DEFAULT_CATALOG_URL
+
+
 class WorkshopCatalog(Plugin):
     name = "workshop_catalog"
     dependencies: ClassVar[list[str]] = ["downloads"]
 
     def __init__(
         self,
-        config_accessor: Callable[[], AppConfig],
         client_factory: Callable[[str], CatalogClient] = CatalogClient,
     ) -> None:
         self.installed_changed: Event[None] = Event()
@@ -83,9 +90,10 @@ class WorkshopCatalog(Plugin):
         self._runner: asyncio.Future[None] | None = None
         self._idle = asyncio.Event()
         self.catalog_url_changed: Event[str] = Event()
-        self._config = config_accessor
+        self.settings = PluginConfig(None, self.name, CatalogSettings)
+        self.settings.changed.connect(self._on_settings_changed)
         self._client_factory = client_factory
-        self._base_url = config_accessor().workshop_catalog_url.strip().rstrip("/")
+        self._base_url = self.settings.value.url.strip().rstrip("/")
         self._client: CatalogClient | None = None
         self._clients: list[CatalogClient] = []
         self._ctx: CoreContext | None = None
@@ -97,6 +105,14 @@ class WorkshopCatalog(Plugin):
     def setup(self, ctx: CoreContext) -> None:
         self._ctx = ctx
         if ctx.has_config_service:
+            self.settings = PluginConfig(
+                ctx.config_service,
+                self.name,
+                CatalogSettings,
+                legacy={"workshop_catalog_url": "url"},
+            )
+            self.settings.changed.connect(self._on_settings_changed)
+            self._change_url(self.settings.value.url)
             self._cache_dir = ctx.config_service.config_dir / "workshop-cache"
         self._manager = download_manager(ctx)
         ctx.mod_service.mods_changed.connect(self._on_installed_changed)
@@ -112,10 +128,12 @@ class WorkshopCatalog(Plugin):
         self._installed_index = None
         self.installed_changed.emit(None)
 
-    def _on_config_changed(self, config: AppConfig) -> None:
+    def _on_config_changed(self, _config: AppConfig) -> None:
         self._installed_index = None
-        self._change_url(config.workshop_catalog_url)
         self.installed_changed.emit(None)
+
+    def _on_settings_changed(self, settings: CatalogSettings) -> None:
+        self._change_url(settings.url)
 
     def _change_url(self, url: str) -> None:
         url = url.strip().rstrip("/")
@@ -126,17 +144,13 @@ class WorkshopCatalog(Plugin):
         self.catalog_url_changed.emit(url)
 
     def set_base_url(self, url: str) -> None:
-        self._config().workshop_catalog_url = url.strip().rstrip("/")
-        self._change_url(url)
-        if self._ctx is not None and self._ctx.has_config_service:
-            self._ctx.config_service.save("config.json", self._config())
+        self.settings.update(CatalogSettings(url.strip().rstrip("/")))
 
     @property
     def configured(self) -> bool:
-        return bool(self._config().workshop_catalog_url.strip())
+        return bool(self._base_url)
 
     def _catalog_client(self) -> CatalogClient:
-        self._change_url(self._config().workshop_catalog_url)
         if not self.configured:
             raise CatalogError("Workshop catalog is disabled.")
         if self._client is None:

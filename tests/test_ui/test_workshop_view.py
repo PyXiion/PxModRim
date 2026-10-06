@@ -9,7 +9,7 @@ from typing import Any, cast
 import msgspec
 import pytest
 from PySide6.QtCore import QObject, QPoint, Qt, QUrl
-from PySide6.QtGui import QAccessible
+from PySide6.QtGui import QAccessible, QKeySequence
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtTest import QTest
@@ -45,6 +45,7 @@ from pxmodrim.ui.components import create_qml_engine
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.navigation import parse_route
 from pxmodrim.ui.panels.mod_info_data import description_to_html
+from pxmodrim.ui.plugins.workshop.plugin import CatalogSettingsSection
 from pxmodrim.ui.plugins.workshop.view import WorkshopViewPanel
 from pxmodrim.ui.theme.qml_theme import Theme
 
@@ -75,7 +76,7 @@ def _mod(pid: str, dependencies: list[str] | None = None) -> CatalogMod:
 
 class FakeCatalog(WorkshopCatalog):
     def __init__(self, ctx: CoreContext) -> None:
-        super().__init__(lambda: ctx.config)
+        super().__init__()
         self.mod_item = _mod("1", ["2"])
         self.dependency = _mod("2")
         self.collection_item = CatalogCollection(
@@ -337,7 +338,7 @@ async def test_unset_catalog_never_fetches(
 ) -> None:
     view, catalog, _ = panel
     await asyncio.sleep(0)
-    view._ctx.update_config(AppConfig(workshop_catalog_url=""))
+    catalog.set_base_url("")
     await view.load()
     assert not view.configured and not catalog.queries
 
@@ -347,16 +348,30 @@ async def test_settings_saves_and_applies_catalog_url(
 ) -> None:
     from pxmodrim.ui.panels.settings_panel import SettingsPanel
 
-    view, catalog, _ = panel
+    view, catalog, warnings = panel
     await asyncio.sleep(0)
-    view._ctx.plugins.register(catalog)
-    settings = SettingsPanel(view._ctx, view._qml.engine(), view)
-    values = dict(cast("dict[str, Any]", settings._backend.initial))
-    values["catalogUrl"] = " https://catalog.example.test/ "
-    settings._save(values)
-    assert settings.get_config().workshop_catalog_url == "https://catalog.example.test/"
-    assert view._ctx.config.workshop_catalog_url == "https://catalog.example.test"
-    await asyncio.sleep(0)
+    settings = SettingsPanel(
+        view._ctx,
+        view._qml.engine(),
+        view,
+        [lambda parent: CatalogSettingsSection(catalog.settings, parent)],
+    )
+    settings.show()
+    await asyncio.sleep(0.2)
+    root = settings._qml.rootObject()
+    assert root is not None
+    field = _find_item(cast("QQuickItem", root), "catalogUrlField")
+    assert field is not None
+    assert field.property("text") == "https://api.modrim.pyxiion.dev"
+    field.forceActiveFocus()
+    QTest.keySequence(settings._qml, QKeySequence.StandardKey.SelectAll)
+    QTest.keyClicks(settings._qml, " https://catalog.example.test/ ")
+    assert catalog.configured and catalog._base_url != "https://catalog.example.test"
+
+    settings._save(dict(cast("dict[str, Any]", settings._backend.initial)))
+    assert catalog.settings.value.url == "https://catalog.example.test/"
+    assert catalog._base_url == "https://catalog.example.test"
+    assert warnings == []
     settings.deleteLater()
 
 

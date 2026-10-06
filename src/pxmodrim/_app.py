@@ -221,6 +221,11 @@ class App:
             else:
                 self._ctx.register_plugin(SteamDownloader())
                 downloaders.append("steam")
+                from pxmodrim.ui.plugins.steam_downloader import (
+                    SteamDownloaderUiPlugin,
+                )
+
+                self._app_ctx.register_plugin(SteamDownloaderUiPlugin())
 
         if "steam" in downloaders and "steamworkshop" not in disabled:
             from pxmodrim.ui.plugins.steam_workshop import SteamWorkshopUiPlugin
@@ -236,7 +241,7 @@ class App:
         if downloaders and "workshop_catalog" not in disabled:
             from pxmodrim.core.workshop import WorkshopCatalog
 
-            self._ctx.register_plugin(WorkshopCatalog(lambda: ctx.config))
+            self._ctx.register_plugin(WorkshopCatalog())
             if "workshop_ui" not in disabled:
                 from pxmodrim.ui.plugins.workshop import WorkshopUiPlugin
 
@@ -296,7 +301,11 @@ class App:
         if not ctx.config.paths.game:
             logger.info("No game path found, showing settings dialog")
             result, dialog = await await_dialog(
-                SettingsPanel, ctx, self.main_window.qml_engine, self.main_window
+                SettingsPanel,
+                ctx,
+                self.main_window.qml_engine,
+                self.main_window,
+                self._app_ctx.settings_sections,
             )
             if app_close_event.is_set():
                 await self._app_ctx.shutdown_all()

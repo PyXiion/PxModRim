@@ -27,6 +27,7 @@ _QML = Path(__file__).parent / "Downloads.qml"
 
 class DownloadsViewPanel(BaseViewPanel):
     view_id = "downloads"
+    lists_downloads = True
     icon_name = "download"
     label = "Downloads"
 

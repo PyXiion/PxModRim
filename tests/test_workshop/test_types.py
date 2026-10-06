@@ -70,15 +70,13 @@ def test_config_default_loads_existing_files_and_persists_override(
     tmp_path: Path,
 ) -> None:
     service = ConfigService(tmp_path)
-    (tmp_path / "config.json").write_bytes(
-        b'{"schema_version":1,"workshop_parallel_items":3}'
-    )
+    (tmp_path / "config.json").write_bytes(b'{"schema_version":1,"max_snapshots":3}')
     config = service.load("config.json", AppConfig)
-    assert config.workshop_catalog_url == "https://api.modrim.pyxiion.dev"
-    assert config.workshop_parallel_items == 3
-    config.workshop_catalog_url = ""
+    assert config.log_upload_endpoint == "https://paste.rs/"
+    assert config.max_snapshots == 3
+    config.log_upload_endpoint = ""
     service.save("config.json", config)
-    assert service.load("config.json", AppConfig).workshop_catalog_url == ""
+    assert service.load("config.json", AppConfig).log_upload_endpoint == ""
 
 
 def test_query_defaults_and_frozen_contract() -> None:

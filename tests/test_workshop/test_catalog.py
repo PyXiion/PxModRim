@@ -19,6 +19,7 @@ from pxmodrim.core.workshop import (
     CatalogClient,
     CatalogError,
     CatalogMod,
+    CatalogSettings,
     DownloadPlan,
     WorkshopCatalog,
 )
@@ -57,7 +58,7 @@ async def test_install_state_uses_sync_not_directory_mtime(
     tmp_path: Path, mod_payload: dict[str, Any]
 ) -> None:
     ctx, _ = make_context(tmp_path)
-    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog = WorkshopCatalog()
     catalog.setup(ctx)
     assert catalog.install_state(decode_mod(mod_payload, "1")) == "installed"
     assert catalog.install_state(decode_mod(mod_payload, "2")) == "outdated"
@@ -102,7 +103,7 @@ async def test_plan_keeps_dependency_order_and_incomplete_flags(
         )
 
     catalog = WorkshopCatalog(
-        lambda: ctx.config, lambda url: CatalogClient(url, httpx.MockTransport(handler))
+        lambda url: CatalogClient(url, httpx.MockTransport(handler))
     )
     catalog.setup(ctx)
     try:
@@ -141,7 +142,7 @@ async def test_installed_metadata_uses_batch(
         )
 
     catalog = WorkshopCatalog(
-        lambda: ctx.config, lambda url: CatalogClient(url, httpx.MockTransport(handler))
+        lambda url: CatalogClient(url, httpx.MockTransport(handler))
     )
     catalog.setup(ctx)
     try:
@@ -156,7 +157,7 @@ async def test_download_delegates_without_activation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx, _ = make_context(tmp_path)
-    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog = WorkshopCatalog()
     catalog.setup(ctx)
     calls: list[list[str]] = []
     result = DownloadResult(succeeded=["2"], failed=[])
@@ -178,15 +179,15 @@ async def test_download_delegates_without_activation(
 
 async def test_empty_url_disabled_without_constructing_client(tmp_path: Path) -> None:
     ctx, _ = make_context(tmp_path)
-    ctx.config.workshop_catalog_url = ""
     clients: list[str] = []
 
     def factory(url: str) -> CatalogClient:
         clients.append(url)
         raise AssertionError("Disabled catalog must not create a client")
 
-    catalog = WorkshopCatalog(lambda: ctx.config, factory)
+    catalog = WorkshopCatalog(factory)
     catalog.setup(ctx)
+    catalog.set_base_url("")
     try:
         assert not catalog.configured
         for operation in [
@@ -216,7 +217,7 @@ async def test_configuration_and_installed_events(
         transports.append(client._http)
         return client
 
-    catalog = WorkshopCatalog(lambda: ctx.config, factory)
+    catalog = WorkshopCatalog(factory)
     catalog.setup(ctx)
     changed: list[str] = []
     installed: list[None] = []
@@ -224,11 +225,11 @@ async def test_configuration_and_installed_events(
     catalog.installed_changed.connect(installed.append)
     await catalog.mod("2009463077")
     catalog.set_base_url(" https://other.example/ ")
-    assert ctx.config.workshop_catalog_url == "https://other.example"
-    assert (
-        ConfigService(tmp_path).load("config.json", AppConfig).workshop_catalog_url
-        == "https://other.example"
+    assert catalog.settings.value.url == "https://other.example"
+    stored = ConfigService(tmp_path).load_toml(
+        "plugins/workshop_catalog.toml", CatalogSettings
     )
+    assert stored == CatalogSettings("https://other.example")
     await catalog.mod("2009463077")
     catalog.set_base_url("")
     assert not catalog.configured
@@ -249,7 +250,7 @@ async def test_cached_serves_remembered_value_before_refreshing(
     tmp_path: Path,
 ) -> None:
     ctx, _ = make_context(tmp_path)
-    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog = WorkshopCatalog()
     catalog.setup(ctx)
     values = iter(["first", "second", "second"])
     calls = 0
@@ -275,7 +276,7 @@ async def test_enqueue_runs_batches_in_order_after_the_running_download(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx, downloader = make_context(tmp_path)
-    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog = WorkshopCatalog()
     catalog.setup(ctx)
     manager = download_manager(ctx)
     manager.register(downloader)
@@ -313,13 +314,13 @@ async def test_cached_values_survive_a_restart_and_corrupt_files_are_ignored(
     async def must_not_run() -> list[int]:
         raise AssertionError("A fresh value on disk must not hit the catalog")
 
-    first = WorkshopCatalog(lambda: ctx.config)
+    first = WorkshopCatalog()
     first.setup(ctx)
     assert [v async for v in first.cached("k", produce, value_type=list[int])] == [
         [1, 2]
     ]
 
-    second = WorkshopCatalog(lambda: ctx.config)
+    second = WorkshopCatalog()
     second.setup(ctx)
     assert [
         v async for v in second.cached("k", must_not_run, value_type=list[int])
@@ -327,7 +328,7 @@ async def test_cached_values_survive_a_restart_and_corrupt_files_are_ignored(
 
     for file in (tmp_path / "workshop-cache").glob("*.json"):
         file.write_text("{not json")
-    third = WorkshopCatalog(lambda: ctx.config)
+    third = WorkshopCatalog()
     third.setup(ctx)
     assert [v async for v in third.cached("k", produce, value_type=list[int])] == [
         [1, 2]
@@ -338,7 +339,7 @@ async def test_equal_cache_refresh_keeps_the_displayed_mods_and_refreshes_age(
     tmp_path: Path, mod_payload: dict[str, Any]
 ) -> None:
     ctx, _ = make_context(tmp_path)
-    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog = WorkshopCatalog()
     catalog.setup(ctx)
     calls = 0
 
@@ -370,9 +371,9 @@ async def test_disk_cache_is_reused_in_memory_after_first_paint(
     async def must_not_run() -> list[CatalogMod]:
         raise AssertionError("A fresh cached response must not hit the catalog")
 
-    first = WorkshopCatalog(lambda: ctx.config)
+    first = WorkshopCatalog()
     first.setup(ctx)
-    second = WorkshopCatalog(lambda: ctx.config)
+    second = WorkshopCatalog()
     second.setup(ctx)
     try:
         await anext(first.cached("installed", produce, value_type=list[CatalogMod]))
@@ -388,3 +389,17 @@ async def test_disk_cache_is_reused_in_memory_after_first_paint(
     finally:
         await first.shutdown()
         await second.shutdown()
+
+
+def test_catalog_url_moves_out_of_the_old_shared_config(tmp_path: Path) -> None:
+    ctx, _ = make_context(tmp_path)
+    (tmp_path / "config.json").write_bytes(
+        b'{"schema_version":1,"workshop_catalog_url":"http://localhost:8787"}'
+    )
+    catalog = WorkshopCatalog()
+    catalog.setup(ctx)
+    assert catalog.settings.value.url == "http://localhost:8787"
+    stored = ConfigService(tmp_path).load_toml(
+        "plugins/workshop_catalog.toml", CatalogSettings
+    )
+    assert stored == CatalogSettings("http://localhost:8787")
