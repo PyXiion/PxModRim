@@ -6,13 +6,16 @@ import httpx
 import msgspec
 import pytest
 
+from pxmodrim.core.config import AppConfig
 from pxmodrim.core.workshop import (
     CatalogClient,
     CatalogCollection,
     CatalogError,
     CatalogMod,
     CatalogQuery,
+    WorkshopCatalog,
 )
+from pxmodrim.ui.plugins.workshop.details import fetch_detail
 
 
 async def test_decodes_every_endpoint(
@@ -119,7 +122,7 @@ async def test_decodes_every_endpoint(
         await client.shutdown()
 
 
-@pytest.mark.parametrize("status", [400, 401, 404, 502, 503])
+@pytest.mark.parametrize("status", [400, 401, 500, 502, 503])
 @pytest.mark.parametrize("json_body", [True, False])
 async def test_error_statuses_are_never_empty_results(
     status: int, json_body: bool
@@ -144,6 +147,118 @@ async def test_error_statuses_are_never_empty_results(
             assert "<html>" not in exc.value.message
     finally:
         await client.shutdown()
+
+
+@pytest.mark.parametrize("kind", ["mod", "collection"])
+@pytest.mark.parametrize("json_body", [True, False])
+async def test_optional_details_return_none_only_for_404(
+    kind: str, json_body: bool
+) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        if json_body:
+            return httpx.Response(404, json={"error": {"message": "Item unavailable"}})
+        return httpx.Response(404, text="Not found")
+
+    client = CatalogClient("https://catalog.example", httpx.MockTransport(handler))
+    try:
+        if kind == "mod":
+            assert await client.mod("123") is None
+        else:
+            assert await client.collection("steam:123") is None
+    finally:
+        await client.shutdown()
+
+
+@pytest.mark.parametrize("kind", ["mod", "collection"])
+async def test_optional_details_keep_server_errors(kind: str) -> None:
+    client = CatalogClient(
+        "https://catalog.example",
+        httpx.MockTransport(lambda _: httpx.Response(500, text="Server error")),
+    )
+    try:
+        with pytest.raises(CatalogError) as exc:
+            if kind == "mod":
+                await client.mod("123")
+            else:
+                await client.collection("steam:123")
+        assert exc.value.status == 500
+    finally:
+        await client.shutdown()
+
+
+@pytest.mark.parametrize("kind", ["mod", "collection"])
+@pytest.mark.parametrize("failure", ["network", "decoding"])
+async def test_optional_details_keep_network_and_decoding_errors(
+    kind: str, failure: str
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if failure == "network":
+            raise httpx.ConnectError("Disconnected", request=request)
+        return httpx.Response(200, content=b"not-json")
+
+    client = CatalogClient("https://catalog.example", httpx.MockTransport(handler))
+    try:
+        with pytest.raises(CatalogError) as exc:
+            if kind == "mod":
+                await client.mod("123")
+            else:
+                await client.collection("steam:123")
+        assert exc.value.status == (None if failure == "network" else 200)
+    finally:
+        await client.shutdown()
+
+
+@pytest.mark.parametrize("endpoint", ["mods", "collections", "batch", "resolve"])
+async def test_non_optional_endpoints_keep_404_errors(endpoint: str) -> None:
+    client = CatalogClient(
+        "https://catalog.example",
+        httpx.MockTransport(lambda _: httpx.Response(404)),
+    )
+    try:
+        with pytest.raises(CatalogError) as exc:
+            if endpoint == "mods":
+                await client.mods(CatalogQuery())
+            elif endpoint == "collections":
+                await client.collections(CatalogQuery())
+            elif endpoint == "batch":
+                await client.mods_batch(["123"])
+            else:
+                await client.resolve(["123"], [])
+        assert exc.value.status == 404
+    finally:
+        await client.shutdown()
+
+
+async def test_fetch_detail_preserves_parent_with_unavailable_dependency(
+    mod_payload: dict[str, Any],
+) -> None:
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request.url.path)
+        if request.url.path == f"/catalog/mods/{mod_payload['id']}":
+            return httpx.Response(200, json=mod_payload)
+        assert request.url.path == "/catalog/mods/818773962"
+        return httpx.Response(404, json={"error": {"message": "Item unavailable"}})
+
+    config = AppConfig()
+    catalog = WorkshopCatalog(
+        lambda: config,
+        lambda url: CatalogClient(url, httpx.MockTransport(handler)),
+    )
+    try:
+        detail = await fetch_detail(catalog, mod_payload["id"], "mod")
+        assert detail.item.id == mod_payload["id"]
+        assert detail.item.title == mod_payload["title"]
+        assert detail.members == []
+        assert detail.warning == "Unavailable dependencies: 818773962"
+        assert not detail.complete
+        assert requested == [
+            f"/catalog/mods/{mod_payload['id']}",
+            "/catalog/mods/818773962",
+        ]
+    finally:
+        await catalog.shutdown()
 
 
 @pytest.mark.parametrize(

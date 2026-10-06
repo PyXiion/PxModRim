@@ -116,15 +116,25 @@ class CatalogClient:
         )
 
     async def mod(self, id: str) -> CatalogMod | None:
-        return await self._request("GET", f"mods/{quote(id, safe='')}", CatalogMod)
+        try:
+            return await self._request("GET", f"mods/{quote(id, safe='')}", CatalogMod)
+        except CatalogError as exc:
+            if exc.status == 404:
+                return None
+            raise
 
     async def collection(self, id: str) -> CollectionDetail | None:
         source, separator, key = id.partition(":")
         if not separator or source not in {"steam", "picked"} or not key:
             raise CatalogError("Invalid Workshop collection ID.")
-        return await self._request(
-            "GET", f"collections/{source}/{quote(key, safe='')}", CollectionDetail
-        )
+        try:
+            return await self._request(
+                "GET", f"collections/{source}/{quote(key, safe='')}", CollectionDetail
+            )
+        except CatalogError as exc:
+            if exc.status == 404:
+                return None
+            raise
 
     async def mods_batch(self, ids: list[str]) -> tuple[list[CatalogMod], list[str]]:
         items: list[CatalogMod] = []

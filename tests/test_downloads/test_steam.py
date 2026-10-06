@@ -14,12 +14,15 @@ import pytest
 from pxmodrim.core.config import AppConfig, ConfigService
 from pxmodrim.core.context import CoreContext
 from pxmodrim.core.downloads import DownloadItemStatus, DownloadResult
+from pxmodrim.core.downloads.manager import download_manager
 from pxmodrim.core.downloads.steam import (
     ClientOptions,
     SteamDownloader,
     WorkshopSyncState,
 )
+from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.models.metadata.structures import ListedMod
+from pxmodrim.core.workshop import DownloadPlan, WorkshopCatalog
 
 
 class FakeClient:
@@ -370,6 +373,70 @@ async def test_auto_update_only_syncs_stale_mods_when_enabled(tmp_path: Path) ->
     synced = _synced(tmp_path, svc, "1")
     await svc._auto_update_once()
     assert _synced(tmp_path, svc, "1") == synced
+
+
+@pytest.mark.parametrize("cancel_auto_update", [False, True])
+async def test_cancelled_manual_batch_does_not_discard_queue_after_auto_update(
+    tmp_path: Path,
+    cancel_auto_update: bool,
+) -> None:
+    manual_gate = threading.Event()
+    auto_gate = threading.Event()
+    client = FakeClient(gates={111: manual_gate, 1: auto_gate})
+    svc, _ = _service(tmp_path, client)
+    assert svc._ctx is not None
+    ctx = svc._ctx
+    ctx._mod_service = ModService(ctx, [])
+    _load(svc, [_mod_at(tmp_path / "Mods" / "1", "1")])
+    ctx.config.workshop_auto_update_hours = 6
+    manager = download_manager(ctx)
+    catalog = WorkshopCatalog(lambda: ctx.config)
+    catalog.setup(ctx)
+    tasks: list[asyncio.Task[Any]] = []
+    try:
+        manual = asyncio.create_task(manager.download_mods(["111"]))
+        tasks.append(manual)
+        assert await asyncio.to_thread(client.blocked.wait, 5)
+        manager.cancel()
+        client.stopped = True
+        manual_gate.set()
+        assert (await asyncio.wait_for(manual, 5)).succeeded == []
+        assert manager.cancelled
+
+        client.stopped = False
+        client.blocked.clear()
+        auto_update = asyncio.create_task(svc._auto_update_once())
+        tasks.append(auto_update)
+        assert await asyncio.to_thread(client.blocked.wait, 5)
+        assert manager.is_downloading
+        catalog.enqueue(DownloadPlan(["222"], [], [], [], {}, True))
+        runner = catalog._runner
+        assert runner is not None
+        await asyncio.sleep(0)
+        assert not runner.done()
+        assert catalog.queued_ids == {"222"}
+        if cancel_auto_update:
+            manager.cancel()
+            client.stopped = True
+
+        auto_gate.set()
+        await asyncio.wait_for(auto_update, 5)
+        await asyncio.wait_for(runner, 5)
+        assert not catalog.queued_ids
+        if cancel_auto_update:
+            assert [call[0] for call in client.calls] == [[111], [1]]
+            assert manager.cancelled
+            assert _synced(tmp_path, svc, "222") is None
+        else:
+            assert [call[0] for call in client.calls] == [[111], [1], [222]]
+            assert not manager.cancelled
+            assert _synced(tmp_path, svc, "222") is not None
+    finally:
+        manual_gate.set()
+        auto_gate.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await catalog.shutdown()
+        await svc.shutdown()
 
 
 async def test_titles_from_steam_are_emitted(tmp_path: Path) -> None:
