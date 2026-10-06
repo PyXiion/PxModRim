@@ -59,4 +59,5 @@ def collection_payload() -> dict[str, Any]:
         "member_ids": ["2009463077"],
         "member_count": 1,
         "member_previews": [],
+        "total_size": None,
     }

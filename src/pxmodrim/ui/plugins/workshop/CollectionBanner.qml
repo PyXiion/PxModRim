@@ -17,6 +17,7 @@ Rectangle {
     required property bool incompatible
     required property bool queued
     required property int memberCount
+    required property string fileSize
     required property string actionLabel
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
@@ -57,7 +58,7 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
-                text: banner.memberCount + " mods · " + banner.sourceLabel + " · " + banner.author
+                text: banner.memberCount + " mods" + (banner.fileSize !== "Unknown" ? " · " + banner.fileSize : "") + " · " + banner.sourceLabel + " · " + banner.author
                 textFormat: Text.PlainText
                 color: Theme.textDim
                 font.family: Theme.fontFamily

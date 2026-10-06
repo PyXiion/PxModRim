@@ -68,6 +68,7 @@ class CatalogCollection(
     member_ids: list[str]
     member_count: int
     member_previews: list[str] = msgspec.field(default_factory=list)
+    total_size: str | None = None
 
     @property
     def kind(self) -> Literal["collection"]:

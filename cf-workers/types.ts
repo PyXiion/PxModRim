@@ -97,6 +97,8 @@ export interface CatalogCollection {
   member_ids: string[];
   member_count: number;
   member_previews: string[];
+  /** Total download size in bytes; null until every member is known. */
+  total_size: string | null;
 }
 
 export type CatalogItem = CatalogMod | CatalogCollection;

@@ -184,6 +184,7 @@ function normalized(file: SteamFile, authors: Map<string, Author>): CatalogItem 
       member_ids: childIds,
       member_count: file.num_children ?? childIds.length,
       member_previews: [],
+      total_size: null,
     };
   }
   const votes = file.vote_data;

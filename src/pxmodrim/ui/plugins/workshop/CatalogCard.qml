@@ -24,9 +24,10 @@ Rectangle {
 
     readonly property bool isMod: kind === "mod"
     readonly property string meta: [
-        isMod ? author : memberCount + " mods · " + author,
+        isMod ? author : memberCount + " mods",
+        isMod ? "" : author,
         isMod && votes !== "Unrated" ? votes + " liked" : "",
-        isMod && fileSize !== "Unknown" ? fileSize : ""
+        fileSize !== "Unknown" ? fileSize : ""
     ].filter(part => part.length > 0).join(" · ")
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2

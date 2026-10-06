@@ -454,6 +454,12 @@ Rectangle {
                                 Copy { Layout.fillWidth: false; text: (root.detail.fileSize || "Unknown") }
                             }
                             RowLayout {
+                                visible: root.detail.kind === "collection"
+                                spacing: 8
+                                Copy { Layout.fillWidth: false; text: root.detail.memberCount + " mods" }
+                                Copy { Layout.fillWidth: false; visible: root.detail.fileSize !== "Unknown"; text: "· " + root.detail.fileSize + " to download" }
+                            }
+                            RowLayout {
                                 visible: !!root.detail.votesUp
                                 spacing: 8
                                 Image {

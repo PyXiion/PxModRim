@@ -145,10 +145,41 @@ async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: 
     key, steam: steam.next_cursor, picked: cursor.picked === null ? null : picked.next_offset, steam_total: steam.total,
   };
   return {
-    items: await attachMemberPreviews(env, [...pickedItems, ...steam.items]),
+    items: await attachCollectionSizes(env.DB, await attachMemberPreviews(env, [...pickedItems, ...steam.items])),
     total: (source === 'steam' ? 0 : picked.total) + steam.total,
     next_cursor: next.steam === null && next.picked === null ? null : encodeCursor(next),
   };
+}
+
+async function attachCollectionSizes(db: D1Database, collections: CatalogCollection[]): Promise<CatalogCollection[]> {
+  const sizes = new Map<string, number>();
+  for (let offset = 0; offset < collections.length; offset += 90) {
+    const chunk = collections.slice(offset, offset + 90);
+    const rows = await db.prepare(`SELECT id, total_size FROM collection_sizes WHERE id IN (${chunk.map(() => '?').join(',')})`)
+      .bind(...chunk.map(collection => collection.id)).all<{ id: string; total_size: number }>();
+    for (const row of rows.results) sizes.set(row.id, row.total_size);
+  }
+  return collections.map(collection => {
+    const size = sizes.get(collection.id);
+    return size === undefined ? collection : { ...collection, total_size: String(size) };
+  });
+}
+
+// The total is stored only when every member is known and sized; otherwise it stays unknown.
+async function recordCollectionSize(db: D1Database, collection: CatalogCollection, members: CatalogItem[], complete: boolean): Promise<void> {
+  let total = 0;
+  let known = complete && members.length === collection.member_count;
+  for (const member of members) {
+    if (member.kind !== 'mod' || member.file_size === null) known = false;
+    else total += Number(member.file_size);
+  }
+  known &&= Number.isSafeInteger(total);
+  if (known) {
+    await db.prepare('INSERT INTO collection_sizes (id, total_size) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET total_size = excluded.total_size')
+      .bind(collection.id, total).run();
+  } else {
+    await db.prepare('DELETE FROM collection_sizes WHERE id = ?').bind(collection.id).run();
+  }
 }
 
 async function collectionDetails(env: Env, ctx: ExecutionContext, collection: CatalogCollection): Promise<Response> {
@@ -158,8 +189,11 @@ async function collectionDetails(env: Env, ctx: ExecutionContext, collection: Ca
     const item = items.get(id);
     if (item) members.push(item);
   }
-  const [withPreviews] = await attachMemberPreviews(env, [collection], items);
-  return json({ collection: withPreviews!, members, unavailable_ids, is_complete: unavailable_ids.length === 0 && collection.member_count === collection.member_ids.length });
+  const isComplete = unavailable_ids.length === 0 && collection.member_count === collection.member_ids.length;
+  await recordCollectionSize(env.DB, collection, members, isComplete);
+  const [sized] = await attachCollectionSizes(env.DB, [collection]);
+  const [withPreviews] = await attachMemberPreviews(env, [sized!], items);
+  return json({ collection: withPreviews!, members, unavailable_ids, is_complete: isComplete });
 }
 
 async function resolve(env: Env, body: Record<string, unknown>): Promise<Response> {

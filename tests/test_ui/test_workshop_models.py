@@ -193,3 +193,32 @@ def test_compat_label(
         _mod("1"), supported_versions=supported, incompatible=incompatible
     )
     assert item_row(mod, lambda _: "missing", game)["compatLabel"] == label
+
+
+def test_collection_size_comes_from_the_server_and_is_hidden_when_unknown() -> None:
+    collection = CatalogCollection(
+        id="picked:x",
+        source="picked",
+        steam_id=None,
+        title="C",
+        author=Author(None, "Curator", None),
+        description="",
+        description_format="text",
+        preview_url=None,
+        previews=[],
+        workshop_url=None,
+        tags=[],
+        supported_versions=[],
+        created_at=None,
+        updated_at=None,
+        member_ids=["1"],
+        member_count=1,
+    )
+    unknown = item_row(collection, lambda _: "missing", "1.6")
+    sized = item_row(
+        msgspec.structs.replace(collection, total_size=str(3 * 1048576)),
+        lambda _: "missing",
+        "1.6",
+    )
+    assert unknown["fileSize"] == "Unknown"
+    assert sized["fileSize"] == "3.0 MB"

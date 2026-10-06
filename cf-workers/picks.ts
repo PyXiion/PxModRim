@@ -146,6 +146,7 @@ function toCollection(row: PickRow): CatalogCollection {
     member_ids: memberIds,
     member_count: memberIds.length,
     member_previews: [],
+    total_size: null,
   };
 }
 

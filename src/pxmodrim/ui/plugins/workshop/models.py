@@ -95,6 +95,8 @@ def item_row(
         )
         action_label = "Download all"
         member_count = item.member_count
+        if item.total_size is not None:
+            file_size = f"{int(item.total_size) / 1048576:.1f} MB"
     versions = set(item.supported_versions)
     return {
         "itemId": item.id,

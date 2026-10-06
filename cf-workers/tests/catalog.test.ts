@@ -91,7 +91,7 @@ function statements(sql: string): string[] {
 }
 
 async function migrate(database: D1Database): Promise<void> {
-  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql']) {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql', '0006_collection_sizes.sql']) {
     const sql = await readFile(resolvePath('migrations', file), 'utf8');
     await database.batch(statements(sql).map(statement => database.prepare(statement)));
   }
@@ -635,4 +635,32 @@ test('index verification checks at most 100 omitted mods per tick and persists i
   const count = await db.prepare('SELECT count(*) AS n FROM catalog_index WHERE id BETWEEN ? AND ?')
     .bind('9000', '9100').first<{ n: number }>();
   assert.equal(count?.n, 0);
+});
+
+test('collection sizes are stored once members are known, and cleared when membership changes', async () => {
+  await createPick('sized', ['10', '13']);
+  const listed = async () => (await (await request('/catalog/collections?source=picked&q=Starter')).json() as CatalogPage<CatalogCollection>)
+    .items.find(item => item.id === 'picked:sized');
+  try {
+    assert.equal((await listed())?.total_size, null);
+
+    const detail = await (await request('/catalog/collections/picked/sized')).json() as { collection: CatalogCollection };
+    assert.equal(detail.collection.total_size, '8192');
+    assert.equal((await listed())?.total_size, '8192');
+
+    await createPick('sized', ['10', '13', '11']);
+    assert.equal((await listed())?.total_size, null);
+  } finally {
+    await request('/catalog/collections/picked/sized', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collections whose total exceeds a safe integer have no stored size', async () => {
+  await createPick('huge', ['10', '18446744073709551615']);
+  try {
+    const detail = await (await request('/catalog/collections/picked/huge')).json() as { collection: CatalogCollection };
+    assert.equal(detail.collection.total_size, null);
+  } finally {
+    await request('/catalog/collections/picked/huge', 'DELETE', undefined, 'test-admin');
+  }
 });
