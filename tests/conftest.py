@@ -10,6 +10,8 @@ import pytest
 
 from pxmodrim.core.config import ConfigService
 
+os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+
 
 @pytest.fixture
 def config_service(tmp_path: Path) -> ConfigService:

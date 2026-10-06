@@ -1,0 +1,174 @@
+{
+  "total_num_allocations": 1225852,
+  "total_bytes_allocated": 25766877141,
+  "allocation_size_histogram": [
+    {
+      "min_bytes": 0,
+      "max_bytes": 5,
+      "count": 19760
+    },
+    {
+      "min_bytes": 6,
+      "max_bytes": 35,
+      "count": 460394
+    },
+    {
+      "min_bytes": 36,
+      "max_bytes": 218,
+      "count": 463926
+    },
+    {
+      "min_bytes": 219,
+      "max_bytes": 1324,
+      "count": 119085
+    },
+    {
+      "min_bytes": 1325,
+      "max_bytes": 7998,
+      "count": 74285
+    },
+    {
+      "min_bytes": 7999,
+      "max_bytes": 48270,
+      "count": 63773
+    },
+    {
+      "min_bytes": 48271,
+      "max_bytes": 291276,
+      "count": 6435
+    },
+    {
+      "min_bytes": 291277,
+      "max_bytes": 1757607,
+      "count": 15591
+    },
+    {
+      "min_bytes": 1757608,
+      "max_bytes": 10605655,
+      "count": 2542
+    },
+    {
+      "min_bytes": 10605656,
+      "max_bytes": 63996000,
+      "count": 61
+    }
+  ],
+  "allocator_type_distribution": {
+    "MALLOC": 1188150,
+    "CALLOC": 19181,
+    "REALLOC": 18067,
+    "MMAP": 454
+  },
+  "top_allocations_by_size": [
+    {
+      "location": "decode_image:scripts/bench_installed_memory.py:79",
+      "size": 13560493309
+    },
+    {
+      "location": "main:scripts/bench_installed_memory.py:229",
+      "size": 5190933210
+    },
+    {
+      "location": "decode_image:scripts/bench_installed_memory.py:72",
+      "size": 3417085580
+    },
+    {
+      "location": "make_pixmap:scripts/bench_installed_memory.py:86",
+      "size": 2929799308
+    },
+    {
+      "location": "decode_image:scripts/bench_installed_memory.py:76",
+      "size": 247624482
+    }
+  ],
+  "top_allocations_by_count": [
+    {
+      "location": "decode_image:scripts/bench_installed_memory.py:76",
+      "count": 269838
+    },
+    {
+      "location": "decode_image:scripts/bench_installed_memory.py:79",
+      "count": 189574
+    },
+    {
+      "location": "_create_about_mod_from_xml:/home/pyxiion/Projects/RimSort/src/pxmodrim/core/models/metadata/parsing.py:695",
+      "count": 187072
+    },
+    {
+      "location": "main:scripts/bench_installed_memory.py:229",
+      "count": 148687
+    },
+    {
+      "location": "decode_image:scripts/bench_installed_memory.py:72",
+      "count": 126555
+    }
+  ],
+  "top_modules_by_allocation_size": [
+    {
+      "module": "bench_installed_memory",
+      "num_allocations": 970888,
+      "total_bytes": 25477471574
+    },
+    {
+      "module": "pxmodrim",
+      "num_allocations": 218195,
+      "total_bytes": 184635383
+    },
+    {
+      "module": "feature",
+      "num_allocations": 4380,
+      "total_bytes": 27584770
+    },
+    {
+      "module": "aiosqlite",
+      "num_allocations": 17612,
+      "total_bytes": 18695669
+    },
+    {
+      "module": "signature_bootstrap",
+      "num_allocations": 4777,
+      "total_bytes": 17094402
+    }
+  ],
+  "top_modules_by_allocation_count": [
+    {
+      "module": "bench_installed_memory",
+      "num_allocations": 970888,
+      "total_bytes": 25477471574
+    },
+    {
+      "module": "pxmodrim",
+      "num_allocations": 218195,
+      "total_bytes": 184635383
+    },
+    {
+      "module": "aiosqlite",
+      "num_allocations": 17612,
+      "total_bytes": 18695669
+    },
+    {
+      "module": "signature_bootstrap",
+      "num_allocations": 4777,
+      "total_bytes": 17094402
+    },
+    {
+      "module": "feature",
+      "num_allocations": 4380,
+      "total_bytes": 27584770
+    }
+  ],
+  "metadata": {
+    "start_time": "2026-10-06 03:20:55.736000+03:00",
+    "end_time": "2026-10-06 03:23:52.869000+03:00",
+    "total_allocations": 2442435,
+    "total_frames": 0,
+    "peak_memory": 5388120495,
+    "command_line": "/home/pyxiion/.cache/uv/builds-v0/.tmpkfM67I/bin/memray run --force -o docs/benchmarks/memray_installed.bin scripts/bench_installed_memory.py",
+    "pid": 265158,
+    "main_thread_id": 1,
+    "python_allocator": "pymalloc",
+    "has_native_traces": false,
+    "trace_python_allocators": false,
+    "file_format": 0
+  }
+}
