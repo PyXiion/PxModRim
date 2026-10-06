@@ -518,6 +518,10 @@ class WorkshopViewPanel(BaseViewPanel):
             await self.select_tab(path[0].title())
         elif len(path) == 2 and path[0] in ("mod", "collection"):
             await self.open_item(path[1], path[0])
+        else:
+            logger.warning(
+                "[workshop] unknown route {}", build_route(self.view_id, *path)
+            )
 
     @asyncSlot()
     async def back(self) -> None:

@@ -272,7 +272,9 @@ class MainWindow(QMainWindow):
     def _open_route(self, url: str) -> None:
         route = parse_route(url)
         if route is None:
+            logger.warning("main_window: ignoring non-route link {}", url)
             return
+        logger.debug("main_window: navigating to {}", url)
         if route.view_id == SETTINGS_VIEW_ID:
             self._start_settings()
             return
@@ -281,6 +283,7 @@ class MainWindow(QMainWindow):
                 self._show_view(index)
                 view.open_route(route.path)
                 return
+        logger.warning("main_window: no view handles {}", url)
 
     def _select_view(self, index: int) -> None:
         if 0 <= index < self._stack.count():
