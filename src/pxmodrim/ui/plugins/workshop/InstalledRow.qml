@@ -18,7 +18,7 @@ Rectangle {
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
     radius: Theme.radiusMd
-    border.color: Theme.border
+    border.color: row.active ? Theme.success : Theme.border
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
     TapHandler { onTapped: workshopPanel.openItem(row.itemId, row.kind) }
     Accessible.role: Accessible.Button
@@ -27,11 +27,21 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 8
-        anchors.rightMargin: 12
+        anchors.leftMargin: 12
+        anchors.rightMargin: 10
         anchors.topMargin: 6
         anchors.bottomMargin: 6
-        spacing: 12
+        spacing: 10
+        PxCheckBox {
+            id: activeBox
+            checked: row.active
+            Accessible.name: "Active"
+            Accessible.description: "Enable or disable " + row.title
+            onToggled: {
+                workshopPanel.toggleActivation(row.itemId)
+                checked = Qt.binding(() => row.active)
+            }
+        }
         CatalogThumb {
             Layout.fillHeight: true
             Layout.preferredWidth: height
@@ -52,27 +62,13 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
-                text: row.author + (row.fileSize !== "Unknown" ? " · " + row.fileSize : "")
+                text: row.incompatible ? "Not for this game version" : row.author + (row.fileSize !== "Unknown" ? " · " + row.fileSize : "")
                 textFormat: Text.PlainText
-                color: Theme.textDim
+                color: row.incompatible ? Theme.warning : Theme.textDim
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSm
                 elide: Text.ElideRight
             }
-        }
-        PxBadge {
-            visible: row.incompatible
-            compact: true
-            text: "INCOMPATIBLE"
-            textColor: Theme.warning
-            fillColor: Theme.warningBg
-        }
-        PxBadge {
-            visible: row.active
-            compact: true
-            text: "ACTIVE"
-            textColor: Theme.success
-            fillColor: Theme.successBg
         }
         PxButton {
             visible: row.state === "outdated"
@@ -80,11 +76,6 @@ Rectangle {
             variant: "warning"
             enabled: !row.queued
             onClicked: workshopPanel.downloadItem(row.itemId, row.kind)
-        }
-        PxButton {
-            text: row.active ? "Deactivate" : "Activate"
-            variant: row.active ? "danger" : "success"
-            onClicked: workshopPanel.toggleActivation(row.itemId)
         }
     }
 }

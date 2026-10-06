@@ -310,22 +310,24 @@ Rectangle {
                 height: GridView.view.cellHeight - 12
             }
         }
-        ListView {
-            id: installedList
+        GridView {
+            id: installedGrid
             objectName: "installedScroll"
             readonly property bool active: workshopPanel.configured && workshopPanel.tab === "Installed"
+            property int columns: Math.max(1, Math.floor(width / 340))
             visible: !workshopPanel.hasDetail && active
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 6
+            cellWidth: width / columns
+            cellHeight: 62
             model: active ? catalogMods : null
             ScrollBar.vertical: PxScrollBar {}
-            header: ListingHeader { width: installedList.width }
-            footer: ListingFooter { width: installedList.width; listing: catalogMods }
+            header: ListingHeader { width: installedGrid.width }
+            footer: ListingFooter { width: installedGrid.width; listing: catalogMods }
             delegate: InstalledRow {
-                width: ListView.view.width - 12
-                height: 56
+                width: GridView.view.cellWidth - 8
+                height: GridView.view.cellHeight - 8
             }
         }
         ScrollView {
