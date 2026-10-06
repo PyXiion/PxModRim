@@ -228,8 +228,9 @@ class SettingsPanel(QDialog):
         self._qml.setSource(QUrl.fromLocalFile(str(_QML)))
         layout.addWidget(self._qml)
         # Unload before the backend and sections (children of this dialog) are
-        # destroyed, or every binding to them re-evaluates against null.
-        self.finished.connect(self._unload)
+        # destroyed, or every binding to them re-evaluates against null. Queued:
+        # Save/Cancel finish the dialog from inside a QML click handler.
+        self.finished.connect(self._unload, Qt.ConnectionType.QueuedConnection)
 
     def _unload(self) -> None:
         self._qml.setSource(QUrl())
