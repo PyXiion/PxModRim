@@ -5,6 +5,8 @@ All notable changes to PxModRim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-10-06
 ### Changed
 - Workshop collections show their members' total size in MB and the game versions all members support (cards, banners and details) when the server knows them; the catalog stores both per collection once the members have been read (expiring after a day), and hides them otherwise.
 - Workshop cards are shorter and show a two-line title, a plain-text summary, game-version compatibility and a single primary action; Discover shows wide collection banners above compact popular mods, and Installed is a multi-column grid of compact tiles with an active checkbox beside each title and an Update button.

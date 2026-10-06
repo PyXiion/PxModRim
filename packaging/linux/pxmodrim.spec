@@ -1,5 +1,5 @@
 Name:           pxmodrim
-Version:        %{?version}%{!?version:0.2.0}
+Version:        %{?version}%{!?version:0.3.0}
 Release:        1%{?dist}
 Summary:        Mod manager for RimWorld
 License:        LGPL-3.0
