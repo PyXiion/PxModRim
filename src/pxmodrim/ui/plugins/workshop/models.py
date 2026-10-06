@@ -132,6 +132,7 @@ def item_row(
         "state": state,
         "active": False,
         "queued": False,
+        "favourite": False,
         "stateLabel": {
             "missing": "Not installed",
             "installed": "Installed",
@@ -180,6 +181,7 @@ class CatalogListModel(QAbstractListModel):
         "votesUp",
         "votesDown",
         "queued",
+        "favourite",
         "summary",
         "compatLabel",
     )

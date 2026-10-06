@@ -51,10 +51,7 @@ Rectangle {
 
         Layout.fillWidth: true
         implicitHeight: body.implicitHeight + 52
-        radius: Theme.radiusMd
-        color: Theme.elevate1
-        border.width: 1
-        border.color: Theme.border
+        color: "transparent"
 
         Text {
             x: 16

@@ -14,6 +14,7 @@ from pxmodrim.core.events import Event
 from pxmodrim.core.plugin import Plugin
 from pxmodrim.core.plugin_config import PluginConfig
 from pxmodrim.core.workshop.client import CatalogClient, CatalogError
+from pxmodrim.core.workshop.favourites import FavouriteCollections
 from pxmodrim.core.workshop.types import (
     CatalogCollection,
     CatalogMod,
@@ -92,6 +93,7 @@ class WorkshopCatalog(Plugin):
         self.catalog_url_changed: Event[str] = Event()
         self.settings = PluginConfig(None, self.name, CatalogSettings)
         self.settings.changed.connect(self._on_settings_changed)
+        self.favourites = FavouriteCollections(None)
         self._client_factory = client_factory
         self._base_url = self.settings.value.url.strip().rstrip("/")
         self._client: CatalogClient | None = None
@@ -114,6 +116,7 @@ class WorkshopCatalog(Plugin):
             self.settings.changed.connect(self._on_settings_changed)
             self._change_url(self.settings.value.url)
             self._cache_dir = ctx.config_service.config_dir / "workshop-cache"
+            self.favourites = FavouriteCollections(ctx.config_service)
         self._manager = download_manager(ctx)
         ctx.mod_service.mods_changed.connect(self._on_installed_changed)
         self._manager.download_finished.connect(self._on_download_finished)
