@@ -58,7 +58,16 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
-                text: banner.memberCount + " mods" + (banner.fileSize !== "Unknown" ? " · " + banner.fileSize : "") + " · " + banner.sourceLabel + " · " + banner.author
+                text: banner.memberCount + " mods" + (banner.fileSize !== "Unknown" ? " · " + banner.fileSize : "")
+                textFormat: Text.PlainText
+                color: Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeMd
+                elide: Text.ElideRight
+            }
+            Text {
+                Layout.fillWidth: true
+                text: banner.sourceLabel + " · " + banner.author
                 textFormat: Text.PlainText
                 color: Theme.textDim
                 font.family: Theme.fontFamily

@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Changed
-- Workshop collections show their total download size in MB (cards, banners and details) when the server knows it; the catalog stores it per collection once the members have been read, and hides it otherwise.
+- Workshop collections show their members' total size in MB and the game versions all members support (cards, banners and details) when the server knows them; the catalog stores both per collection once the members have been read (expiring after a day), and hides them otherwise.
 - Workshop cards are shorter and show a two-line title, a plain-text summary, game-version compatibility and a single primary action; Discover shows wide collection banners above compact popular mods, and Installed is a multi-column grid of compact tiles with an active checkbox beside each title and an Update button.
 - Workshop Back walks the detail history (a dependency's Back returns to the mod you came from) and is labelled with the previous page. Workshop pages and the rail views are addressable with `modrim://` links, e.g. `modrim://workshop/mod/<id>` and `modrim://downloads`.
 

@@ -457,7 +457,7 @@ Rectangle {
                                 visible: root.detail.kind === "collection"
                                 spacing: 8
                                 Copy { Layout.fillWidth: false; text: root.detail.memberCount + " mods" }
-                                Copy { Layout.fillWidth: false; visible: root.detail.fileSize !== "Unknown"; text: "· " + root.detail.fileSize + " to download" }
+                                Copy { Layout.fillWidth: false; visible: root.detail.fileSize !== "Unknown"; text: "· " + root.detail.fileSize + " total" }
                             }
                             RowLayout {
                                 visible: !!root.detail.votesUp

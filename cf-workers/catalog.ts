@@ -145,41 +145,55 @@ async function collectionPage(env: Env, ctx: ExecutionContext, url: URL, query: 
     key, steam: steam.next_cursor, picked: cursor.picked === null ? null : picked.next_offset, steam_total: steam.total,
   };
   return {
-    items: await attachCollectionSizes(env.DB, await attachMemberPreviews(env, [...pickedItems, ...steam.items])),
+    items: await attachCollectionSummaries(env.DB, await attachMemberPreviews(env, [...pickedItems, ...steam.items])),
     total: (source === 'steam' ? 0 : picked.total) + steam.total,
     next_cursor: next.steam === null && next.picked === null ? null : encodeCursor(next),
   };
 }
 
-async function attachCollectionSizes(db: D1Database, collections: CatalogCollection[]): Promise<CatalogCollection[]> {
-  const sizes = new Map<string, number>();
+const SUMMARY_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_SIZE = 2n ** 63n - 1n;
+
+interface SummaryRow { id: string; total_size: string | null; supported_versions: string }
+
+// Totals and versions are denormalised from the members; they expire so a member update cannot leave them wrong for long.
+async function attachCollectionSummaries(db: D1Database, collections: CatalogCollection[]): Promise<CatalogCollection[]> {
+  const summaries = new Map<string, SummaryRow>();
+  const cutoff = Date.now() - SUMMARY_TTL_MS;
   for (let offset = 0; offset < collections.length; offset += 90) {
     const chunk = collections.slice(offset, offset + 90);
-    const rows = await db.prepare(`SELECT id, total_size FROM collection_sizes WHERE id IN (${chunk.map(() => '?').join(',')})`)
-      .bind(...chunk.map(collection => collection.id)).all<{ id: string; total_size: number }>();
-    for (const row of rows.results) sizes.set(row.id, row.total_size);
+    const rows = await db.prepare(
+      `SELECT id, total_size, supported_versions FROM collection_summaries WHERE computed_at > ? AND id IN (${chunk.map(() => '?').join(',')})`,
+    ).bind(cutoff, ...chunk.map(collection => collection.id)).all<SummaryRow>();
+    for (const row of rows.results) summaries.set(row.id, row);
   }
   return collections.map(collection => {
-    const size = sizes.get(collection.id);
-    return size === undefined ? collection : { ...collection, total_size: String(size) };
+    const summary = summaries.get(collection.id);
+    if (!summary) return collection;
+    return { ...collection, total_size: summary.total_size, supported_versions: JSON.parse(summary.supported_versions) as string[] };
   });
 }
 
-// The total is stored only when every member is known and sized; otherwise it stays unknown.
-async function recordCollectionSize(db: D1Database, collection: CatalogCollection, members: CatalogItem[], complete: boolean): Promise<void> {
-  let total = 0;
-  let known = complete && members.length === collection.member_count;
-  for (const member of members) {
-    if (member.kind !== 'mod' || member.file_size === null) known = false;
-    else total += Number(member.file_size);
+// Stored only once every member is a known mod. The size stays null if any member size is unknown;
+// the versions are those every member supports.
+async function recordCollectionSummary(db: D1Database, collection: CatalogCollection, members: CatalogItem[], complete: boolean): Promise<void> {
+  const mods = members.filter((member): member is CatalogMod => member.kind === 'mod');
+  if (!complete || mods.length !== members.length || mods.length !== collection.member_count) {
+    await db.prepare('DELETE FROM collection_summaries WHERE id = ?').bind(collection.id).run();
+    return;
   }
-  known &&= Number.isSafeInteger(total);
-  if (known) {
-    await db.prepare('INSERT INTO collection_sizes (id, total_size) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET total_size = excluded.total_size')
-      .bind(collection.id, total).run();
-  } else {
-    await db.prepare('DELETE FROM collection_sizes WHERE id = ?').bind(collection.id).run();
+  let total: bigint | null = 0n;
+  for (const mod of mods) {
+    total = total === null || mod.file_size === null || !/^\d+$/.test(mod.file_size) ? null : total + BigInt(mod.file_size);
   }
+  if (total !== null && total > MAX_SIZE) total = null;
+  const versions = mods.length
+    ? mods.map(mod => mod.supported_versions).reduce((common, next) => common.filter(version => next.includes(version)))
+    : [];
+  await db.prepare(
+    `INSERT INTO collection_summaries (id, total_size, supported_versions, computed_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET total_size = excluded.total_size, supported_versions = excluded.supported_versions, computed_at = excluded.computed_at`,
+  ).bind(collection.id, total === null ? null : total.toString(), JSON.stringify(versions), Date.now()).run();
 }
 
 async function collectionDetails(env: Env, ctx: ExecutionContext, collection: CatalogCollection): Promise<Response> {
@@ -190,9 +204,9 @@ async function collectionDetails(env: Env, ctx: ExecutionContext, collection: Ca
     if (item) members.push(item);
   }
   const isComplete = unavailable_ids.length === 0 && collection.member_count === collection.member_ids.length;
-  await recordCollectionSize(env.DB, collection, members, isComplete);
-  const [sized] = await attachCollectionSizes(env.DB, [collection]);
-  const [withPreviews] = await attachMemberPreviews(env, [sized!], items);
+  await recordCollectionSummary(env.DB, collection, members, isComplete);
+  const [summarised] = await attachCollectionSummaries(env.DB, [collection]);
+  const [withPreviews] = await attachMemberPreviews(env, [summarised!], items);
   return json({ collection: withPreviews!, members, unavailable_ids, is_complete: isComplete });
 }
 
