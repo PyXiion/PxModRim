@@ -584,14 +584,12 @@ async def test_routes_open_tabs_and_items_and_reset_history(
     await view.open_item("1", "mod")
     await view.open_item("2", "mod")
 
-    view.open_route(("collection", "picked:test"))
-    await asyncio.sleep(0.2)
+    await view.follow_route(("collection", "picked:test"))
     assert view.url == "pxmodrim://workshop/collection/picked%3Atest"
     await view.back()
     assert not view.hasDetail
 
-    view.open_route(("installed",))
-    await asyncio.sleep(0.2)
+    await view.follow_route(("installed",))
     assert view.tab == "Installed"
     assert view.url == "pxmodrim://workshop/installed"
 

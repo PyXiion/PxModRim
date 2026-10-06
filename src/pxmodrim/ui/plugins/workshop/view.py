@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from hashlib import sha256
 from pathlib import Path
@@ -90,6 +91,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._detail_data: Detail | None = None
         self._installed = InstalledList()
         self._installed_dirty = False
+        self._route_tasks: set[asyncio.Future[None]] = set()
         self._current: tuple[str, str] | None = None
         self._trail: list[tuple[str, str, str]] = []
         self._update_count = 0
@@ -499,13 +501,18 @@ class WorkshopViewPanel(BaseViewPanel):
             await self._load_pack()
 
     def open_route(self, path: tuple[str, ...]) -> None:
+        task = asyncio.ensure_future(self.follow_route(path))
+        self._route_tasks.add(task)
+        task.add_done_callback(self._route_tasks.discard)
+
+    async def follow_route(self, path: tuple[str, ...]) -> None:
         if self._torn_down:
             return
         if len(path) == 1 and path[0].title() in _TABS:
-            self.selectTab(path[0].title())
+            await self.selectTab(path[0].title())
         elif len(path) == 2 and path[0] in ("mod", "collection"):
             self._clear_detail()
-            self.openItem(path[1], path[0])
+            await self.open_item(path[1], path[0])
 
     @asyncSlot()
     async def back(self) -> None:

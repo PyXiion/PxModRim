@@ -48,6 +48,7 @@ GROUPS: dict[str, set[str]] = {
     "core.support": {"core.support"},
     "ui.progress": {"ui.progress"},
     "ui.context": {"ui.context"},
+    "ui.navigation": {"ui.navigation"},
     "ui.theme": {"ui.theme"},
     "ui.components": {"ui.components"},
     "ui.models": {"ui.models"},
@@ -131,6 +132,7 @@ ALLOWED: dict[str, set[str]] = {
     "ui.components": {"ui.theme"},
     "ui.models": {"ui.theme"},
     "ui.ui_prefs": set(),
+    "ui.navigation": set(),
     "ui.config": {"core", "ui.ui_prefs"},
     "ui.mod_selection": {"ui.panels"},
     "ui.plugins": {
@@ -142,6 +144,7 @@ ALLOWED: dict[str, set[str]] = {
         "ui.views",
         "ui.panels",
         "ui.mod_selection",
+        "ui.navigation",
     },
     "ui.panels": {
         "ui.theme",
@@ -171,6 +174,7 @@ ALLOWED: dict[str, set[str]] = {
         "ui.config",
         "ui.ui_prefs",
         "ui.mod_selection",
+        "ui.navigation",
     },
 }
 

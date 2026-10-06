@@ -51,6 +51,29 @@ def test_view_shortcuts_wrap_and_ignore_invalid_indexes() -> None:
     assert selections == [2, 0]
 
 
+def test_route_selects_the_view_then_hands_it_the_path() -> None:
+    opened: list[tuple[str, ...]] = []
+    selected: list[int] = []
+
+    def view(view_id: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            view_id=view_id,
+            open_route=lambda path, v=view_id: opened.append((v, *path)),
+        )
+
+    window = cast(
+        MainWindow,
+        SimpleNamespace(
+            _views=[view("mods"), view("workshop")], _select_view=selected.append
+        ),
+    )
+    MainWindow._open_route(window, "pxmodrim://workshop/mod/42")
+    MainWindow._open_route(window, "pxmodrim://missing/x")
+    MainWindow._open_route(window, "workshop")
+    assert selected == [1]
+    assert opened == [("workshop", "mod", "42")]
+
+
 def test_dirty_state_tracks_active_list_order_and_updates_header() -> None:
     class Header:
         unsaved_changes = False
