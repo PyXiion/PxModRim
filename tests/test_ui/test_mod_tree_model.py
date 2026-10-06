@@ -249,7 +249,7 @@ def _find_quick_item(root_item: QQuickItem, name: str) -> QQuickItem | None:
     return None
 
 
-async def _until(predicate: Callable[[], object], timeout: float = 3.0) -> None:
+async def _until(predicate: Callable[[], object], timeout: float = 10.0) -> None:
     deadline = asyncio.get_running_loop().time() + timeout
     while not predicate() and asyncio.get_running_loop().time() < deadline:
         await asyncio.sleep(0.02)

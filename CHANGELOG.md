@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Fixed
 - QML menus, combo box dropdowns and tooltips open in their own window, so they are no longer clipped by the widget that hosts them (the header's launch-strategy menu and help menu).
+- Qt Quick Controls default to the customizable Basic style on every platform; UI tests allow slower CI rendering and wait for organizer rule-window activation before interacting.
 
 ### Added
 - Settings and Help are pinned to the bottom of the left rail (the header no longer has a Settings button). The Help menu has Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.

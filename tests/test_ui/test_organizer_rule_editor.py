@@ -39,7 +39,7 @@ def qapp() -> Iterator[QApplication]:
     yield app
 
 
-async def _until(condition: Callable[[], bool], timeout: float = 3.0) -> None:
+async def _until(condition: Callable[[], bool], timeout: float = 10.0) -> None:
     """Pump both Qt and asyncio (asyncSlot tasks) until ``condition`` holds."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
@@ -162,6 +162,8 @@ async def test_rule_editor_persists_ordered_rules_and_keeps_invalid_draft(
         async def open_editor(count: int) -> list[QQuickItem]:
             QTest.mouseClick(rules_button, Qt.MouseButton.LeftButton)
             await _until(lambda: bool(dialog.property("opened")))
+            # Opening the QML root does not wait for native window activation.
+            assert QTest.qWaitForWindowActive(view._rules_dialog)
             return await _laid_out_rows(dialog, count)
 
         async def save_and_close() -> None:
@@ -293,6 +295,7 @@ async def test_rule_editor_adds_standard_rules_only_from_clean_draft(
         assert dialog is not None
         QTest.mouseClick(view.rules_button, Qt.MouseButton.LeftButton)
         await _until(lambda: bool(dialog.property("opened")))
+        assert QTest.qWaitForWindowActive(view._rules_dialog)
         await _laid_out_rows(dialog, 0)
         standard = dialog.findChild(QQuickItem, "organizerAddStandardRules")
         assert standard is not None

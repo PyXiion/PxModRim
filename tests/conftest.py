@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import gc
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from pxmodrim.core.config import ConfigService
+
+os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
 
 @pytest.fixture
