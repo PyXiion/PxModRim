@@ -99,6 +99,8 @@ export interface CatalogCollection {
   member_previews: string[];
   /** Total download size in bytes; null until every member is known. */
   total_size: string | null;
+  /** True when every member is known and no game version is supported by all of them. */
+  no_common_version: boolean;
 }
 
 export type CatalogItem = CatalogMod | CatalogCollection;

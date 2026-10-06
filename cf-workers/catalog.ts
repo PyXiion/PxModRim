@@ -170,7 +170,8 @@ async function attachCollectionSummaries(db: D1Database, collections: CatalogCol
   return collections.map(collection => {
     const summary = summaries.get(collection.id);
     if (!summary) return collection;
-    return { ...collection, total_size: summary.total_size, supported_versions: JSON.parse(summary.supported_versions) as string[] };
+    const versions = JSON.parse(summary.supported_versions) as string[];
+    return { ...collection, total_size: summary.total_size, supported_versions: versions, no_common_version: versions.length === 0 };
   });
 }
 
@@ -358,7 +359,7 @@ export async function handleCatalogRequest(request: Request, env: Env, ctx: Exec
     return await route(request, env, ctx);
   } catch (error) {
     if (error instanceof HttpError) return json({ error: { message: error.message } }, error.status);
-    console.error('[CATALOG] Internal request failure');
+    console.error('[CATALOG] Internal request failure', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
     return json({ error: { message: 'Internal catalog error' } }, 500);
   }
 }

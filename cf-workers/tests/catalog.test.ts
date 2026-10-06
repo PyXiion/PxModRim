@@ -647,6 +647,7 @@ test('collection sizes and common versions are stored once members are known, an
     const detail = await (await request('/catalog/collections/picked/sized')).json() as { collection: CatalogCollection };
     assert.equal(detail.collection.total_size, '8192');
     assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+    assert.equal(detail.collection.no_common_version, false);
     assert.equal((await listed())?.total_size, '8192');
 
     await db.prepare('UPDATE collection_summaries SET computed_at = 1 WHERE id = ?').bind('picked:sized').run();
@@ -676,6 +677,7 @@ test('a collection supports only the game versions every member supports', async
   try {
     const detail = await (await request('/catalog/collections/picked/versions')).json() as { collection: CatalogCollection };
     assert.deepEqual(detail.collection.supported_versions, []);
+    assert.equal(detail.collection.no_common_version, true);
     assert.equal(detail.collection.total_size, '8192');
   } finally {
     await request('/catalog/collections/picked/versions', 'DELETE', undefined, 'test-admin');

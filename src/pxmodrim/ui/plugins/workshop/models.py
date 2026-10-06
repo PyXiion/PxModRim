@@ -48,9 +48,13 @@ def summarize(text: str, description_format: str = "bbcode") -> str:
     return f"{cut}…"
 
 
-def _compat_label(supported: list[str], game_version: str, incompatible: bool) -> str:
+def _compat_label(
+    supported: list[str], game_version: str, incompatible: bool, no_common: bool
+) -> str:
     if not game_version:
         return ""
+    if no_common:
+        return "No common version"
     if incompatible:
         return f"Not for {game_version}"
     if not supported:
@@ -98,6 +102,8 @@ def item_row(
         if item.total_size is not None:
             file_size = f"{int(item.total_size) / 1048576:.1f} MB"
     versions = set(item.supported_versions)
+    no_common = isinstance(item, CatalogCollection) and item.no_common_version
+    incompatible = incompatible or no_common
     return {
         "itemId": item.id,
         "kind": item.kind,
@@ -144,7 +150,7 @@ def item_row(
         "votesDown": votes_down,
         "summary": summarize(item.description, item.description_format),
         "compatLabel": _compat_label(
-            item.supported_versions, game_version, incompatible
+            item.supported_versions, game_version, incompatible, no_common
         ),
     }
 

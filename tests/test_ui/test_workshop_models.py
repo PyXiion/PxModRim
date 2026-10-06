@@ -222,3 +222,35 @@ def test_collection_size_comes_from_the_server_and_is_hidden_when_unknown() -> N
     )
     assert unknown["fileSize"] == "Unknown"
     assert sized["fileSize"] == "3.0 MB"
+
+
+def test_collection_without_a_common_version_is_incompatible_not_unstated() -> None:
+    collection = CatalogCollection(
+        id="steam:1",
+        source="steam",
+        steam_id="1",
+        title="C",
+        author=Author(None, "Curator", None),
+        description="",
+        description_format="bbcode",
+        preview_url=None,
+        previews=[],
+        workshop_url=None,
+        tags=[],
+        supported_versions=[],
+        created_at=None,
+        updated_at=None,
+        member_ids=["1", "2"],
+        member_count=2,
+        no_common_version=True,
+    )
+    row = item_row(collection, lambda _: "missing", "1.6")
+    assert row["compatLabel"] == "No common version"
+    assert row["incompatible"] is True
+    unknown = item_row(
+        msgspec.structs.replace(collection, no_common_version=False),
+        lambda _: "missing",
+        "1.6",
+    )
+    assert unknown["compatLabel"] == "Version not stated"
+    assert unknown["incompatible"] is False

@@ -60,4 +60,5 @@ def collection_payload() -> dict[str, Any]:
         "member_count": 1,
         "member_previews": [],
         "total_size": None,
+        "no_common_version": False,
     }
