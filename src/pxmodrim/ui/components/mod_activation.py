@@ -59,7 +59,7 @@ async def apply_activation(
     enabling = list(enable)
     disabling = list(disable)
     activation = ctx.activation
-    dependents = activation.dependents_of(disabling)
+    dependents = activation.dependents_of(disabling, enable=enabling)
     if dependents:
         all_mods = ctx.all_mods
         details = [_dependent_detail(all_mods[uuid]) for uuid in dependents]

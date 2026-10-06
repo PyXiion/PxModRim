@@ -21,6 +21,7 @@ from pxmodrim.core.downloads.types import (
     DownloadProgress,
     DownloadResult,
 )
+from pxmodrim.core.plugin_config import PluginConfig
 
 if TYPE_CHECKING:
     from pxmodrim.core.context import CoreContext
@@ -128,6 +129,20 @@ class _Batch:
         )
 
 
+class SteamSettings(msgspec.Struct, frozen=True):
+    auto_update_hours: int = 0
+    parallel_items: int = 8
+    threads_per_item: int = 1
+    proxy: str = ""
+    connect_timeout: int = 10
+    stall_timeout: int = 30
+
+
+_LEGACY_SETTINGS = {
+    f"workshop_{field}": field for field in SteamSettings.__struct_fields__
+}
+
+
 class SteamDownloader(Downloader):
     """Downloads Steam Workshop items into the local mods folder via PxSteamDL."""
 
@@ -145,10 +160,15 @@ class SteamDownloader(Downloader):
         self._sync = WorkshopSyncState()
         self._auto_task: asyncio.Task[None] | None = None
         self._running: asyncio.Future[list[pxsteamdl.Result]] | None = None
+        self.settings = PluginConfig(None, self.name, SteamSettings)
 
     def setup(self, ctx: CoreContext) -> None:
         super().setup(ctx)
         self._ctx = ctx
+        if ctx.has_config_service:
+            self.settings = PluginConfig(
+                ctx.config_service, self.name, SteamSettings, legacy=_LEGACY_SETTINGS
+            )
 
     async def init(self, ctx: CoreContext) -> None:
         self._sync = await asyncio.to_thread(
@@ -279,7 +299,7 @@ class SteamDownloader(Downloader):
     async def _auto_update_once(self) -> None:
         if self._ctx is None or self.is_downloading:
             return
-        hours = self._ctx.config.workshop_auto_update_hours
+        hours = self.settings.value.auto_update_hours
         if hours <= 0:
             return
         ids = self.stale_ids(hours * 3600)
@@ -326,13 +346,9 @@ class SteamDownloader(Downloader):
                 self._finish_item(batch, pid, error=message)
             return
 
-        cfg = self._ctx.config if self._ctx is not None else None
-        parallel_items = min(
-            MAX_PARALLEL_ITEMS, max(1, cfg.workshop_parallel_items if cfg else 8)
-        )
-        threads_per_item = min(
-            MAX_THREADS_PER_ITEM, max(1, cfg.workshop_threads_per_item if cfg else 1)
-        )
+        cfg = self.settings.value
+        parallel_items = min(MAX_PARALLEL_ITEMS, max(1, cfg.parallel_items))
+        threads_per_item = min(MAX_THREADS_PER_ITEM, max(1, cfg.threads_per_item))
         logger.debug(
             "[workshop] client.download start: {} items, {} parallel x {} threads",
             len(ids),
@@ -402,13 +418,11 @@ class SteamDownloader(Downloader):
                 self._finish_item(batch, pid, error=result.error)
 
     def _wanted_options(self) -> ClientOptions:
-        cfg = self._ctx.config if self._ctx is not None else None
-        if cfg is None:
-            return (None, 10, 30)
+        cfg = self.settings.value
         return (
-            cfg.workshop_proxy.strip() or None,
-            max(1, cfg.workshop_connect_timeout),
-            max(1, cfg.workshop_stall_timeout),
+            cfg.proxy.strip() or None,
+            max(1, cfg.connect_timeout),
+            max(1, cfg.stall_timeout),
         )
 
     async def _ensure_client(self) -> WorkshopClient:

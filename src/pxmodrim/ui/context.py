@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar, Protocol
 from PySide6.QtWidgets import QWidget
 
 from pxmodrim.core.plugin import Plugin, PluginRegistry
+from pxmodrim.ui.settings_section import SettingsSectionFactory
 from pxmodrim.ui.ui_prefs import UIPrefs
 
 if TYPE_CHECKING:
@@ -27,6 +28,12 @@ class RailView(QWidget):
     view_id: ClassVar[str]
     icon_name: ClassVar[str]
     label: ClassVar[str]
+    #: The download queue: the header's downloads button opens it, and the header
+    #: hides its own download progress while it is shown.
+    lists_downloads: ClassVar[bool] = False
+
+    def open_route(self, path: tuple[str, ...]) -> None:
+        """Handle the part of a ``modrim://<view_id>/…`` link after the view id."""
 
     def __init__(
         self,
@@ -44,6 +51,7 @@ class AppContext:
         "_navigate",
         "_plugins",
         "_rail_views",
+        "_settings_sections",
         "_toasts",
         "_ui_prefs",
     )
@@ -52,6 +60,7 @@ class AppContext:
         self._core = core
         self._plugins = PluginRegistry()
         self._rail_views: list[type[RailView]] = []
+        self._settings_sections: list[SettingsSectionFactory] = []
         self._toasts: Notifier | None = None
         self._navigate: Callable[[str], None] | None = None
         self._ui_prefs = ui_prefs or UIPrefs()
@@ -79,6 +88,16 @@ class AppContext:
     def rail_views(self) -> tuple[type[RailView], ...]:
         return tuple(self._rail_views)
 
+    # ── Settings sections ─────────────────────────────
+
+    def add_settings_section(self, factory: SettingsSectionFactory) -> None:
+        """Show a plugin's section, built per dialog with the dialog as parent."""
+        self._settings_sections.append(factory)
+
+    @property
+    def settings_sections(self) -> tuple[SettingsSectionFactory, ...]:
+        return tuple(self._settings_sections)
+
     # ── Toasts ────────────────────────────────────────
 
     @property
@@ -91,10 +110,10 @@ class AppContext:
 
     # ── Navigation ────────────────────────────────────
 
-    def navigate(self, view_id: str) -> None:
-        """Switch the main window to the rail view *view_id* (no-op if unknown)."""
+    def navigate(self, url: str) -> None:
+        """Open a ``modrim://<view_id>[/…]`` link (no-op if the view is unknown)."""
         if self._navigate is not None:
-            self._navigate(view_id)
+            self._navigate(url)
 
     def set_navigator(self, navigate: Callable[[str], None] | None) -> None:
         self._navigate = navigate

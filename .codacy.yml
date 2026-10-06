@@ -6,3 +6,8 @@ exclude_paths:
   - "rimsort-original/**"
   - "tests/**"
   - "**/qwebchannel.js"
+  # SARIF formatting reads reported files as UTF-8; binary artwork is not source.
+  - "**/*.png"
+  - "**/*.ico"
+  - "**/*.icns"
+  - ".codacy/**"

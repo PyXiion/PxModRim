@@ -9,7 +9,6 @@ from types import TracebackType
 
 from loguru import logger
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 from qasync import QEventLoop
 
@@ -42,6 +41,7 @@ from pxmodrim.core.config import (  # noqa: E402
 )
 from pxmodrim.core.context import CoreContext  # noqa: E402
 from pxmodrim.ui.components.dialogs import await_dialog  # noqa: E402
+from pxmodrim.ui.components.popup_parent import QuickPopupParenting  # noqa: E402
 from pxmodrim.ui.config import UIPrefsService  # noqa: E402
 from pxmodrim.ui.context import AppContext  # noqa: E402
 from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
@@ -101,7 +101,22 @@ def _configure_file_logging() -> int:
 
 def _parse_disabled_plugins() -> set[str]:
     disabled_raw = os.environ.get("PX_DISABLED_PLUGINS", "")
-    return {n.strip() for n in disabled_raw.split(",") if n.strip()}
+    disabled = {n.strip() for n in disabled_raw.split(",") if n.strip()}
+    manifest = resource_files("pxmodrim") / "workshop-variant.txt"
+    if manifest.is_file():
+        exclusions = {
+            "NoWorkshop": {
+                "steam_downloader",
+                "steamworkshop",
+                "downloads_ui",
+                "workshop_catalog",
+                "workshop_ui",
+            },
+            "NativeWorkshop": {"steamworkshop"},
+            "SteamWorkshop": {"workshop_catalog", "workshop_ui"},
+        }
+        disabled.update(exclusions[manifest.read_text(encoding="utf-8").strip()])
+    return disabled
 
 
 _WHEEL_SCROLL_LINES = 8
@@ -113,16 +128,25 @@ class App:
     __slots__ = (
         "_app_ctx",
         "_ctx",
+        "_disabled_plugins",
         "main_window",
         "qt_app",
     )
 
     def __init__(self) -> None:
         _configure_file_logging()
-        QtWebEngineQuick.initialize()
+        self._disabled_plugins = _parse_disabled_plugins()
+        if (
+            "steamworkshop" not in self._disabled_plugins
+            and "steam_downloader" not in self._disabled_plugins
+        ):
+            from PySide6.QtWebEngineQuick import QtWebEngineQuick
+
+            QtWebEngineQuick.initialize()
 
         self._ctx: CoreContext | None = None
         self.qt_app = QApplication(sys.argv)
+        self.qt_app.installEventFilter(QuickPopupParenting(self.qt_app))
         # async_run owns the exit: plugin shutdown awaits I/O after the window closes.
         self.qt_app.setQuitOnLastWindowClosed(False)
         icon = QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
@@ -186,7 +210,7 @@ class App:
 
         self._app_ctx.register_plugin(OrganizerUiPlugin())
 
-        disabled = _parse_disabled_plugins()
+        disabled = self._disabled_plugins
 
         downloaders: list[str] = []
         steam_enabled = "steam_downloader" not in disabled
@@ -199,9 +223,14 @@ class App:
             else:
                 self._ctx.register_plugin(SteamDownloader())
                 downloaders.append("steam")
+                from pxmodrim.ui.plugins.steam_downloader import (
+                    SteamDownloaderUiPlugin,
+                )
+
+                self._app_ctx.register_plugin(SteamDownloaderUiPlugin())
 
         if "steam" in downloaders and "steamworkshop" not in disabled:
-            from pxmodrim.ui.plugins import SteamWorkshopUiPlugin
+            from pxmodrim.ui.plugins.steam_workshop import SteamWorkshopUiPlugin
 
             self._app_ctx.register_plugin(SteamWorkshopUiPlugin())
 
@@ -210,6 +239,15 @@ class App:
             from pxmodrim.ui.plugins.downloads import DownloadsUiPlugin
 
             self._app_ctx.register_plugin(DownloadsUiPlugin())
+
+        if downloaders and "workshop_catalog" not in disabled:
+            from pxmodrim.core.workshop import WorkshopCatalog
+
+            self._ctx.register_plugin(WorkshopCatalog())
+            if "workshop_ui" not in disabled:
+                from pxmodrim.ui.plugins.workshop import WorkshopUiPlugin
+
+                self._app_ctx.register_plugin(WorkshopUiPlugin())
 
         self._app_ctx.setup_all()
         self.main_window = MainWindow(self._app_ctx)
@@ -265,7 +303,11 @@ class App:
         if not ctx.config.paths.game:
             logger.info("No game path found, showing settings dialog")
             result, dialog = await await_dialog(
-                SettingsPanel, ctx, self.main_window.qml_engine, self.main_window
+                SettingsPanel,
+                ctx,
+                self.main_window.qml_engine,
+                self.main_window,
+                self._app_ctx.settings_sections,
             )
             if app_close_event.is_set():
                 await self._app_ctx.shutdown_all()

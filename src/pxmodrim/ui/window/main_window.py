@@ -52,6 +52,7 @@ from pxmodrim.ui.components.mod_updates import (
 from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.mod_selection import ModSelectionPresenter
+from pxmodrim.ui.navigation import SETTINGS_VIEW_ID, build_route, parse_route
 from pxmodrim.ui.panels.about_panel import AboutPanel
 from pxmodrim.ui.panels.keyboard_shortcuts_dialog import (
     QML_SHORTCUTS,
@@ -151,6 +152,7 @@ class MainWindow(QMainWindow):
         self._close_task: asyncio.Task[None] | None = None
         self._update_service = UpdateService(get_app_version())
         self._update_task: asyncio.Task[None] | None = None
+        self._settings_task: asyncio.Task[None] | None = None
         self._launch_task: asyncio.Task[None] | None = None
 
         self._setup_window_basics()
@@ -211,10 +213,8 @@ class MainWindow(QMainWindow):
         self._header_controller.maximize_requested.connect(self._toggle_maximized)
         self._header_controller.close_requested.connect(self.close)
         self._header_controller.drag_started.connect(self._start_system_move)
-        self._header_controller.downloads_requested.connect(
-            lambda: self._show_view("downloads")
-        )
-        self._app_ctx.set_navigator(self._show_view)
+        self._header_controller.downloads_requested.connect(self._open_downloads)
+        self._app_ctx.set_navigator(self._open_route)
         self._header_controller.update_mods_requested.connect(self._update_mods)
 
         self._header = HeaderPanel(self._header_controller, self._qml_engine)
@@ -223,7 +223,9 @@ class MainWindow(QMainWindow):
         handlers = {
             ActionId.SAVE: self._save_mods_config,
             ActionId.RESTORE: self._restore_snapshot,
-            ActionId.SETTINGS: self._open_settings,
+            ActionId.SETTINGS: lambda: self._app_ctx.navigate(
+                build_route(SETTINGS_VIEW_ID)
+            ),
             ActionId.QUIT: self.close,
             ActionId.REFRESH: self._refresh_mods,
             ActionId.FULL_RESCAN: self._full_rescan,
@@ -265,16 +267,34 @@ class MainWindow(QMainWindow):
         else:
             self.showFullScreen()
 
-    def _show_view(self, view_id: str) -> None:
+    def _open_route(self, url: str) -> None:
+        route = parse_route(url)
+        if route is None:
+            logger.warning("main_window: ignoring non-route link {}", url)
+            return
+        logger.debug("main_window: navigating to {}", url)
+        if route.view_id == SETTINGS_VIEW_ID:
+            self._start_settings()
+            return
         for index, view in enumerate(self._views):
-            if view.view_id == view_id:
-                self._select_view(index)
+            if view.view_id == route.view_id:
+                self._show_view(index)
+                view.open_route(route.path)
                 return
+        logger.warning("main_window: no view handles {}", url)
+
+    def _open_downloads(self) -> None:
+        view = next((v for v in self._views if v.lists_downloads), None)
+        if view is not None:
+            self._app_ctx.navigate(build_route(view.view_id))
 
     def _select_view(self, index: int) -> None:
         if 0 <= index < self._stack.count():
-            self._rail.set_current(index)
-            self._on_rail_tab_changed(index)
+            self._app_ctx.navigate(build_route(self._views[index].view_id))
+
+    def _show_view(self, index: int) -> None:
+        self._rail.set_current(index)
+        self._on_rail_tab_changed(index)
 
     def _cycle_view(self, direction: int) -> None:
         count = self._stack.count()
@@ -346,9 +366,11 @@ class MainWindow(QMainWindow):
         self._splitter.setCollapsible(1, False)
         rail_width = RAIL_MIN_WIDTH if self._ui_prefs.rail_collapsed else RAIL_MAX_WIDTH
         self._splitter.setSizes([rail_width, self.width() - rail_width])
-        self._rail.currentChanged.connect(self._on_rail_tab_changed)
+        self._rail.currentChanged.connect(self._select_view)
         self._rail.hovered.connect(self._on_rail_hovered)
-        self._rail.settings_requested.connect(self._open_settings)
+        self._rail.settings_requested.connect(
+            lambda: self._app_ctx.navigate(build_route(SETTINGS_VIEW_ID))
+        )
         self._rail.help_action_requested.connect(
             lambda action_id: self._actions[ActionId(action_id)].trigger()
         )
@@ -576,10 +598,18 @@ class MainWindow(QMainWindow):
                 self._app_ctx.refresh_mods()
             )
 
-    @asyncSlot()
+    def _start_settings(self) -> None:
+        if self._settings_task is not None and not self._settings_task.done():
+            return
+        self._settings_task = asyncio.create_task(self._open_settings())
+
     async def _open_settings(self) -> None:
         result, dialog = await await_dialog(
-            SettingsPanel, self._ctx, self._qml_engine, self
+            SettingsPanel,
+            self._ctx,
+            self._qml_engine,
+            self,
+            self._app_ctx.settings_sections,
         )
         if result != QDialog.DialogCode.Accepted:
             return
@@ -858,7 +888,7 @@ class MainWindow(QMainWindow):
         logger.debug("main_window: rail tab changed to {}", index)
         self._stack.setCurrentIndex(index)
         self._header_controller.set_downloads_progress_shown(
-            self._views[index].view_id != "downloads"
+            not self._views[index].lists_downloads
         )
         # Preload an adjacent tab (e.g. the Steam view next to Mods) so its
         # content is already warm when the user moves to it.

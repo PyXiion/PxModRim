@@ -5,17 +5,58 @@ All notable changes to PxModRim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-10-06
+### Changed
+- Workshop collections show their members' total size in MB and the game versions all members support (cards, banners and details) when the server knows them; the catalog stores both per collection once the members have been read (expiring after a day), and hides them otherwise.
+- Workshop cards are shorter and show a two-line title, a plain-text summary, game-version compatibility and a single primary action; Discover shows wide collection banners above compact popular mods, and Installed is a multi-column grid of compact tiles with an active checkbox beside each title and an Update button.
+- Workshop Back walks the detail history (a dependency's Back returns to the mod you came from) and is labelled with the previous page. All navigation goes through `modrim://` links — rail views, view shortcuts, Settings (`modrim://settings`) and Workshop tabs and pages (e.g. `modrim://workshop/mod/<id>`); opening a Workshop page from another one keeps Back history like a browser.
+
+- Plugin settings live in each plugin's own `plugins/<name>.json` (`steam_downloader.json`, `workshop_catalog.json`), seeded once from the old `config.json` keys; plugins add their own Settings tabs, so the Settings dialog and the main window no longer refer to specific plugins.
+- Workshop pages refresh in place when only item details change, instead of rebuilding every card.
+- Collection members and a mod's required mods use the same rows as the Installed tab (active checkbox, thumbnail, author and size, Download/Update); collection members fill a multi-column grid above the description.
+- Workshop detail pages: no boxes around the description and member lists; collections show the description first, with small "Jump to mods" / "Back to top" links when the description is long. The "Supports …" line is gone (versions join the tag line, e.g. "Mod · 1.6") and the incompatibility warning is just "Does not list your game version."
+
 ### Fixed
+- Picked collection API responses now expose the stored `featured_rank` in lists, details and PUT results, so metadata editors can preserve the collection's existing featured ordering.
+- On Wayland, QML tooltips, menus and combo box lists open again: every QML surface's window gets its top-level window as transient parent.
+- Closing Settings no longer logs a burst of `Cannot read property … of null` QML errors.
+- Collection download buttons show `Preparing…`, `Queued` or `Downloading` while the collection's mods are being planned or downloaded, instead of offering the download again.
+- Collection banners show Installed (or Complete download when partly installed) as soon as the list loads, instead of only after opening the collection.
+- Collections that declare the game version themselves (e.g. a `1.6` tag) are no longer flagged "No common version" because one member lists older versions; members without listed versions no longer constrain a collection's versions. Worker migration `0007_collection_compatibility.sql` recomputes the stored summaries.
+- Cancel or Save in Settings no longer crashes the app (the dialog's QML was unloaded while its click handler was still running).
+- Workshop catalog refreshes remove deleted, private, banned and other non-public Steam items from cached details and search, while failed refreshes preserve cached items and picked collections.
+- Workshop Installed lists refresh immediately when the installed set changes while retaining the five-minute cache for unchanged sets; Deactivate removes every active copy, and Activate only this pack keeps dependents when a redundant copy is removed.
+- Workshop downloads queued during auto-update no longer disappear after an earlier cancellation, and unavailable dependencies show a warning without preventing public mod details from opening.
+- Organizer rule-editor UI tests wait for the modal window to become active before clicking its controls, avoiding lost initial clicks on macOS.
 - QML menus, combo box dropdowns and tooltips open in their own window, so they are no longer clipped by the widget that hosts them (the header's launch-strategy menu and help menu).
+- Workshop thumbnails and detail previews request display-sized Steam CDN images, avoid loading hidden previews and collages, and preserve existing URL queries and fragments when resizing.
+- Workshop supported versions are deduplicated, sorted numerically, and shown once rather than repeated among category tags.
+- Collection detail pages show member-image collages when no collection preview is available, including cached responses without thumbnail metadata.
+- Closing the Workshop browser disconnects its core event subscriptions before Qt deletes its models, so queue cancellation during application shutdown no longer calls a deleted model.
+- App header logo SVGs place decorative orbital arcs behind the PxModRim text, eliminating the accidental strikethrough appearance across letters at smaller sizes.
+- Workshop Mods, Collections and Installed lists only keep the visible cards (and their images) alive, and hidden lists no longer keep their cards in memory, which cut memory use when switching tabs by tens of megabytes; the list scroll position is kept when returning from a detail page.
+- Workshop Installed tab reuses the installed-mod list for 5 minutes instead of re-downloading and re-decoding about 2000 mods on every visit, and list cards no longer render their full descriptions (only the detail page does), so memory stays flat when switching tabs.
+- Workshop cached Installed results reuse the displayed mod objects after unchanged refreshes and retain disk-loaded results in memory, avoiding a second full installed-mod list and repeated cache decoding.
+- Workshop cards create button and badge tooltips only while hovered, reducing card memory without changing their appearance, action colours or accessible labels.
 - Qt Quick Controls default to the customizable Basic style on every platform; UI tests allow slower CI rendering and wait for organizer rule-window activation before interacting.
 
 ### Added
+- Native QML Workshop browser: Discover, Mods, Collections and Installed views, catalog filters and detail pages, dependency-aware mod/collection downloads into Local mods, compatibility warnings and updates for downloader-managed copies. Downloads queue in the background (progress in the header, results in Downloads) so browsing stays usable, pages show remembered results immediately and refresh in the background, and the Installed tab loads 48 mods at a time. Catalog URL defaults to `https://api.modrim.pyxiion.dev` and can be changed or emptied to disable network requests; no catalog descriptions execute as HTML and downloads never activate mods.
+- Favourite Workshop collections: a star on collection banners and pages adds the collection to the Workshop's Favourites tab (`modrim://workshop/favourites`, newest first, searchable). Favourites are stored locally in `plugins/workshop_favourites.json` with the last seen catalog details, so the tab works without a network round trip.
 - Settings and Help are pinned to the bottom of the left rail (the header no longer has a Settings button). The Help menu has Report issue, Log & system info, Open logs folder, Keyboard shortcuts, Check for updates and About, so they no longer need the Alt-only menu bar.
 - Settings > Steam Workshop: `Proxy` (empty uses `https_proxy`/`all_proxy` from the environment), `Connect timeout` and `Stall timeout` for Workshop downloads. Changing them logs in to Steam again before the next download.
 - Launch workflow: Play shows `Launching…` then `Running` and is disabled while RimWorld runs (tracked by process, for Steam launches too); a toast reports when the game closes or exits with a non-zero code.
 - Settings > Launch: game arguments (also passed through `steam://run` for the Steam strategy), a wrapper command for direct launch (`KEY=VALUE` env vars, `%command%` placeholder, e.g. `gamemoderun %command%`), and what the window does after launch (stay open, minimize while the game runs, close).
 - Pre-launch prompts for a mod list with errors, unsaved changes (saved before launch), and a game that is already running. Each has a "Don't ask again" checkbox and a Settings toggle.
 - The left rail's collapsed/expanded state is remembered between sessions.
+- Native Workshop cards display approval percentage with thumb icons, formatted vote counts, score, and mod file size.
+- Installed Workshop mod cards and detail views provide Activate/Deactivate toggles alongside installed badges, keeping mods safe from accidental activation during download.
+- Workshop tag filtering uses a searchable dropdown populated from known mod and collection tags, replacing free-text exact matching.
+- Navigating back from Workshop mod details preserves the current tab, search query, active filters, and scroll position.
+- Workshop and Mod Info share the same sanitized description pipeline and selectable rich-text description renderer.
+- Release builds come in three variants across Linux, macOS and Windows (artifact names end in the variant): `NoWorkshop` (plain mod sorter without the Steam downloader, Downloads tab or any Workshop browser, and without building PxSteamDL), `SteamWorkshop` (downloader with the Steam web browser) and `NativeWorkshop` (downloader with the native browser, no WebEngine).
+- Fully downloaded Workshop collections show Activate all / Deactivate all and Activate only this pack (deactivates every other Workshop mod, keeps local mods), matching the Steam web integration. Workshop buttons are colour-coded: Download blue, Update orange, Activate green, Deactivate red.
 
 ### Changed
 - Updated PxSteamDL to 0.3.0: failed updates keep the previous item installed, concurrent downloads of one item are serialized by a lock, transient network failures are retried, and a failed item-details request fails only its batch instead of the whole download. Download progress uses the unpacked byte counters and cancellation uses `Result.cancelled`.

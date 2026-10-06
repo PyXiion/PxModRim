@@ -5,6 +5,7 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 
+os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 import pytest
 
 from pxmodrim.core.config import ConfigService

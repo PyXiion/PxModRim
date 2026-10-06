@@ -3,6 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
 from pxmodrim.core.downloads import DownloadManager
 from pxmodrim.core.models.metadata.structures import (
     AboutXmlMod,
@@ -13,7 +15,6 @@ from pxmodrim.core.models.metadata.structures import (
 )
 from pxmodrim.core.models.view.diagnostics import ModIssueView
 from pxmodrim.core.plugin import PluginRegistry
-from pxmodrim.ui.components.unity_rich_text import unity_rich_text_to_html
 from pxmodrim.ui.panels.mod_info_data import (
     IMG_WIDTH_TOKEN,
     _conflicts,
@@ -24,14 +25,9 @@ from pxmodrim.ui.panels.mod_info_data import (
     bbcode_images,
     bbcode_markup,
     build_mod_info,
+    description_to_html,
     restore_entities,
 )
-
-
-def render(text: str) -> str:
-    return autolink(
-        bbcode_markup(bbcode_images(restore_entities(unity_rich_text_to_html(text))))
-    )
 
 
 def make_mod(
@@ -150,12 +146,12 @@ class TestRestoreEntities:
 
 class TestAutolinkEscaped:
     def test_quoted_url_excludes_entity(self) -> None:
-        assert render('see "https://a.com/x" ok') == (
+        assert description_to_html('see "https://a.com/x" ok') == (
             'see &quot;<a href="https://a.com/x">https://a.com/x</a>&quot; ok'
         )
 
     def test_angle_bracketed_url_excludes_entity(self) -> None:
-        assert render("<https://a.com/x>") == (
+        assert description_to_html("<https://a.com/x>") == (
             '&lt;<a href="https://a.com/x">https://a.com/x</a>&gt;'
         )
 
@@ -165,28 +161,72 @@ class TestAutolinkEscaped:
         )
 
 
+class TestDescription:
+    def test_rich_description_preserves_formatting_entities_and_images(self) -> None:
+        assert description_to_html(
+            "[h2]Title[/h2]\n<b>Bold</b> &#8226;\n"
+            "[img]https://a.com/image.png[/img]\nhttps://a.com/wiki"
+        ) == (
+            "<h2>Title</h2><b>Bold</b> &#8226;<br>"
+            f'<img src="https://a.com/image.png" width="{IMG_WIDTH_TOKEN}"><br>'
+            '<a href="https://a.com/wiki">https://a.com/wiki</a>'
+        )
+
+    def test_plaintext_is_literal_and_preserves_line_breaks(self) -> None:
+        assert description_to_html(
+            "<b>Literal & text</b>\n[img]https://a.com/image.png[/img]\n"
+            "[url=https://a.com]wiki[/url]",
+            "plaintext",
+        ) == (
+            "&lt;b&gt;Literal &amp; text&lt;/b&gt;<br>"
+            "[img]https://a.com/image.png[/img]<br>[url=https://a.com]wiki[/url]"
+        )
+
+
 class TestSecurity:
     def test_file_img_is_not_an_image(self) -> None:
-        assert "<img" not in render("[img]file:///etc/passwd[/img]")
+        assert "<img" not in description_to_html("[img]file:///etc/passwd[/img]")
 
     def test_http_img_is_a_link_not_an_image(self) -> None:
-        html = render("[img]http://a.com/i.png[/img]")
+        html = description_to_html("[img]http://a.com/i.png[/img]")
         assert "<img" not in html
         assert '<a href="http://a.com/i.png">' in html
 
     def test_javascript_url_tag_has_no_anchor(self) -> None:
-        assert "<a " not in render("[url=javascript:alert(1)]x[/url]")
+        assert "<a " not in description_to_html("[url=javascript:alert(1)]x[/url]")
 
     def test_raw_html_is_escaped(self) -> None:
-        html = render('<a href="evil">x</a> <b onclick="1">y</b>')
+        html = description_to_html('<a href="evil">x</a> <b onclick="1">y</b>')
         assert "<a " not in html
         assert "<b " not in html
         assert "&lt;a href=" in html
 
     def test_quote_injection_in_url_attribute(self) -> None:
-        html = render('[url=https://a.com/x" onclick="evil]t[/url]')
+        html = description_to_html('[url=https://a.com/x" onclick="evil]t[/url]')
         assert 'onclick="' not in html
         assert '" onclick' not in html
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "javascript:alert(1)",
+            "data:image/png;base64,AAAA",
+            "file:///etc/passwd",
+            "qrc:/private.png",
+            "steam://run/294100",
+        ],
+    )
+    def test_unsafe_schemes_never_become_links_or_images(self, url: str) -> None:
+        html = description_to_html(
+            f"[url={url}]link[/url] [url]{url}[/url] [img]{url}[/img] "
+            f"<link={url}>Unity link</link>"
+        )
+        assert "<a " not in html
+        assert "<img " not in html
+
+    def test_raw_html_image_cannot_load_a_resource(self) -> None:
+        html = description_to_html('<img src="file:///etc/passwd">')
+        assert html == "&lt;img src=&quot;file:///etc/passwd&quot;&gt;"
 
 
 class TestNeeds:

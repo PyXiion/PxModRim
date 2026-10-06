@@ -66,12 +66,6 @@ class AppConfig(msgspec.Struct):
     )
     max_snapshots: int = 10
     compact_mod_list: bool = False
-    workshop_auto_update_hours: int = 0
-    workshop_parallel_items: int = 8
-    workshop_threads_per_item: int = 1
-    workshop_proxy: str = ""
-    workshop_connect_timeout: int = 10
-    workshop_stall_timeout: int = 30
     log_upload_endpoint: str = "https://paste.rs/"
     launch_args: str = ""
     launch_wrapper: str = ""
@@ -155,6 +149,23 @@ class ConfigService:
             raw[_JSON_SCHEMA_MARKER] = CURRENT_CONFIG_SCHEMA_VERSION
             encoded = msgspec.json.encode(raw)
         self._write(path, encoded)
+
+    def load_existing(
+        self, filename: str, struct_type: type[StructT]
+    ) -> StructT | None:
+        """Like ``load``, but ``None`` when *filename* does not exist yet."""
+        if not (self._config_dir / filename).exists():
+            return None
+        return self.load(filename, struct_type)
+
+    def load_raw(self, filename: str) -> dict[str, Any]:
+        """The undecoded top-level JSON object in *filename*, or ``{}``."""
+        try:
+            return msgspec.json.decode(
+                (self._config_dir / filename).read_bytes(), type=dict[str, Any]
+            )
+        except (OSError, msgspec.DecodeError):
+            return {}
 
     @staticmethod
     def _write(path: Path, data: bytes | dict[str, Any]) -> None:

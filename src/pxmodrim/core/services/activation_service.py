@@ -21,14 +21,25 @@ class ActivationService:
     def __init__(self, ctx: CoreContext) -> None:
         self._ctx = ctx
 
-    def dependents_of(self, uuids: Iterable[str]) -> list[str]:
-        """Active mods that transitively depend on any of *uuids*, in active order."""
+    def dependents_of(
+        self, uuids: Iterable[str], *, enable: Iterable[str] = ()
+    ) -> list[str]:
+        """Active dependents of packages lost after the enable/disable changes."""
         excluded = set(uuids)
         all_mods = self._ctx.all_mods
+        remaining = {
+            PackageId(mod.package_id)
+            for uuid in (*self._ctx.active_uuids, *enable)
+            if uuid not in excluded
+            and isinstance(mod := all_mods.get(uuid), AboutXmlMod)
+        }
         roots: set[PackageId] = set()
         for uuid in excluded:
             mod = all_mods.get(uuid)
-            if isinstance(mod, AboutXmlMod):
+            if (
+                isinstance(mod, AboutXmlMod)
+                and PackageId(mod.package_id) not in remaining
+            ):
                 roots.add(PackageId(mod.package_id))
         if not roots:
             return []

@@ -30,12 +30,26 @@ def test_view_shortcuts_wrap_and_ignore_invalid_indexes() -> None:
         def set_current(self, index: int) -> None:
             selections.append(index)
 
+    views = [
+        SimpleNamespace(view_id=v, open_route=lambda path: None)
+        for v in ("a", "b", "c")
+    ]
+
     class Window:
         _stack = stack
         _rail = Rail()
+        _views = views
+
+        def __init__(self) -> None:
+            self._app_ctx = SimpleNamespace(
+                navigate=lambda url: MainWindow._open_route(cast(MainWindow, self), url)
+            )
 
         def _select_view(self, index: int) -> None:
             MainWindow._select_view(cast(MainWindow, self), index)
+
+        def _show_view(self, index: int) -> None:
+            MainWindow._show_view(cast(MainWindow, self), index)
 
         def _on_rail_tab_changed(self, index: int) -> None:
             stack.index = index
@@ -49,6 +63,45 @@ def test_view_shortcuts_wrap_and_ignore_invalid_indexes() -> None:
     assert stack.index == 0
     MainWindow._select_view(window, 3)
     assert selections == [2, 0]
+
+
+def test_route_selects_the_view_then_hands_it_the_path() -> None:
+    opened: list[tuple[str, ...]] = []
+    shown: list[int] = []
+
+    def view(view_id: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            view_id=view_id,
+            open_route=lambda path, v=view_id: opened.append((v, *path)),
+        )
+
+    window = cast(
+        MainWindow,
+        SimpleNamespace(
+            _views=[view("mods"), view("workshop")], _show_view=shown.append
+        ),
+    )
+    MainWindow._open_route(window, "modrim://workshop/mod/42")
+    MainWindow._open_route(window, "modrim://missing/x")
+    MainWindow._open_route(window, "workshop")
+    assert shown == [1]
+    assert opened == [("workshop", "mod", "42")]
+
+
+def test_settings_route_opens_settings_without_switching_views() -> None:
+    shown: list[int] = []
+    opened: list[bool] = []
+    window = cast(
+        MainWindow,
+        SimpleNamespace(
+            _views=[],
+            _show_view=shown.append,
+            _start_settings=lambda: opened.append(True),
+        ),
+    )
+    MainWindow._open_route(window, "modrim://settings")
+    assert opened == [True]
+    assert shown == []
 
 
 def test_dirty_state_tracks_active_list_order_and_updates_header() -> None:

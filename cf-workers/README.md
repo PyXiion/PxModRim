@@ -1,150 +1,203 @@
-# RimSort Steam Workshop CF Worker
+# PxModRim Workshop backend
 
-Worker that resolves RimWorld Steam Workshop mod dependency trees. Primary data source is Steam WebAPI (
-`IPublishedFileService/GetDetails/v1`), with ScrapingAnt HTML scraping as fallback. D1 caches results. Optional
-Cloudflare Queue handles background refresh.
+TypeScript Cloudflare Worker for the native Workshop browser and the existing dependency resolver. Public catalog data comes from Steam; PxModRim-picked collections are managed in D1. There is no demo catalog or production seed data.
 
-## Exports
+This is the backend only. Installed state, comparing installed timestamps against Workshop metadata, downloading files, and activation remain client responsibilities. The Worker neither subscribes a Steam account nor downloads mod archives.
 
-| Export      | Trigger          | Purpose                                                                    |
-|-------------|------------------|----------------------------------------------------------------------------|
-| `fetch`     | HTTP request     | `GET /` — health check; `GET /deps?id=<steamid>` — dependency tree         |
-| `scheduled` | Cron             | One `QueryFiles` page fetch + one `GetDetails` batch (200) scrape per tick |
-| `queue`     | Cloudflare Queue | Background re-scrape of incomplete trees                                   |
+## Local development with Wrangler
 
-## Environment bindings
+Requires Node.js 22+ and npm. Run these commands from `cf-workers/`:
 
-| Binding         | Required      | Description                                       |
-|-----------------|---------------|---------------------------------------------------|
-| `STEAM_API_KEY` | Yes           | Steam WebAPI key (fallback: ScrapingAnt only)     |
-| `DB`            | Yes           | D1 database binding                               |
-| `SCRAPI`        | Fallback only | ScrapingAnt API key                               |
-| `SCRAPE_QUEUE`  | Optional      | Cloudflare Queue binding for background rescrapes |
-| `USE_QUEUE`     | Optional      | Set to `"true"` to enable queue path              |
-| `CONTROL_KEYS`  | `/purge` only | JSON array of admin keys, e.g. `["abc123"]`      |
-
-## D1 schema
-
-### `items` — mod cache
-
-```sql
-CREATE TABLE items (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL DEFAULT '',
-  is_collection INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT '',
-  updated_at INTEGER NOT NULL DEFAULT 0,
-  package_id TEXT NOT NULL DEFAULT '',
-  deps TEXT NOT NULL DEFAULT ''
-);
+```sh
+npm ci
+npm run db:migrate
+npm run dev
 ```
 
-`deps` is a comma-separated list of Steam workshop IDs. Collections (`is_collection=1`) have `deps=''` when they appear as sub-dependencies. Root collections are an exception — `ensureCollectionRootDeps` re-fetches the root's children from Steam API and writes them to `deps`.
+`wrangler.local.jsonc` binds a local D1 database; its `local-only` database ID is deliberately not a production database ID. The migration script uses `--local`. The health check and picked-collection listing work without Steam credentials.
 
-### `crawl_state` — cron pagination cursor
+For Steam-backed requests, create a gitignored `.dev.vars`:
 
-```sql
-CREATE TABLE crawl_state (
-  id INTEGER PRIMARY KEY DEFAULT 1,
-  cursor TEXT NOT NULL DEFAULT '*',
-  todo_ids TEXT NOT NULL DEFAULT '',
-  total_processed INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL DEFAULT 0
-);
+```dotenv
+STEAM_API_KEY="your-steam-web-api-key"
+CONTROL_KEYS='["a-long-random-admin-token"]'
 ```
 
-Single-row table (id=1). `todo_ids` is comma-separated IDs from the current `QueryFiles` page awaiting scrape. Seeded on
-first access if missing.
+Do not distribute `CONTROL_KEYS` to application clients. They authorize picked-collection writes and the existing cache-purge endpoint.
 
-## Status codes
-
-| status                     | Meaning                        |
-|----------------------------|--------------------------------|
-| `OK`                       | Successfully scraped           |
-| `PENDING`                  | Not yet scraped                |
-| `PRIVATE`                  | Steam result=15 or hidden page |
-| `DELETED`                  | Not in API response            |
-| `ERROR_RESULT_{code}`      | Steam returned non-1 result    |
-| `INVALID_PAGE`             | HTML scrape returned no title  |
-| `SCRAPE_ERROR_HTTP_{code}` | ScrapingAnt HTTP error         |
-
-## Data flow
-
-```
-Request /deps?id=X
-  │
-  ├─ prewarmCacheFromD1(DB, X)
-  │   BFS traversal via D1 batch SELECT (99/batch, 200 per step)
-  │   Populates GLOBAL_RAM_CACHE (LRUMap, 10k cap)
-  │
-  ├─ buildTree(X)
-  │   Walks cache: fresh OK → itemsMap; expired/missing → missingIds
-  │
-  ├─ scrapeInline(env, missingIds)
-  │   BFS batch scrape with two tiers:
-  │     1. fetchSteamApiDetails — batched GetDetails (200/batch, 800 cap)
-  │     2. scrapeViaScrapingAnt — HTML fallback per-ID
-  │   Results → saveToDB → GLOBAL_RAM_CACHE
-  │
-  ├─ (optional queue enqueue if missing remain)
-  │
-  └─ JSON response { rootId, totalItemsLoaded, isComplete, items }
+```sh
+curl 'http://localhost:8787/'
+curl 'http://localhost:8787/catalog/collections?source=picked'
+curl 'http://localhost:8787/catalog/mods?version=1.6&sort=popular&limit=24'
 ```
 
-### Key behaviors
+Verification:
 
-- **Deps from Steam API**: `children` from `GetDetails` is parsed for ALL mods (both individual and collections). The API returns required items as `children` for individual mods, and collection items as `children` for collections.
-- **Collection deps stripped**: When saving a mod via `scrapeInline`, collection children are stripped unless the mod is the root (`mod.id === rootId`). This prevents sub-collections from expanding, while the root collection's children are preserved.
-- **Root collection fallback**: `ensureCollectionRootDeps` handles pre-cached roots — if a root collection was cached without children (from a previous scrape), it re-fetches them and updates D1 + RAM cache.
-- **ScrapingAnt fallback**: Only used when Steam API call fails entirely (null response). Individual mods get
-  `RequiredItems` HTML parsing for deps; collections get `deps = []`.
-- **BFS expansion**: Only from `deps` in cached/scraped results. Since collections have no deps and individual mods have
-  no deps from Steam API, BFS only expands via ScrapingAnt-fallback individual mods' `RequiredItems`.
+```sh
+npm run check   # strict TypeScript checking
+npm run build   # Wrangler deployment dry-run; bundles dist/worker.js
+npm test        # builds first, then runs the bundled Worker in Miniflare/workerd with D1
+```
 
-## Constants
+Tests intercept Steam HTTP requests with explicit fixtures. They exercise metadata boundaries, collection kinds, pagination, authentication, curation persistence, dependency expansion, cache expiry, error handling, and the existing `/deps` response. They do not demonstrate live Steam credentials or a remote deployment.
 
-| Constant               | Value | Description                             |
-|------------------------|-------|-----------------------------------------|
-| `CACHE_TTL_OK_MOD`         | 72h   | Fresh OK mod entry lifetime                 |
-| `CACHE_TTL_OK_COLLECTION` | 1h    | Fresh OK collection entry lifetime          |
-| `CACHE_TTL_ERROR`      | 1h    | Error entry lifetime                    |
-| `QUEUE_DEDUP_TTL_MS`   | 60s   | Dedup window for re-enqueuing same root |
-| `MAX_INLINE_SCRAPE`    | 800   | Max mods scraped per `/deps` request    |
-| `STEAM_API_BATCH_SIZE` | 200   | Mods per GetDetails call                |
-| `QUERY_MODS_PAGE_SIZE` | 3000  | Mods per QueryFiles call (crawl)        |
-| `CRAWL_BATCH_SIZE`     | 200   | Mods scraped per cron tick              |
-| `LRU maxSize`          | 10000 | GLOBAL_RAM_CACHE capacity               |
+## Deployment
 
-## Crawl system (`scheduled`)
+Production Wrangler configuration remains user-managed. Point its `main` at `cf-workers/worker.ts` and its D1 `migrations_dir` at `cf-workers/migrations`, resolving both relative to that configuration file. Keep the existing real database ID, routes, cron schedule, and optional queue bindings. Apply the additive migrations before deploying:
 
-Per tick:
+```sh
+npx wrangler d1 migrations apply DB --remote --config /path/to/production/wrangler.toml
+npx wrangler deploy --config /path/to/production/wrangler.toml
+```
 
-1. Read `crawl_state` from D1
-2. If `todo_ids` empty → `queryMods(cursor)` → `findStaleIds` (missing + expired) → store as `todo_ids`
-3. Slice 200 from `todo_ids` → `scrapeInline` → increment total
-4. Save state. If page consumed + `cursor=""` → reset to `"*"`
+These commands change production; local development and `npm run build` do not execute them. Set secrets using `wrangler secret put NAME --config /path/to/production/wrangler.toml`. No production database ID or secret is checked into this directory.
 
-Cron schedule is configured in `wrangler.toml` (not in repo — user-managed).
+| Binding | Requirement | Purpose |
+|---|---|---|
+| `DB` | Required | Dependency cache, catalog metadata, and picked collections |
+| `STEAM_API_KEY` | Uncached Steam requests and crawling | Steam WebAPI key |
+| `CONTROL_KEYS` | Admin operations | JSON array of non-empty admin tokens |
+| `SCRAPI` | Optional, legacy resolver only | ScrapingAnt HTML fallback key |
+| `SCRAPE_QUEUE` | Optional | Background dependency refresh queue |
+| `USE_QUEUE` | Optional | Set to `"true"` to enable the queue path |
 
-## Queue system
+Exports remain `fetch`, `scheduled`, and `queue`. Catalog routes use Steam directly; they do not scrape Steam HTML or use ScrapingAnt.
 
-Enabled when `USE_QUEUE="true"` and `SCRAPE_QUEUE` binding exists. Handler sends a single `{ rootId }` message per
-incomplete tree. Queue consumer runs `scrapeInline` + `buildTree`; if still incomplete, re-enqueues with 30s
-`deliveryDelay`. 60s dedup via `RECENTLY_QUEUED` Map.
+## Catalog API
 
-## Endpoints
+All Workshop IDs and file sizes are decimal **strings**, not JavaScript numbers. Mod IDs are bare Workshop IDs; collection IDs are namespaced as `steam:<Workshop-ID>` or `picked:<slug>`. Timestamps are Unix seconds. Public results exclude unavailable, private, banned, non-RimWorld, and non-mod/non-collection Steam files.
 
-### `GET /deps?id=<steamid>`
+Catalog responses are JSON with `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. Steam query pages (`query_cache`) and metadata (`catalog_items`) are stored in D1, and browsing never waits for a refresh: a query page older than five minutes and a mod or collection detail older than fifteen minutes are returned as stored while a background refresh runs (pages are kept for a week). Only data that was never stored waits for Steam. Curated listings are read from D1 on each request, so writes and deletes are not hidden by a public response cache.
 
-- Response: `{ rootId, totalItemsLoaded, isComplete, items: { [id]: {...} } }`
-- Each item: `{ id, title, is_collection, is_available, status, deps, package_id }`
+Successful, complete Steam detail refreshes evict cached files that are no longer public, including their local search entries. Subsequent detail reads return 404, and batch/resolve and collection member responses include the evicted IDs in `unavailable_ids`. Failed or incomplete upstream responses retain cached records; PxModRim-picked collections are never evicted by Steam refreshes. Migration `0005_catalog_eviction.sql` connects metadata deletion to the existing search-index/FTS deletion triggers.
 
-### `GET /purge?id=<steamid>&key=<admin_key>`
+### Discovery and browsing
 
-- Purges the cached response for a specific mod from the edge cache.
-- Requires `key` matching a value in `CONTROL_KEYS` env var.
-- Response: `Purged <steamid>` or `401 Unauthorized`.
+| Method | Path | Response |
+|---|---|---|
+| GET | `/catalog/discover` | `{ mods: Page<Mod>, collections: Page<Collection> }`; four mods and up to three mixed-source collections |
+| GET | `/catalog/mods` | `Page<Mod>` |
+| GET | `/catalog/collections` | `Page<Collection>`; `source=all` (default), `steam`, or `picked` |
 
-### `GET /`
+A page is `{ items, total, next_cursor }`; `next_cursor: null` ends pagination. Steam totals reflect Steam's query count and can include entries subsequently excluded by public metadata validation. Picked totals count matching stored collections.
 
-- Response: `ok`
+Browsing parameters:
+
+- `q`: text, at most 200 characters. Steam matches titles/descriptions, **not creator nicknames**. Picked collections also search the curator field; `%` and `_` are literal characters, not SQL wildcards.
+- `tag`: exact tag, at most 100 characters.
+- `version`: version tag such as `1.6`.
+- `sort`: `popular` (default), `updated`, `newest`, `trending`, or `relevance`.
+- `limit`: 1–50, default 24.
+- `cursor`: use the previous `next_cursor`; omit for the first page.
+
+Steam sort modes use its corresponding query rankings; trending uses seven days. Picks use `featured_rank` for popular/trending/relevance, creation time for newest, and modification time for updated. Mixed collection pages reserve room for both sources and continue the remaining source when the other is exhausted. Reuse a collection cursor with the same source, search, filters, sort, and limit; mismatched queries return 400. Text matching for picks follows SQLite's built-in `lower()` behavior, not full Unicode case folding.
+
+Discovery does not accept a continuation cursor. Start the browsing endpoints with their own page size when opening a tab; if consuming discovery's returned page cursors directly, retain their original limits (four mods / three collections).
+
+### Details and installed-mod metadata
+
+| Method | Path | Response |
+|---|---|---|
+| GET | `/catalog/mods/:id` | A mod, or 404 |
+| POST | `/catalog/mods/batch` | `{ items: Mod[], unavailable_ids: string[] }` |
+| GET | `/catalog/collections/steam/:id` | `{ collection, members, unavailable_ids, is_complete }` |
+| GET | `/catalog/collections/picked/:slug` | Same detail envelope |
+
+Batch request: `{ "ids": ["2009463077", "818773962"] }`, at most 100 IDs. Metadata older than fifteen minutes is refetched from Steam before answering, so the client can compare each mod's `updated_at` against its installed copy. `/catalog/resolve` behaves the same.
+
+Mods expose title, Steam author/profile, description, previews, Workshop URL, tags, supported versions, publication/update times, file size, subscription count, votes, dependency IDs, package ID when provided by Steam, and incompatibility status. Missing optional data remains `null`; unrated mods do not receive an invented approval percentage.
+
+Collections expose source, author, description, preview, tags, supported versions, ordered direct member IDs, member count, and timestamps. Supported versions retain the collection's own version declarations (including numeric version tags) and add the intersection of declared member versions; members without version declarations do not restrict that intersection. `no_common_version` is true only when declared member versions conflict and the collection declares no supported version itself. A Steam member may itself be a collection. Detail responses hydrate available direct members only; download resolution expands the complete nested graph. A member-count mismatch or unavailable member makes `is_complete` false.
+
+Collections without a primary preview include up to four `member_previews` in both listing and detail responses. Detail thumbnails reuse the already hydrated direct members rather than fetching them again.
+
+Steam descriptions have `description_format: "bbcode"`; picked descriptions use `"text"`. Treat both as untrusted content in clients, not executable HTML. Author names come from `ISteamUser/GetPlayerSummaries`; missing names are `null`, with the Steam ID retained. Do not infer local installed status from any catalog field.
+
+### Download resolution
+
+```http
+POST /catalog/resolve
+Content-Type: application/json
+
+{"ids":[],"collection_ids":["steam:123456789","picked:starter-pack"]}
+```
+
+Examples illustrate the request format; replace IDs/slugs with actual public items and existing picks.
+
+- `ids`: optional array of up to 50 Workshop IDs.
+- `collection_ids`: optional array of up to ten namespaced collection IDs.
+- At least one root is required. An empty explicit mod selection is valid when collections are present.
+- Expands transitive required mods, nested Steam collections, and picked collections.
+- Deduplicates IDs and terminates cycles. `mod_ids` is dependency-first where the graph is acyclic; a cycle has no valid topological order.
+- Returns `{ roots, items, mod_ids, unavailable_ids, incomplete_collection_ids, is_complete }`.
+- `items` uses mod IDs and namespaced collection IDs as keys; `mod_ids` contains only downloadable mods, never collection IDs.
+- Missing/private files or incomplete collection membership set `is_complete: false`. A Steam collection ID referring to a mod returns 400.
+- Graphs exceeding 1,000 Steam items return 413 rather than silently truncating the download plan.
+
+The client downloads `mod_ids` and decides how to present an incomplete plan. Resolution does not activate mods or modify subscriptions.
+
+### Managing PxModRim picks
+
+`PUT /catalog/collections/picked/:slug` creates or replaces a collection. `DELETE` removes it. Both require `Authorization: Bearer <token>` matching `CONTROL_KEYS`. Slugs are lowercase letters/digits separated by single dashes, at most 80 characters.
+
+```json
+{
+  "title": "Starter pack",
+  "author": "PxModRim",
+  "description": "A curated set of quality-of-life mods.",
+  "preview_url": null,
+  "tags": ["Quality of Life"],
+  "supported_versions": ["1.6"],
+  "member_ids": ["2009463077", "818773962"],
+  "featured_rank": 10
+}
+```
+
+Required: title (1–200 characters), author (1–120), description (up to 20,000), and 1–500 member IDs. Optional: HTTPS preview URL, up to 30 tags (100 characters each), up to 20 numeric version tags, and integer rank 0–1,000,000 (lower ranks first). Duplicate members are removed while retaining their first position. Every member must resolve to an available public RimWorld **mod**, not a collection. Unknown fields are rejected.
+
+Picked collection JSON includes the stored numeric `featured_rank` in browsing/discovery lists, detail responses, and successful PUT responses; Steam collections omit it. Metadata editors should load and resend that value when replacing an existing pick. Omitting `featured_rank` from a PUT defaults it to `0`, including when replacing a collection. This response field needs no new D1 migration: the rank is already stored in `picked_collections`.
+
+Successful PUT returns the stored collection with HTTP 200 and preserves its original `created_at`; DELETE returns 204, or 404 for an absent slug. There is no public write or client-embedded admin token.
+
+### Errors and request limits
+
+Errors use `{ "error": { "message": "..." } }`. Invalid inputs return 400, unauthorized writes 401, missing items/routes 404, unsupported methods 405, oversized bodies/graphs 413, and unsupported content types 415. Steam rate limiting, rejected/missing credentials return 503; malformed/unavailable upstream responses return 502. Unexpected server errors return a sanitized 500.
+
+JSON requests require `application/json` and are bounded to 64 KiB, including streamed bodies. Numeric JSON IDs, noncanonical/zero/out-of-range uint64 IDs, malformed cursors, and unknown payload fields are rejected. Secrets are not returned in upstream errors. The backend does not turn unavailable Steam data into a successful empty catalog.
+
+## D1 migrations
+
+- `0001_dependencies.sql`: existing `items` and `crawl_state` tables, created only when absent. Existing dependency data is preserved.
+- `0002_catalog.sql`: `catalog_items` metadata cache and `picked_collections` with JSON-array constraints and browsing indexes. No sample rows are inserted.
+- `0003_search.sql`: `catalog_index` (mods seen by the catalog) with an FTS5 table, and `index_state` for the crawler. The scheduled handler walks the Workshop newest-updated first; `/catalog/index` reports `ready` once one full pass has finished. After that, mod searches and the popular/updated/newest listings (with tag and version filters) are answered from the index; trending, collections and cursors that do not start with `ix:` still go to Steam. Every mod the catalog fetches for any reason is indexed too.
+  Full passes also confirm stored mods omitted by Steam's listing through fresh `GetDetails` requests, at most 100 per tick. Public files remain indexed; confirmed unavailable files are evicted from metadata and search. The verification phase walks ids in order, isolates files whose refresh keeps failing so later ids are still checked, and restarts the pass instead of completing while any omitted file is unverified.
+- `0004_query_cache.sql`: `query_cache`, the ordered IDs, total and cursor of each Steam query page. Pages and metadata both live in D1, so they survive restarts and deploys and are identical at every edge.
+- `0006_collection_summaries.sql`: `collection_summaries`, facts derived from a collection's members and written when its details are read, once every member is a known mod: `total_size` (decimal bytes, null if any member size is unknown) and `supported_versions` (the intersection of declared member versions). Listings read them without touching members; rows expire after 24 hours and triggers drop them when the collection's members change or it is deleted. Collections without a fresh row report `total_size: null` and their own versions.
+- `0007_collection_compatibility.sql`: distinguishes conflicting member versions from missing declarations via a stored `no_common_version` flag, and clears summaries computed under the earlier rules. Apply it before deploying the updated Worker.
+
+The catalog cache is separate from `items`: the legacy resolver intentionally strips nested collection children in some paths; catalog resolution retains them.
+
+## Existing dependency resolver
+
+`GET /deps?id=<Workshop-ID>` retains `{ rootId, totalItemsLoaded, isComplete, items }`. Each item retains `{ id, title, is_collection, is_available, status, deps, package_id }`. `GET /` still returns `ok`.
+
+The resolver prewarms its 10,000-entry RAM cache from D1, traverses dependencies, and scrapes missing/expired entries inline. Steam `GetDetails` children supply both mod requirements and collection members. HTML scraping through ScrapingAnt is only a fallback when Steam detail fetching fails entirely. Non-root collection children remain stripped in this legacy path; root collection children are preserved/refetched as before.
+
+| Setting | Value |
+|---|---|
+| Fresh mod cache | 72 hours |
+| Fresh collection / error cache | 1 hour |
+| Inline scrape cap | 800 items |
+| Legacy Steam detail batch / cron scrape batch | 200 items |
+| Cron query page | 3,000 items |
+| Queue deduplication window | 60 seconds |
+
+Stored statuses remain `OK`, `PENDING`, `PRIVATE`, `DELETED`, `ERROR_RESULT_<code>`, `INVALID_PAGE`, and `SCRAPE_ERROR_HTTP_<code>`.
+
+The scheduled handler fetches a Workshop query page when needed, processes one batch, and persists `crawl_state`. The optional queue sends `{ rootId }`; its consumer refreshes the tree and re-enqueues incomplete work with Cloudflare's `delaySeconds: 30`. Cron/queue provisioning remains in production Wrangler configuration.
+
+`GET /purge?id=<Workshop-ID>&key=<admin-key>` retains the existing authenticated edge-response purge behavior. It does not delete catalog metadata or picks; catalog metadata expires separately.
+
+## Steam contracts
+
+[IPublishedFileService documentation](https://partner.steamgames.com/doc/webapi/IPublishedFileService) defines `QueryFiles` parameters passed via `input_json`. Matching file type is 0 for items and 1 for collections, while returned `EWorkshopFileType` is 0 for mods and **2** for collections; these are different enums. Rich metadata/children fields follow the [Steam published-file protobuf definitions](https://github.com/SteamDatabase/Protobufs/blob/master/steam/steammessages_publishedfile.steamclient.proto).

@@ -28,9 +28,20 @@ src/pxmodrim/
 ## Download plugins
 Downloads are plugins; the UI only talks to `core/downloads/manager.py` (`DownloadManager`, always present, plugin name `downloads`).
 - Sources subclass `core.downloads.Downloader` (`core/downloads/steam.py` = `steam_downloader`, the only one today) and register with the manager in `setup()`. Third-party imports stay inside the source's own module; `_app.py` imports it lazily and skips it if disabled or missing.
-- UI plugins: `downloads_ui` (Downloads tab, source-agnostic, shown when any downloader exists), `steamworkshop` (Steam WebView, needs `steam_downloader`).
-- Disable at runtime: `PX_DISABLED_PLUGINS=steam_downloader,steamworkshop,downloads_ui` (comma-separated).
+- Catalog: `workshop_catalog` consumes the read-only catalog API with constructor-injected configuration/client factory; it resolves transitive download plans and delegates files to `DownloadManager`, without activating mods. `AppConfig.workshop_catalog_url` defaults to `https://api.modrim.pyxiion.dev`; an empty string disables catalog network requests. Defaulted config fields load from older files without a schema migration.
+- UI plugins: `downloads_ui` (Downloads tab, source-agnostic, shown when any downloader exists), `steamworkshop` (Steam WebView, needs `steam_downloader`), `workshop_ui` (native QML Workshop browser, needs `workshop_catalog` and `downloads`).
+- Disable at runtime: `PX_DISABLED_PLUGINS=steam_downloader,steamworkshop,downloads_ui,workshop_catalog,workshop_ui` (comma-separated). Disabling the catalog also omits its UI.
+- Installed catalog state uses discovered mods' `published_file_id` (About/PublishedFileId.txt or numeric folder); only downloader-managed local copies have known sync times. Steam-client Workshop copies are installed, but cannot be marked outdated without a known sync timestamp. Downloading places mods in Local mods and never subscribes or activates them.
+- Catalog requests batch installed metadata by 100 IDs and resolution by 50 mod roots / 10 collection roots; large Update all selections retain dependency-first order and deduplicate shared dependencies across requests.
 - New source: subclass `Downloader`, register in `_app.py`, add its name to the `downloaders` list; UI needs no change.
+
+## Plugin API
+Core and the shell (`ui/window`, `ui/panels`) never name a concrete plugin; only `_app.py` (composition root) does.
+- Settings: `PluginConfig(ctx.config_service, name, Struct, legacy={old_config_json_key: field})` in `setup()` → `plugins/<name>.json`; subscribe to `.changed`.
+- Settings UI: a UI plugin calls `app_ctx.add_settings_section(factory)` (one Settings tab each); subclass `ui.settings_section.PluginConfigSection` with `title` + `source` (QML whose root has `required property QtObject section`, reading `section.initial` and calling `section.set(key, value)`). Edits apply on Save only.
+- Views: `RailView` subclasses on `app_ctx.add_rail_view`; `open_route(path)` handles `modrim://<view_id>/…`; `lists_downloads = True` marks the download queue.
+- `steam_downloader_ui` holds the Steam download settings section.
+- Build variants: `packaging/build.py --workshop {NoWorkshop,SteamWorkshop,NativeWorkshop}` bakes `workshop-variant.txt` into the package, which `_app.py` turns into disabled plugins, and `_variant_exclusions` leaves the matching modules out of the Nuitka build. `NoWorkshop` omits PxSteamDL, the Downloads tab and both browsers (CI syncs it with `--no-install-package pxsteamdl`); `SteamWorkshop` omits the native browser; `NativeWorkshop` omits the web browser and WebEngine. CI builds all three on every OS. Build jobs set `UV_NO_SYNC=1` so `uv run` preserves the explicitly synced variant environment; both Workshop variants sync with `--extra steam`.
 
 ## Key conventions
 - `from __future__ import annotations` in every `.py` file
@@ -58,7 +69,7 @@ Output `inject.js` is gitignored; always build before running.
 
 ## Layer dependency checker
 `just check-deps` (`scripts/check-deps.py`) enforces strict import rules via pydeps.
-Defines 24 groups with explicit ALLOWED dependency matrices.
+Defines groups with explicit ALLOWED dependency matrices, including `core.workshop`.
 If a new import violates boundaries, update `scripts/check-deps.py`'s `ALLOWED` dict.
 
 ## CI matrix

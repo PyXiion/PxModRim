@@ -1,0 +1,788 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolve as resolvePath } from 'node:path';
+import { after, before, test } from 'node:test';
+import { Miniflare } from 'miniflare';
+import type { CatalogCollection, CatalogItem, CatalogMod, CatalogPage, SteamFile } from '../types';
+
+const creator = '76561198000000001';
+function mod(id: string, title: string, children: string[] = [], versions = ['1.6']): SteamFile {
+  return {
+    publishedfileid: id, result: 1, consumer_appid: 294100, creator_appid: 294100,
+    creator, title, file_type: 0, file_description: '[b]A real description format[/b]',
+    file_size: '4096', time_created: 1700000000, time_updated: 1720000000,
+    preview_url: 'https://images.example.test/preview.png',
+    tags: [...versions, 'Quality of life'].map(tag => ({ tag })),
+    children: children.map((publishedfileid, sortorder) => ({ publishedfileid, sortorder })),
+    vote_data: { votes_up: 90, votes_down: 10 },
+  };
+}
+const files: Record<string, SteamFile> = {
+  '10': mod('10', 'Allow Tool', ['12']),
+  '11': { ...mod('11', 'Harmony'), kvtags: [{ key: 'packageId', value: 'brrainz.harmony' }] },
+  '12': mod('12', 'HugsLib', ['11']),
+  '13': mod('13', 'RimHUD', ['11']),
+  '14': mod('14', 'Camera+', ['11'], ['1.5']),
+  '15': { ...mod('15', 'Another game'), consumer_appid: 730 },
+  '16': { publishedfileid: '16', result: 15 },
+  '17': { ...mod('17', 'Artwork'), file_type: 3 },
+  '20': mod('20', 'Cycle A', ['21']),
+  '21': mod('21', 'Cycle B', ['20']),
+  '100': { ...mod('100', 'Steam Collection'), file_type: 2, children: [{ publishedfileid: '101', sortorder: 1 }, { publishedfileid: '10', sortorder: 0 }], num_children: 2 },
+  '101': { ...mod('101', 'Nested Collection'), file_type: 2, children: [{ publishedfileid: '13', sortorder: 0 }], num_children: 1 },
+  '102': { ...mod('102', 'no-thumb collection'), file_type: 2, preview_url: '', children: [{ publishedfileid: '13', sortorder: 0 }, { publishedfileid: '16', sortorder: 1 }, { publishedfileid: '101', sortorder: 2 }, { publishedfileid: '11', sortorder: 3 }], num_children: 4 },
+  '18446744073709551615': { ...mod('18446744073709551615', 'Maximum ID'), file_size: '18446744073709551615', vote_data: { votes_up: 0, votes_down: 0 } },
+};
+
+let flakyCalls = 0;
+let queryCalls = 0;
+const detailFailures = new Map<string, 'http' | 'partial' | 'metadata'>();
+
+async function upstream(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  if (url.hostname !== 'api.steampowered.com') return new Response('Unexpected upstream', { status: 502 });
+  if (url.pathname.includes('GetPlayerSummaries')) {
+    const players = [{ steamid: creator, personaname: 'Fixture Author' }];
+    return Response.json({ response: { players: url.pathname.endsWith('/v1/') ? { player: players } : players } });
+  }
+  const input = JSON.parse(url.searchParams.get('input_json') ?? '{}') as {
+    publishedfileids?: string[]; filetype?: number; search_text?: string; cursor?: string; numperpage?: number; requiredtags?: string[];
+  };
+  if (url.pathname.includes('GetDetails')) {
+    const ids = input.publishedfileids ?? [];
+    if (ids.some(id => detailFailures.get(id) === 'http')) return new Response('Steam unavailable', { status: 503 });
+    if (ids.some(id => detailFailures.get(id) === 'metadata')) {
+      return Response.json({ response: { publishedfiledetails: ids.map(publishedfileid => ({ publishedfileid, result: 1 })) } });
+    }
+    if (ids.includes('999')) {
+      return Response.json({ response: { publishedfiledetails: [{ ...mod('999', 'Malformed upstream'), tags: 'not-an-array' }] } });
+    }
+    return Response.json({ response: { publishedfiledetails: ids.filter(id => detailFailures.get(id) !== 'partial')
+      .map(id => files[id] ?? { publishedfileid: id, result: 9 }) } });
+  }
+  if (url.pathname.includes('QueryFiles')) {
+    queryCalls++;
+    if (input.search_text === 'upstream-rate-limit') return new Response('Rate limited', { status: 429 });
+    if (input.search_text === 'upstream-flaky' && flakyCalls++ === 0) return new Response('Hiccup', { status: 500 });
+    const candidateIds = input.filetype === 1 ? (input.search_text === 'no-thumb' ? ['102'] : ['100', '101']) : ['10', '11', '12', '13', '14'];
+    const matching = candidateIds.map(id => files[id]!).filter(file =>
+      (file.title ?? '').toLowerCase().includes((input.search_text ?? '').toLowerCase())
+      && (input.requiredtags ?? []).every(tag => file.tags?.some(value => value.tag === tag)));
+    const offset = input.cursor === '*' ? 0 : Number(input.cursor);
+    const details = matching.slice(offset, offset + (input.numperpage ?? 24));
+    const next = offset + details.length;
+    return Response.json({ response: { total: matching.length, publishedfiledetails: details, next_cursor: next < matching.length ? String(next) : '' } });
+  }
+  return new Response('Unexpected Steam method', { status: 502 });
+}
+
+let worker: Miniflare;
+let db: D1Database;
+
+function statements(sql: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  for (const line of sql.split('\n')) {
+    current += `${line}\n`;
+    const inTrigger = /CREATE TRIGGER/i.test(current) && !/^END;$/m.test(current);
+    if (line.trimEnd().endsWith(';') && !inTrigger) { result.push(current.trim()); current = ''; }
+  }
+  return result.filter(statement => statement && statement !== ';');
+}
+
+async function migrate(database: D1Database): Promise<void> {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql', '0006_collection_summaries.sql', '0007_collection_compatibility.sql']) {
+    const sql = await readFile(resolvePath('migrations', file), 'utf8');
+    await database.batch(statements(sql).map(statement => database.prepare(statement)));
+  }
+}
+
+before(async () => {
+  worker = new Miniflare({
+    workers: [{
+      config: {
+        name: 'catalog-tests', compatibilityDate: '2026-10-05',
+        manifest: { mainModule: 'worker.js', modules: { 'worker.js': { type: 'esm', contents: await readFile(resolvePath('dist/worker.js'), 'utf8') } } },
+        env: {
+          DB: { type: 'd1', id: 'catalog-tests' },
+          STEAM_API_KEY: { type: 'text', value: 'fixture-only-key' },
+          CONTROL_KEYS: { type: 'text', value: '["test-admin"]' },
+        },
+      },
+      dev: { outboundService: { type: 'fetcher', handler: upstream } },
+    }],
+  });
+  db = await worker.getD1Database('DB');
+  await migrate(db);
+});
+after(async () => { await worker?.dispose(); });
+
+async function request(path: string, method = 'GET', body?: unknown, token?: string) {
+  return await worker.dispatchFetch(`https://catalog.test${path}`, {
+    method,
+    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
+async function createPick(slug: string, memberIds = ['10', '13'], title = 'Starter colony', extra: Record<string, unknown> = {}) {
+  const response = await request(`/catalog/collections/picked/${slug}`, 'PUT', {
+    title, author: 'PxModRim', description: 'A focused collection.', member_ids: memberIds,
+    tags: ['Quality of life'], supported_versions: ['1.6'], ...extra,
+  }, 'test-admin');
+  assert.equal(response.status, 200, await response.text());
+}
+
+test('mod details expose real tag declarations, creators, votes and required IDs', async () => {
+  const response = await request('/catalog/mods/10');
+  assert.equal(response.status, 200);
+  const detail = await response.json() as CatalogMod;
+  assert.equal(detail.author.name, 'Fixture Author');
+  assert.equal(detail.description_format, 'bbcode');
+  assert.equal(detail.description, '[b]A real description format[/b]');
+  assert.deepEqual(detail.supported_versions, ['1.6']);
+  assert.deepEqual(detail.dependencies, ['12']);
+  assert.deepEqual(detail.votes, { up: 90, down: 10, positive_percent: 90 });
+});
+
+test('uint64 IDs and sizes retain their exact string value; unrated is not zero percent', async () => {
+  const response = await request('/catalog/mods/18446744073709551615');
+  assert.equal(response.status, 200);
+  const detail = await response.json() as CatalogMod;
+  assert.equal(detail.id, '18446744073709551615');
+  assert.equal(detail.file_size, '18446744073709551615');
+  assert.equal(detail.votes?.positive_percent, null);
+});
+
+test('private, foreign-game and non-mod files are not advertised as downloadable mods', async () => {
+  for (const id of ['15', '16', '17', '100']) assert.equal((await request(`/catalog/mods/${id}`)).status, 404);
+  const batch = await request('/catalog/mods/batch', 'POST', { ids: ['10', '15', '16', '17', '100'] });
+  const value = await batch.json() as { items: CatalogMod[]; unavailable_ids: string[] };
+  assert.deepEqual(value.items.map(item => item.id), ['10']);
+  assert.deepEqual(value.unavailable_ids, ['15', '16', '17', '100']);
+});
+
+test('Steam browsing filters version tags and paginates without repeating the first page', async () => {
+  const first = await request('/catalog/mods?version=1.6&limit=2');
+  const value = await first.json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(value.items.map(item => item.id), ['10', '11']);
+  assert.equal(value.total, 4);
+  const second = await request(`/catalog/mods?version=1.6&limit=2&cursor=${encodeURIComponent(value.next_cursor!)}`);
+  const next = await second.json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(next.items.map(item => item.id), ['12', '13']);
+  assert.equal(next.next_cursor, null);
+});
+
+test('Steam collection details retain ordered members, including nested collections', async () => {
+  const response = await request('/catalog/collections/steam/100');
+  const value = await response.json() as { collection: CatalogCollection; members: CatalogItem[] };
+  assert.equal(response.status, 200);
+  assert.equal(value.collection.id, 'steam:100');
+  assert.equal(Object.hasOwn(value.collection, 'featured_rank'), false);
+  assert.deepEqual(value.collection.member_ids, ['10', '101']);
+  assert.deepEqual(value.members.map(item => item.id), ['10', 'steam:101']);
+  assert.equal(value.members[1]?.kind, 'collection');
+});
+
+test('picked collection mutations require authentication and validate members before persistence', async () => {
+  const body = { title: 'Protected', author: 'PxModRim', description: '', member_ids: ['10'] };
+  assert.equal((await request('/catalog/collections/picked/protected', 'PUT', body)).status, 401);
+  assert.equal((await request('/catalog/collections/picked/protected', 'PUT', body, 'wrong')).status, 401);
+  assert.equal((await request('/catalog/collections/picked/protected')).status, 404);
+  for (const invalid of [['15'], ['100'], [10], ['18446744073709551616']]) {
+    assert.equal((await request('/catalog/collections/picked/protected', 'PUT', { ...body, member_ids: invalid }, 'test-admin')).status, 400);
+  }
+  await createPick('protected', ['10', '10', '13']);
+  const value = await (await request('/catalog/collections/picked/protected')).json() as { collection: CatalogCollection };
+  assert.deepEqual(value.collection.member_ids, ['10', '13']);
+  assert.equal(value.collection.source, 'picked');
+  assert.equal(value.collection.workshop_url, null);
+  assert.equal(value.collection.featured_rank, 0);
+  assert.equal((await request('/catalog/collections/picked/protected', 'DELETE')).status, 401);
+  assert.equal((await request('/catalog/collections/picked/protected', 'DELETE', undefined, 'test-admin')).status, 204);
+  assert.equal((await request('/catalog/collections/picked/protected')).status, 404);
+});
+
+test('picked search treats wildcard text literally, combines tag/version filters, and preserves creation time', async () => {
+  await createPick('literal', ['10'], '100% colony', { featured_rank: 1 });
+  const before = await db.prepare('SELECT created_at FROM picked_collections WHERE slug = ?').bind('literal').first<{ created_at: number }>();
+  await createPick('literal', ['13'], '100% colony updated', { featured_rank: 1 });
+  const after = await db.prepare('SELECT created_at FROM picked_collections WHERE slug = ?').bind('literal').first<{ created_at: number }>();
+  assert.equal(after?.created_at, before?.created_at);
+  const response = await request('/catalog/collections?source=picked&q=%25&tag=Quality%20of%20life&version=1.6');
+  const value = await response.json() as CatalogPage<CatalogCollection>;
+  assert.deepEqual(value.items.map(item => item.id), ['picked:literal']);
+  assert.deepEqual(value.items[0]?.member_ids, ['13']);
+  assert.equal((await (await request('/catalog/collections?source=picked&q=%25&version=1.5')).json() as CatalogPage<CatalogCollection>).total, 0);
+});
+
+test('picked ranks round-trip through PUT, detail and ordered lists when editing metadata', async () => {
+  const slugs = ['rank-first', 'rank-second'];
+  const body = {
+    title: 'Ranked collection', author: 'Curator', description: 'Original metadata.',
+    tags: ['rank-roundtrip'], supported_versions: ['1.6'], member_ids: ['10'], featured_rank: 42,
+  };
+  try {
+    const createdResponse = await request('/catalog/collections/picked/rank-first', 'PUT', body, 'test-admin');
+    assert.equal(createdResponse.status, 200);
+    const created = await createdResponse.json() as CatalogCollection;
+    assert.equal(created.featured_rank, 42);
+    await createPick('rank-second', ['13'], 'Other ranked collection', { tags: ['rank-roundtrip'], featured_rank: 7 });
+    for (const sort of ['popular', 'trending', 'relevance']) {
+      const response = await request(`/catalog/collections?source=picked&tag=rank-roundtrip&q=ranked&sort=${sort}`);
+      assert.equal(response.status, 200);
+      const page = await response.json() as CatalogPage<CatalogCollection>;
+      assert.deepEqual(page.items.map(item => [item.id, item.featured_rank]), [['picked:rank-second', 7], ['picked:rank-first', 42]]);
+    }
+
+    const detailResponse = await request('/catalog/collections/picked/rank-first');
+    assert.equal(detailResponse.status, 200);
+    const detail = await detailResponse.json() as { collection: CatalogCollection };
+    assert.equal(detail.collection.featured_rank, 42);
+    const updatedResponse = await request('/catalog/collections/picked/rank-first', 'PUT', {
+      ...body, title: 'Edited collection', description: 'Edited metadata.', featured_rank: detail.collection.featured_rank,
+    }, 'test-admin');
+    assert.equal(updatedResponse.status, 200);
+    const updated = await updatedResponse.json() as CatalogCollection;
+    assert.equal(updated.featured_rank, 42);
+    assert.equal(updated.created_at, created.created_at);
+    assert.equal(updated.title, 'Edited collection');
+    assert.equal(updated.description, 'Edited metadata.');
+
+    const reloaded = await (await request('/catalog/collections/picked/rank-first')).json() as { collection: CatalogCollection };
+    assert.equal(reloaded.collection.featured_rank, 42);
+    assert.equal(reloaded.collection.description, 'Edited metadata.');
+    const page = await (await request('/catalog/collections?source=picked&tag=rank-roundtrip')).json() as CatalogPage<CatalogCollection>;
+    assert.deepEqual(page.items.map(item => [item.id, item.featured_rank]), [['picked:rank-second', 7], ['picked:rank-first', 42]]);
+  } finally {
+    for (const slug of slugs) await request(`/catalog/collections/picked/${slug}`, 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('mixed collection pagination retains both sources without duplicates or query-mismatched cursors', async () => {
+  await createPick('starter', ['10'], 'Starter colony', { featured_rank: 10 });
+  await createPick('tools', ['13'], 'Useful tools', { featured_rank: 20 });
+  const first = await request('/catalog/collections?limit=3&version=1.6');
+  const firstPage = await first.json() as CatalogPage<CatalogCollection>;
+  const all = [...firstPage.items];
+  let cursor = firstPage.next_cursor;
+  while (cursor) {
+    const page = await (await request(`/catalog/collections?limit=3&version=1.6&cursor=${encodeURIComponent(cursor)}`)).json() as CatalogPage<CatalogCollection>;
+    all.push(...page.items); cursor = page.next_cursor;
+  }
+  assert.deepEqual(all.map(item => item.id).sort(), ['picked:literal', 'picked:starter', 'picked:tools', 'steam:100', 'steam:101'].sort());
+  assert.deepEqual(all.filter(item => item.source === 'picked').map(item => [item.id, item.featured_rank]), [
+    ['picked:literal', 1], ['picked:starter', 10], ['picked:tools', 20],
+  ]);
+  assert.ok(all.filter(item => item.source === 'steam').every(item => !Object.hasOwn(item, 'featured_rank')));
+  assert.equal(firstPage.total, 5);
+  assert.equal((await request(`/catalog/collections?limit=3&version=1.5&cursor=${encodeURIComponent(firstPage.next_cursor!)}`)).status, 400);
+});
+
+test('Unicode queries survive opaque picked collection pagination', async () => {
+  await createPick('unicode-a', ['10'], 'Колония A');
+  await createPick('unicode-b', ['13'], 'Колония B');
+  const path = '/catalog/collections?source=picked&q=%D0%9A%D0%BE%D0%BB%D0%BE%D0%BD%D0%B8%D1%8F&limit=1';
+  const first = await (await request(path)).json() as CatalogPage<CatalogCollection>;
+  const next = await (await request(`${path}&cursor=${encodeURIComponent(first.next_cursor!)}`)).json() as CatalogPage<CatalogCollection>;
+  assert.deepEqual([first.items[0]?.id, next.items[0]?.id], ['picked:unicode-a', 'picked:unicode-b']);
+  assert.equal(next.next_cursor, null);
+});
+
+test('download resolution expands nested collections, includes transitive dependencies once, and orders libraries first', async () => {
+  const response = await request('/catalog/resolve', 'POST', { ids: ['13'], collection_ids: ['steam:100', 'picked:starter'] });
+  const value = await response.json() as { mod_ids: string[]; items: Record<string, CatalogItem>; is_complete: boolean };
+  assert.equal(response.status, 200);
+  assert.deepEqual(value.mod_ids, ['11', '13', '12', '10']);
+  assert.equal(value.items['steam:101']?.kind, 'collection');
+  assert.equal(value.is_complete, true);
+});
+
+test('a collection-only download accepts an empty explicit mod selection but not an entirely empty request', async () => {
+  const response = await request('/catalog/resolve', 'POST', { ids: [], collection_ids: ['steam:100'] });
+  assert.equal(response.status, 200);
+  const value = await response.json() as { mod_ids: string[]; is_complete: boolean };
+  assert.deepEqual(value.mod_ids, ['11', '12', '10', '13']);
+  assert.equal(value.is_complete, true);
+  assert.equal((await request('/catalog/resolve', 'POST', { ids: [], collection_ids: [] })).status, 400);
+});
+
+test('download resolution terminates cycles and reports missing items rather than claiming completeness', async () => {
+  const cycle = await (await request('/catalog/resolve', 'POST', { ids: ['20'] })).json() as { mod_ids: string[]; is_complete: boolean };
+  assert.deepEqual(cycle.mod_ids, ['21', '20']);
+  assert.equal(cycle.is_complete, true);
+  const missing = await (await request('/catalog/resolve', 'POST', { ids: ['10', '16'] })).json() as { mod_ids: string[]; unavailable_ids: string[]; is_complete: boolean };
+  assert.deepEqual(missing.mod_ids, ['11', '12', '10']);
+  assert.deepEqual(missing.unavailable_ids, ['16']);
+  assert.equal(missing.is_complete, false);
+});
+
+test('expired metadata is refreshed instead of hiding a newer Workshop update', async () => {
+  const stale = { ...await (await request('/catalog/mods/13')).json() as CatalogMod, updated_at: 1 };
+  await db.prepare('UPDATE catalog_items SET data = ?, updated_at = 0 WHERE id = ?').bind(JSON.stringify(stale), '13').run();
+  const fresh = await (await request('/catalog/mods/batch', 'POST', { ids: ['13'] })).json() as { items: CatalogMod[] };
+  assert.equal(fresh.items[0]?.updated_at, 1720000000);
+});
+
+test('invalid input and malformed/rate-limited upstreams have explicit non-success responses without leaking secrets', async () => {
+  for (const path of ['/catalog/mods?limit=0', '/catalog/mods?sort=name', '/catalog/mods?version=banana', '/catalog/mods/0']) {
+    assert.equal((await request(path)).status, 400);
+  }
+  assert.equal((await request('/catalog/mods/batch', 'POST', { ids: [10] })).status, 400);
+  assert.equal((await request('/catalog/resolve', 'POST', { collection_ids: ['steam:10'] })).status, 400);
+  assert.equal((await request('/catalog/mods/999')).status, 502);
+  const limited = await request('/catalog/mods?q=upstream-rate-limit');
+  assert.equal(limited.status, 503);
+  assert.equal((await limited.text()).includes('fixture-only-key'), false);
+});
+
+test('a transient Steam failure is retried instead of failing the browse request', async () => {
+  const response = await request('/catalog/mods?q=upstream-flaky');
+  assert.equal(response.status, 200);
+  assert.equal(flakyCalls, 2);
+});
+
+test('the idempotent dependency migration and existing /deps response preserve populated dependency data', async () => {
+  const now = Date.now();
+  await db.batch([
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind('777', 'Existing mod', 0, 'OK', now, 'existing.mod', '778'),
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind('778', 'Existing dependency', 0, 'OK', now, 'existing.dependency', ''),
+  ]);
+  const sql = await readFile(resolvePath('migrations', '0001_dependencies.sql'), 'utf8');
+  await db.batch(statements(sql).map(statement => db.prepare(statement)));
+  const response = await request('/deps?id=777');
+  const value = await response.json() as { rootId: string; totalItemsLoaded: number; isComplete: boolean; items: Record<string, { deps: string[]; package_id: string }> };
+  assert.equal(response.status, 200);
+  assert.equal(value.rootId, '777');
+  assert.equal(value.totalItemsLoaded, 2);
+  assert.equal(value.isComplete, true);
+  assert.deepEqual(value.items['777']?.deps, ['778']);
+  assert.equal(value.items['777']?.package_id, 'existing.mod');
+});
+
+test('an unconfigured Steam key does not turn a missing catalog into a successful empty page', async () => {
+  const noKey = new Miniflare({ workers: [{
+    config: {
+      name: 'no-key', compatibilityDate: '2026-10-05',
+      manifest: { mainModule: 'worker.js', modules: { 'worker.js': { type: 'esm', contents: await readFile(resolvePath('dist/worker.js'), 'utf8') } } },
+      env: { DB: { type: 'd1', id: 'no-key' } },
+    },
+  }] });
+  try {
+    const database = await noKey.getD1Database('DB');
+    await migrate(database);
+    const response = await noKey.dispatchFetch('https://no-key.test/catalog/mods');
+    assert.equal(response.status, 503);
+    const picks = await noKey.dispatchFetch('https://no-key.test/catalog/collections?source=picked');
+    assert.equal(picks.status, 200);
+    assert.deepEqual((await picks.json() as CatalogPage<CatalogCollection>).items, []);
+  } finally { await noKey.dispose(); }
+});
+
+test('newest picks use creation time while recently updated picks use modification time', async () => {
+  const slugs = ['ordering-first', 'ordering-second'];
+  try {
+    for (const slug of slugs) {
+      assert.equal((await request(`/catalog/collections/picked/${slug}`, 'PUT', {
+        title: slug, author: 'Curator', description: '', tags: ['ordering'], member_ids: ['10'],
+      }, 'test-admin')).status, 200);
+    }
+    await db.prepare("UPDATE picked_collections SET created_at = CASE slug WHEN 'ordering-first' THEN 100 ELSE 200 END, updated_at = CASE slug WHEN 'ordering-first' THEN 300 ELSE 200 END WHERE slug IN ('ordering-first', 'ordering-second')").run();
+    const newest = await (await request('/catalog/collections?source=picked&tag=ordering&sort=newest')).json() as CatalogPage<CatalogCollection>;
+    assert.deepEqual(newest.items.map(item => item.id), ['picked:ordering-second', 'picked:ordering-first']);
+    const updated = await (await request('/catalog/collections?source=picked&tag=ordering&sort=updated')).json() as CatalogPage<CatalogCollection>;
+    assert.deepEqual(updated.items.map(item => item.id), ['picked:ordering-first', 'picked:ordering-second']);
+  } finally {
+    for (const slug of slugs) await request(`/catalog/collections/picked/${slug}`, 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collections without a Steam image get a collage from their member mods, skipping unavailable and nested members', async () => {
+  const response = await request('/catalog/collections?source=steam&q=no-thumb');
+  const page = await response.json() as CatalogPage<CatalogCollection>;
+  assert.equal(response.status, 200);
+  assert.equal(page.items[0]?.preview_url, null);
+  assert.deepEqual(page.items[0]?.member_previews, Array(2).fill('https://images.example.test/preview.png'));
+});
+
+test('Steam and picked collection details include member collages without their own preview', async () => {
+  await createPick('thumbnail-detail', ['13', '11']);
+  for (const path of ['/catalog/collections/steam/102', '/catalog/collections/picked/thumbnail-detail']) {
+    const response = await request(path);
+    const detail = await response.json() as { collection: CatalogCollection; members: CatalogItem[] };
+    assert.equal(response.status, 200);
+    assert.equal(detail.collection.preview_url, null);
+    assert.deepEqual(detail.collection.member_previews, Array(2).fill('https://images.example.test/preview.png'));
+  }
+});
+
+test('text search is answered by the local index only after a full crawl cycle, and filters by tag and version', async () => {
+  assert.equal((await (await request('/catalog/index')).json() as { ready: boolean }).ready, false);
+  const before = await request('/catalog/mods?q=upstream-rate-limit');
+  assert.equal(before.status, 503);
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const status = await (await request('/catalog/index')).json() as { ready: boolean; indexed: number; cycle_in_progress: boolean };
+  assert.equal(status.ready, true);
+  assert.equal(status.cycle_in_progress, false);
+  assert.ok(status.indexed >= 5);
+
+  const local = await request('/catalog/mods?q=upstream-rate-limit');
+  assert.equal(local.status, 200);
+  assert.deepEqual((await local.json() as CatalogPage<CatalogMod>).items, []);
+
+  const prefix = await (await request('/catalog/mods?q=harm')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(prefix.items.map(item => item.id), ['11']);
+  assert.equal(prefix.items[0]?.previews.length, 0);
+
+  const old = await (await request('/catalog/mods?q=camera&version=1.5')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(old.items.map(item => item.id), ['14']);
+  const none = await (await request('/catalog/mods?q=camera&version=1.6')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(none.items, []);
+
+  const first = await (await request('/catalog/mods?q=h&limit=1&sort=updated')).json() as CatalogPage<CatalogMod>;
+  assert.equal(first.items.length, 1);
+  assert.ok(first.total >= 2 && first.next_cursor?.startsWith('ix:'));
+  const second = await (await request(`/catalog/mods?q=h&limit=1&sort=updated&cursor=${first.next_cursor}`)).json() as CatalogPage<CatalogMod>;
+  assert.notEqual(second.items[0]?.id, first.items[0]?.id);
+
+  const hostile = await request('/catalog/mods?q=%22%20OR%20*%20NEAR(');
+  assert.equal(hostile.status, 200);
+});
+
+test('expired detail reads answer from storage immediately and refresh in the background; update checks still wait', async () => {
+  const stale = { ...await (await request('/catalog/mods/13')).json() as CatalogMod, title: 'Old title' };
+  const expire = () => db.prepare('UPDATE catalog_items SET data = ?, updated_at = 0 WHERE id = ?').bind(JSON.stringify(stale), '13').run();
+
+  await expire();
+  const served = await (await request('/catalog/mods/13')).json() as CatalogMod;
+  assert.equal(served.title, 'Old title');
+  let refreshed = '';
+  for (let attempt = 0; attempt < 50 && refreshed !== 'RimHUD'; attempt++) {
+    await new Promise(done => setTimeout(done, 20));
+    refreshed = (await db.prepare('SELECT json_extract(data, "$.title") AS title FROM catalog_items WHERE id = ?').bind('13').first<{ title: string }>())?.title ?? '';
+  }
+  assert.equal(refreshed, 'RimHUD');
+
+  await expire();
+  const checked = await (await request('/catalog/mods/batch', 'POST', { ids: ['13'] })).json() as { items: CatalogMod[] };
+  assert.equal(checked.items[0]?.title, 'RimHUD');
+});
+
+test('query pages are remembered in D1: repeats do not call Steam, and expired pages are served first then refreshed', async () => {
+  const path = '/catalog/collections?source=steam&q=no-thumb&limit=7';
+  const before = queryCalls;
+  const first = await (await request(path)).json() as CatalogPage<CatalogCollection>;
+  assert.equal(queryCalls, before + 1);
+  await request(path);
+  assert.equal(queryCalls, before + 1);
+
+  await db.prepare('UPDATE query_cache SET fetched_at = 1').run();
+  const served = await (await request(path)).json() as CatalogPage<CatalogCollection>;
+  assert.deepEqual(served.items.map(item => item.id), first.items.map(item => item.id));
+  let refreshedAt = 1;
+  for (let attempt = 0; attempt < 50 && refreshedAt === 1; attempt++) {
+    await new Promise(done => setTimeout(done, 20));
+    refreshedAt = (await db.prepare('SELECT max(fetched_at) AS at FROM query_cache').first<{ at: number }>())?.at ?? 1;
+  }
+  assert.ok(refreshedAt > 1 && queryCalls === before + 2);
+});
+
+test('once the index is ready, mod browsing without text comes from it, except trending which needs Steam', async () => {
+  const calls = queryCalls;
+  const newest = await (await request('/catalog/mods?sort=newest&limit=2')).json() as CatalogPage<CatalogMod>;
+  assert.equal(newest.items.length, 2);
+  assert.ok(newest.total >= 5);
+  const popular = await (await request('/catalog/mods?version=1.5&limit=5')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(popular.items.map(item => item.id), ['14']);
+  assert.equal(queryCalls, calls);
+  await request('/catalog/mods?sort=trending&limit=3');
+  assert.equal(queryCalls, calls + 1);
+});
+
+test('a cached mod removed by Steam disappears after background refresh, including from local search and batch', async () => {
+  const id = '800';
+  files[id] = mod(id, 'Evictionfixture');
+  assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+  const search = () => request('/catalog/mods?q=Evictionfixture');
+  assert.deepEqual((await (await search()).json() as CatalogPage<CatalogMod>).items.map(item => item.id), [id]);
+  delete files[id];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind(id).run();
+  assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+  let cached: { id: string } | null = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    cached = await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind(id).first<{ id: string }>();
+    if (!cached) break;
+    await new Promise(done => setTimeout(done, 20));
+  }
+  assert.equal(cached, null);
+  assert.equal((await request(`/catalog/mods/${id}`)).status, 404);
+  assert.deepEqual((await (await search()).json() as CatalogPage<CatalogMod>).items, []);
+  const batch = await (await request('/catalog/mods/batch', 'POST', { ids: [id] })).json() as { items: CatalogMod[]; unavailable_ids: string[] };
+  assert.deepEqual(batch, { items: [], unavailable_ids: [id] });
+});
+
+test('batch and resolve evict cached files that become non-public rather than leaving them searchable', async () => {
+  const changes: Partial<SteamFile>[] = [
+    { result: 9 }, { visibility: 1 }, { visibility: 2 }, { visibility: 3 },
+    { banned: true }, { consumer_appid: 730 }, { file_type: 3 },
+  ];
+  for (const [index, change] of changes.entries()) {
+    const id = String(810 + index);
+    files[id] = mod(id, 'Withdrawnfixture');
+    assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+    files[id] = { ...files[id]!, ...change };
+    await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind(id).run();
+    const path = index % 2 ? '/catalog/resolve' : '/catalog/mods/batch';
+    const response = await request(path, 'POST', { ids: [id] });
+    assert.equal(response.status, 200);
+    const value = await response.json() as { unavailable_ids: string[] };
+    assert.deepEqual(value.unavailable_ids, [id]);
+    assert.equal((await request(`/catalog/mods/${id}`)).status, 404);
+  }
+  const search = await (await request('/catalog/mods?q=Withdrawnfixture')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(search.items, []);
+});
+
+test('evicted collection members are unavailable while Steam collection eviction never removes picked collections', async () => {
+  files['820'] = mod('820', 'Collectionmemberfixture');
+  files['821'] = { ...mod('821', 'Withdrawn collection', ['820']), file_type: 2, num_children: 1, preview_url: '' };
+  await createPick('evictionfixture', ['820']);
+  assert.equal((await request('/catalog/collections/steam/821')).status, 200);
+  delete files['820'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind('820').run();
+  const batch = await (await request('/catalog/mods/batch', 'POST', { ids: ['820'] })).json() as { unavailable_ids: string[] };
+  assert.deepEqual(batch.unavailable_ids, ['820']);
+  for (const path of ['/catalog/collections/steam/821', '/catalog/collections/picked/evictionfixture']) {
+    const detail = await (await request(path)).json() as { members: CatalogItem[]; unavailable_ids: string[]; is_complete: boolean; collection: CatalogCollection };
+    assert.deepEqual(detail.members, []);
+    assert.deepEqual(detail.unavailable_ids, ['820']);
+    assert.equal(detail.is_complete, false);
+    assert.deepEqual(detail.collection.member_previews, []);
+  }
+  delete files['821'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind('821').run();
+  const resolved = await (await request('/catalog/resolve', 'POST', { collection_ids: ['steam:821', 'picked:evictionfixture'] })).json() as { items: Record<string, CatalogItem>; unavailable_ids: string[] };
+  assert.deepEqual(resolved.unavailable_ids, ['821', '820']);
+  assert.ok(resolved.items['picked:evictionfixture']);
+  assert.equal((await request('/catalog/collections/steam/821')).status, 404);
+  assert.equal((await request('/catalog/collections/picked/evictionfixture')).status, 200);
+});
+
+test('failed and partial Steam refreshes retain cached metadata and search entries', async () => {
+  for (const [index, failure] of (['http', 'partial', 'metadata'] as const).entries()) {
+    const id = String(830 + index);
+    const companion = String(840 + index);
+    files[id] = mod(id, 'Retainedfixture');
+    files[companion] = mod(companion, 'Retainedfixture companion');
+    assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+    assert.equal((await request(`/catalog/mods/${companion}`)).status, 200);
+    delete files[companion];
+    detailFailures.set(id, failure);
+    await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind(id, companion).run();
+    try {
+      assert.equal((await request('/catalog/mods/batch', 'POST', { ids: [id, companion] })).status, 502);
+      const rows = await db.prepare('SELECT id FROM catalog_items WHERE id IN (?, ?) ORDER BY id').bind(id, companion).all<{ id: string }>();
+      assert.deepEqual(rows.results.map(row => row.id), [id, companion]);
+      const search = await (await request('/catalog/mods?q=Retainedfixture')).json() as CatalogPage<CatalogMod>;
+      assert.ok(search.items.some(item => item.id === id));
+      assert.ok(search.items.some(item => item.id === companion));
+      assert.equal((await request(`/catalog/mods/${id}`)).status, 200);
+    } finally {
+      detailFailures.delete(id);
+    }
+  }
+});
+
+test('full index cycles confirm omitted files, evict unavailable ones and retain public ones', async () => {
+  files['850'] = mod('850', 'UnseenDeletedFixture');
+  files['851'] = mod('851', 'UnseenPublicFixture');
+  await request('/catalog/mods/850');
+  await request('/catalog/mods/851');
+  delete files['850'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind('850', '851').run();
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+
+  assert.equal(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('850').first(), null);
+  const removed = await (await request('/catalog/mods?q=UnseenDeletedFixture')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(removed.items, []);
+  const retained = await (await request('/catalog/mods?q=UnseenPublicFixture')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(retained.items.map(item => item.id), ['851']);
+});
+
+test('index verification resumes after failed Steam refreshes without evicting records', async () => {
+  files['860'] = mod('860', 'UnseenFailedFixture');
+  await request('/catalog/mods/860');
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind('860').run();
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+  detailFailures.set('860', 'http');
+  try {
+    await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+    const state = await db.prepare('SELECT cursor, full_at, cycle_started_at FROM index_state WHERE id = 1')
+      .first<{ cursor: string; full_at: number; cycle_started_at: number }>();
+    assert.equal(state?.cursor, 'verify:0:');
+    assert.equal(state?.full_at, 1);
+    assert.ok((state?.cycle_started_at ?? 0) > 0);
+    assert.ok(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('860').first());
+  } finally {
+    detailFailures.delete('860');
+  }
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const state = await db.prepare('SELECT full_at, cycle_started_at FROM index_state WHERE id = 1')
+    .first<{ full_at: number; cycle_started_at: number }>();
+  assert.ok((state?.full_at ?? 0) > 1);
+  assert.equal(state?.cycle_started_at, 0);
+});
+
+test('a persistently failing omitted file does not starve later ones or complete the pass', async () => {
+  files['870'] = mod('870', 'UnseenPoisonFixture');
+  files['871'] = mod('871', 'UnseenBehindPoisonFixture');
+  await request('/catalog/mods/870');
+  await request('/catalog/mods/871');
+  delete files['871'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind('870', '871').run();
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+  detailFailures.set('870', 'metadata');
+  try {
+    for (let tick = 0; tick < 3; tick++) await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+    assert.equal(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('871').first(), null);
+    assert.ok(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('870').first());
+    const state = await db.prepare('SELECT full_at FROM index_state WHERE id = 1').first<{ full_at: number }>();
+    assert.equal(state?.full_at, 1);
+  } finally {
+    detailFailures.delete('870');
+  }
+});
+
+test('index verification checks at most 100 omitted mods per tick and persists its phase', async () => {
+  const seed = await (await request('/catalog/mods/10')).json() as CatalogMod;
+  const statements = Array.from({ length: 101 }, (_, index) => {
+    const id = String(9000 + index);
+    return db.prepare('INSERT INTO catalog_items (id, data, updated_at) VALUES (?, ?, 0)')
+      .bind(id, JSON.stringify({ ...seed, id }));
+  });
+  await db.batch(statements);
+  const indexRows = Array.from({ length: 101 }, (_, index) => db.prepare(
+    `INSERT INTO catalog_index (id, title, data, tags, indexed_at) VALUES (?, ?, ?, '[]', 0)`,
+  ).bind(String(9000 + index), 'UnseenBatchFixture', JSON.stringify({ ...seed, id: String(9000 + index) })));
+  await db.batch(indexRows);
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+  await db.prepare('UPDATE catalog_items SET updated_at = ? WHERE id NOT BETWEEN ? AND ?')
+    .bind(Date.now() + 60_000, '9000', '9100').run();
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const remaining = await db.prepare('SELECT count(*) AS n FROM catalog_index WHERE id BETWEEN ? AND ?')
+    .bind('9000', '9100').first<{ n: number }>();
+  assert.equal(remaining?.n, 1);
+  const phase = await db.prepare('SELECT cursor FROM index_state WHERE id = 1').first<{ cursor: string }>();
+  assert.ok(phase?.cursor.startsWith('verify:0:9'));
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const complete = await db.prepare('SELECT cycle_started_at FROM index_state WHERE id = 1').first<{ cycle_started_at: number }>();
+  assert.equal(complete?.cycle_started_at, 0);
+  const count = await db.prepare('SELECT count(*) AS n FROM catalog_index WHERE id BETWEEN ? AND ?')
+    .bind('9000', '9100').first<{ n: number }>();
+  assert.equal(count?.n, 0);
+});
+
+test('collection sizes and common versions are stored once members are known, and cleared when membership changes', async () => {
+  await createPick('sized', ['10', '13']);
+  const listed = async () => (await (await request('/catalog/collections?source=picked&q=Starter')).json() as CatalogPage<CatalogCollection>)
+    .items.find(item => item.id === 'picked:sized');
+  try {
+    assert.equal((await listed())?.total_size, null);
+
+    const detail = await (await request('/catalog/collections/picked/sized')).json() as { collection: CatalogCollection };
+    assert.equal(detail.collection.total_size, '8192');
+    assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+    assert.equal(detail.collection.no_common_version, false);
+    assert.equal((await listed())?.total_size, '8192');
+
+    await db.prepare('UPDATE collection_summaries SET computed_at = 1 WHERE id = ?').bind('picked:sized').run();
+    assert.equal((await listed())?.total_size, null);
+    await request('/catalog/collections/picked/sized');
+    assert.equal((await listed())?.total_size, '8192');
+
+    await createPick('sized', ['10', '13', '11']);
+    assert.equal((await listed())?.total_size, null);
+  } finally {
+    await request('/catalog/collections/picked/sized', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collections whose total exceeds a safe integer have no stored size', async () => {
+  await createPick('huge', ['10', '18446744073709551615']);
+  try {
+    const detail = await (await request('/catalog/collections/picked/huge')).json() as { collection: CatalogCollection };
+    assert.equal(detail.collection.total_size, null);
+  } finally {
+    await request('/catalog/collections/picked/huge', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('undeclared collections with conflicting member versions have no common version', async () => {
+  await createPick('versions', ['10', '14'], 'Conflicting versions', { supported_versions: [] });
+  try {
+    const detail = await (await request('/catalog/collections/picked/versions')).json() as { collection: CatalogCollection };
+    assert.deepEqual(detail.collection.supported_versions, []);
+    assert.equal(detail.collection.no_common_version, true);
+    assert.equal(detail.collection.total_size, '8192');
+  } finally {
+    await request('/catalog/collections/picked/versions', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('members with unknown versions do not erase known compatible versions', async () => {
+  files['880'] = mod('880', 'Unversioned member', [], []);
+  await createPick('unknown-member', ['10', '880'], 'Unknown member versions', { supported_versions: [] });
+  try {
+    const detail = await (await request('/catalog/collections/picked/unknown-member')).json() as { collection: CatalogCollection };
+    assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+    assert.equal(detail.collection.no_common_version, false);
+  } finally {
+    await request('/catalog/collections/picked/unknown-member', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collections with only unknown member versions are unstated rather than conflicting', async () => {
+  files['881'] = mod('881', 'Another unversioned member', [], []);
+  await createPick('unknown-versions', ['881'], 'Unknown versions', { supported_versions: [] });
+  try {
+    const detail = await (await request('/catalog/collections/picked/unknown-versions')).json() as { collection: CatalogCollection };
+    assert.deepEqual(detail.collection.supported_versions, []);
+    assert.equal(detail.collection.no_common_version, false);
+  } finally {
+    await request('/catalog/collections/picked/unknown-versions', 'DELETE', undefined, 'test-admin');
+  }
+});
+
+test('collection declarations remain compatible despite conflicting member versions in details and listings', async () => {
+  for (const declaration of [{ supported_versions: ['1.6'], tags: [] }, { supported_versions: [], tags: ['Mod', '1.6'] }]) {
+    await createPick('declared-version', ['10', '14'], 'Declared version fixture', declaration);
+    try {
+      const detail = await (await request('/catalog/collections/picked/declared-version')).json() as { collection: CatalogCollection };
+      assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+      assert.equal(detail.collection.no_common_version, false);
+      const listing = await (await request('/catalog/collections?source=picked&q=Declared')).json() as CatalogPage<CatalogCollection>;
+      assert.deepEqual(listing.items[0]?.supported_versions, ['1.6']);
+      assert.equal(listing.items[0]?.no_common_version, false);
+    } finally {
+      await request('/catalog/collections/picked/declared-version', 'DELETE', undefined, 'test-admin');
+    }
+  }
+});
+
+test('migration 0006 removes the objects of the earlier collection_sizes migration', async () => {
+  await db.batch([
+    db.prepare('CREATE TABLE IF NOT EXISTS collection_sizes (id TEXT PRIMARY KEY, total_size INTEGER NOT NULL)'),
+    db.prepare("CREATE TRIGGER IF NOT EXISTS collection_sizes_item_ad AFTER DELETE ON catalog_items BEGIN DELETE FROM collection_sizes WHERE id = 'steam:' || old.id; END"),
+    db.prepare('DROP TABLE collection_sizes'),
+  ]);
+  await db.prepare("INSERT INTO catalog_items (id, data, updated_at) VALUES ('old-trigger', '{}', 0)").run();
+  await assert.rejects(db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run());
+  const sql = await readFile(resolvePath('migrations', '0006_collection_summaries.sql'), 'utf8');
+  await db.batch(statements(sql).map(statement => db.prepare(statement)));
+  await db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run();
+});

@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         "chevron-left",
         "chevron-down",
         "folder",
+        "thumbs-up",
         "tag",
         "steam",
         "local",
@@ -41,6 +42,8 @@ if TYPE_CHECKING:
         "donut",
         "bars",
         "grip",
+        "star",
+        "star-filled",
     ]
 
 from PySide6.QtCore import QRectF
@@ -50,9 +53,21 @@ from PySide6.QtXml import QDomDocument
 
 from pxmodrim.ui.theme.palette import PALETTE
 
+_STAR = (
+    "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25"
+    "L7 14.14 2 9.27l6.91-1.01L12 2z"
+)
+
 # Each icon is an SVG path data string.
 # stroke svg uses 24x24 viewBox, stroke-width 2, stroke="currentColor"
 _ICONS: dict[str, str] = {
+    "thumbs-up": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M7 10l5-7h2v7h5a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7"/>'
+        '<path d="M3 10h4v11H3z"/>'
+        "</svg>"
+    ),
     "logo": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
         ' stroke-linecap="round" stroke-linejoin="round">'
@@ -358,6 +373,18 @@ _ICONS: dict[str, str] = {
         '<line x1="12" y1="5" x2="12" y2="5"/>'
         '<line x1="12" y1="12" x2="12" y2="12"/>'
         '<line x1="12" y1="19" x2="12" y2="19"/>'
+        "</svg>"
+    ),
+    "star": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round">'
+        f'<path d="{_STAR}"/>'
+        "</svg>"
+    ),
+    "star-filled": (
+        '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor"'
+        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        f'<path d="{_STAR}"/>'
         "</svg>"
     ),
 }

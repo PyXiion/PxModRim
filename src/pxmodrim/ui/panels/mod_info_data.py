@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import time
 from typing import TYPE_CHECKING, Any
@@ -119,6 +120,15 @@ def autolink(html_text: str) -> str:
         else:
             out.append(part if in_anchor else _URL_RE.sub(link, part))
     return "".join(out)
+
+
+def description_to_html(text: str, description_format: str = "bbcode") -> str:
+    """Render descriptions as safe Qt rich text, preserving plain-text content."""
+    if description_format != "bbcode":
+        return html.escape(text).replace("\n", "<br>")
+    return autolink(
+        bbcode_markup(bbcode_images(restore_entities(unity_rich_text_to_html(text))))
+    )
 
 
 def format_age(mtime: float, now: float | None = None) -> str:
@@ -278,15 +288,7 @@ def build_mod_info(
         "needs": needs,
         "conflicts": conflicts,
         "neededBy": needed_by,
-        "description": autolink(
-            bbcode_markup(
-                bbcode_images(
-                    restore_entities(unity_rich_text_to_html(mod.description))
-                )
-            )
-        )
-        if mod.description
-        else "",
+        "description": description_to_html(mod.description),
         "details": _details(mod, downloads.last_synced(mod)),
         "canOpenFolder": mod.mod_path is not None and mod.mod_path.exists(),
         "canUpdate": source is not None,

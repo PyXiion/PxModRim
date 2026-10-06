@@ -61,7 +61,9 @@ class DownloadManager(Plugin):
         downloader.batch_started.connect(self.batch_started.emit)
         downloader.busy_changed.connect(self._on_busy)
 
-    def _on_busy(self, _busy: bool) -> None:
+    def _on_busy(self, busy: bool) -> None:
+        if busy:
+            self._cancelled = False
         self.busy_changed.emit(self.is_downloading)
 
     @property
@@ -130,6 +132,10 @@ class DownloadManager(Plugin):
             total.failed += result.failed
             total.changed += result.changed
         return total
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
 
     def cancel(self) -> None:
         self._cancelled = True

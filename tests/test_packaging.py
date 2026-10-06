@@ -85,6 +85,40 @@ def test_get_standalone_platform_args(monkeypatch) -> None:
     assert "--windows-product-name=PxModRim" in args
 
 
+@pytest.mark.parametrize(
+    ("workshop", "left_out", "shipped"),
+    [
+        (
+            "NoWorkshop",
+            [
+                "pxsteamdl",
+                "ui.plugins.steam_workshop",
+                "ui.plugins.workshop",
+                "ui.plugins.downloads",
+                "QtWebEngine",
+            ],
+            [],
+        ),
+        (
+            "SteamWorkshop",
+            ["ui.plugins.workshop"],
+            ["pxsteamdl", "ui.plugins.steam_workshop", "ui.plugins.downloads"],
+        ),
+        (
+            "NativeWorkshop",
+            ["ui.plugins.steam_workshop", "QtWebEngine"],
+            ["pxsteamdl", "ui.plugins.workshop", "ui.plugins.downloads"],
+        ),
+    ],
+)
+def test_workshop_variants_leave_out_only_what_they_do_not_ship(
+    workshop: str, left_out: list[str], shipped: list[str]
+) -> None:
+    options = " ".join(pkg_build.get_standalone_args(workshop=workshop))
+    assert all(name in options for name in left_out)
+    assert not any(name in options for name in shipped)
+
+
 def test_strip_unused_qml_modules_leaves_missing_directory_unchanged(
     tmp_path: Path,
 ) -> None:
