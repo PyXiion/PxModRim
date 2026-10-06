@@ -4,6 +4,7 @@ import { resolve as resolvePath } from 'node:path';
 import { after, before, test } from 'node:test';
 import { Miniflare } from 'miniflare';
 import type { CatalogCollection, CatalogItem, CatalogMod, CatalogPage, SteamFile } from '../types';
+import { indexMods } from '../search';
 
 const creator = '76561198000000001';
 function mod(id: string, title: string, children: string[] = [], versions = ['1.6']): SteamFile {
@@ -91,7 +92,7 @@ function statements(sql: string): string[] {
 }
 
 async function migrate(database: D1Database): Promise<void> {
-  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql', '0006_collection_summaries.sql', '0007_collection_compatibility.sql']) {
+  for (const file of ['0001_dependencies.sql', '0002_catalog.sql', '0003_search.sql', '0004_query_cache.sql', '0005_catalog_eviction.sql', '0006_collection_summaries.sql', '0007_collection_compatibility.sql', '0008_search_fts_gate.sql']) {
     const sql = await readFile(resolvePath('migrations', file), 'utf8');
     await database.batch(statements(sql).map(statement => database.prepare(statement)));
   }
@@ -786,3 +787,144 @@ test('migration 0006 removes the objects of the earlier collection_sizes migrati
   await db.batch(statements(sql).map(statement => db.prepare(statement)));
   await db.prepare("DELETE FROM catalog_items WHERE id = 'old-trigger'").run();
 });
+
+test('migration 0008 gates catalog_index FTS updates on text changes, avoiding churn on stats-only updates', async () => {
+  const modId = 'gate-stat-test';
+  await db.prepare(`
+    INSERT INTO catalog_index (id, title, author, tags, tag_text, description, data, subscriptions, created_at, updated_at, indexed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    modId, 'Stable Title', 'Stable Author', '["1.6"]', '1.6', 'Stable description text',
+    JSON.stringify({ id: modId, title: 'Stable Title' }), 10, 1000, 1000, 1000,
+  ).run();
+
+  try {
+    const ftsBefore = await db.prepare(
+      'SELECT catalog_index.id FROM catalog_fts JOIN catalog_index ON catalog_index.rowid = catalog_fts.rowid WHERE catalog_fts MATCH ?',
+    ).bind('Stable').all<{ id: string }>();
+    assert.deepEqual(ftsBefore.results.map(r => r.id), [modId]);
+
+    const statsUpdate = await db.prepare(
+      'UPDATE catalog_index SET subscriptions = 500, updated_at = 2000 WHERE id = ?',
+    ).bind(modId).run();
+
+    const ftsAfterStats = await db.prepare(
+      'SELECT catalog_index.id FROM catalog_fts JOIN catalog_index ON catalog_index.rowid = catalog_fts.rowid WHERE catalog_fts MATCH ?',
+    ).bind('Stable').all<{ id: string }>();
+    assert.deepEqual(ftsAfterStats.results.map(r => r.id), [modId]);
+
+    const textUpdate = await db.prepare(
+      'UPDATE catalog_index SET subscriptions = 600, updated_at = 3000, title = ? WHERE id = ?',
+    ).bind('Changed Title', modId).run();
+    assert.ok(textUpdate.meta.rows_written > statsUpdate.meta.rows_written);
+  } finally {
+    await db.prepare('DELETE FROM catalog_index WHERE id = ?').bind(modId).run();
+  }
+});
+
+test('catalog_index_au trigger updates FTS on title, author, tags, or description changes', async () => {
+  const modId = 'fts-fields-test';
+  await db.prepare(`
+    INSERT INTO catalog_index (id, title, author, tags, tag_text, description, data, subscriptions, created_at, updated_at, indexed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    modId, 'OldTitleKeyword', 'OldAuthorKeyword', '["tagalpha"]', 'tagalpha', 'OldDescriptionKeyword',
+    JSON.stringify({ id: modId }), 0, 1000, 1000, 1000,
+  ).run();
+
+  const search = async (term: string) => {
+    const res = await db.prepare(
+      'SELECT catalog_index.id FROM catalog_fts JOIN catalog_index ON catalog_index.rowid = catalog_fts.rowid WHERE catalog_fts MATCH ?',
+    ).bind(term).all<{ id: string }>();
+    return res.results.map(r => r.id);
+  };
+
+  try {
+    assert.deepEqual(await search('OldTitleKeyword'), [modId]);
+    assert.deepEqual(await search('OldAuthorKeyword'), [modId]);
+    assert.deepEqual(await search('tagalpha'), [modId]);
+    assert.deepEqual(await search('OldDescriptionKeyword'), [modId]);
+
+    assert.deepEqual(await search('NewTitleKeyword'), []);
+    assert.deepEqual(await search('NewAuthorKeyword'), []);
+    assert.deepEqual(await search('tagbeta'), []);
+    assert.deepEqual(await search('NewDescriptionKeyword'), []);
+
+    await db.prepare('UPDATE catalog_index SET title = ? WHERE id = ?').bind('NewTitleKeyword', modId).run();
+    assert.deepEqual(await search('OldTitleKeyword'), []);
+    assert.deepEqual(await search('NewTitleKeyword'), [modId]);
+    assert.deepEqual(await search('OldAuthorKeyword'), [modId]);
+
+    await db.prepare('UPDATE catalog_index SET author = ? WHERE id = ?').bind('NewAuthorKeyword', modId).run();
+    assert.deepEqual(await search('OldAuthorKeyword'), []);
+    assert.deepEqual(await search('NewAuthorKeyword'), [modId]);
+
+    await db.prepare('UPDATE catalog_index SET tags = ?, tag_text = ? WHERE id = ?')
+      .bind(JSON.stringify(['tagbeta']), 'tagbeta', modId).run();
+    assert.deepEqual(await search('tagalpha'), []);
+    assert.deepEqual(await search('tagbeta'), [modId]);
+
+    await db.prepare('UPDATE catalog_index SET description = ? WHERE id = ?').bind('NewDescriptionKeyword', modId).run();
+    assert.deepEqual(await search('OldDescriptionKeyword'), []);
+    assert.deepEqual(await search('NewDescriptionKeyword'), [modId]);
+
+    assert.deepEqual(await search('NewTitleKeyword'), [modId]);
+    assert.deepEqual(await search('NewAuthorKeyword'), [modId]);
+    assert.deepEqual(await search('tagbeta'), [modId]);
+  } finally {
+    await db.prepare('DELETE FROM catalog_index WHERE id = ?').bind(modId).run();
+  }
+});
+
+test('indexMods updates FTS when description changes only beyond the first 300 characters', async () => {
+  const modId = 'index-mods-desc-guard-test';
+  const commonPrefix = 'prefixtoken '.repeat(35);
+  const initialMod: CatalogMod = {
+    id: modId,
+    kind: 'mod',
+    source: 'steam',
+    title: 'Description Guard Mod',
+    author: { id: '1', name: 'Guard Author', profile_url: null },
+    description: `${commonPrefix} InitialDeepKeyword restofdescription`,
+    description_format: 'bbcode',
+    preview_url: null,
+    previews: [],
+    workshop_url: `https://steamcommunity.com/sharedfiles/filedetails/?id=${modId}`,
+    tags: ['1.6'],
+    supported_versions: ['1.6'],
+    created_at: 1000,
+    updated_at: 1000,
+    file_size: '1024',
+    subscriptions: 50,
+    votes: null,
+    dependencies: [],
+    package_id: 'guard.desc.mod',
+    incompatible: false,
+  };
+
+  const search = async (term: string) => {
+    const res = await db.prepare(
+      'SELECT catalog_index.id FROM catalog_fts JOIN catalog_index ON catalog_index.rowid = catalog_fts.rowid WHERE catalog_fts MATCH ?',
+    ).bind(term).all<{ id: string }>();
+    return res.results.map(r => r.id);
+  };
+
+  try {
+    await indexMods(db, [initialMod]);
+    assert.deepEqual(await search('InitialDeepKeyword'), [modId]);
+    assert.deepEqual(await search('UpdatedDeepKeyword'), []);
+
+    const updatedMod: CatalogMod = {
+      ...initialMod,
+      description: `${commonPrefix} UpdatedDeepKeyword restofdescription`,
+    };
+
+    await indexMods(db, [updatedMod]);
+
+    assert.deepEqual(await search('InitialDeepKeyword'), []);
+    assert.deepEqual(await search('UpdatedDeepKeyword'), [modId]);
+  } finally {
+    await db.prepare('DELETE FROM catalog_index WHERE id = ?').bind(modId).run();
+  }
+});
+

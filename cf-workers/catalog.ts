@@ -180,7 +180,8 @@ async function attachCollectionSummaries(db: D1Database, collections: CatalogCol
 async function recordCollectionSummary(db: D1Database, collection: CatalogCollection, members: CatalogItem[], complete: boolean): Promise<void> {
   const mods = members.filter((member): member is CatalogMod => member.kind === 'mod');
   if (!complete || mods.length !== members.length || mods.length !== collection.member_count) {
-    await db.prepare('DELETE FROM collection_summaries WHERE id = ?').bind(collection.id).run();
+    const result = await db.prepare('DELETE FROM collection_summaries WHERE id = ?').bind(collection.id).run();
+    console.log('[D1_WRITES]', JSON.stringify({ category: 'collection_summaries', rows_written: result.meta.rows_written }));
     return;
   }
   let total: bigint | null = 0n;
@@ -193,10 +194,11 @@ async function recordCollectionSummary(db: D1Database, collection: CatalogCollec
     ? declaredVersions.reduce((common, next) => common.filter(version => next.includes(version)))
     : [];
   const noCommonVersion = declaredVersions.length > 0 && versions.length === 0;
-  await db.prepare(
+  const result = await db.prepare(
     `INSERT INTO collection_summaries (id, total_size, supported_versions, no_common_version, computed_at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET total_size = excluded.total_size, supported_versions = excluded.supported_versions, no_common_version = excluded.no_common_version, computed_at = excluded.computed_at`,
   ).bind(collection.id, total === null ? null : total.toString(), JSON.stringify(versions), Number(noCommonVersion), Date.now()).run();
+  console.log('[D1_WRITES]', JSON.stringify({ category: 'collection_summaries', rows_written: result.meta.rows_written }));
 }
 
 async function collectionDetails(env: Env, ctx: ExecutionContext, collection: CatalogCollection): Promise<Response> {

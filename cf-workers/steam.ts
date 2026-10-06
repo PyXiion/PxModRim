@@ -204,13 +204,16 @@ function normalized(file: SteamFile, authors: Map<string, Author>): CatalogItem 
   };
 }
 
-async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
+export async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
   const now = Date.now();
+  let rowsWritten = 0;
   for (let offset = 0; offset < items.length; offset += API_BATCH_SIZE) {
-    await db.batch(items.slice(offset, offset + API_BATCH_SIZE).map(item => db.prepare(
+    const results = await db.batch(items.slice(offset, offset + API_BATCH_SIZE).map(item => db.prepare(
       'INSERT INTO catalog_items (id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at',
     ).bind(item.kind === 'collection' ? item.steam_id : item.id, JSON.stringify(item), now)));
+    rowsWritten += results.reduce((total, result) => total + result.meta.rows_written, 0);
   }
+  if (items.length) console.log('[D1_WRITES]', JSON.stringify({ category: 'catalog_cache', rows_written: rowsWritten }));
   await indexMods(db, items.filter((item): item is CatalogMod => item.kind === 'mod')).catch(error =>
     console.error('Search index update failed', error instanceof Error ? error.message : error));
 }
@@ -248,11 +251,14 @@ export async function refreshSteamItems(env: Env, ids: string[]): Promise<Map<st
   }
   // Do not evict anything if a later Steam batch or creator lookup fails.
   await saveItems(env.DB, [...fetched.values()]);
+  let rowsWritten = 0;
   for (let offset = 0; offset < unavailable.length; offset += API_BATCH_SIZE) {
-    await env.DB.batch(unavailable.slice(offset, offset + API_BATCH_SIZE).map(id => env.DB.prepare(
+    const results = await env.DB.batch(unavailable.slice(offset, offset + API_BATCH_SIZE).map(id => env.DB.prepare(
       "DELETE FROM catalog_items WHERE id = ? AND json_extract(data, '$.source') = 'steam'",
     ).bind(id)));
+    rowsWritten += results.reduce((total, result) => total + result.meta.rows_written, 0);
   }
+  if (unavailable.length) console.log('[D1_WRITES]', JSON.stringify({ category: 'catalog_cache', rows_written: rowsWritten }));
   return fetched;
 }
 
@@ -351,7 +357,6 @@ export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind:
   const files = details.filter(file => publicFile(file) && file.file_type === (kind === 'mod' ? 0 : 2));
   const authors = await authorsFor(env, files);
   const items = files.map(file => normalized(file, authors));
-  await saveItems(env.DB, items);
   const cursor = typeof response.next_cursor === 'string' ? response.next_cursor : '';
   return {
     items,
@@ -384,14 +389,18 @@ export async function querySteam<K extends 'mod' | 'collection'>(env: Env, ctx: 
 
   const refresh = async (): Promise<Page> => {
     const { items, total, next_cursor } = await queryFiles(env, kind, query);
+    await saveItems(env.DB, items);
     const ids = items.map(item => item.kind === 'collection' ? item.steam_id! : item.id);
-    await env.DB.batch([
+    const results = await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO query_cache (key, ids, total, next_cursor, fetched_at) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET ids = excluded.ids, total = excluded.total, next_cursor = excluded.next_cursor, fetched_at = excluded.fetched_at`,
       ).bind(key, JSON.stringify(ids), total, next_cursor, Date.now()),
       env.DB.prepare('DELETE FROM query_cache WHERE fetched_at < ?').bind(Date.now() - QUERY_KEEP_MS),
     ]);
+    console.log('[D1_WRITES]', JSON.stringify({
+      category: 'query_cache', rows_written: results.reduce((total, result) => total + result.meta.rows_written, 0),
+    }));
     return { items, total, next_cursor } as Page;
   };
 

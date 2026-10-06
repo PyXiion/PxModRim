@@ -174,8 +174,13 @@ JSON requests require `application/json` and are bounded to 64 KiB, including st
 - `0004_query_cache.sql`: `query_cache`, the ordered IDs, total and cursor of each Steam query page. Pages and metadata both live in D1, so they survive restarts and deploys and are identical at every edge.
 - `0006_collection_summaries.sql`: `collection_summaries`, facts derived from a collection's members and written when its details are read, once every member is a known mod: `total_size` (decimal bytes, null if any member size is unknown) and `supported_versions` (the intersection of declared member versions). Listings read them without touching members; rows expire after 24 hours and triggers drop them when the collection's members change or it is deleted. Collections without a fresh row report `total_size: null` and their own versions.
 - `0007_collection_compatibility.sql`: distinguishes conflicting member versions from missing declarations via a stored `no_common_version` flag, and clears summaries computed under the earlier rules. Apply it before deploying the updated Worker.
+- `0008_search_fts_gate.sql`: rebuilds FTS entries only when title, author, tag text or indexed description changes; subscription/vote-only updates still refresh search result data without rewriting FTS.
 
 The catalog cache is separate from `items`: the legacy resolver intentionally strips nested collection children in some paths; catalog resolution retains them.
+
+Incremental indexing persists only items at or newer than its overlap cutoff; the older boundary page is fetched to stop pagination but is not rewritten. Weekly full passes still refresh all listed items and verify omitted mods.
+
+Write operations log `[D1_WRITES]` with `{ "category": "...", "rows_written": N }`, using actual D1 result metadata. Categories are `catalog_cache` (including evictions), `search_index`, `query_cache` (including expired-page cleanup), `collection_summaries`, and `legacy_cache`. Sum by category to compare scheduled indexing and browsing workloads. Counts include index/trigger work attributed by D1 to each statement; these logs do not cover admin curation, purge or crawler-state writes, so they are not a complete billing total.
 
 ## Existing dependency resolver
 

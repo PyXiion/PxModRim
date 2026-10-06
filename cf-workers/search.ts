@@ -24,10 +24,11 @@ export async function indexMods(db: D1Database, mods: CatalogMod[]): Promise<voi
        title = excluded.title, author = excluded.author, tags = excluded.tags, tag_text = excluded.tag_text,
        description = excluded.description, data = excluded.data, subscriptions = excluded.subscriptions,
        created_at = excluded.created_at, updated_at = excluded.updated_at, indexed_at = excluded.indexed_at
-     WHERE catalog_index.data IS NOT excluded.data`,
+     WHERE catalog_index.data IS NOT excluded.data OR catalog_index.description IS NOT excluded.description`,
   );
+  let rowsWritten = 0;
   for (let offset = 0; offset < mods.length; offset += BATCH_SIZE) {
-    await db.batch(mods.slice(offset, offset + BATCH_SIZE).map(mod => {
+    const results = await db.batch(mods.slice(offset, offset + BATCH_SIZE).map(mod => {
       const listed: CatalogMod = { ...mod, description: mod.description.slice(0, LIST_DESCRIPTION_CHARS), previews: [] };
       return statement.bind(
         mod.id, mod.title, mod.author.name ?? '', JSON.stringify(mod.tags), mod.tags.join(' '),
@@ -35,7 +36,9 @@ export async function indexMods(db: D1Database, mods: CatalogMod[]): Promise<voi
         JSON.stringify(listed), mod.subscriptions ?? 0, mod.created_at ?? 0, mod.updated_at ?? 0, now,
       );
     }));
+    rowsWritten += results.reduce((total, result) => total + result.meta.rows_written, 0);
   }
+  if (mods.length) console.log('[D1_WRITES]', JSON.stringify({ category: 'search_index', rows_written: rowsWritten }));
 }
 
 export async function indexStatus(db: D1Database): Promise<IndexStatus> {

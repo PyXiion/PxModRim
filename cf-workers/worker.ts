@@ -185,7 +185,7 @@ async function saveToDB(
 ): Promise<void> {
   try {
     const depsStr = Array.isArray(deps) ? deps.join(',') : '';
-    await db.prepare(
+    const result = await db.prepare(
       `INSERT INTO items (id, title, is_collection, status, updated_at, package_id, deps)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
@@ -196,6 +196,7 @@ async function saveToDB(
          package_id = excluded.package_id,
          deps = excluded.deps`
     ).bind(modId, title, isCollection ? 1 : 0, status, timestamp, packageId, depsStr).run();
+    console.log('[D1_WRITES]', JSON.stringify({ category: 'legacy_cache', rows_written: result.meta.rows_written }));
   } catch (err) {
     console.error(`[D1 SAVE ERROR] ID ${modId}:`, err instanceof Error ? err.message : err);
   }
