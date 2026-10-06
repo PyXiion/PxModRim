@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2680" viewBox="0 0 1200 2680" role="img" aria-labelledby="title description">
+<title id="title">PxModRim installed-mod memory profile</title>
+<desc id="description">Measured memray allocation peaks, decoded image payloads, WebP disk cache sizes, metadata costs, and controlled virtual versus nonvirtual grid retention. Exact bytes are included alongside binary MiB units.</desc>
+<rect x="0" y="0" width="1200.00" height="2680" rx="0" fill="#0b0d10"/>
+<text x="60" y="78" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="44" font-weight="800" fill="#f2f3f5" text-anchor="start">Installed mods · memory profile</text>
+<text x="60" y="115" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="400" fill="#949ba4" text-anchor="start">PxModRim · 2,041 installed mods · 1,512 PNG previews · Python 3.12.13 / Qt offscreen</text>
+<rect x="60" y="139" width="110.00" height="6" rx="3" fill="#66c0f4"/>
+<rect x="176" y="139" width="60.00" height="6" rx="3" fill="#6c737f"/>
+<rect x="60" y="182" width="348.00" height="158" rx="10" fill="#1a1d21"/>
+<rect x="60" y="182" width="4.00" height="158" rx="2" fill="#66c0f4"/>
+<text x="86" y="245" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="51" font-weight="800" fill="#66c0f4" text-anchor="start">76.2%</text>
+<text x="86" y="283" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">lower peak allocations</text>
+<text x="86" y="314" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">Raw PNG → bounded WebP</text>
+<rect x="426" y="182" width="348.00" height="158" rx="10" fill="#1a1d21"/>
+<rect x="426" y="182" width="4.00" height="158" rx="2" fill="#66c0f4"/>
+<text x="452" y="245" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="51" font-weight="800" fill="#66c0f4" text-anchor="start">65.0%</text>
+<text x="452" y="283" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">less decoded image RAM</text>
+<text x="452" y="314" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">Raw image → bounded reader</text>
+<rect x="792" y="182" width="348.00" height="158" rx="10" fill="#1a1d21"/>
+<rect x="792" y="182" width="4.00" height="158" rx="2" fill="#66c0f4"/>
+<text x="818" y="245" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="51" font-weight="800" fill="#66c0f4" text-anchor="start">5.8%</text>
+<text x="818" y="283" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">of the original disk size</text>
+<text x="818" y="314" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">WebP quality 80 vs raw PNG</text>
+<text x="60" y="404" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="26" font-weight="700" fill="#f2f3f5" text-anchor="start">Preview images · measured peak</text>
+<text x="1140" y="404" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#6c737f" text-anchor="end">all previews retained · lower is better</text>
+<line x1="60" y1="419" x2="1140" y2="419" stroke="#2c3036"/>
+<text x="60" y="449" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="400" fill="#949ba4" text-anchor="start">Live memray allocations: metadata + images + decode/conversion scratch</text>
+<text x="60" y="496" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Raw QImage + QPixmap</text>
+<text x="60" y="520" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">full-size About/Preview.png</text>
+<rect x="365" y="478" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="478" width="565.00" height="26" rx="6" fill="#6c737f"/>
+<text x="948" y="497" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#6c737f" text-anchor="start">5,115.75 MiB</text>
+<text x="948" y="520" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">5,364,257,507 B</text>
+<text x="60" y="570" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Bounded QImageReader</text>
+<text x="60" y="594" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">600 × 338 max · aspect ratio preserved</text>
+<rect x="365" y="552" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="552" width="189.67" height="26" rx="6" fill="#66c0f4"/>
+<text x="948" y="571" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#66c0f4" text-anchor="start">1,717.39 MiB</text>
+<text x="948" y="594" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">1,800,812,141 B</text>
+<text x="60" y="644" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Compressed WebP cache</text>
+<text x="60" y="668" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">bounded thumbnails · decoded for display</text>
+<rect x="365" y="626" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="626" width="134.50" height="26" rx="6" fill="#85d6b2"/>
+<text x="948" y="645" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#85d6b2" text-anchor="start">1,217.81 MiB</text>
+<text x="948" y="668" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">1,276,971,380 B</text>
+<rect x="60" y="703" width="1080.00" height="72" rx="10" fill="#1a1d21"/>
+<text x="80" y="732" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#66c0f4" text-anchor="start">PNG caveat</text>
+<text x="208" y="732" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="400" fill="#949ba4" text-anchor="start">setScaledSize bounds the output; PNG still needs full-resolution decode scratch.</text>
+<text x="80" y="756" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">WebP is smaller on disk, not compressed in display RAM. QPixmap conversion can allocate another bitmap.</text>
+<text x="60" y="827" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="26" font-weight="700" fill="#f2f3f5" text-anchor="start">Decoded bitmap payload · retained QImages</text>
+<text x="1140" y="827" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#6c737f" text-anchor="end">sizeInBytes() · excludes QPixmap copies</text>
+<line x1="60" y1="842" x2="1140" y2="842" stroke="#2c3036"/>
+<text x="60" y="878" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Raw PNG</text>
+<rect x="365" y="860" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="860" width="565.00" height="26" rx="6" fill="#6c737f"/>
+<text x="948" y="879" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#6c737f" text-anchor="start">3,059.07 MiB</text>
+<text x="948" y="902" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">3,207,672,404 B</text>
+<text x="60" y="945" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Bounded PNG reader</text>
+<rect x="365" y="927" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="927" width="198.03" height="26" rx="6" fill="#66c0f4"/>
+<text x="948" y="946" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#66c0f4" text-anchor="start">1,072.20 MiB</text>
+<text x="948" y="969" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">1,124,286,140 B</text>
+<text x="60" y="1012" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Bounded WebP</text>
+<rect x="365" y="994" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="994" width="197.60" height="26" rx="6" fill="#85d6b2"/>
+<text x="948" y="1013" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#85d6b2" text-anchor="start">1,069.86 MiB</text>
+<text x="948" y="1036" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">1,121,830,668 B</text>
+<text x="60" y="1062" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">Largest source dimensions in corpus: up to 5,333 px wide / 3,000 px high.</text>
+<text x="60" y="1120" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="26" font-weight="700" fill="#f2f3f5" text-anchor="start">Disk footprint · thumbnail cache</text>
+<text x="1140" y="1120" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#6c737f" text-anchor="end">compressed file bytes · no source files changed</text>
+<line x1="60" y1="1135" x2="1140" y2="1135" stroke="#2c3036"/>
+<text x="60" y="1172" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">Original PNG files</text>
+<rect x="365" y="1154" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="1154" width="565.00" height="26" rx="6" fill="#6c737f"/>
+<text x="948" y="1173" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#6c737f" text-anchor="start">475.54 MiB</text>
+<text x="948" y="1196" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">498,640,290 B</text>
+<text x="60" y="1240" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">WebP thumbnails · Q80</text>
+<rect x="365" y="1222" width="565.00" height="26" rx="6" fill="#1a1d21"/>
+<rect x="365" y="1222" width="32.90" height="26" rx="6" fill="#85d6b2"/>
+<text x="948" y="1241" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#85d6b2" text-anchor="start">27.69 MiB</text>
+<text x="948" y="1264" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">29,036,184 B</text>
+<text x="60" y="1290" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="400" fill="#949ba4" text-anchor="start">17.17× smaller · 94.18% less disk space · temporary thumbnail cache removed after profiling</text>
+<text x="60" y="1350" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="26" font-weight="700" fill="#f2f3f5" text-anchor="start">Grid retention · visit every row, retain only the viewport</text>
+<text x="1140" y="1350" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#6c737f" text-anchor="end">controlled QWidget / QLabel experiment</text>
+<line x1="60" y1="1365" x2="1140" y2="1365" stroke="#2c3036"/>
+<text x="60" y="1390" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#66c0f4" text-anchor="start">Virtualized · at most 24 delegates</text>
+<text x="485" y="1390" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#6c737f" text-anchor="start">Non-virtualized · all delegates</text>
+<text x="1140" y="1390" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="end">bars: end-of-run live allocations</text>
+<text x="60" y="1442" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">24 rows</text>
+<text x="60" y="1470" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">24 / 24 retained</text>
+<rect x="285" y="1423" width="645.00" height="24" rx="6" fill="#1a1d21"/>
+<rect x="285" y="1423" width="11.40" height="24" rx="6" fill="#66c0f4"/>
+<text x="948" y="1441" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#66c0f4" text-anchor="start">26.05 MiB</text>
+<text x="948" y="1458" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">peak 32.47 MiB</text>
+<rect x="285" y="1460" width="645.00" height="24" rx="6" fill="#1a1d21"/>
+<rect x="285" y="1460" width="11.40" height="24" rx="6" fill="#6c737f"/>
+<text x="948" y="1478" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#6c737f" text-anchor="start">26.05 MiB</text>
+<text x="948" y="1495" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">peak 32.47 MiB</text>
+<text x="60" y="1548" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">100 rows</text>
+<text x="60" y="1576" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">24 / 100 retained</text>
+<rect x="285" y="1529" width="645.00" height="24" rx="6" fill="#1a1d21"/>
+<rect x="285" y="1529" width="11.92" height="24" rx="6" fill="#66c0f4"/>
+<text x="948" y="1547" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#66c0f4" text-anchor="start">27.24 MiB</text>
+<text x="948" y="1564" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">peak 39.40 MiB</text>
+<rect x="285" y="1566" width="645.00" height="24" rx="6" fill="#1a1d21"/>
+<rect x="285" y="1566" width="33.87" height="24" rx="6" fill="#6c737f"/>
+<text x="948" y="1584" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#6c737f" text-anchor="start">77.39 MiB</text>
+<text x="948" y="1601" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">peak 78.20 MiB</text>
+<text x="60" y="1654" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="18" font-weight="600" fill="#f2f3f5" text-anchor="start">2,041 rows</text>
+<text x="60" y="1682" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">24 / 2,041 retained</text>
+<rect x="285" y="1635" width="645.00" height="24" rx="6" fill="#1a1d21"/>
+<rect x="285" y="1635" width="12.10" height="24" rx="6" fill="#66c0f4"/>
+<text x="948" y="1653" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#66c0f4" text-anchor="start">27.64 MiB</text>
+<text x="948" y="1670" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">peak 149.28 MiB</text>
+<rect x="285" y="1672" width="645.00" height="24" rx="6" fill="#1a1d21"/>
+<rect x="285" y="1672" width="645.00" height="24" rx="6" fill="#6c737f"/>
+<text x="948" y="1690" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="700" fill="#6c737f" text-anchor="start">1,473.69 MiB</text>
+<text x="948" y="1707" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">peak 1,502.47 MiB</text>
+<rect x="60" y="1750" width="1080.00" height="84" rx="10" fill="#1a1d21"/>
+<text x="80" y="1781" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="21" font-weight="700" fill="#66c0f4" text-anchor="start">98.12% less retained memory at 2,041 rows</text>
+<text x="80" y="1808" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">Virtual peak: 149.28 MiB; nonvirtual peak: 1,502.47 MiB. Large PNG scratch still spikes.</text>
+<text x="60" y="1890" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="26" font-weight="700" fill="#f2f3f5" text-anchor="start">Where the allocations go</text>
+<text x="1140" y="1890" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#6c737f" text-anchor="end">peak live stacks · each column is a separate run</text>
+<line x1="60" y1="1905" x2="1140" y2="1905" stroke="#2c3036"/>
+<text x="340" y="1930" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="700" fill="#f2f3f5" text-anchor="start">Metadata cold</text>
+<text x="590" y="1930" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="700" fill="#f2f3f5" text-anchor="start">Raw previews</text>
+<text x="855" y="1930" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="700" fill="#f2f3f5" text-anchor="start">Bounded grid · all</text>
+<rect x="60" y="1947" width="1080.00" height="52" rx="8" fill="#1a1d21"/>
+<rect x="77" y="1965" width="12.00" height="12" rx="3" fill="#66c0f4"/>
+<text x="100" y="1979" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#949ba4" text-anchor="start">Bitmaps / decode / conversion</text>
+<text x="340" y="1970" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.00 MiB</text>
+<text x="340" y="1990" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">0 B</text>
+<text x="590" y="1970" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">5,105.16 MiB</text>
+<text x="590" y="1990" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">5,353,152,821 B</text>
+<text x="855" y="1970" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">1,467.53 MiB</text>
+<text x="855" y="1990" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">1,538,820,331 B</text>
+<rect x="60" y="2005" width="1080.00" height="52" rx="8" fill="#0b0d10"/>
+<rect x="77" y="2023" width="12.00" height="12" rx="3" fill="#ab9af5"/>
+<text x="100" y="2037" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#949ba4" text-anchor="start">Python objects</text>
+<text x="340" y="2028" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">15.34 MiB</text>
+<text x="340" y="2048" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">16,087,307 B</text>
+<text x="590" y="2028" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">10.58 MiB</text>
+<text x="590" y="2048" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">11,090,086 B</text>
+<text x="855" y="2028" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">10.67 MiB</text>
+<text x="855" y="2048" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">11,185,341 B</text>
+<rect x="60" y="2063" width="1080.00" height="52" rx="8" fill="#1a1d21"/>
+<rect x="77" y="2081" width="12.00" height="12" rx="3" fill="#85d6b2"/>
+<text x="100" y="2095" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#949ba4" text-anchor="start">SQLite cache</text>
+<text x="340" y="2086" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">2.32 MiB</text>
+<text x="340" y="2106" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">2,435,008 B</text>
+<text x="590" y="2086" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.00 MiB</text>
+<text x="590" y="2106" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">0 B</text>
+<text x="855" y="2086" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.00 MiB</text>
+<text x="855" y="2106" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">0 B</text>
+<rect x="60" y="2121" width="1080.00" height="52" rx="8" fill="#0b0d10"/>
+<rect x="77" y="2139" width="12.00" height="12" rx="3" fill="#e3b66c"/>
+<text x="100" y="2153" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#949ba4" text-anchor="start">Qt widgets / layouts</text>
+<text x="340" y="2144" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.00 MiB</text>
+<text x="340" y="2164" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">0 B</text>
+<text x="590" y="2144" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.00 MiB</text>
+<text x="590" y="2164" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">0 B</text>
+<text x="855" y="2144" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">24.25 MiB</text>
+<text x="855" y="2164" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">25,429,107 B</text>
+<rect x="60" y="2179" width="1080.00" height="52" rx="8" fill="#1a1d21"/>
+<rect x="77" y="2197" width="12.00" height="12" rx="3" fill="#6c737f"/>
+<text x="100" y="2211" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="15" font-weight="600" fill="#949ba4" text-anchor="start">Other native allocations</text>
+<text x="340" y="2202" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.04 MiB</text>
+<text x="340" y="2222" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">37,168 B</text>
+<text x="590" y="2202" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.01 MiB</text>
+<text x="590" y="2222" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">14,600 B</text>
+<text x="855" y="2202" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="16" font-weight="600" fill="#f2f3f5" text-anchor="start">0.01 MiB</text>
+<text x="855" y="2222" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="12" font-weight="400" fill="#949ba4" text-anchor="start">14,600 B</text>
+<text x="60" y="2271" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">SQLite is closed after discovery: its allocations are absent at the later image/grid peak, not unmeasured.</text>
+<text x="60" y="2326" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="26" font-weight="700" fill="#f2f3f5" text-anchor="start">Metadata baseline · real discovery, models, SQLite cache</text>
+<text x="1140" y="2326" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#6c737f" text-anchor="end">2,041 mods · no preview images</text>
+<line x1="60" y1="2341" x2="1140" y2="2341" stroke="#2c3036"/>
+<text x="60" y="2365" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="600" fill="#f2f3f5" text-anchor="start">Cold XML parsing</text>
+<text x="360" y="2365" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#66c0f4" text-anchor="start">peak 17.70 MiB</text>
+<text x="730" y="2365" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="400" fill="#949ba4" text-anchor="start">retained 10.58 MiB</text>
+<text x="60" y="2401" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="600" fill="#f2f3f5" text-anchor="start">Warm SQLite lookup</text>
+<text x="360" y="2401" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="700" fill="#66c0f4" text-anchor="start">peak 17.86 MiB</text>
+<text x="730" y="2401" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="17" font-weight="400" fill="#949ba4" text-anchor="start">retained 10.49 MiB</text>
+<text x="60" y="2437" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="14" font-weight="400" fill="#949ba4" text-anchor="start">SQLite database: 4.08 MiB (4,280,320 B). Cache improves parsing time, not the model-retention floor.</text>
+<line x1="60" y1="2473" x2="1140" y2="2473" stroke="#2c3036"/>
+<text x="60" y="2501" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">Measured on Linux x86_64 · Python 3.12.13 · memray 1.20.0 · QT_QPA_PLATFORM=offscreen.</text>
+<text x="60" y="2524" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">Comparison workers are isolated; Qt/import baseline is excluded from memray allocations, but included in JSON RSS figures.</text>
+<text x="60" y="2547" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">Grid uses one QWidget + two QLabels per delegate and real corpus previews; production QML ListView already reuses items.</text>
+<text x="60" y="2570" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">529 mods lack About/Preview.png. Grid images cycle through the corpus so every delegate has the same workload.</text>
+<text x="60" y="2593" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">Breakdown: native sqlite3 frames, image/pixmap frames, widget-construction frames, Python allocator records, then other.</text>
+<text x="60" y="2616" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">Outer HTML flamegraph also includes imports and thumbnail encoding. Its total peak is not the isolated comparison peak.</text>
+<text x="60" y="2639" font-family="Inter, 'Noto Sans', 'DejaVu Sans', sans-serif" font-size="13" font-weight="400" fill="#949ba4" text-anchor="start">Exact bytes, sampled RSS, timing, and methodology: installed-memory-profile.json · CLI summary: installed-memory-stats.json.</text>
+</svg>
