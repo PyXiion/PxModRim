@@ -98,9 +98,10 @@ class WorkshopViewPanel(BaseViewPanel):
         self._collection_mods: dict[str, frozenset[str]] = {}
         self._items: dict[str, CatalogMod | CatalogCollection] = {}
         self._known_tags: set[str] = set()
+        self._installed_ids: set[str] = set()
         self._active_ids: set[str] = set()
         self._pack_ids: frozenset[str] = frozenset()
-        self._refresh_active_ids()
+        self._refresh_mod_ids()
         self._qml = QQuickWidget(qml_engine, self)  # type: ignore[arg-type]
         self._qml.setObjectName("workshopView")
         self._qml.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
@@ -146,8 +147,13 @@ class WorkshopViewPanel(BaseViewPanel):
 
     # -- rows -------------------------------------------------------------
 
-    def _refresh_active_ids(self) -> None:
+    def _refresh_mod_ids(self) -> None:
         mods = self._ctx.all_mods
+        self._installed_ids = {
+            published_id
+            for mod in mods.values()
+            if (published_id := mod.published_file_id) is not None
+        }
         self._active_ids = {
             published_id
             for uuid in self._ctx.active_uuids
@@ -164,10 +170,20 @@ class WorkshopViewPanel(BaseViewPanel):
             item, self._catalog.install_state, self._game_version, detail=detail
         )
         row["active"] = isinstance(item, CatalogMod) and item.id in self._active_ids
-        if isinstance(item, CatalogCollection) and item.id in self._favourites:
-            row["favourite"] = True
-            self._favourites.remember(item)
-        if row["state"] != "installed":
+        if isinstance(item, CatalogCollection):
+            if not detail:
+                installed_count = sum(
+                    member_id in self._installed_ids for member_id in item.member_ids
+                )
+                if item.member_ids and installed_count == len(item.member_ids):
+                    row["state"], row["stateLabel"] = "installed", "Installed"
+                    row["actionLabel"] = "Installed"
+                elif installed_count:
+                    row["actionLabel"] = "Complete download"
+            if item.id in self._favourites:
+                row["favourite"] = True
+                self._favourites.remember(item)
+        if isinstance(item, CatalogCollection) or row["state"] != "installed":
             self._mark_progress(item, row)
         return row
 
@@ -180,7 +196,9 @@ class WorkshopViewPanel(BaseViewPanel):
         if isinstance(item, CatalogMod):
             ids: frozenset[str] = frozenset((item.id,))
         else:
-            ids = self._collection_mods.get(item.id, frozenset())
+            ids = frozenset(item.member_ids) | self._collection_mods.get(
+                item.id, frozenset()
+            )
             if self._detail_data is not None and self._detail_data.item.id == item.id:
                 ids |= self._pack_ids
         if not ids.isdisjoint(self._downloads.active_ids):
@@ -189,6 +207,7 @@ class WorkshopViewPanel(BaseViewPanel):
             row["queued"], row["actionLabel"] = True, "Queued"
 
     def _rows(self, items: Iterable[CatalogMod | CatalogCollection]) -> list[Any]:
+        self._refresh_mod_ids()
         return [self._row(item) for item in items]
 
     def _detail_row(self, detail: Detail) -> dict[str, Any]:
@@ -219,8 +238,9 @@ class WorkshopViewPanel(BaseViewPanel):
             copies = self._pack_copies()
             if copies is not None:
                 active = set(self._ctx.active_uuids)
-                row["state"] = "installed"
-                row["actionLabel"] = "Installed"
+                row["state"], row["stateLabel"] = "installed", "Installed"
+                if not row["queued"]:
+                    row["actionLabel"] = "Installed"
                 row["active"] = all(uuid in active for uuid in copies)
         return row
 
@@ -721,7 +741,7 @@ class WorkshopViewPanel(BaseViewPanel):
     # -- catalog events ---------------------------------------------------
 
     def _on_active_state_changed(self, _uuids: tuple[str, ...]) -> None:
-        self._refresh_active_ids()
+        self._refresh_mod_ids()
         self._refresh_rows()
         self.changed.emit()
 
@@ -753,7 +773,7 @@ class WorkshopViewPanel(BaseViewPanel):
         if self._torn_down:
             return
         self._installed_dirty = True
-        self._refresh_active_ids()
+        self._refresh_mod_ids()
         self._recount()
         self._refresh_rows()
         self.changed.emit()

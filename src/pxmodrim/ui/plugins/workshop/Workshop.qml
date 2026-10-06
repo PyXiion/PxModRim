@@ -340,6 +340,11 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
             contentWidth: availableWidth
+            function jumpToMembers() {
+                const flickable = contentItem
+                const target = membersHeading.mapToItem(flickable.contentItem, 0, 0).y
+                flickable.contentY = Math.max(0, Math.min(target, flickable.contentHeight - flickable.height))
+            }
             ColumnLayout {
                 width: detailScroll.availableWidth
                 ColumnLayout {
@@ -413,9 +418,13 @@ Rectangle {
                             }
                             Heading { Layout.fillWidth: true; text: root.detail.title || ""; font.pixelSize: 26; wrapMode: Text.Wrap }
                             Copy { text: "by " + (root.detail.author || "") }
-                            Copy { Layout.fillWidth: true; text: "Supports " + (root.detail.versions || "") }
-                            Copy { Layout.fillWidth: true; visible: !!root.detail.tags; text: root.detail.tags || "" }
-                            Copy { Layout.fillWidth: true; visible: !!root.detail.incompatible; text: "Does not list your game version. Downloading does not make it compatible."; color: Theme.warning }
+                            Copy {
+                                objectName: "detailTags"
+                                Layout.fillWidth: true
+                                text: [root.detail.tags, root.detail.versions === "Not specified" ? "" : root.detail.versions].filter(s => !!s).join(" · ")
+                                visible: !!text
+                            }
+                            Copy { Layout.fillWidth: true; visible: !!root.detail.incompatible; text: "Does not list your game version."; color: Theme.warning }
                             Copy { Layout.fillWidth: true; visible: !!root.detail.warning; text: root.detail.warning || ""; color: Theme.warning }
                             Flow {
                                 Layout.fillWidth: true
@@ -496,59 +505,70 @@ Rectangle {
                         columns: pack ? 1 : 2
                         columnSpacing: 16
                         rowSpacing: 16
-                        Rectangle {
-                            Layout.row: detailBody.pack ? 1 : 0
+                        ColumnLayout {
+                            id: descColumn
+                            objectName: "detailDescription"
+                            Layout.row: 0
                             Layout.column: 0
                             Layout.fillWidth: true
                             Layout.preferredWidth: 3
                             Layout.alignment: Qt.AlignTop
-                            implicitHeight: descColumn.implicitHeight + 32
-                            color: Theme.elevate2
-                            border.color: Theme.border
-                            radius: Theme.radiusMd
-                            ColumnLayout {
-                                id: descColumn
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 10
+                            spacing: 10
+                            readonly property bool tall: descriptionText.implicitHeight > detailScroll.availableHeight
+                            RowLayout {
+                                Layout.fillWidth: true
                                 Heading { text: "Description" }
-                                ModDescription {
-                                    Layout.fillWidth: true
-                                    description: root.detail.description || ""
-                                    onLinkActivated: link => workshopPanel.openLink(link)
+                                PxButton {
+                                    objectName: "jumpToMembers"
+                                    visible: descColumn.tall && catalogMembers.count > 0
+                                    text: detailBody.pack ? "Jump to mods" : "Jump to required mods"
+                                    variant: "ghost"
+                                    font.pixelSize: Theme.fontSizeSm
+                                    onClicked: detailScroll.jumpToMembers()
                                 }
                             }
+                            ModDescription {
+                                id: descriptionText
+                                Layout.fillWidth: true
+                                description: root.detail.description || ""
+                                onLinkActivated: link => workshopPanel.openLink(link)
+                            }
                         }
-                        Rectangle {
-                            Layout.row: 0
+                        ColumnLayout {
+                            objectName: "detailMembers"
+                            Layout.row: detailBody.pack ? 1 : 0
                             Layout.column: detailBody.pack ? 0 : 1
                             Layout.fillWidth: true
                             Layout.preferredWidth: 2
                             Layout.alignment: Qt.AlignTop
-                            implicitHeight: membersColumn.implicitHeight + 32
-                            color: Theme.elevate2
-                            border.color: Theme.border
-                            radius: Theme.radiusMd
-                            ColumnLayout {
-                                id: membersColumn
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 8
+                            spacing: 8
+                            RowLayout {
+                                id: membersHeading
+                                objectName: "membersHeading"
+                                Layout.fillWidth: true
                                 Heading { text: (detailBody.pack ? "Collection members · " : "Required mods · ") + catalogMembers.count }
-                                Copy { visible: catalogMembers.count === 0; text: "None listed." }
-                                GridLayout {
-                                    objectName: "membersGrid"
-                                    Layout.fillWidth: true
-                                    columns: detailBody.pack ? Math.max(1, Math.floor((Math.min(1200, detailScroll.availableWidth) - 32) / 340)) : 1
-                                    columnSpacing: 8
-                                    rowSpacing: 8
-                                    Repeater {
-                                        model: catalogMembers
-                                        ModRow {
-                                            Layout.fillWidth: true
-                                            Layout.preferredWidth: 1
-                                            Layout.preferredHeight: 54
-                                        }
+                                PxButton {
+                                    objectName: "detailBackToTop"
+                                    visible: detailScroll.contentItem.contentY > 0
+                                    text: "Back to top"
+                                    variant: "ghost"
+                                    font.pixelSize: Theme.fontSizeSm
+                                    onClicked: detailScroll.contentItem.contentY = 0
+                                }
+                            }
+                            Copy { visible: catalogMembers.count === 0; text: "None listed." }
+                            GridLayout {
+                                objectName: "membersGrid"
+                                Layout.fillWidth: true
+                                columns: detailBody.pack ? Math.max(1, Math.floor(Math.min(1200, detailScroll.availableWidth) / 340)) : 1
+                                columnSpacing: 8
+                                rowSpacing: 8
+                                Repeater {
+                                    model: catalogMembers
+                                    ModRow {
+                                        Layout.fillWidth: true
+                                        Layout.preferredWidth: 1
+                                        Layout.preferredHeight: 54
                                     }
                                 }
                             }

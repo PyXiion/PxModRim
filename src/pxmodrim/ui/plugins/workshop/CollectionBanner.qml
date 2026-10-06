@@ -20,6 +20,7 @@ Rectangle {
     required property string fileSize
     required property string actionLabel
     required property bool favourite
+    required property string state
 
     color: hover.hovered ? Qt.lighter(Theme.elevate2, 1.08) : Theme.elevate2
     radius: Theme.radiusMd
@@ -105,7 +106,15 @@ Rectangle {
                     ToolTip.text: banner.favourite ? "Remove from favourites" : "Add to favourites"
                     onClicked: workshopPanel.toggleFavourite(banner.itemId)
                 }
+                Text {
+                    visible: banner.state === "installed"
+                    text: "Installed"
+                    color: Theme.success
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeMd
+                }
                 PxButton {
+                    visible: banner.state !== "installed"
                     text: banner.actionLabel
                     variant: "primary"
                     enabled: !banner.queued

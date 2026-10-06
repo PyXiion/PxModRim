@@ -335,6 +335,144 @@ async def test_collection_detail_uses_member_images_when_preview_metadata_is_abs
     assert detail["collage"] == ["https://images.test/member.png"]
 
 
+@pytest.mark.parametrize("tab", ["Discover", "Collections", "Favourites"])
+@pytest.mark.parametrize(
+    ("installed_count", "state", "action_label"),
+    [
+        (0, "missing", "Download all"),
+        (1, "missing", "Complete download"),
+        (2, "installed", "Installed"),
+    ],
+)
+async def test_collection_listing_detects_installed_members_without_opening_detail(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    tab: str,
+    installed_count: int,
+    state: str,
+    action_label: str,
+) -> None:
+    view, catalog, _ = panel
+    catalog.collection_item = msgspec.structs.replace(
+        catalog.collection_item, member_ids=["1", "2"]
+    )
+    catalog._responses.clear()
+    installed_ids = catalog.collection_item.member_ids[:installed_count]
+    view._ctx.load(
+        {
+            uuid: mod
+            for uuid, mod in installed_mods.items()
+            if mod.published_file_id in installed_ids
+        },
+        [],
+    )
+    await view.load()
+    if tab == "Favourites":
+        view.toggleFavourite(catalog.collection_item.id)
+    await view.select_tab(tab)
+
+    row = view.collections_model._rows[0]
+    assert row["state"] == state
+    assert row["actionLabel"] == action_label
+    assert not view.hasDetail
+
+
+async def test_collection_listing_refreshes_when_installed_members_change(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, catalog, _ = panel
+    catalog.collection_item = msgspec.structs.replace(
+        catalog.collection_item, member_ids=["1", "2"]
+    )
+    catalog._responses.clear()
+    await view.select_tab("Collections")
+    assert view.collections_model._rows[0]["actionLabel"] == "Download all"
+
+    view._ctx.load(installed_mods, [])
+    await view._on_installed_changed(None)
+    row = view.collections_model._rows[0]
+    assert row["state"] == "installed"
+    assert row["actionLabel"] == "Installed"
+
+    steamcmd, _, _ = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+    await view._on_installed_changed(None)
+    row = view.collections_model._rows[0]
+    assert row["state"] == "missing"
+    assert row["actionLabel"] == "Complete download"
+
+    view._ctx.load({}, [])
+    await view._on_installed_changed(None)
+    assert view.collections_model._rows[0]["actionLabel"] == "Download all"
+    assert not view.hasDetail
+
+
+@pytest.mark.parametrize("fully_installed", [False, True])
+async def test_collection_listing_progress_overrides_installed_member_labels(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    monkeypatch: pytest.MonkeyPatch,
+    fully_installed: bool,
+) -> None:
+    view, catalog, _ = panel
+    catalog.collection_complete = True
+    catalog.collection_item = msgspec.structs.replace(
+        catalog.collection_item, member_ids=["1", "2"]
+    )
+    catalog._responses.clear()
+    steamcmd, _, _ = installed_mods
+    view._ctx.load(
+        installed_mods if fully_installed else {steamcmd: installed_mods[steamcmd]},
+        [],
+    )
+    await view.load()
+    release = asyncio.Event()
+    plan = catalog.plan
+
+    async def gated_plan(mod_ids: list[str], collection_ids: list[str]) -> DownloadPlan:
+        await release.wait()
+        return await plan(mod_ids, collection_ids)
+
+    monkeypatch.setattr(catalog, "plan", gated_plan)
+    planning = asyncio.ensure_future(view._download([], [catalog.collection_item.id]))
+    try:
+        await asyncio.sleep(0)
+        row = view.collections_model._rows[0]
+        assert row["queued"] and row["actionLabel"] == "Preparing…"
+    finally:
+        release.set()
+        await planning
+    row = view.collections_model._rows[0]
+    assert row["queued"] and row["actionLabel"] == "Queued"
+    catalog.cancel_queue()
+    assert view.collections_model._rows[0]["actionLabel"] == (
+        "Installed" if fully_installed else "Complete download"
+    )
+
+
+async def test_installed_collection_listing_and_resolved_detail_agree(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, catalog, _ = panel
+    catalog.collection_complete = True
+    catalog.collection_item = msgspec.structs.replace(
+        catalog.collection_item, member_ids=["1"], member_count=1
+    )
+    catalog._responses.clear()
+    view._ctx.load(installed_mods, [])
+    await view.load()
+    listing = view.collections_model._rows[0]
+    assert listing["state"] == "installed"
+    assert listing["actionLabel"] == "Installed"
+
+    await view.open_item(catalog.collection_item.id, "collection")
+    detail = cast("dict[str, Any]", view.detail)
+    assert detail["state"] == listing["state"]
+    assert detail["actionLabel"] == listing["actionLabel"]
+
+
 async def test_collection_download_button_tracks_its_queued_mods(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
     monkeypatch: pytest.MonkeyPatch,
@@ -411,6 +549,7 @@ async def test_settings_saves_and_applies_catalog_url(
     settings._save(dict(cast("dict[str, Any]", settings._backend.initial)))
     assert catalog.settings.value.url == "https://catalog.example.test/"
     assert catalog._base_url == "https://catalog.example.test"
+    QTest.qWait(10)
     delete(settings)
     assert warnings == []
 
@@ -1167,3 +1306,138 @@ def test_card_controls_show_tooltips_lazily_on_hover(
         widget.setSource(QUrl())
         owner.close()
         owner.deleteLater()
+
+
+@pytest.mark.parametrize("kind", ["collection", "mod"])
+@pytest.mark.parametrize("long_description", [False, True])
+async def test_detail_section_layout_and_jump_navigation(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    long_description: bool,
+) -> None:
+    view, catalog, warnings = panel
+    members: list[CatalogMod | CatalogCollection] = [
+        _mod(str(index)) for index in range(2, 14)
+    ]
+    description = "\n\n".join(
+        f"Paragraph {index}: a detailed explanation of this Workshop item."
+        for index in range(70 if long_description else 1)
+    )
+    collection = msgspec.structs.replace(
+        catalog.collection_item,
+        description=description,
+        member_ids=[member.id for member in members],
+        member_count=len(members),
+    )
+
+    async def collection_detail(_: str) -> CollectionDetail:
+        return CollectionDetail(collection, members, [], True)
+
+    catalog.mod_item = msgspec.structs.replace(
+        catalog.mod_item,
+        description=description,
+        description_format="text",
+        dependencies=[member.id for member in members],
+    )
+
+    async def mod_detail(item_id: str) -> CatalogMod | None:
+        return next(
+            (mod for mod in [catalog.mod_item, *members] if mod.id == item_id), None
+        )
+
+    monkeypatch.setattr(catalog, "collection", collection_detail)
+    monkeypatch.setattr(catalog, "mod", mod_detail)
+    view.setParent(None)
+    view.resize(1300, 1000)
+    view.show()
+    try:
+        await asyncio.sleep(0)
+        await view.load()
+        await view.open_item(collection.id if kind == "collection" else "1", kind)
+        await asyncio.sleep(0.05)
+        view._qml.grabFramebuffer()
+        root = cast("QQuickItem", view._qml.rootObject())
+        desc = _find_item(root, "detailDescription")
+        members_section = _find_item(root, "detailMembers")
+        heading = _find_item(root, "membersHeading")
+        grid = _find_item(root, "membersGrid")
+        scroll = _find_item(root, "detailScroll")
+        jump = _find_item(root, "jumpToMembers")
+        back = _find_item(root, "detailBackToTop")
+        assert all(
+            item is not None
+            for item in (desc, members_section, heading, grid, scroll, jump, back)
+        )
+        assert desc is not None and members_section is not None
+        assert heading is not None and scroll is not None and grid is not None
+        assert jump is not None and back is not None
+        if kind == "collection":
+            assert members_section.y() >= desc.y() + desc.height()
+            assert grid.property("columns") == 3
+        else:
+            assert members_section.y() == pytest.approx(desc.y())
+            assert members_section.x() >= desc.x() + desc.width()
+            assert grid.property("columns") == 1
+        assert jump.isVisible() is long_description
+        assert not back.isVisible()
+        flickable = cast("QQuickItem", scroll.property("contentItem"))
+        if long_description:
+            content = cast("QQuickItem", flickable.property("contentItem"))
+            target = heading.mapToItem(content, heading.boundingRect().topLeft()).y()
+            maximum = max(0, flickable.property("contentHeight") - flickable.height())
+            QTest.mouseClick(
+                view._qml,
+                Qt.MouseButton.LeftButton,
+                pos=jump.mapToScene(jump.boundingRect().center()).toPoint(),
+            )
+            await asyncio.sleep(0.05)
+            view._qml.grabFramebuffer()
+            assert flickable.property("contentY") == pytest.approx(
+                max(0, min(target, maximum))
+            )
+            assert flickable.property("contentY") > 0
+            assert back.isVisible()
+            QTest.mouseClick(
+                view._qml,
+                Qt.MouseButton.LeftButton,
+                pos=back.mapToScene(back.boundingRect().center()).toPoint(),
+            )
+            await asyncio.sleep(0.05)
+            assert flickable.property("contentY") == 0
+            assert not back.isVisible()
+        assert not warnings, [warning.toString() for warning in warnings]
+    finally:
+        view.close()
+
+
+@pytest.mark.parametrize(
+    ("tags", "versions", "visible"),
+    [
+        (["Mod"], ["1.6"], True),
+        ([], ["1.6"], True),
+        (["Mod"], [], True),
+        ([], [], False),
+    ],
+)
+async def test_detail_metadata_preserves_tags_and_versions(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    tags: list[str],
+    versions: list[str],
+    visible: bool,
+) -> None:
+    view, catalog, warnings = panel
+    catalog.collection_item = msgspec.structs.replace(
+        catalog.collection_item, tags=tags, supported_versions=versions
+    )
+    await asyncio.sleep(0)
+    await view.load()
+    await view.open_item(catalog.collection_item.id, "collection")
+    root = cast("QQuickItem", view._qml.rootObject())
+    metadata = _find_item(root, "detailTags")
+    assert metadata is not None
+    assert metadata.property("visible") is visible
+    displayed = metadata.property("text")
+    for value in tags + versions:
+        assert value in displayed
+    assert not warnings, [warning.toString() for warning in warnings]

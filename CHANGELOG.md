@@ -13,11 +13,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Plugin settings live in each plugin's own `plugins/<name>.json` (`steam_downloader.json`, `workshop_catalog.json`), seeded once from the old `config.json` keys; plugins add their own Settings tabs, so the Settings dialog and the main window no longer refer to specific plugins.
 - Workshop pages refresh in place when only item details change, instead of rebuilding every card.
 - Collection members and a mod's required mods use the same rows as the Installed tab (active checkbox, thumbnail, author and size, Download/Update); collection members fill a multi-column grid above the description.
+- Workshop detail pages: no boxes around the description and member lists; collections show the description first, with small "Jump to mods" / "Back to top" links when the description is long. The "Supports …" line is gone (versions join the tag line, e.g. "Mod · 1.6") and the incompatibility warning is just "Does not list your game version."
 
 ### Fixed
 - On Wayland, QML tooltips, menus and combo box lists open again: every QML surface's window gets its top-level window as transient parent.
 - Closing Settings no longer logs a burst of `Cannot read property … of null` QML errors.
 - Collection download buttons show `Preparing…`, `Queued` or `Downloading` while the collection's mods are being planned or downloaded, instead of offering the download again.
+- Collection banners show Installed (or Complete download when partly installed) as soon as the list loads, instead of only after opening the collection.
+- Collections that declare the game version themselves (e.g. a `1.6` tag) are no longer flagged "No common version" because one member lists older versions; members without listed versions no longer constrain a collection's versions. Worker migration `0007_collection_compatibility.sql` recomputes the stored summaries.
+- Cancel or Save in Settings no longer crashes the app (the dialog's QML was unloaded while its click handler was still running).
 - Workshop catalog refreshes remove deleted, private, banned and other non-public Steam items from cached details and search, while failed refreshes preserve cached items and picked collections.
 - Workshop Installed lists refresh immediately when the installed set changes while retaining the five-minute cache for unchanged sets; Deactivate removes every active copy, and Activate only this pack keeps dependents when a redundant copy is removed.
 - Workshop downloads queued during auto-update no longer disappear after an earlier cancellation, and unavailable dependencies show a warning without preventing public mod details from opening.
