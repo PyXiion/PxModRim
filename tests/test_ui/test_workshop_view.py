@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import msgspec
@@ -41,6 +42,8 @@ from pxmodrim.core.workshop import (
     WorkshopCatalog,
 )
 from pxmodrim.ui.components import create_qml_engine
+from pxmodrim.ui.context import AppContext
+from pxmodrim.ui.navigation import parse_route
 from pxmodrim.ui.panels.mod_info_data import description_to_html
 from pxmodrim.ui.plugins.workshop.view import WorkshopViewPanel
 from pxmodrim.ui.theme.qml_theme import Theme
@@ -263,7 +266,7 @@ async def test_view_paging_filters_and_catalog_errors(
 ) -> None:
     view, catalog, _ = panel
     await asyncio.sleep(0)
-    await view.selectTab("Mods")
+    await view.select_tab("Mods")
     await view.filter("", "1.6", "all", "popular", "")
     await view.loadMore()
     assert view.mods_model.count == 2 and not view.mods_model.hasMore
@@ -375,7 +378,7 @@ async def test_installed_search_filters_loaded_mods_without_refetching(
         return mods
 
     catalog.installed_with_updates = installed  # type: ignore[method-assign]
-    await view.selectTab("Installed")
+    await view.select_tab("Installed")
     assert view.mods_model.count == 3 and fetches == 1
 
     await view.filter("hugs", "", "all", "popular", "")
@@ -404,9 +407,9 @@ async def test_installed_set_changes_refresh_the_cached_list(
         return [items[pid] for pid in catalog._installed()]
 
     catalog.installed_with_updates = installed  # type: ignore[method-assign]
-    await view.selectTab("Installed")
-    await view.selectTab("Mods")
-    await view.selectTab("Installed")
+    await view.select_tab("Installed")
+    await view.select_tab("Mods")
+    await view.select_tab("Installed")
     assert fetches == 1 and view.mods_model.count == 1
 
     catalog.installed_changed.disconnect(view._on_installed_changed)
@@ -426,8 +429,8 @@ async def test_installed_set_changes_refresh_the_cached_list(
     assert view.mods_model._rows[0]["itemId"] == "2"
 
     catalog._responses.clear()
-    await view.selectTab("Mods")
-    await view.selectTab("Installed")
+    await view.select_tab("Mods")
+    await view.select_tab("Installed")
     assert fetches == 3 and view.mods_model._rows[0]["itemId"] == "2"
 
 
@@ -524,7 +527,7 @@ async def test_installed_checkbox_click_toggles_activation_without_opening_detai
     view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
     view.window().resize(1100, 800)
     view.window().show()
-    await view.selectTab("Installed")
+    await view.select_tab("Installed")
     await asyncio.sleep(0.5)
     view._qml.grabFramebuffer()
     await asyncio.sleep(0.2)
@@ -540,6 +543,45 @@ async def test_installed_checkbox_click_toggles_activation_without_opening_detai
             await asyncio.sleep(0.02)
     assert view._ctx.active_uuids == [steamcmd]
     assert not view.hasDetail
+
+
+async def test_clicking_an_installed_row_navigates_by_link(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+) -> None:
+    view, catalog, _ = panel
+    catalog._ctx = view._ctx
+    steamcmd, _, _ = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+    links: list[str] = []
+
+    def navigate(url: str) -> None:
+        links.append(url)
+        route = parse_route(url)
+        assert route is not None
+        view.open_route(route.path)
+
+    view._app_ctx = cast("AppContext", SimpleNamespace(navigate=navigate))
+    view.window().resize(1100, 800)
+    view.window().show()
+    await view.select_tab("Installed")
+    await asyncio.sleep(0.5)
+    view._qml.grabFramebuffer()
+    await asyncio.sleep(0.2)
+
+    root = view._qml.rootObject()
+    assert root is not None
+    box = _find_item(cast("QQuickItem", root), "activeToggle")
+    assert box is not None
+    beside = box.mapToScene(box.boundingRect().center()).toPoint()
+    beside.setX(beside.x() + 150)
+    QTest.mouseClick(view._qml, Qt.MouseButton.LeftButton, pos=beside)
+    async with asyncio.timeout(3):
+        while not view.hasDetail:
+            await asyncio.sleep(0.02)
+    assert links == ["modrim://workshop/mod/1"]
+    assert view.url == "modrim://workshop/mod/1"
+    assert not view._ctx.active_uuids
 
 
 async def test_activation_does_nothing_without_an_installed_copy(
@@ -593,7 +635,7 @@ async def test_known_tag_options_accumulate_loaded_tags_but_not_version_tags(
     assert view.tagOptions == ["All tags", "Curated", "Utility"]
     await view.open_item("1", "mod")
     assert view.tagOptions == ["All tags", "Curated", "Dependency", "Utility"]
-    await view.selectTab("Installed")
+    await view.select_tab("Installed")
     assert view.searchQuery == "utility"
 
 
@@ -601,7 +643,7 @@ async def test_back_walks_detail_history_before_returning_to_listing(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
 ) -> None:
     view, catalog, _ = panel
-    await view.selectTab("Mods")
+    await view.select_tab("Mods")
     await view.open_item("1", "mod")
     await view.open_item("2", "mod")
     assert view.url == "modrim://workshop/mod/2"
@@ -640,7 +682,7 @@ async def test_failed_back_keeps_the_previous_page_for_retry(
     assert view.url == "modrim://workshop/mod/1"
 
 
-async def test_routes_open_tabs_and_items_and_reset_history(
+async def test_routes_open_tabs_and_items_like_links(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
 ) -> None:
     view, _, _ = panel
@@ -650,7 +692,7 @@ async def test_routes_open_tabs_and_items_and_reset_history(
     await view.follow_route(("collection", "picked:test"))
     assert view.url == "modrim://workshop/collection/picked%3Atest"
     await view.back()
-    assert not view.hasDetail
+    assert view.url == "modrim://workshop/mod/2"
 
     await view.follow_route(("installed",))
     assert view.tab == "Installed"
@@ -885,7 +927,7 @@ async def test_installed_changes_preserve_details_and_reload_when_going_back(
         return [items[pid] for pid in catalog._installed()]
 
     monkeypatch.setattr(catalog, "installed_with_updates", installed)
-    await view.selectTab("Installed")
+    await view.select_tab("Installed")
     await view.open_item("1", "mod")
     view._ctx.load(installed_mods, [])
     catalog._installed_index = None
@@ -943,7 +985,7 @@ async def test_revisiting_installed_within_freshness_does_not_refetch(
 
     catalog.installed_with_updates = installed  # type: ignore[method-assign]
     for tab in ("Installed", "Mods", "Installed"):
-        await view.selectTab(tab)
+        await view.select_tab(tab)
     assert fetches == 1 and view.mods_model.count == 1
 
 

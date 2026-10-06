@@ -11,7 +11,6 @@ from loguru import logger
 from PySide6.QtCore import Property, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtQuickWidgets import QQuickWidget
-from PySide6.QtWidgets import QDialog
 from qasync import asyncSlot
 
 from pxmodrim.core.downloads import download_manager
@@ -26,10 +25,8 @@ from pxmodrim.core.workshop import (
     WorkshopCatalog,
 )
 from pxmodrim.core.workshop.catalog import FRESH_SECONDS
-from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.mod_activation import apply_activation
-from pxmodrim.ui.navigation import build_route
-from pxmodrim.ui.panels.settings_panel import SettingsPanel
+from pxmodrim.ui.navigation import SETTINGS_VIEW_ID, build_route
 from pxmodrim.ui.plugins.workshop.details import (
     Detail,
     fetch_detail,
@@ -435,8 +432,11 @@ class WorkshopViewPanel(BaseViewPanel):
     async def refresh(self) -> None:
         await self.load()
 
-    @asyncSlot(str)
-    async def selectTab(self, tab: str) -> None:
+    @Slot(str)
+    def selectTab(self, tab: str) -> None:
+        self._go(tab.lower())
+
+    async def select_tab(self, tab: str) -> None:
         self._tab, self._notice, self._pending = tab, "", None
         self._clear_detail()
         self._installed.reset_paging()
@@ -470,9 +470,15 @@ class WorkshopViewPanel(BaseViewPanel):
         if self._retry:
             await self._retry()
 
-    @asyncSlot(str, str)
-    async def openItem(self, item_id: str, kind: str) -> None:
-        await self.open_item(item_id, kind)
+    @Slot(str, str)
+    def openItem(self, item_id: str, kind: str) -> None:
+        self._go(kind, item_id)
+
+    def _go(self, *path: str) -> None:
+        if self._app_ctx is None:
+            self.open_route(path)
+        else:
+            self._app_ctx.navigate(build_route(self.view_id, *path))
 
     async def open_item(self, item_id: str, kind: str, *, record: bool = True) -> None:
         self._pack_ids = frozenset()
@@ -509,9 +515,8 @@ class WorkshopViewPanel(BaseViewPanel):
         if self._torn_down:
             return
         if len(path) == 1 and path[0].title() in _TABS:
-            await self.selectTab(path[0].title())
+            await self.select_tab(path[0].title())
         elif len(path) == 2 and path[0] in ("mod", "collection"):
-            self._clear_detail()
             await self.open_item(path[1], path[0])
 
     @asyncSlot()
@@ -622,16 +627,10 @@ class WorkshopViewPanel(BaseViewPanel):
         if safe_url(url):
             QDesktopServices.openUrl(QUrl(url))
 
-    @asyncSlot()
-    async def openSettings(self) -> None:
-        if self._qml_engine is None:
-            return
-        result, dialog = await await_dialog(
-            SettingsPanel, self._ctx, self._qml_engine, self
-        )
-        if result == QDialog.DialogCode.Accepted:
-            self._ctx.update_config(dialog.get_config())
-        dialog.deleteLater()
+    @Slot()
+    def openSettings(self) -> None:
+        if self._app_ctx is not None:
+            self._app_ctx.navigate(build_route(SETTINGS_VIEW_ID))
 
     # -- downloads --------------------------------------------------------
 
