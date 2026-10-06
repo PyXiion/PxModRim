@@ -169,7 +169,7 @@ async function attachCollectionSummaries(db: D1Database, collections: CatalogCol
   }
   return collections.map(collection => {
     const summary = summaries.get(collection.id);
-    if (!summary) return collection;
+    if (!summary) return { ...collection, total_size: null, no_common_version: false };
     const versions = JSON.parse(summary.supported_versions) as string[];
     return { ...collection, total_size: summary.total_size, supported_versions: versions, no_common_version: versions.length === 0 };
   });
