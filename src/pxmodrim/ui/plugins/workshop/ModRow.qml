@@ -11,6 +11,7 @@ Rectangle {
     required property string author
     required property string previewUrl
     required property string state
+    required property string actionLabel
     required property bool incompatible
     required property bool queued
     required property bool active
@@ -32,15 +33,21 @@ Rectangle {
         anchors.topMargin: 6
         anchors.bottomMargin: 6
         spacing: 10
-        PxCheckBox {
-            id: activeBox
-            objectName: "activeToggle"
-            checked: row.active
-            Accessible.name: "Active"
-            Accessible.description: "Enable or disable " + row.title
-            onToggled: {
-                workshopPanel.toggleActivation(row.itemId)
-                checked = Qt.binding(() => row.active)
+        Item {
+            implicitWidth: activeBox.implicitWidth
+            implicitHeight: activeBox.implicitHeight
+            PxCheckBox {
+                id: activeBox
+                objectName: "activeToggle"
+                anchors.centerIn: parent
+                visible: row.kind === "mod" && row.state !== "missing"
+                checked: row.active
+                Accessible.name: "Active"
+                Accessible.description: "Enable or disable " + row.title
+                onToggled: {
+                    workshopPanel.toggleActivation(row.itemId)
+                    checked = Qt.binding(() => row.active)
+                }
             }
         }
         CatalogThumb {
@@ -72,9 +79,9 @@ Rectangle {
             }
         }
         PxButton {
-            visible: row.state === "outdated"
-            text: "Update"
-            variant: "warning"
+            visible: row.state !== "installed"
+            text: row.actionLabel
+            variant: row.state === "outdated" ? "warning" : "primary"
             enabled: !row.queued
             onClicked: workshopPanel.downloadItem(row.itemId, row.kind)
         }

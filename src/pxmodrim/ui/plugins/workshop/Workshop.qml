@@ -325,7 +325,7 @@ Rectangle {
             ScrollBar.vertical: PxScrollBar {}
             header: ListingHeader { width: installedGrid.width }
             footer: ListingFooter { width: installedGrid.width; listing: catalogMods }
-            delegate: InstalledRow {
+            delegate: ModRow {
                 width: GridView.view.cellWidth - 8
                 height: GridView.view.cellHeight - 8
             }
@@ -478,10 +478,16 @@ Rectangle {
                             }
                         }
                     }
-                    RowLayout {
+                    GridLayout {
+                        id: detailBody
+                        readonly property bool pack: root.detail.kind === "collection"
                         Layout.fillWidth: true
-                        spacing: 16
+                        columns: pack ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 16
                         Rectangle {
+                            Layout.row: detailBody.pack ? 1 : 0
+                            Layout.column: 0
                             Layout.fillWidth: true
                             Layout.preferredWidth: 3
                             Layout.alignment: Qt.AlignTop
@@ -503,6 +509,8 @@ Rectangle {
                             }
                         }
                         Rectangle {
+                            Layout.row: 0
+                            Layout.column: detailBody.pack ? 0 : 1
                             Layout.fillWidth: true
                             Layout.preferredWidth: 2
                             Layout.alignment: Qt.AlignTop
@@ -515,38 +523,20 @@ Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 16
                                 spacing: 8
-                                Heading { text: root.detail.kind === "collection" ? "Collection members · " + catalogMembers.count : "Required mods · " + catalogMembers.count }
+                                Heading { text: (detailBody.pack ? "Collection members · " : "Required mods · ") + catalogMembers.count }
                                 Copy { visible: catalogMembers.count === 0; text: "None listed." }
-                                Repeater {
-                                    model: catalogMembers
-                                    Rectangle {
-                                        id: member
-                                        required property string itemId
-                                        required property string kind
-                                        required property string title
-                                        required property string versions
-                                        required property string stateLabel
-                                        required property string state
-                                        required property string actionLabel
-                                        required property bool incompatible
-                                        required property bool queued
-                                        Layout.fillWidth: true
-                                        implicitHeight: memberRow.implicitHeight + 20
-                                        radius: Theme.radiusSm
-                                        color: Theme.elevate3
-                                        RowLayout {
-                                            id: memberRow
-                                            anchors.fill: parent
-                                            anchors.margins: 10
-                                            spacing: 8
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 2
-                                                Copy { Layout.fillWidth: true; text: member.title; color: Theme.textMain; elide: Text.ElideRight; maximumLineCount: 1 }
-                                                Copy { text: member.stateLabel + (member.incompatible ? " · incompatible" : ""); font.pixelSize: Theme.fontSizeSm; color: member.incompatible ? Theme.warning : Theme.textMuted }
-                                            }
-                                            PxButton { text: "Details"; variant: "ghost"; onClicked: workshopPanel.openItem(member.itemId, member.kind) }
-                                            PxButton { visible: member.state !== "installed"; text: member.actionLabel; variant: member.state === "outdated" ? "warning" : "primary"; enabled: !member.queued; onClicked: workshopPanel.downloadItem(member.itemId, member.kind) }
+                                GridLayout {
+                                    objectName: "membersGrid"
+                                    Layout.fillWidth: true
+                                    columns: detailBody.pack ? Math.max(1, Math.floor((Math.min(1200, detailScroll.availableWidth) - 32) / 340)) : 1
+                                    columnSpacing: 8
+                                    rowSpacing: 8
+                                    Repeater {
+                                        model: catalogMembers
+                                        ModRow {
+                                            Layout.fillWidth: true
+                                            Layout.preferredWidth: 1
+                                            Layout.preferredHeight: 54
                                         }
                                     }
                                 }
