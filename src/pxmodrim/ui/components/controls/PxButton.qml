@@ -48,9 +48,13 @@ Button {
 
     Accessible.name: text.length > 0 ? text : ToolTip.text
 
-    PxToolTip {
-        visible: control.hovered && text.length > 0
-        text: control.ToolTip.text
+    Loader {
+        active: control.hovered && control.ToolTip.text.length > 0
+        sourceComponent: PxToolTip {
+            parent: control
+            visible: true
+            text: control.ToolTip.text
+        }
     }
 
     contentItem: Item {

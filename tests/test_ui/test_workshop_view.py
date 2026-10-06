@@ -7,9 +7,11 @@ from typing import Any, cast
 
 import msgspec
 import pytest
-from PySide6.QtCore import QObject, QUrl
+from PySide6.QtCore import QObject, QPoint, QUrl
+from PySide6.QtGui import QAccessible
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QWidget
+from pytestqt.qtbot import QtBot
 from shiboken6 import delete, isValid
 
 from pxmodrim.core.config import AppConfig, ConfigService
@@ -613,3 +615,87 @@ async def test_revisiting_installed_within_freshness_does_not_refetch(
     for tab in ("Installed", "Mods", "Installed"):
         await view.selectTab(tab)
     assert fetches == 1 and view.mods_model.count == 1
+
+
+@pytest.mark.parametrize(
+    ("control", "tooltip_binding"),
+    [("PxButton", "ToolTip.text"), ("PxBadge", "tooltip")],
+)
+def test_card_controls_show_tooltips_lazily_on_hover(
+    qapp: object,
+    qtbot: QtBot,
+    tmp_path: Path,
+    control: str,
+    tooltip_binding: str,
+) -> None:
+    owner = QWidget()
+    owner.resize(300, 160)
+    engine = create_qml_engine(owner)
+    theme = Theme(engine)
+    engine.rootContext().setContextProperty("Theme", theme)
+    controls = QUrl.fromLocalFile(
+        str(Path(__file__).parents[2] / "src/pxmodrim/ui/components/controls")
+    ).toString()
+    source = tmp_path / "Tooltips.qml"
+    source.write_text(
+        f'import QtQuick\nimport QtQuick.Controls\nimport "{controls}"\n'
+        "Rectangle {\n"
+        '    property string tipText: ""\n'
+        f"    {control} {{\n"
+        '        objectName: "target"; x: 20; y: 20; text: "Test action"\n'
+        f"        {tooltip_binding}: parent.tipText\n"
+        "    }\n"
+        "}\n"
+    )
+    widget = QQuickWidget(engine, owner)
+    widget.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+    widget.resize(300, 160)
+    widget.setSource(QUrl.fromLocalFile(str(source)))
+    owner.show()
+    widget.show()
+    root = widget.rootObject()
+    assert root is not None
+    target = root.findChild(QObject, "target")
+    assert target is not None
+
+    def tooltip() -> QObject | None:
+        return next(
+            (
+                obj
+                for obj in root.findChildren(QObject)
+                if obj.inherits("QQuickToolTip")
+            ),
+            None,
+        )
+
+    try:
+        qtbot.mouseMove(widget, QPoint(280, 140))
+        assert tooltip() is None
+        root.setProperty("tipText", "Help for this action")
+        assert tooltip() is None
+        qtbot.mouseMove(widget, QPoint(30, 25))
+        qtbot.waitUntil(
+            lambda: (tip := tooltip()) is not None and bool(tip.property("opened")),
+            timeout=3000,
+        )
+        tip = tooltip()
+        assert tip is not None
+        assert tip.property("text") == "Help for this action"
+        assert tip.property("delay") == theme.tooltipDelay
+        assert tip.property("parent") == target
+        accessible = QAccessible.queryAccessibleInterface(target)
+        assert accessible is not None
+        assert accessible.text(QAccessible.Text.Name) == "Test action"
+        qtbot.mouseMove(widget, QPoint(280, 140))
+        qtbot.waitUntil(lambda: tooltip() is None)
+        qtbot.mouseMove(widget, QPoint(30, 25))
+        qtbot.waitUntil(
+            lambda: (tip := tooltip()) is not None and bool(tip.property("opened")),
+            timeout=3000,
+        )
+        root.setProperty("tipText", "")
+        qtbot.waitUntil(lambda: tooltip() is None)
+    finally:
+        widget.setSource(QUrl())
+        owner.close()
+        owner.deleteLater()

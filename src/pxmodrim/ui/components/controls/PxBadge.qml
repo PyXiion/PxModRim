@@ -46,8 +46,12 @@ Rectangle {
         enabled: root.tooltip.length > 0
     }
 
-    PxToolTip {
-        visible: hover.hovered && root.tooltip.length > 0
-        text: root.tooltip
+    Loader {
+        active: hover.hovered && root.tooltip.length > 0
+        sourceComponent: PxToolTip {
+            parent: root
+            visible: true
+            text: root.tooltip
+        }
     }
 }
