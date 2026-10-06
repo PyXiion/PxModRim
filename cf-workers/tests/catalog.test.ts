@@ -543,3 +543,96 @@ test('failed and partial Steam refreshes retain cached metadata and search entri
     }
   }
 });
+
+test('full index cycles confirm omitted files, evict unavailable ones and retain public ones', async () => {
+  files['850'] = mod('850', 'UnseenDeletedFixture');
+  files['851'] = mod('851', 'UnseenPublicFixture');
+  await request('/catalog/mods/850');
+  await request('/catalog/mods/851');
+  delete files['850'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind('850', '851').run();
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+
+  assert.equal(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('850').first(), null);
+  const removed = await (await request('/catalog/mods?q=UnseenDeletedFixture')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(removed.items, []);
+  const retained = await (await request('/catalog/mods?q=UnseenPublicFixture')).json() as CatalogPage<CatalogMod>;
+  assert.deepEqual(retained.items.map(item => item.id), ['851']);
+});
+
+test('index verification resumes after failed Steam refreshes without evicting records', async () => {
+  files['860'] = mod('860', 'UnseenFailedFixture');
+  await request('/catalog/mods/860');
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind('860').run();
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+  detailFailures.set('860', 'http');
+  try {
+    await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+    const state = await db.prepare('SELECT cursor, full_at, cycle_started_at FROM index_state WHERE id = 1')
+      .first<{ cursor: string; full_at: number; cycle_started_at: number }>();
+    assert.equal(state?.cursor, 'verify:0:');
+    assert.equal(state?.full_at, 1);
+    assert.ok((state?.cycle_started_at ?? 0) > 0);
+    assert.ok(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('860').first());
+  } finally {
+    detailFailures.delete('860');
+  }
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const state = await db.prepare('SELECT full_at, cycle_started_at FROM index_state WHERE id = 1')
+    .first<{ full_at: number; cycle_started_at: number }>();
+  assert.ok((state?.full_at ?? 0) > 1);
+  assert.equal(state?.cycle_started_at, 0);
+});
+
+test('a persistently failing omitted file does not starve later ones or complete the pass', async () => {
+  files['870'] = mod('870', 'UnseenPoisonFixture');
+  files['871'] = mod('871', 'UnseenBehindPoisonFixture');
+  await request('/catalog/mods/870');
+  await request('/catalog/mods/871');
+  delete files['871'];
+  await db.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id IN (?, ?)').bind('870', '871').run();
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+  detailFailures.set('870', 'http');
+  try {
+    for (let tick = 0; tick < 3; tick++) await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+    assert.equal(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('871').first(), null);
+    assert.ok(await db.prepare('SELECT id FROM catalog_items WHERE id = ?').bind('870').first());
+    const state = await db.prepare('SELECT full_at FROM index_state WHERE id = 1').first<{ full_at: number }>();
+    assert.equal(state?.full_at, 1);
+  } finally {
+    detailFailures.delete('870');
+  }
+});
+
+test('index verification checks at most 100 omitted mods per tick and persists its phase', async () => {
+  const seed = await (await request('/catalog/mods/10')).json() as CatalogMod;
+  const statements = Array.from({ length: 101 }, (_, index) => {
+    const id = String(9000 + index);
+    return db.prepare('INSERT INTO catalog_items (id, data, updated_at) VALUES (?, ?, 0)')
+      .bind(id, JSON.stringify({ ...seed, id }));
+  });
+  await db.batch(statements);
+  const indexRows = Array.from({ length: 101 }, (_, index) => db.prepare(
+    `INSERT INTO catalog_index (id, title, data, tags, indexed_at) VALUES (?, ?, ?, '[]', 0)`,
+  ).bind(String(9000 + index), 'UnseenBatchFixture', JSON.stringify({ ...seed, id: String(9000 + index) })));
+  await db.batch(indexRows);
+  await db.prepare('UPDATE index_state SET full_at = 1, cycle_started_at = 0, cursor = ?').bind('*').run();
+  await db.prepare('UPDATE catalog_items SET updated_at = ? WHERE id NOT BETWEEN ? AND ?')
+    .bind(Date.now() + 60_000, '9000', '9100').run();
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const remaining = await db.prepare('SELECT count(*) AS n FROM catalog_index WHERE id BETWEEN ? AND ?')
+    .bind('9000', '9100').first<{ n: number }>();
+  assert.equal(remaining?.n, 1);
+  const phase = await db.prepare('SELECT cursor FROM index_state WHERE id = 1').first<{ cursor: string }>();
+  assert.ok(phase?.cursor.startsWith('verify:0:9'));
+
+  await (await worker.getWorker()).scheduled({ cron: '* * * * *' });
+  const complete = await db.prepare('SELECT cycle_started_at FROM index_state WHERE id = 1').first<{ cycle_started_at: number }>();
+  assert.equal(complete?.cycle_started_at, 0);
+  const count = await db.prepare('SELECT count(*) AS n FROM catalog_index WHERE id BETWEEN ? AND ?')
+    .bind('9000', '9100').first<{ n: number }>();
+  assert.equal(count?.n, 0);
+});

@@ -92,6 +92,7 @@ class FakeCatalog(WorkshopCatalog):
             member_count=2,
         )
         self.failure = False
+        self.collection_complete = False
         self.downloaded: list[str] = []
         self.queries: list[CatalogQuery] = []
 
@@ -118,6 +119,11 @@ class FakeCatalog(WorkshopCatalog):
         return {"1": self.mod_item, "2": self.dependency}.get(id)
 
     async def collection(self, id: str) -> CollectionDetail | None:
+        if self.collection_complete:
+            collection = msgspec.structs.replace(
+                self.collection_item, member_ids=["1"], member_count=1
+            )
+            return CollectionDetail(collection, [self.mod_item], [], True)
         return CollectionDetail(
             self.collection_item, [self.mod_item], ["missing"], False
         )
@@ -129,13 +135,14 @@ class FakeCatalog(WorkshopCatalog):
         return "outdated" if mod.id == "1" else "missing"
 
     async def plan(self, mod_ids: list[str], collection_ids: list[str]) -> DownloadPlan:
+        incomplete = bool(collection_ids) and not self.collection_complete
         return DownloadPlan(
             ["2", "1"],
             [],
-            ["missing"] if collection_ids else [],
-            collection_ids,
+            ["missing"] if incomplete else [],
+            collection_ids if incomplete else [],
             {"1": "Mod", "2": "Dependency"},
-            not collection_ids,
+            not incomplete,
         )
 
     def enqueue(self, plan: DownloadPlan) -> None:
@@ -586,7 +593,7 @@ async def test_back_preserves_scroll_position_and_active_filters(
     await view.open_item("1", "mod")
     assert view.hasDetail
 
-    view.back()
+    await view.back()
     await asyncio.sleep(0.2)
     view._qml.grab()
     assert not view.hasDetail
@@ -600,7 +607,8 @@ async def test_downloaded_collection_activates_all_or_only_its_pack(
     installed_mods: dict[str, ListedMod],
     tmp_path: Path,
 ) -> None:
-    view, _, _ = panel
+    view, catalog, _ = panel
+    catalog.collection_complete = True
     steamcmd, _, dependency = installed_mods
     outside = AboutXmlMod(
         name="Outside",
@@ -640,7 +648,8 @@ async def test_collection_deactivation_removes_every_active_copy(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
     installed_mods: dict[str, ListedMod],
 ) -> None:
-    view, _, _ = panel
+    view, catalog, _ = panel
+    catalog.collection_complete = True
     view._ctx.load(installed_mods, list(installed_mods))
     await view.open_item("picked:test", "collection")
     assert cast("dict[str, Any]", view.detail)["active"] is True
@@ -658,7 +667,8 @@ async def test_activate_only_collection_keeps_dependents_of_retained_duplicate(
 ) -> None:
     from PySide6.QtWidgets import QMessageBox
 
-    view, _, _ = panel
+    view, catalog, _ = panel
+    catalog.collection_complete = True
     steamcmd, steam, dependent = installed_mods
     mod = cast("AboutXmlMod", installed_mods[dependent])
     mod.about_rules = BaseRules(
@@ -691,7 +701,8 @@ async def test_partly_downloaded_collection_has_no_activation(
     panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
     installed_mods: dict[str, ListedMod],
 ) -> None:
-    view, _, _ = panel
+    view, catalog, _ = panel
+    catalog.collection_complete = True
     steamcmd, _, _ = installed_mods
     view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
     await view.open_item("picked:test", "collection")
@@ -699,6 +710,122 @@ async def test_partly_downloaded_collection_has_no_activation(
     await view.toggleCollection()
     await view.activateOnlyCollection()
     assert view._ctx.active_uuids == []
+
+
+async def test_incomplete_collection_cannot_activate_only_its_available_members(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, catalog, _ = panel
+    view._ctx.load(installed_mods, list(installed_mods))
+    active_before = view._ctx.active_uuids
+
+    async def incomplete_plan(
+        mod_ids: list[str], collection_ids: list[str]
+    ) -> DownloadPlan:
+        return DownloadPlan([], ["1"], ["2"], [], {}, False)
+
+    monkeypatch.setattr(catalog, "plan", incomplete_plan)
+    await view.open_item("picked:test", "collection")
+    assert cast("dict[str, Any]", view.detail)["state"] == "missing"
+    await view.toggleCollection()
+    await view.activateOnlyCollection()
+    assert view._ctx.active_uuids == active_before
+
+
+async def test_installed_changes_during_fetch_are_loaded_after_it_finishes(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, catalog, _ = panel
+    await view.load()
+    catalog._ctx = view._ctx
+    steamcmd, _, _ = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+    started, release = asyncio.Event(), asyncio.Event()
+    requested: list[list[str]] = []
+
+    async def installed() -> list[CatalogMod]:
+        ids = list(catalog._installed())
+        requested.append(ids)
+        if len(requested) == 1:
+            started.set()
+            await release.wait()
+        items = {"1": catalog.mod_item, "2": catalog.dependency}
+        return [items[pid] for pid in ids]
+
+    monkeypatch.setattr(catalog, "installed_with_updates", installed)
+    view._tab = "Installed"
+    task = asyncio.create_task(view.load())
+    async with asyncio.timeout(3):
+        await started.wait()
+        view._ctx.load(installed_mods, [])
+        catalog._installed_index = None
+        await view._on_installed_changed(None)
+        release.set()
+        await task
+    assert requested == [["1"], ["1", "2"]]
+    assert {row["itemId"] for row in view.mods_model._rows} == {"1", "2"}
+
+
+async def test_installed_changes_preserve_details_and_reload_when_going_back(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    installed_mods: dict[str, ListedMod],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, catalog, _ = panel
+    catalog._ctx = view._ctx
+    steamcmd, _, _ = installed_mods
+    view._ctx.load({steamcmd: installed_mods[steamcmd]}, [])
+
+    async def installed() -> list[CatalogMod]:
+        items = {"1": catalog.mod_item, "2": catalog.dependency}
+        return [items[pid] for pid in catalog._installed()]
+
+    monkeypatch.setattr(catalog, "installed_with_updates", installed)
+    await view.selectTab("Installed")
+    await view.open_item("1", "mod")
+    view._ctx.load(installed_mods, [])
+    catalog._installed_index = None
+    await view._on_installed_changed(None)
+    assert view.hasDetail and cast("dict[str, Any]", view.detail)["itemId"] == "1"
+    await view.back()
+    assert not view.hasDetail
+    assert {row["itemId"] for row in view.mods_model._rows} == {"1", "2"}
+
+
+@pytest.mark.parametrize("failure", [False, True])
+async def test_download_plan_finishing_after_destruction_is_discarded(
+    panel: tuple[WorkshopViewPanel, FakeCatalog, list[Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    failure: bool,
+) -> None:
+    view, catalog, _ = panel
+    await view.load()
+    started, release = asyncio.Event(), asyncio.Event()
+    plan = catalog.plan
+
+    async def delayed_plan(
+        mod_ids: list[str], collection_ids: list[str]
+    ) -> DownloadPlan:
+        started.set()
+        await release.wait()
+        if failure:
+            raise CatalogError("Catalog unavailable", 503)
+        return await plan(mod_ids, collection_ids)
+
+    monkeypatch.setattr(catalog, "plan", delayed_plan)
+    task = asyncio.create_task(view._download(["1"], []))
+    async with asyncio.timeout(3):
+        await started.wait()
+        view.teardown()
+        view._qml.setSource(QUrl())
+        delete(view)
+        release.set()
+        await task
+    assert not catalog.downloaded
 
 
 async def test_revisiting_installed_within_freshness_does_not_refetch(

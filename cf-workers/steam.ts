@@ -213,7 +213,7 @@ async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
     console.error('Search index update failed', error instanceof Error ? error.message : error));
 }
 
-async function fetchItems(env: Env, ids: string[]): Promise<Map<string, CatalogItem>> {
+export async function refreshSteamItems(env: Env, ids: string[]): Promise<Map<string, CatalogItem>> {
   const fetched = new Map<string, CatalogItem>();
   const unavailable: string[] = [];
   for (let offset = 0; offset < ids.length; offset += API_BATCH_SIZE) {
@@ -273,9 +273,9 @@ export async function getSteamItems(env: Env, requestedIds: string[], ctx?: Exec
     }
   }
   if (ctx && stale.length) {
-    ctx.waitUntil(fetchItems(env, stale).then(() => undefined).catch(error => console.error('Background refresh failed', error instanceof Error ? error.message : error)));
+    ctx.waitUntil(refreshSteamItems(env, stale).then(() => undefined).catch(error => console.error('Background refresh failed', error instanceof Error ? error.message : error)));
   }
-  const fetched = await fetchItems(env, ids.filter(id => !items.has(id)));
+  const fetched = await refreshSteamItems(env, ids.filter(id => !items.has(id)));
   for (const [id, item] of fetched) items.set(id, item);
   return { items, unavailable_ids: ids.filter(id => !items.has(id)) };
 }

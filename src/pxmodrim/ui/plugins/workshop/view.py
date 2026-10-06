@@ -87,6 +87,7 @@ class WorkshopViewPanel(BaseViewPanel):
         self._detail: dict[str, Any] = {}
         self._detail_data: Detail | None = None
         self._installed = InstalledList()
+        self._installed_dirty = False
         self._update_count = 0
         self._pending: DownloadPlan | None = None
         self._planning = 0
@@ -238,7 +239,11 @@ class WorkshopViewPanel(BaseViewPanel):
             return
         if generation != self._generation:
             return
-        self._pack_ids = frozenset((*plan.to_download, *plan.already_current))
+        self._pack_ids = (
+            frozenset((*plan.to_download, *plan.already_current))
+            if plan.is_complete
+            else frozenset()
+        )
         self._refresh_rows()
         self.changed.emit()
 
@@ -291,6 +296,12 @@ class WorkshopViewPanel(BaseViewPanel):
             if generation == self._generation:
                 self._busy = False
                 self.changed.emit()
+                if (
+                    self._installed_dirty
+                    and self._tab == "Installed"
+                    and self._detail_data is None
+                ):
+                    await self.load()
 
     async def _run_cached(
         self,
@@ -311,6 +322,8 @@ class WorkshopViewPanel(BaseViewPanel):
     # -- loading tabs -----------------------------------------------------
 
     async def load(self, *, append: bool = False) -> None:
+        if self._torn_down:
+            return
         if not self._catalog.configured:
             self._generation += 1
             self._busy = False
@@ -368,6 +381,8 @@ class WorkshopViewPanel(BaseViewPanel):
                 append=True,
             )
             return
+
+        self._installed_dirty = False
 
         def apply(mods: list[CatalogMod]) -> None:
             self._installed.replace(mods)
@@ -468,12 +483,16 @@ class WorkshopViewPanel(BaseViewPanel):
         if kind == "collection":
             await self._load_pack()
 
-    @Slot()
-    def back(self) -> None:
+    @asyncSlot()
+    async def back(self) -> None:
+        if self._torn_down:
+            return
         self._generation += 1
         self._clear_detail()
         self._error, self._busy = "", False
         self.changed.emit()
+        if self._tab == "Installed" and self._installed_dirty:
+            await self.load()
 
     @asyncSlot(str, str)
     async def downloadItem(self, item_id: str, kind: str) -> None:
@@ -548,6 +567,8 @@ class WorkshopViewPanel(BaseViewPanel):
 
     @asyncSlot()
     async def downloadAvailable(self) -> None:
+        if self._torn_down:
+            return
         plan, self._pending = self._pending, None
         if plan and plan.to_download:
             self._queue_plan(plan)
@@ -581,17 +602,23 @@ class WorkshopViewPanel(BaseViewPanel):
         self._notice = queued_notice(len(plan.to_download))
 
     async def _download(self, ids: list[str], collections: list[str]) -> None:
+        if self._torn_down:
+            return
         self._notice, self._pending = "Preparing download…", None
         self._planning += 1
         self.changed.emit()
         try:
             plan = await self._catalog.plan(ids, collections)
         except _FAILURES as exc:
-            self._notice = f"Could not prepare the download: {_message(exc)}"
+            if not self._torn_down:
+                self._notice = f"Could not prepare the download: {_message(exc)}"
             return
         finally:
             self._planning -= 1
-            self.changed.emit()
+            if not self._torn_down:
+                self.changed.emit()
+        if self._torn_down:
+            return
         if not plan.is_complete:
             self._pending, self._notice = plan, incomplete_plan_notice(plan)
         elif not plan.to_download:
@@ -613,6 +640,8 @@ class WorkshopViewPanel(BaseViewPanel):
 
     @asyncSlot(str)
     async def _on_url_changed(self, _url: str) -> None:
+        if self._torn_down:
+            return
         self._clear_detail()
         self._error, self._notice, self._pending = "", "", None
         self._items.clear()
@@ -623,11 +652,14 @@ class WorkshopViewPanel(BaseViewPanel):
 
     @asyncSlot(object)
     async def _on_installed_changed(self, _value: None) -> None:
+        if self._torn_down:
+            return
+        self._installed_dirty = True
         self._refresh_active_ids()
         self._recount()
         self._refresh_rows()
         self.changed.emit()
-        if self._tab == "Installed" and not self._busy:
+        if self._tab == "Installed" and not self._busy and self._detail_data is None:
             await self.load()
 
     # -- QML properties ---------------------------------------------------
