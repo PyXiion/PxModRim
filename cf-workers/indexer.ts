@@ -1,7 +1,7 @@
 import { queryFiles, refreshSteamItems, saveItems } from './steam';
 import { HttpError, type Env } from './types';
 
-const PAGES_PER_TICK = 4;
+const PAGES_PER_TICK = 1;
 const PAGE_SIZE = 100;
 const FULL_REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
 const OVERLAP_MS = 60 * 60 * 1000;

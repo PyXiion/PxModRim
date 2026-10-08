@@ -155,6 +155,10 @@ test('mixed incremental pages persist new and exactly-at-cutoff items, skipping 
   assert.deepEqual(after.index.map(row => row.id), ['10', '11', '12']);
   assert.deepEqual(after.catalog.find(row => row.id === '12'), before.catalog[0]);
   assert.deepEqual(after.index.find(row => row.id === '12'), before.index[0]);
+  const pending = await db.prepare('SELECT cursor, cycle_started_at FROM index_state WHERE id = 1')
+    .first<{ cursor: string; cycle_started_at: number }>();
+  assert.deepEqual(pending, { cursor: 'boundary', cycle_started_at: NOW });
+  await indexTick(env);
   assert.deepEqual(queries, ['*', 'boundary']);
   assert.equal((await db.prepare('SELECT cycle_started_at FROM index_state WHERE id = 1').first<{ cycle_started_at: number }>())?.cycle_started_at, 0);
 });

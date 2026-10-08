@@ -180,6 +180,8 @@ The catalog cache is separate from `items`: the legacy resolver intentionally st
 
 Incremental indexing persists only items at or newer than its overlap cutoff; the older boundary page is fetched to stop pagination but is not rewritten. Weekly full passes still refresh all listed items and verify omitted mods.
 
+The listing phase processes at most one 100-mod page per scheduled tick. With a 20-minute production cron, that is at most 7,200 listed mods per day, trading slower backfills for lower D1 write usage. This is a rate limit, not a daily write budget: verification requests, the legacy crawler, and catalog browsing still consume writes independently. Cron configuration and the legacy crawler are unchanged.
+
 Write operations log `[D1_WRITES]` with `{ "category": "...", "rows_written": N }`, using actual D1 result metadata. Categories are `catalog_cache` (including evictions), `search_index`, `query_cache` (including expired-page cleanup), `collection_summaries`, and `legacy_cache`. Sum by category to compare scheduled indexing and browsing workloads. Counts include index/trigger work attributed by D1 to each statement; these logs do not cover admin curation, purge or crawler-state writes, so they are not a complete billing total.
 
 ## Existing dependency resolver
