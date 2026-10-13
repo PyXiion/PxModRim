@@ -6,9 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-13
+
 ### Changed
 - Workshop backend avoids rebuilding full-text search for statistics-only updates and skips rewriting older items encountered at incremental indexing boundaries. Weekly full verification and cache freshness remain unchanged. Apply Worker migration `0008_search_fts_gate.sql` before deploying.
 - Workshop backend logs actual D1 rows written by catalog cache, search index, query cache, collection summaries and legacy dependency cache operations.
+- Workshop backend indexes one catalog page per scheduled tick to reduce D1 load.
 
 ### Fixed
 - Direct launch recognizes RimWorld 1.7's Waylith executables on Linux, Windows and macOS, prefers them over leftover Unity files, and tracks the new `RimWorld` process name while retaining support for older versions.
