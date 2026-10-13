@@ -18,6 +18,7 @@ from pxmodrim.core.context import CoreContext
 
 _PROCESS_NAMES = frozenset(
     {
+        "RimWorld",
         "RimWorldLinux",
         "RimWorldWin64.exe",
         "RimWorldWin.exe",
@@ -170,13 +171,19 @@ class GameLauncher:
     @staticmethod
     def _find_executable(game_path: Path) -> Path | None:
         if sys.platform == "linux":
-            exe = game_path / "RimWorldLinux"
-            return exe if exe.is_file() and os.access(exe, os.X_OK) else None
+            for name in ("RimWorld", "RimWorldLinux"):
+                exe = game_path / name
+                if exe.is_file() and os.access(exe, os.X_OK):
+                    return exe
+            return None
         if sys.platform == "darwin":
+            exe = game_path / "RimWorld.app"
+            if exe.is_dir():
+                return exe
             apps = list(game_path.glob("*.app"))
             return apps[0] if apps else None
         if sys.platform == "win32":
-            for name in ("RimWorldWin64.exe", "RimWorldWin.exe", "RimWorld.exe"):
+            for name in ("RimWorld.exe", "RimWorldWin64.exe", "RimWorldWin.exe"):
                 exe = game_path / name
                 if exe.is_file():
                     return exe

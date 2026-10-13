@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workshop backend avoids rebuilding full-text search for statistics-only updates and skips rewriting older items encountered at incremental indexing boundaries. Weekly full verification and cache freshness remain unchanged. Apply Worker migration `0008_search_fts_gate.sql` before deploying.
 - Workshop backend logs actual D1 rows written by catalog cache, search index, query cache, collection summaries and legacy dependency cache operations.
 
+### Fixed
+- Direct launch recognizes RimWorld 1.7's Waylith executables on Linux, Windows and macOS, prefers them over leftover Unity files, and tracks the new `RimWorld` process name while retaining support for older versions.
+
 ## [0.3.0] - 2026-10-06
 ### Changed
 - Workshop collections show their members' total size in MB and the game versions all members support (cards, banners and details) when the server knows them; the catalog stores both per collection once the members have been read (expiring after a day), and hides them otherwise.

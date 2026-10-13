@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
@@ -46,6 +47,69 @@ def test_unbalanced_quotes_raise() -> None:
         build_direct_command("/g/rw", "", '"oops')
 
 
+@pytest.mark.parametrize(
+    ("platform", "name"),
+    [
+        ("linux", "RimWorld"),
+        ("linux", "RimWorldLinux"),
+        ("win32", "RimWorld.exe"),
+        ("win32", "RimWorldWin64.exe"),
+        ("win32", "RimWorldWin.exe"),
+        ("darwin", "RimWorld.app"),
+        ("darwin", "RimWorldMac.app"),
+    ],
+)
+def test_find_executable_supports_current_and_legacy_installs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, platform: str, name: str
+) -> None:
+    monkeypatch.setattr(sys, "platform", platform)
+    exe = tmp_path / name
+    if platform == "darwin":
+        exe.mkdir()
+    else:
+        exe.touch()
+        exe.chmod(0o755)
+    assert GameLauncher._find_executable(tmp_path) == exe
+
+
+@pytest.mark.parametrize(
+    ("platform", "current", "legacy"),
+    [
+        ("linux", "RimWorld", "RimWorldLinux"),
+        ("win32", "RimWorld.exe", "RimWorldWin64.exe"),
+        ("darwin", "RimWorld.app", "RimWorldMac.app"),
+    ],
+)
+def test_find_executable_prefers_waylith_over_leftover_unity_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    platform: str,
+    current: str,
+    legacy: str,
+) -> None:
+    monkeypatch.setattr(sys, "platform", platform)
+    for name in (legacy, current):
+        exe = tmp_path / name
+        if platform == "darwin":
+            exe.mkdir()
+        else:
+            exe.touch()
+            exe.chmod(0o755)
+    assert GameLauncher._find_executable(tmp_path) == tmp_path / current
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX executable permissions")
+def test_linux_lookup_skips_non_executable_waylith_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    (tmp_path / "RimWorld").touch()
+    legacy = tmp_path / "RimWorldLinux"
+    legacy.touch()
+    legacy.chmod(0o755)
+    assert GameLauncher._find_executable(tmp_path) == legacy
+
+
 class _Proc:
     def __init__(self, name: str, status: str = "running", pid: int = 1) -> None:
         self.pid = pid
@@ -66,8 +130,29 @@ def _patch_procs(monkeypatch: pytest.MonkeyPatch, procs: list[list[_Proc]]) -> N
     )
 
 
-def test_zombie_game_process_is_not_running(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_procs(monkeypatch, [[_Proc("RimWorldLinux", "zombie"), _Proc("bash")]])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "RimWorld",
+        "RimWorld.exe",
+        "RimWorldLinux",
+        "RimWorldWin64.exe",
+        "RimWorldWin.exe",
+        "RimWorld by Ludeon Studios",
+    ],
+)
+def test_recognizes_current_and_legacy_game_processes(
+    monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    _patch_procs(monkeypatch, [[_Proc(name), _Proc("bash")]])
+    assert GameLauncher.is_running() is True
+
+
+@pytest.mark.parametrize("name", ["RimWorld", "RimWorldLinux"])
+def test_zombie_game_process_is_not_running(
+    monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    _patch_procs(monkeypatch, [[_Proc(name, "zombie"), _Proc("bash")]])
     assert GameLauncher.is_running() is False
 
 
