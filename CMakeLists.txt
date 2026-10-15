@@ -45,7 +45,10 @@ if(PX_BUILD_TESTS)
     list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
 endif()
 
-include(cmake/Steam.cmake OPTIONAL)
+# NoWorkshop ships without Steam downloads, so PxSteamDL is not fetched or linked.
+if(NOT PX_WORKSHOP_VARIANT STREQUAL "NoWorkshop")
+    include(cmake/Steam.cmake OPTIONAL)
+endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 

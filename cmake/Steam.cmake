@@ -1,6 +1,6 @@
 # Steam Workshop downloads via PxSteamDL. The root CMakeLists includes this file
-# OPTIONALLY: without it the build has no Steam support and downloads/steam.cpp
-# is compiled out (PX_HAS_STEAM stays undefined).
+# unless PX_WORKSHOP_VARIANT is NoWorkshop. Without it the build has no Steam support
+# and downloads/steam.cpp is compiled out (PX_HAS_STEAM stays undefined).
 
 # PxSteamDL builds all of its dependencies from source. Its cacert dependency
 # uses a date as VERSION, which CPM rejects as a find_package() name when local

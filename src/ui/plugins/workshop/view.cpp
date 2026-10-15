@@ -43,14 +43,14 @@ WorkshopViewPanel::WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine,
       catalog_(catalog), downloads_(ctx.downloads()), favourites_(catalog.favourites()) {
     if (!gameVersion().isEmpty()) criteria_.version = gameVersion();
     refresh_mod_ids();
-    auto* qml = new QQuickWidget(engine, this);
-    qml->setObjectName(QStringLiteral("workshopView"));
-    qml->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    qml->setClearColor(px::ui::paletteColor(u"ELEVATE_0"));
-    qml->rootContext()->setContextProperty(QStringLiteral("workshopPanel"), this);
-    qml->rootContext()->setContextProperty(QStringLiteral("catalogMods"), mods_model);
-    qml->rootContext()->setContextProperty(QStringLiteral("catalogCollections"), collections_model);
-    qml->rootContext()->setContextProperty(QStringLiteral("catalogMembers"), members_model);
+    qml_ = new QQuickWidget(engine, this);
+    qml_->setObjectName(QStringLiteral("workshopView"));
+    qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    qml_->setClearColor(px::ui::paletteColor(u"ELEVATE_0"));
+    qml_->rootContext()->setContextProperty(QStringLiteral("workshopPanel"), this);
+    qml_->rootContext()->setContextProperty(QStringLiteral("catalogMods"), mods_model);
+    qml_->rootContext()->setContextProperty(QStringLiteral("catalogCollections"), collections_model);
+    qml_->rootContext()->setContextProperty(QStringLiteral("catalogMembers"), members_model);
     busy_id_ = downloads_.busy_changed.connect([this](bool) { refresh_rows(); emit changed(); });
     queue_id_ = catalog_.queue_changed.connect([this](const std::monostate&) { refresh_rows(); emit changed(); });
     url_id_ = catalog_.catalog_url_changed.connect([this](const QString&) { url_changed(); });
@@ -62,11 +62,15 @@ WorkshopViewPanel::WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine,
     active_id_ = ctx_.activeStateChanged().connect([this](const QStringList&) {
         refresh_mod_ids(); refresh_rows(); emit changed();
     });
-    qml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/Workshop.qml")));
-    root_->addWidget(qml, 1);
+    qml_->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/Workshop.qml")));
+    root_->addWidget(qml_, 1);
 }
 
-WorkshopViewPanel::~WorkshopViewPanel() { teardown(); }
+WorkshopViewPanel::~WorkshopViewPanel() {
+    teardown();
+    // Workshop.qml bindings read workshopPanel; the view must die while this panel is still alive.
+    delete qml_;
+}
 void WorkshopViewPanel::teardown() {
     if (torn_down_) return;
     torn_down_ = true;

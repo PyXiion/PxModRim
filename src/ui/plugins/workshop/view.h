@@ -14,6 +14,8 @@
 #include "ui/plugins/workshop/models.h"
 #include "ui/views/base.h"
 
+class QQuickWidget;
+
 namespace px::ui::workshop {
 
 class WorkshopViewPanel : public BaseViewPanel {
@@ -133,6 +135,7 @@ private:
     core::workshop::WorkshopCatalog& catalog_;
     core::DownloadManager& downloads_;
     core::workshop::FavouriteCollections& favourites_;
+    QQuickWidget* qml_ = nullptr;
     QString tab_ = QStringLiteral("Discover");
     core::workshop::CatalogQuery criteria_;
     bool busy_ = false;

@@ -167,7 +167,7 @@ TEST_CASE("UpdateService wraps non-JSON bodies") {
 }
 
 TEST_CASE("UpdateService rejects non-object JSON payloads") {
-    for (const QByteArray& payload : {"[]", "null", "\"tag\"", "3"}) {
+    for (const QByteArray payload : {QByteArray("[]"), QByteArray("null"), QByteArray("\"tag\""), QByteArray("3")}) {
         CAPTURE(payload);
         const auto result = check_payload(payload);
         CHECK(!result.has_value());

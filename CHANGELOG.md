@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- Rewrote PxModRim in C++23 on Qt 6 (Qt Quick UI, QCoro coroutines) with CMake, replacing the Python/PySide6 implementation. User-visible behaviour is unchanged. Building from source now needs CMake 3.24+, Qt 6.8+ (CI uses 6.11), QCoro, pugixml, libzip and spdlog, see `AGENTS.md`; release packages are built from CMake install rules and Qt deployment tools.
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
 - Ported the Organizer rail view, folder dialogs, tree and filter models, tag editor, and auto-folder rule editor to the C++/Qt UI, retaining the existing QML behavior and adding Catch2 UI regression coverage.
 

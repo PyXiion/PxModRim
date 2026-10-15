@@ -163,6 +163,7 @@ TEST_CASE("QML selection follows UUID during a row move and reveal respects filt
 }
 TEST_CASE("search focus disables list keyboard actions and Space remains input text") {
     PanelFixture f(false); f.show();
+    f.parent.show(); REQUIRE(QTest::qWaitForWindowActive(&f.parent));
     QTest::mouseClick(f.panel->qml_widget(),Qt::LeftButton,Qt::NoModifier,QPoint(100,26));
     QTest::qWait(1); CHECK(f.root()->property("keyboardActive").toBool());
     f.select(0,"uuid-a"); f.panel->search_input->setFocus(); QTest::qWait(1);

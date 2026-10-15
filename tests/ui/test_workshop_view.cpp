@@ -206,12 +206,13 @@ TEST_CASE("workshop collection detail falls back to member preview collage") {
 
 TEST_CASE("workshop collection listing detects partial and fully installed members") {
     PanelFixture f;
+    f.collection.member_ids = {"1", "2"}; f.collection.member_count = 2;
     f.install(QStringLiteral("1"));
     run(f.view->select_tab(QStringLiteral("Collections")));
     auto row = f.view->collections_model->rows().front();
     CHECK(row.value(QStringLiteral("actionLabel")) == QStringLiteral("Complete download"));
     CHECK(row.value(QStringLiteral("state")) == QStringLiteral("missing"));
-    f.install(QStringLiteral("missing"));
+    f.install(QStringLiteral("2"));
     row = f.view->collections_model->rows().front();
     CHECK(row.value(QStringLiteral("actionLabel")) == QStringLiteral("Installed"));
     CHECK(row.value(QStringLiteral("state")) == QStringLiteral("installed"));

@@ -8,26 +8,35 @@ on:
 
 permissions: {}
 
+env:
+  QT_VERSION: '6.11.0'
+  QCORO_REF: 'v0.13.0'
+
 jobs:
-  ci:
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.workshop }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
+    env:
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@main
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
         with:
-          python-version-file: pyproject.toml
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtdeclarative qtshadertools qtsvg qtpositioning qtwebchannel qtwebengine' || 'qtdeclarative qtshadertools qtsvg' }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+      - name: Setup MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -35,29 +44,67 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2.87.16
+        uses: taiki-e/install-action@v2
         with:
-          tool: just@1.40.0
+          tool: just
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          sudo apt-get install -y ninja-build ccache libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev libspdlog-dev
 
-      - name: Install Dependencies
-        run: uv sync --locked --dev --extra steam
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja ccache pugixml libzip spdlog
 
-      - name: Check (type checking + dependency layers)
-        run: just check
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install ninja ccache --yes --no-progress
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install pugixml libzip spdlog --triplet x64-windows-static-md
 
-      - name: Run tests
+      - name: Build QCoro against Qt
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            export QT_QPA_PLATFORM=offscreen
+          git clone --depth 1 --branch "$QCORO_REF" https://github.com/qcoro/qcoro.git "$RUNNER_TEMP/qcoro-src"
+          cmake -S "$RUNNER_TEMP/qcoro-src" -B "$RUNNER_TEMP/qcoro-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
+            -DUSE_QT_VERSION=6 \
+            -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_BUILD_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/qcoro-build"
+          cmake --install "$RUNNER_TEMP/qcoro-build"
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ci-${{ matrix.os }}-${{ matrix.workshop }}
+
+      - name: Build injected JavaScript
+        run: just build-js
+
+      - name: Configure
+        shell: bash
+        run: |
+          extra=()
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            extra+=(-DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md)
           fi
-          just test
+          cmake --preset default \
+            -DPX_WORKSHOP_VARIANT=${{ matrix.workshop }} \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR;$RUNNER_TEMP/qcoro" \
+            "${extra[@]}"
+
+      - name: Build
+        run: cmake --build --preset default
+
+      - name: Test
+        run: ctest --preset default
 
   workshop-backend:
     runs-on: ubuntu-latest
