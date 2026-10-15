@@ -54,7 +54,7 @@ Result<void> write_cached(const QString& directory, const QString& path, const s
 WorkshopCatalog::WorkshopCatalog()
     : Plugin(QStringLiteral("workshop_catalog"), {QStringLiteral("downloads")}),
       settings_(nullptr, QStringLiteral("workshop_catalog")),
-      base_url_(QString::fromStdString(settings_.value().url)), favourites_(nullptr) {
+      base_url_(normalize_base_url(QString::fromStdString(settings_.value().url))), favourites_(nullptr) {
     settings_.changed.connect([this](const CatalogSettings& value) { change_url(QString::fromStdString(value.url)); });
 }
 

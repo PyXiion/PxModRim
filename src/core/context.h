@@ -104,13 +104,14 @@ private:
     // Shared by providers and the network; declared before the services so they outlive them.
     QThreadPool pool_;
     QNetworkAccessManager network_;
-    PluginRegistry plugins_;
-    // Services are declared last, so they are destroyed before what they use.
+    // Services are declared before the plugins, so plugins (which disconnect from service
+    // events in their destructors) are destroyed first.
     std::unique_ptr<ModService> mod_service_;
     std::unique_ptr<DiagnosticsService> diagnostics_service_;
     std::unique_ptr<SortService> sort_service_;
     std::unique_ptr<services::GameLauncher> game_launcher_;
     std::unique_ptr<ActivationService> activation_;
+    PluginRegistry plugins_;
 };
 
 }  // namespace px::core

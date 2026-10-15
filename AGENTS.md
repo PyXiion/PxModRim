@@ -57,7 +57,7 @@ Core and the shell (`ui/window`, `ui/panels`) never name a concrete plugin; only
 - Always make commits on the go -- never leave working tree uncommitted at milestones or task completion.
 
 ## TypeScript / JS build
-Steam Workshop WebView injection uses TypeScript sources in `src/pxmodrim/ui/plugins/steam_workshop/ts/`, bundled to `inject.js` via esbuild:
+Steam Workshop WebView injection uses TypeScript sources in `src/ui/plugins/steam_workshop/ts/`, bundled to `src/ui/plugins/steam_workshop/inject.js` via esbuild:
 
 ```
 just build-js   # npx esbuild ts/main.ts --bundle --format=iife --target=es2020
@@ -65,7 +65,7 @@ just build-js   # npx esbuild ts/main.ts --bundle --format=iife --target=es2020
 
 `build-js` runs as a prerequisite of `run`, `test`, `check`, and `build`.
 Cached by mtime comparison -- only rebuilds when `ts/` sources change.
-Output `inject.js` is gitignored; always build before running.
+Output `inject.js` is gitignored. When present at configure/build time, it is embedded as a Qt resource; without it the web browser remains usable but has no injected download controls.
 
 ## Layer dependency checker
 `just check-deps` (`scripts/check-deps.py`) enforces strict import rules via pydeps.

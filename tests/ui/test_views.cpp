@@ -1,0 +1,51 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <QObject>
+#include <QQmlContext>
+#include <QQmlEngine>
+#include <QQuickItem>
+#include <QQuickWidget>
+#include <QString>
+#include <QWidget>
+
+#include "test_support.h"
+#include "core/context.h"
+#include "ui/components/svg_provider.h"
+#include "ui/context.h"
+#include "ui/theme/qml_theme.h"
+
+#ifdef PX_HAS_STEAM
+#include "ui/plugins/steam_workshop/view.h"
+
+namespace {
+// The embedded browser exists only in WebEngine builds; without it there is no "workshopWeb" object.
+QObject* web_of(const px::ui::SteamWorkshopViewPanel& view) {
+    for (auto* quick : view.findChildren<QQuickWidget*>()) {
+        if (auto* root = quick->rootObject()) {
+            if (auto* web = root->findChild<QObject*>(QStringLiteral("workshopWeb"))) return web;
+        }
+    }
+    return nullptr;
+}
+}  // namespace
+
+TEST_CASE("steam workshop view preloads without error") {
+    QWidget host;
+    auto* engine = px::ui::createQmlEngine(&host);
+    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
+    auto core = px::ui_test::makeCore();
+    px::ui::AppContext app(*core);
+    px::ui::SteamWorkshopViewPanel view(*core, engine, &host, app);
+    view.preload();
+}
+
+TEST_CASE("steam workshop view has no web view before initialization") {
+    QWidget host;
+    auto* engine = px::ui::createQmlEngine(&host);
+    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
+    auto core = px::ui_test::makeCore();
+    px::ui::AppContext app(*core);
+    px::ui::SteamWorkshopViewPanel view(*core, engine, &host, app);
+    CHECK(web_of(view) == nullptr);
+}
+#endif
