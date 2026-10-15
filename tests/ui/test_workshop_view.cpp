@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <memory>
 #include <QApplication>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickWidget>
 #include <QTemporaryDir>
 
 #include "test_support.h"
+#include "ui/theme/qml_theme.h"
 #include "../core/workshop/support.h"
 #include "core/context.h"
 #include "core/downloads/downloader.h"
@@ -85,6 +87,7 @@ struct PanelFixture {
         collection.supported_versions = {"1.6"}; collection.member_ids = {"1", "missing"}; collection.member_count = 2;
         catalog.set_base_url(server.url());
         engine = createQmlEngine(&owner);
+        engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
         view = std::make_unique<WorkshopViewPanel>(*core, engine, &owner, app, catalog);
         view->resize(1100, 800);
         run(view->load());

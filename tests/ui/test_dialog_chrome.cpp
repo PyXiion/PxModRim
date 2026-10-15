@@ -9,14 +9,8 @@
 
 namespace {
 
-// The widget tests need a QApplication for the lifetime of the test binary.
-QApplication& application() {
-    static int argc = 1;
-    static char name[] = "pxui_tests";
-    static char* argv[] = {name, nullptr};
-    static QApplication app(argc, argv);
-    return app;
-}
+// The shared QApplication is created by tests/ui/main.cpp.
+QApplication& application() { return *static_cast<QApplication*>(QApplication::instance()); }
 
 void clickClose(QDialog& dialog) {
     px::ui::installDialogChrome(&dialog);

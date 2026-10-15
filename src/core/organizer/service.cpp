@@ -8,6 +8,7 @@
 #include <QRegularExpression>
 #include <spdlog/spdlog.h>
 
+#include "core/context.h"
 #include "core/organizer/defaults.h"
 
 namespace px::core::organizer {
@@ -15,18 +16,6 @@ namespace {
 
 const QHash<QString, ListedModPtr> kEmptyMods;
 const QStringList kEmptyActive;
-
-struct ContextSeam {
-    std::function<const QHash<QString, ListedModPtr>&(const CoreContext&)> all_mods =
-        [](const CoreContext&) -> const QHash<QString, ListedModPtr>& { return kEmptyMods; };
-    std::function<const QStringList&(const CoreContext&)> active_uuids =
-        [](const CoreContext&) -> const QStringList& { return kEmptyActive; };
-};
-
-ContextSeam& global_context_seam() {
-    static ContextSeam seam;
-    return seam;
-}
 
 Result<QString> clean_name(const QString& name, const QString& what) {
     const QString cleaned = name.trimmed();
@@ -37,13 +26,6 @@ Result<QString> clean_name(const QString& name, const QString& what) {
 }
 
 }  // namespace
-
-void register_core_context_seam(
-    std::function<const QHash<QString, ListedModPtr>&(const CoreContext&)> all_mods,
-    std::function<const QStringList&(const CoreContext&)> active_uuids) {
-    global_context_seam().all_mods = std::move(all_mods);
-    global_context_seam().active_uuids = std::move(active_uuids);
-}
 
 OrganizerService::OrganizerService(CoreContext& ctx, OrganizerDb& db)
     : Plugin(QStringLiteral("organizer")), ctx_(&ctx), db_(db) {}
@@ -59,7 +41,7 @@ const QHash<QString, ListedModPtr>& OrganizerService::all_mods() const {
         return all_mods_fn_();
     }
     if (ctx_) {
-        return global_context_seam().all_mods(*ctx_);
+        return ctx_->allMods();
     }
     return kEmptyMods;
 }
@@ -69,7 +51,7 @@ const QStringList& OrganizerService::active_uuids() const {
         return active_uuids_fn_();
     }
     if (ctx_) {
-        return global_context_seam().active_uuids(*ctx_);
+        return ctx_->activeUuids();
     }
     return kEmptyActive;
 }

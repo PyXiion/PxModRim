@@ -12,18 +12,8 @@ using px::ui::DeleteFolderDialog;
 
 namespace {
 
-// Widgets need a QApplication. The test binary keeps one for its whole run, offscreen
-// unless the environment picks a platform, so no display is needed.
-QApplication& widget_app() {
-    static int argc = 1;
-    static char name[] = "pxmodrim_ui_tests";
-    static char* argv[] = {name, nullptr};
-    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
-        qputenv("QT_QPA_PLATFORM", "offscreen");
-    }
-    static QApplication app(argc, argv);
-    return app;
-}
+// The shared QApplication is created by tests/ui/main.cpp.
+QApplication& widget_app() { return *static_cast<QApplication*>(QApplication::instance()); }
 
 }  // namespace
 

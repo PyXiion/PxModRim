@@ -1,12 +1,14 @@
 #include <catch2/catch_test_macros.hpp>
 #include <QApplication>
 #include <QEventLoop>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlError>
 #include <QQuickItem>
 #include <QQuickWidget>
 #include <QTimer>
 #include "test_support.h"
+#include "ui/theme/qml_theme.h"
 #include "core/context.h"
 #include "ui/components/svg_provider.h"
 #include "ui/panels/settings_panel.h"
@@ -32,6 +34,7 @@ TEST_CASE("Cancel settings unloads QML without binding errors") {
     ensureApplication();
     QWidget host;
     auto* engine = px::ui::createQmlEngine(&host);
+    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
     QList<QQmlError> warnings;
     QObject::connect(engine, &QQmlEngine::warnings, &host, [&](const QList<QQmlError>& values) { warnings.append(values); });
     auto context = px::ui_test::makeCore();

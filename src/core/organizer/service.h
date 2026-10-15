@@ -115,9 +115,4 @@ private:
     std::optional<OrganizerState> state_;
 };
 
-// Wires the bridge between CoreContext and OrganizerService when CoreContext is available.
-void register_core_context_seam(
-    std::function<const QHash<QString, ListedModPtr>&(const CoreContext&)> all_mods,
-    std::function<const QStringList&(const CoreContext&)> active_uuids);
-
 }  // namespace px::core::organizer
