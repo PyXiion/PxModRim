@@ -6,7 +6,7 @@ A friendly, modern mod manager for RimWorld. NOw with fast Steam downloading
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12-blue?logo=python" alt="Python 3.12" />
-  <img src="https://img.shields.io/badge/license-LGPL--3.0-blue" alt="License: LGPL-3.0" />
+  <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0" />
   <img src="https://img.shields.io/codacy/grade/f0c8db5021594e89adf514192fa9a205" alt="Codacy grade" />
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20win%20%7C%20macOS-lightgrey" alt="Platforms" />
 </p>
@@ -89,4 +89,4 @@ Features from RimSort will be adopted slowly and only when they genuinely improv
 
 ## License
 
-LGPL-3.0.
+GPL-3.0-or-later. Portions are derived from [RimSort](https://github.com/RimSort/RimSort) (GPL-3.0); see `NOTICE`.

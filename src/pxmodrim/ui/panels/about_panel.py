@@ -187,7 +187,7 @@ class AboutPanel(QDialog):
         environment = "  •  ".join(self._environment())
         rows = (
             ("CREATED BY", "PyXiion"),
-            ("LICENSE", "LGPL-3.0"),
+            ("LICENSE", "GPL-3.0-or-later"),
             ("INSPIRED BY", "RimSort"),
             ("ENVIRONMENT", environment),
         )

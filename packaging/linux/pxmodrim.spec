@@ -2,7 +2,7 @@ Name:           pxmodrim
 Version:        %{?version}%{!?version:0.3.1}
 Release:        1%{?dist}
 Summary:        Mod manager for RimWorld
-License:        LGPL-3.0
+License:        GPL-3.0-or-later
 URL:            https://github.com/PyXiion/PxModRim
 BuildArch:      %{_arch}
 AutoReqProv:    no

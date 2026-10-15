@@ -204,7 +204,7 @@ def test_flatpak_metadata_contract() -> None:
         "packaging/flatpak/com.github.PyXiion.PxModRim.metainfo.xml"
     ).getroot()
     assert metadata.findtext("id") == "com.github.PyXiion.PxModRim"
-    assert metadata.findtext("project_license") == "LGPL-3.0"
+    assert metadata.findtext("project_license") == "GPL-3.0-or-later"
     urls = {url.attrib["type"]: url.text for url in metadata.findall("url")}
     assert urls == {
         "homepage": "https://github.com/PyXiion/PxModRim",
