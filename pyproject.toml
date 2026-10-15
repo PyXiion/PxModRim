@@ -1,6 +1,8 @@
 [project]
 name = "pxmodrim"
 description = "A mod manager for RimWorld."
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "NOTICE"]
 version = "0.3.1"
 requires-python = "==3.12.*"
 dependencies = [
