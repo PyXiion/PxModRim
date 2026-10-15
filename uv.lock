@@ -293,14 +293,14 @@ source = { git = "https://github.com/PyXiion/PxSteamDL#d486d6b2125b8354cf4382020
 
 [[package]]
 name = "pydeps"
-version = "3.0.8"
+version = "3.0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "stdlib-list" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/66/7b/4c40de7ca4c27395adc772bec625674d874f6983657fd8763fb36bee9444/pydeps-3.0.8.tar.gz", hash = "sha256:e54b19d22c8f94b4787bc0bbb3bbe4afc074e32ff9e7868d7750340faec9f8ec", size = 59676, upload-time = "2026-09-07T13:58:56.692Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/0e/0c4570012b268fa86ab72c53603b02fdc2e951f997a0ca36f12741b82d07/pydeps-3.0.9.tar.gz", hash = "sha256:5b54d3854a3b40eaf19ad1dbcc273260e57e362a4396ad0a3ed6ea87a4e48649", size = 60477, upload-time = "2026-10-01T16:15:27.717Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/5b/84b74df24b6c958dce0b8d99dc3f5b510f04828ade387ef4ae4a846f2b0a/pydeps-3.0.8-py3-none-any.whl", hash = "sha256:e7d8479292d427c87f7a05e96601c1495ca4147f5e160c48254197f4fc68601f", size = 50215, upload-time = "2026-09-07T13:58:55.576Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/95/f7698fdd996137e29f8c68a2820e09c166eea5df68518800fbed90888282/pydeps-3.0.9-py3-none-any.whl", hash = "sha256:abde61b121876335a143296b0ff0fc2953d4f06d0bef5a3a00aa892c11f06451", size = 50545, upload-time = "2026-10-01T16:15:26.652Z" },
 ]
 
 [[package]]
