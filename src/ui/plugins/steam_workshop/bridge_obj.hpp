@@ -4,6 +4,7 @@
 
 #include <QJsonValue>
 #include <QObject>
+#include <QPointer>
 
 #include <QCoro/QCoroTask>
 
@@ -15,6 +16,7 @@ class PxModRimBridge final : public QObject {
   Q_OBJECT
  public:
   PxModRimBridge(SteamWorkshopUiPlugin& plugin, QObject* parent);
+  void setPage(QObject* page);
   Q_INVOKABLE void call(const QString& requestId, const QString& method,
                         const QString& payload);
  signals:
@@ -26,6 +28,7 @@ class PxModRimBridge final : public QObject {
                const QJsonValue& result = QJsonValue(QJsonValue::Null),
                const QString& error = {});
   SteamWorkshopUiPlugin& m_plugin;
+  QPointer<QObject> m_page;
 };
 
 }  // namespace px::modrim

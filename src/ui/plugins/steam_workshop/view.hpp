@@ -2,6 +2,8 @@
 
 #ifdef PX_HAS_STEAM
 
+#include <QUrl>
+
 #include "ui/plugins/steam_workshop/plugin.hpp"
 #include "ui/views/base.hpp"
 
@@ -25,6 +27,7 @@ class SteamWorkshopViewPanel final : public BaseViewPanel {
   void teardown();
   Q_INVOKABLE void navigateHome();
   Q_INVOKABLE void navigateToUrl(const QString& text);
+  Q_INVOKABLE static bool isSteamOrigin(const QUrl& url);
 
  protected:
   void showEvent(QShowEvent* event) override;

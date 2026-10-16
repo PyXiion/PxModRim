@@ -2,6 +2,7 @@
 
 #ifdef PX_HAS_STEAM
 
+#include <QDesktopServices>
 #include <QFile>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -139,6 +140,7 @@ void SteamWorkshopViewPanel::ensureInitialized() {
   context->setContextProperty(QStringLiteral("_injectCode"), injection());
   m_qml->setSource(
       QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/SteamWorkshop.qml")));
+  if (bridge) bridge->setPage(web());
 #endif
 }
 
@@ -164,12 +166,21 @@ void SteamWorkshopViewPanel::navigateHome() {
   if (auto* browser = web()) browser->setProperty("url", kWorkshopUrl);
 }
 
+bool SteamWorkshopViewPanel::isSteamOrigin(const QUrl& url) {
+  if (!url.isValid() || url.scheme() != QLatin1String("https")) return false;
+  const auto host = url.host();
+  return host == QLatin1String("steamcommunity.com") ||
+         host.endsWith(QLatin1String(".steamcommunity.com"));
+}
+
 void SteamWorkshopViewPanel::navigateToUrl(const QString& text) {
   if (text.isEmpty()) return;
   auto url = QUrl::fromUserInput(text);
-  if (url.scheme() == QLatin1String("http"))
-    url.setScheme(QStringLiteral("https"));
   if (!url.isValid()) return;
+  if (!isSteamOrigin(url)) {
+    QDesktopServices::openUrl(url);
+    return;
+  }
   if (auto* browser = web()) browser->setProperty("url", url);
 }
 

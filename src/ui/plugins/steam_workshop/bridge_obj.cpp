@@ -7,9 +7,11 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QPointer>
+#include <QVariant>
 #include <algorithm>
 
 #include "ui/plugins/steam_workshop/plugin.hpp"
+#include "ui/plugins/steam_workshop/view.hpp"
 
 namespace px::modrim {
 namespace {
@@ -24,6 +26,8 @@ bool isPublishedFileId(const QJsonValue& value) {
 
 PxModRimBridge::PxModRimBridge(SteamWorkshopUiPlugin& plugin, QObject* parent)
     : QObject(parent), m_plugin(plugin) {}
+
+void PxModRimBridge::setPage(QObject* page) { m_page = page; }
 
 void PxModRimBridge::call(const QString& requestId, const QString& method,
                           const QString& payload) {
@@ -43,6 +47,12 @@ void PxModRimBridge::respond(const QString& requestId, bool ok,
 
 QCoro::Task<void> PxModRimBridge::handle(QString requestId, QString method,
                                          QString payload) {
+  if (!m_page ||
+      !SteamWorkshopViewPanel::isSteamOrigin(m_page->property("url").toUrl())) {
+    respond(requestId, false, {},
+            QStringLiteral("The bridge is only available on Steam pages"));
+    co_return;
+  }
   QJsonParseError parseError;
   const auto document = QJsonDocument::fromJson(
       payload.isEmpty() ? QByteArray("{}") : payload.toUtf8(), &parseError);

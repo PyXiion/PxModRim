@@ -135,8 +135,16 @@ Rectangle {
             WebEngineView {
                 id: webView
                 objectName: "workshopWeb"
-                webChannel: channel
+                webChannel: steamWorkshopPanel.isSteamOrigin(url) ? channel : null
                 anchors.fill: parent
+
+                onNavigationRequested: function(request) {
+                    if (!request.isMainFrame || steamWorkshopPanel.isSteamOrigin(request.url))
+                        return
+                    request.action = WebEngineView.IgnoreRequest
+                    if (request.url.toString() !== "about:blank")
+                        Qt.openUrlExternally(request.url)
+                }
 
                 profile: WebEngineProfile {
                     id: steamProfile

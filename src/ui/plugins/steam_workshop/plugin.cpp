@@ -104,38 +104,30 @@ void SteamWorkshopUiPlugin::batchToggleDownloadChecked(
 }
 
 void SteamWorkshopUiPlugin::toggleActive(const QString& id, bool active) {
-  if (!m_core) return;
-  for (auto it = m_core->allMods().cbegin(); it != m_core->allMods().cend();
-       ++it) {
-    if (it.value()->publishedFileId() != id) continue;
-    auto current = m_core->activeUuids();
-    if (active) {
-      if (!current.contains(it.key())) current.append(it.key());
-    } else {
-      current.removeAll(it.key());
-    }
-    m_core->setActive(std::move(current));
-    return;
-  }
+  batchToggleActive({id}, active);
 }
 
 void SteamWorkshopUiPlugin::batchToggleActive(const QStringList& ids,
                                               bool active) {
   if (!m_core) return;
-  QHash<QString, QString> byPublishedId;
+  const QSet<QString> requested(ids.cbegin(), ids.cend());
+  auto current = m_core->activeUuids();
+  QHash<QString, QString> chosenCopies;
   for (auto it = m_core->allMods().cbegin(); it != m_core->allMods().cend();
        ++it) {
-    if (auto id = it.value()->publishedFileId())
-      byPublishedId.insert(*id, it.key());
+    const auto id = it.value()->publishedFileId();
+    if (!id || !requested.contains(*id)) continue;
+    if (!active) {
+      current.removeAll(it.key());
+    } else if (!chosenCopies.contains(*id) || current.contains(it.key())) {
+      chosenCopies.insert(*id, it.key());
+    }
   }
-  auto current = m_core->activeUuids();
-  for (const auto& id : ids) {
-    const auto it = byPublishedId.constFind(id);
-    if (it == byPublishedId.cend()) continue;
-    if (active) {
-      if (!current.contains(*it)) current.append(*it);
-    } else {
-      current.removeAll(*it);
+  if (active) {
+    for (const auto& id : ids) {
+      const auto copy = chosenCopies.constFind(id);
+      if (copy != chosenCopies.cend() && !current.contains(*copy))
+        current.append(*copy);
     }
   }
   m_core->setActive(std::move(current));
