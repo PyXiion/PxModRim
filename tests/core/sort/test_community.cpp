@@ -6,8 +6,8 @@
 #include "core/sort/community.h"
 #include "../test_support.h"
 
-using px::core::sort::load_community_rules;
-using px::core::sort::PackageId;
+using px::modrim::sort::load_community_rules;
+using px::modrim::sort::PackageId;
 
 TEST_CASE("a missing community rules file means no rules") {
     QTemporaryDir dir;

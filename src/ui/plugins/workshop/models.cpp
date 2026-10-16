@@ -12,9 +12,9 @@
 
 #include "ui/panels/mod_info_data.h"
 
-namespace px::ui::workshop {
+namespace px::modrim::workshop {
 namespace {
-using namespace core::workshop;
+using namespace workshop;
 
 constexpr std::array<const char*, 25> roles = {
     "itemId", "kind", "title", "author", "previewUrl", "collage", "sourceLabel", "versions", "tags",
@@ -157,7 +157,7 @@ QVariantMap item_row(const CatalogEntry& entry,
             {"tags", tag_labels.join(QStringLiteral(" · "))}, {"state", state_name}, {"active", false},
             {"queued", false}, {"favourite", false}, {"stateLabel", state_label}, {"actionLabel", action},
             {"incompatible", incompatible}, {"memberCount", member_count},
-            {"description", detail ? px::ui::description_to_html(description, format) : QString{}},
+            {"description", detail ? px::modrim::description_to_html(description, format) : QString{}},
             {"workshopUrl", safe_url(workshop_url)}, {"fileSize", size}, {"votes", votes},
             {"votesUp", up}, {"votesDown", down}, {"summary", summarize(description, format)},
             {"compatLabel", compat_label(versions, game_version, incompatible, no_common)}};
@@ -222,4 +222,4 @@ QHash<int, QByteArray> CatalogListModel::roleNames() const {
     return names;
 }
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

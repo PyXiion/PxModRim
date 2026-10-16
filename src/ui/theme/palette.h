@@ -6,7 +6,7 @@
 
 class QApplication;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Look up a color token by its uppercase name, e.g. "ELEVATE_0", "PRIMARY".
 // Returns an empty string if the name is unknown.
@@ -27,4 +27,4 @@ QString getStylesheet();
 // matching legacy pxmodrim/_app.py `_apply_theme`.
 void applyAppTheme(QApplication& app);
 
-}  // namespace px::ui
+}  // namespace px::modrim

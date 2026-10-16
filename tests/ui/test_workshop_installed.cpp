@@ -6,9 +6,9 @@
 
 #include "ui/plugins/workshop/installed.h"
 
-using px::core::workshop::CatalogMod;
-using px::ui::workshop::InstalledList;
-using px::ui::workshop::PAGE;
+using px::modrim::workshop::CatalogMod;
+using px::modrim::workshop::InstalledList;
+using px::modrim::workshop::PAGE;
 
 namespace {
 CatalogMod installed_mod(std::string id, std::string title, std::string author = "Someone",

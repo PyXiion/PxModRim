@@ -25,7 +25,7 @@
 #include "ui/context.h"
 #include "ui/panels/upload_report_dialog.h"
 
-namespace px::ui {
+namespace px::modrim {
 QStringList AboutPanel::environment() {
 #if defined(__clang__)
     const QString compiler = QStringLiteral("Clang " __clang_version__);
@@ -42,7 +42,7 @@ QStringList AboutPanel::environment() {
 }
 
 QString AboutPanel::systemInformation() const {
-    return (QStringList{QStringLiteral("PxModRim %1").arg(core::appVersion())} + environment()).join(u'\n');
+    return (QStringList{QStringLiteral("PxModRim %1").arg(appVersion())} + environment()).join(u'\n');
 }
 
 QString AboutPanel::creditsHtml() {
@@ -65,7 +65,7 @@ QString AboutPanel::creditsHtml() {
         .arg(SPDLOG_VER_MAJOR).arg(SPDLOG_VER_MINOR).arg(SPDLOG_VER_PATCH);
 }
 
-AboutPanel::AboutPanel(QWidget* parent, core::CoreContext& ctx, Notifier& toast)
+AboutPanel::AboutPanel(QWidget* parent, CoreContext& ctx, Notifier& toast)
     : QDialog(parent), ctx_(ctx), toast_(toast) {
     setObjectName(QStringLiteral("aboutPanel"));
     setWindowTitle(tr("About PxModRim"));
@@ -91,7 +91,7 @@ AboutPanel::AboutPanel(QWidget* parent, core::CoreContext& ctx, Notifier& toast)
     title->setObjectName(QStringLiteral("aboutTitle"));
     titleRow->addWidget(title);
     titleRow->addStretch();
-    auto* version = new QLabel(QStringLiteral("v%1").arg(core::appVersion()), hero);
+    auto* version = new QLabel(QStringLiteral("v%1").arg(appVersion()), hero);
     version->setObjectName(QStringLiteral("aboutVersionBadge"));
     titleRow->addWidget(version, 0, Qt::AlignVCenter);
     identity->addLayout(titleRow);
@@ -230,4 +230,4 @@ QCoro::Task<void> AboutPanel::uploadReport() {
     co_await handle_upload_report(this, ctx_, toast_);
     if (button) button->setEnabled(true);
 }
-}  // namespace px::ui
+}  // namespace px::modrim

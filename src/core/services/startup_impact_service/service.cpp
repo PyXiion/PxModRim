@@ -9,7 +9,7 @@
 #include "core/context.h"
 #include "core/services/startup_impact_service/parser.h"
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 namespace {
 
@@ -106,4 +106,4 @@ QCoro::Task<void> StartupImpactService::close_connection() { co_await db_.close(
 
 void StartupImpactService::close_connection_sync() { db_.close_sync(); }
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

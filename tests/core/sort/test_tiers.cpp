@@ -6,14 +6,14 @@
 
 #include "core/sort/tiers.h"
 
-using px::core::sort::assign_tiers;
-using px::core::sort::find_cycle;
-using px::core::sort::get_deps_recursive;
-using px::core::sort::get_reverse_deps_recursive;
-using px::core::sort::PackageGraph;
-using px::core::sort::PackageId;
-using px::core::sort::Tier;
-using px::core::sort::TierConfig;
+using px::modrim::sort::assign_tiers;
+using px::modrim::sort::find_cycle;
+using px::modrim::sort::get_deps_recursive;
+using px::modrim::sort::get_reverse_deps_recursive;
+using px::modrim::sort::PackageGraph;
+using px::modrim::sort::PackageId;
+using px::modrim::sort::Tier;
+using px::modrim::sort::TierConfig;
 
 namespace {
 

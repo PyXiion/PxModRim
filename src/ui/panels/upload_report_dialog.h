@@ -4,8 +4,8 @@
 #include <QCoro/QCoroTask>
 #include <QDialog>
 
-namespace px::core { class CoreContext; }
-namespace px::ui {
+namespace px::modrim { class CoreContext; }
+namespace px::modrim {
 class Notifier;
 enum class UploadChoice { CANCEL = QDialog::Rejected, UPLOAD = QDialog::Accepted, SAVE_TO_FILE = 2 };
 class UploadConfirmDialog : public QDialog {
@@ -16,6 +16,6 @@ class UploadFailedDialog : public QDialog {
 public:
     explicit UploadFailedDialog(const QString& errorMessage, QWidget* parent = nullptr);
 };
-QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, core::CoreContext& ctx,
+QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, CoreContext& ctx,
                                                         Notifier& toast);
-}  // namespace px::ui
+}  // namespace px::modrim

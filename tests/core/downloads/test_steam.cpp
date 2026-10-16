@@ -38,21 +38,21 @@ namespace {
 
 using namespace std::chrono_literals;
 
-using px::core::ConfigService;
-using px::core::DownloadItemStatus;
-using px::core::DownloadManager;
-using px::core::DownloadProgress;
-using px::core::DownloadResult;
-using px::core::ListedMod;
-using px::core::ListedModPtr;
-using px::core::LoginOptions;
-using px::core::Result;
-using px::core::SteamBatch;
-using px::core::SteamDownloader;
-using px::core::SteamDownloaderDeps;
-using px::core::SteamSettings;
-using px::core::WorkshopClient;
-using px::core::WorkshopSyncState;
+using px::modrim::ConfigService;
+using px::modrim::DownloadItemStatus;
+using px::modrim::DownloadManager;
+using px::modrim::DownloadProgress;
+using px::modrim::DownloadResult;
+using px::modrim::ListedMod;
+using px::modrim::ListedModPtr;
+using px::modrim::LoginOptions;
+using px::modrim::Result;
+using px::modrim::SteamBatch;
+using px::modrim::SteamDownloader;
+using px::modrim::SteamDownloaderDeps;
+using px::modrim::SteamSettings;
+using px::modrim::WorkshopClient;
+using px::modrim::WorkshopSyncState;
 using test_support::TestApplication;
 
 // Thread-safe flag with a timeout-aware wait.
@@ -235,7 +235,7 @@ struct Service {
     QCoro::Task<Result<std::shared_ptr<WorkshopClient>>> login(LoginOptions opts) {
         logins.push_back(opts);
         if (clients_.empty()) {
-            co_return std::unexpected(px::core::Error{QStringLiteral("logon denied")});
+            co_return std::unexpected(px::modrim::Error{QStringLiteral("logon denied")});
         }
         auto client = clients_.front();
         clients_.pop_front();
@@ -590,7 +590,7 @@ TEST_CASE("success records sync time and persists", "[downloads][steam]") {
     REQUIRE(synced_of(svc, "111").has_value());
     REQUIRE_FALSE(synced_of(svc, "222").has_value());
 
-    auto reloaded = svc.config.load<WorkshopSyncState>(px::core::kWorkshopSyncFile);
+    auto reloaded = svc.config.load<WorkshopSyncState>(px::modrim::kWorkshopSyncFile);
     REQUIRE(reloaded.has_value());
     std::vector<std::string> keys;
     for (const auto& [k, _] : reloaded->synced) {
@@ -607,7 +607,7 @@ TEST_CASE("stale ids never synced first then oldest", "[downloads][steam]") {
     }
     WorkshopSyncState seed;
     seed.synced = {{"1", 1000.0}, {"2", 9000.0}, {"3", 500.0}};
-    REQUIRE(svc.config.save(px::core::kWorkshopSyncFile, seed).has_value());
+    REQUIRE(svc.config.save(px::modrim::kWorkshopSyncFile, seed).has_value());
     run_loop_void(svc.steam->load_sync_state());
 
     REQUIRE(svc.steam->stale_ids(3600.0, 10000.0) == QStringList{"4", "3", "1"});

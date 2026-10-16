@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace px::core {
+namespace px::modrim {
 
 LoadingState::LoadingState(QObject* parent) : QObject(parent) {}
 
@@ -77,4 +77,4 @@ void LoadingState::emit_changed() {
     Q_EMIT changed(frame.status, pct, frame.current_step, frame.total_steps);
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

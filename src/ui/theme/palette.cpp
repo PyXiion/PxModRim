@@ -8,7 +8,7 @@
 #include <QStringView>
 #include <spdlog/spdlog.h>
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -104,4 +104,4 @@ void applyAppTheme(QApplication& app) {
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

@@ -11,7 +11,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/sort/config.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 using PackageId = CaseInsensitiveStr;
 using AboutXmlModPtr = std::shared_ptr<AboutXmlMod>;
@@ -58,4 +58,4 @@ struct CheckContext {
     const QList<QList<PackageId>>& cycles;
 };
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

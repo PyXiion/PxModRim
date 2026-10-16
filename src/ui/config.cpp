@@ -2,7 +2,7 @@
 
 #include <QtGlobal>
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -10,13 +10,13 @@ const QString kUiPrefsFile = QStringLiteral("ui_prefs.json");
 
 }  // namespace
 
-core::Result<void> saveUiPrefs(const UiPrefs& prefs, const core::ConfigService& svc) {
+Result<void> saveUiPrefs(const UiPrefs& prefs, const ConfigService& svc) {
     return svc.save(kUiPrefsFile, prefs);
 }
 
-UiPrefsService::UiPrefsService(core::ConfigService& svc) : svc_(svc) {}
+UiPrefsService::UiPrefsService(ConfigService& svc) : svc_(svc) {}
 
-QCoro::Task<core::Result<void>> UiPrefsService::setup() {
+QCoro::Task<Result<void>> UiPrefsService::setup() {
     auto loaded = svc_.load<UiPrefs>(kUiPrefsFile);
     if (!loaded) {
         co_return std::unexpected(loaded.error());
@@ -30,11 +30,11 @@ const UiPrefs& UiPrefsService::prefs() const {
     return *prefs_;
 }
 
-core::Result<void> UiPrefsService::savePrefs() const {
+Result<void> UiPrefsService::savePrefs() const {
     if (!prefs_) {
         return {};
     }
     return saveUiPrefs(*prefs_, svc_);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

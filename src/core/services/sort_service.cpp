@@ -11,7 +11,7 @@
 #include "core/profiler.h"
 #include "core/services/diagnostics_service.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -116,4 +116,4 @@ QStringList SortService::missing_dependency_uuids(const QHash<QString, ListedMod
     return unique;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

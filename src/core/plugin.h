@@ -15,7 +15,7 @@
 #include "core/error.h"
 #include "core/toposort.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // `setup` runs synchronously in dependency order; `init` is awaited right after
 // setup, for I/O or async start-up. `shutdown` runs in reverse order. Templated over
@@ -153,4 +153,4 @@ private:
 using Plugin = BasicPlugin<CoreContext>;
 using PluginRegistry = BasicPluginRegistry<CoreContext>;
 
-}  // namespace px::core
+}  // namespace px::modrim

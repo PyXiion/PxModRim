@@ -4,19 +4,19 @@
 #include "ui/context.h"
 #include "ui/settings_section.h"
 
-namespace px::ui::workshop {
+namespace px::modrim::workshop {
 
 class CatalogSettingsSection : public PluginConfigSectionBase {
 public:
-    CatalogSettingsSection(core::workshop::WorkshopCatalog& catalog, QObject* parent);
+    CatalogSettingsSection(workshop::WorkshopCatalog& catalog, QObject* parent);
     QString title() const override;
     QUrl source() const override;
 
 protected:
-    core::Result<void> commit(const QJsonObject& merged) override;
+    Result<void> commit(const QJsonObject& merged) override;
 
 private:
-    core::workshop::WorkshopCatalog& catalog_;
+    workshop::WorkshopCatalog& catalog_;
 };
 
 class WorkshopUiPlugin : public UiPlugin {
@@ -25,4 +25,4 @@ public:
     void setup(AppContext& ctx) override;
 };
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

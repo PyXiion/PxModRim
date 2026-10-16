@@ -17,7 +17,7 @@
 #include "ui/plugins/steam_workshop/download_sidebar.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 namespace {
 const QUrl workshop_url(QStringLiteral("https://steamcommunity.com/workshop/browse/?appid=294100"));
 
@@ -39,7 +39,7 @@ QString injection() {
 }
 }
 
-SteamWorkshopViewPanel::SteamWorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+SteamWorkshopViewPanel::SteamWorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
     : BaseViewPanel(ctx, engine, parent, app) {
     auto* content = new QWidget(this);
     auto* layout = new QHBoxLayout(content);
@@ -81,7 +81,7 @@ void SteamWorkshopViewPanel::ensure_initialized() {
             run_js(QStringLiteral("if (window.__pxmSetActive) window.__pxmSetActive(%1)").arg(json_argument(QJsonArray::fromStringList(ids))));
         });
         sidebar_id_ = plugin_->sidebar_sync_requested.connect([this](const SidebarSync& sync) { sidebar_->sync_from(sync.checked_ids, sync.statuses); });
-        status_id_ = plugin_->item_status_changed.connect([this](const core::DownloadItemStatus& status) {
+        status_id_ = plugin_->item_status_changed.connect([this](const DownloadItemStatus& status) {
             sidebar_->update_status(status.mod_id, status.status, status.bytes_done, status.bytes_total);
         });
         busy_id_ = plugin_->download_busy_changed.connect([this](bool busy) { sidebar_->set_download_enabled(!busy); });
@@ -160,5 +160,5 @@ void SteamWorkshopViewPanel::teardown() {
     initialized_ = false;
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim
 #endif

@@ -17,7 +17,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/profiler.h"
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 // Runs `fn` on `pool`, or on the global pool when `pool` is null, and returns a future for its
 // result. Awaiting the future from a coroutine resumes it on the calling thread.
@@ -127,4 +127,4 @@ private:
     MetadataCacheStore* metadata_cache_;
 };
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

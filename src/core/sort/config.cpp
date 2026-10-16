@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 TierConfig TierConfig::defaults() {
     return TierConfig{
@@ -38,4 +38,4 @@ TierConfig TierConfig::defaults() {
     };
 }
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

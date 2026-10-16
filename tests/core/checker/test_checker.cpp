@@ -17,8 +17,8 @@
 #include "core/models/metadata/structures.h"
 #include "core/sort/config.h"
 
-using namespace px::core;
-using namespace px::core::checker;
+using namespace px::modrim;
+using namespace px::modrim::checker;
 
 namespace {
 

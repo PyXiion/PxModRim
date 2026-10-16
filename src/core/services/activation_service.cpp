@@ -18,7 +18,7 @@
 #include "core/sort/config.h"
 #include "core/sort/models.h"
 
-namespace px::core {
+namespace px::modrim {
 namespace {
 
 using checker::ConstraintEdge;
@@ -498,4 +498,4 @@ bool ActivationService::apply(const QStringList& enable, const QStringList& disa
     return true;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

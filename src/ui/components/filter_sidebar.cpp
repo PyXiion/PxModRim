@@ -3,7 +3,7 @@
 #include <QAbstractItemModel>
 #include <QQmlContext>
 #include <QQuickItem>
-namespace px::ui {
+namespace px::modrim {
 FilterSidebar::FilterSidebar(QQmlEngine* engine, QAbstractItemModel* model, QWidget* parent)
     : QQuickWidget(engine, parent) {
     setResizeMode(QQuickWidget::SizeRootObjectToView);

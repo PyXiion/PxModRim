@@ -1,6 +1,6 @@
 #include "ui/plugins/organizer/filter_model.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 OrganizerFilterModel::OrganizerFilterModel(QObject* parent) : QAbstractListModel(parent) {}
 
@@ -39,7 +39,7 @@ QHash<int, QByteArray> OrganizerFilterModel::roleNames() const {
         {IconRole, "iconName"}, {SectionRole, "sectionName"}, {KeyRole, "key"}};
 }
 
-void OrganizerFilterModel::update(const QList<core::organizer::TreeFilter>& entries) {
+void OrganizerFilterModel::update(const QList<organizer::TreeFilter>& entries) {
     bool same_keys = entries.size() == items_.size();
     for (qsizetype i = 0; same_keys && i < entries.size(); ++i)
         same_keys = entries[i].key == items_[i].key;
@@ -60,10 +60,10 @@ std::optional<QString> OrganizerFilterModel::key_at(int row) const {
     return items_[row].key;
 }
 
-core::organizer::TreeFilter OrganizerFilterModel::for_key(const QString& key) const {
+organizer::TreeFilter OrganizerFilterModel::for_key(const QString& key) const {
     for (const auto& entry : items_) if (entry.key == key) return entry;
     if (!items_.isEmpty()) return items_.first();
     return {QStringLiteral("all"), QStringLiteral("All"), 0};
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

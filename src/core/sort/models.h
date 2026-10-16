@@ -6,7 +6,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/sort/config.h"
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 // Load-order rule from the community database for one package id.
 struct CommunityRule {
@@ -25,4 +25,4 @@ using CommunityRules = QHash<PackageId, CommunityRule>;
 // Adjacency map over package ids: a node's dependencies or reverse dependencies.
 using PackageGraph = QHash<PackageId, QSet<PackageId>>;
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

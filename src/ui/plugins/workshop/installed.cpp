@@ -5,9 +5,9 @@
 
 #include <QStringList>
 
-namespace px::ui::workshop {
+namespace px::modrim::workshop {
 
-void InstalledList::replace(std::vector<core::workshop::CatalogMod> mods) {
+void InstalledList::replace(std::vector<workshop::CatalogMod> mods) {
     mods_ = std::move(mods);
     rematch();
 }
@@ -22,18 +22,18 @@ void InstalledList::reset_paging() {
     shown_ = PAGE;
 }
 
-std::vector<core::workshop::CatalogMod> InstalledList::visible() const {
+std::vector<workshop::CatalogMod> InstalledList::visible() const {
     return slice(0, std::min(shown_, matches_.size()));
 }
 
-std::vector<core::workshop::CatalogMod> InstalledList::next_page() {
+std::vector<workshop::CatalogMod> InstalledList::next_page() {
     const auto start = shown_;
     shown_ = std::min(start + PAGE, matches_.size());
     return slice(start, shown_);
 }
 
-std::vector<core::workshop::CatalogMod> InstalledList::slice(std::size_t start, std::size_t end) const {
-    std::vector<core::workshop::CatalogMod> result;
+std::vector<workshop::CatalogMod> InstalledList::slice(std::size_t start, std::size_t end) const {
+    std::vector<workshop::CatalogMod> result;
     if (start >= end) return result;
     result.reserve(end - start);
     for (auto i = start; i < end; ++i) result.push_back(mods_[matches_[i]]);
@@ -57,4 +57,4 @@ void InstalledList::rematch() {
     }
 }
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

@@ -23,22 +23,22 @@ void ensureApplication() {
 }
 
 TEST_CASE("Every window action belongs to exactly one menu", "[ui][window]") {
-    std::multiset<px::ui::ActionId> placed;
-    for (const auto& menu : px::ui::menuLayout())
+    std::multiset<px::modrim::ActionId> placed;
+    for (const auto& menu : px::modrim::menuLayout())
         for (const auto id : menu.actions) if (id) placed.insert(*id);
-    REQUIRE(placed.size() == px::ui::actionSpecs().size());
-    for (const auto& spec : px::ui::actionSpecs()) CHECK(placed.count(spec.id) == 1);
+    REQUIRE(placed.size() == px::modrim::actionSpecs().size());
+    for (const auto& spec : px::modrim::actionSpecs()) CHECK(placed.count(spec.id) == 1);
 }
 
 TEST_CASE("Window shortcuts are unique and view switching is collapsed", "[ui][window]") {
     ensureApplication();
     std::set<QString> shortcuts;
-    for (const auto& spec : px::ui::actionSpecs())
+    for (const auto& spec : px::modrim::actionSpecs())
         if (!spec.shortcut.isEmpty()) CHECK(shortcuts.insert(spec.shortcut).second);
     std::set<std::pair<QString, QString>> unique;
     int viewRows = 0;
     bool save = false, refresh = false;
-    for (const auto& row : px::ui::shortcutRows()) {
+    for (const auto& row : px::modrim::shortcutRows()) {
         CHECK(unique.emplace(row.first, row.second).second);
         if (row.second == QStringLiteral("Switch to view")) ++viewRows;
         save |= row.second == QStringLiteral("Save mod list");
@@ -52,15 +52,15 @@ TEST_CASE("Window shortcuts are unique and view switching is collapsed", "[ui][w
 TEST_CASE("Hidden menu actions retain their window shortcuts", "[ui][window]") {
     ensureApplication();
     QMainWindow window;
-    const auto actions = px::ui::createActions(window);
-    px::ui::MenuBar menu(actions, &window);
+    const auto actions = px::modrim::createActions(window);
+    px::modrim::MenuBar menu(actions, &window);
     menu.hide();
     bool triggered = false;
-    QObject::connect(actions.at(px::ui::ActionId::Save), &QAction::triggered, &window, [&] { triggered = true; });
+    QObject::connect(actions.at(px::modrim::ActionId::Save), &QAction::triggered, &window, [&] { triggered = true; });
     QMenu* file = nullptr;
     for (auto* item : menu.findChildren<QMenu*>()) if (item->title() == QStringLiteral("&File")) file = item;
     REQUIRE(file != nullptr);
-    auto* save = actions.at(px::ui::ActionId::Save);
+    auto* save = actions.at(px::modrim::ActionId::Save);
     CHECK(file->actions().contains(save));
     CHECK(save->shortcut() == QKeySequence(QStringLiteral("Ctrl+S")));
     CHECK(window.actions().contains(save));

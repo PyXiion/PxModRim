@@ -11,11 +11,11 @@
 #include "core/services/startup_impact_service/db.h"
 #include "core/services/startup_impact_service/models.h"
 
-namespace px::core {
+namespace px::modrim {
 class CoreContext;
 }
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 // Loads the game's startup impact report into the history database and answers queries about
 // historical averages and per-session breakdowns.
@@ -46,4 +46,4 @@ private:
     StartupImpactDb db_;
 };
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

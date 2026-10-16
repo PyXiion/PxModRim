@@ -17,7 +17,7 @@
 
 #include "core/constants.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -451,4 +451,4 @@ Result<void> AppConfigService::save_cfg() const {
     return svc_.save(kConfigFile, *cfg_);
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

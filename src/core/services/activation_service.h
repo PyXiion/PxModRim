@@ -2,7 +2,7 @@
 
 #include <QStringList>
 
-namespace px::core {
+namespace px::modrim {
 
 class CoreContext;
 
@@ -24,4 +24,4 @@ private:
     CoreContext& ctx_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

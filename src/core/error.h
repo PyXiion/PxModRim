@@ -4,7 +4,7 @@
 
 #include <QString>
 
-namespace px::core {
+namespace px::modrim {
 
 struct Error {
     QString message;
@@ -13,4 +13,4 @@ struct Error {
 template <class T>
 using Result = std::expected<T, Error>;
 
-}  // namespace px::core
+}  // namespace px::modrim

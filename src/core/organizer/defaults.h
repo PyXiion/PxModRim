@@ -5,7 +5,7 @@
 
 #include "core/organizer/models.h"
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 // A built-in auto-folder rule targeting a top-level folder by name.
 struct StandardRule {
@@ -18,4 +18,4 @@ struct StandardRule {
 // Built-in rules in priority order: the first match wins.
 const QList<StandardRule>& standard_rules();
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

@@ -14,8 +14,8 @@
 #include "ui/navigation.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui::workshop {
-using namespace core::workshop;
+namespace px::modrim::workshop {
+using namespace workshop;
 namespace {
 QString id_of(const CatalogEntry& item) {
     return std::visit([](const auto& value) { return QString::fromStdString(value.id); }, item);
@@ -28,15 +28,15 @@ QSet<QString> ids_of(const std::vector<std::string>& ids) {
 std::optional<QString> cursor_of(const std::optional<std::string>& cursor) {
     return cursor ? std::optional(QString::fromStdString(*cursor)) : std::nullopt;
 }
-WorkshopCatalog& catalog_of(core::CoreContext& ctx) {
+WorkshopCatalog& catalog_of(CoreContext& ctx) {
     return *static_cast<WorkshopCatalog*>(ctx.plugins().get(QStringLiteral("workshop_catalog")));
 }
 }
 
-WorkshopViewPanel::WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+WorkshopViewPanel::WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
     : WorkshopViewPanel(ctx, engine, parent, app, catalog_of(ctx)) {}
 
-WorkshopViewPanel::WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app,
+WorkshopViewPanel::WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app,
                                    WorkshopCatalog& catalog)
     : BaseViewPanel(ctx, engine, parent, app), mods_model(new CatalogListModel(this)),
       collections_model(new CatalogListModel(this)), members_model(new CatalogListModel(this)),
@@ -46,7 +46,7 @@ WorkshopViewPanel::WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine,
     qml_ = new QQuickWidget(engine, this);
     qml_->setObjectName(QStringLiteral("workshopView"));
     qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    qml_->setClearColor(px::ui::paletteColor(u"ELEVATE_0"));
+    qml_->setClearColor(px::modrim::paletteColor(u"ELEVATE_0"));
     qml_->rootContext()->setContextProperty(QStringLiteral("workshopPanel"), this);
     qml_->rootContext()->setContextProperty(QStringLiteral("catalogMods"), mods_model);
     qml_->rootContext()->setContextProperty(QStringLiteral("catalogCollections"), collections_model);
@@ -453,4 +453,4 @@ QStringList WorkshopViewPanel::versionOptions() const {
     return versions;
 }
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

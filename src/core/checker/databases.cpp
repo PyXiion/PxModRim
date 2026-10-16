@@ -29,7 +29,7 @@
 #include "core/file_io.h"
 #include "core/xml.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 namespace {
 
 const QString kNoVersionWarningUrl =
@@ -421,4 +421,4 @@ QCoro::Task<QHash<QString, ReplacementInfo>> UseThisInsteadService::download() {
     co_return entries_;
 }
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

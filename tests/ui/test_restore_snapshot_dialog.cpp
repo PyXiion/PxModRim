@@ -21,10 +21,10 @@
 
 namespace {
 
-using px::core::CaseInsensitiveStr;
-using px::core::ModsConfig;
-using px::ui::ConfirmRestoreDialog;
-using px::ui::RestoreSnapshotDialog;
+using px::modrim::CaseInsensitiveStr;
+using px::modrim::ModsConfig;
+using px::modrim::ConfirmRestoreDialog;
+using px::modrim::RestoreSnapshotDialog;
 
 // Widgets need a QApplication for the whole run; the first test that asks for it creates it.
 QApplication& ensure_app() {
@@ -49,7 +49,7 @@ void write_snapshot(const QString& path, const QStringList& package_ids) {
     for (const QString& id : package_ids) {
         config.activeMods.append(CaseInsensitiveStr(id));
     }
-    REQUIRE(px::core::write_mods_config(path, config, QFileInfo(path).absolutePath()).has_value());
+    REQUIRE(px::modrim::write_mods_config(path, config, QFileInfo(path).absolutePath()).has_value());
 }
 
 QListWidget* list_of(RestoreSnapshotDialog& dialog) {

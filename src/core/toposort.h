@@ -11,7 +11,7 @@
 
 #include "core/error.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // Kahn's algorithm, layered the way the `toposort` package lays levels: level 0
 // holds nodes without dependencies, and each later level holds nodes whose
@@ -60,4 +60,4 @@ inline Result<std::vector<QStringList>> toposort_levels(
     return levels;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

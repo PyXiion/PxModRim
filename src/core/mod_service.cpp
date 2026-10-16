@@ -14,7 +14,7 @@
 #include "core/services/diagnostics_service.h"
 #include "core/services/mod_discovery.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -192,7 +192,7 @@ QCoro::Task<Result<void>> ModService::reload(bool full) {
 
 QStringList ModService::get_snapshots() const {
     const auto snapshots = snapshots_dir();
-    return snapshots ? px::core::get_snapshots(*snapshots) : QStringList{};
+    return snapshots ? px::modrim::get_snapshots(*snapshots) : QStringList{};
 }
 
 QCoro::Task<bool> ModService::restore_snapshot(QString snapshot_path) {
@@ -204,7 +204,7 @@ QCoro::Task<bool> ModService::restore_snapshot(QString snapshot_path) {
     }
 
     const QString config_path = QDir(config_folder).filePath(QStringLiteral("ModsConfig.xml"));
-    auto restored = px::core::restore_snapshot(snapshot_path, config_path, *snapshots,
+    auto restored = px::modrim::restore_snapshot(snapshot_path, config_path, *snapshots,
                                                ctx_.config().max_snapshots);
     if (!restored) {
         spdlog::warn("Failed to restore snapshot: {}", restored.error().message.toStdString());
@@ -267,4 +267,4 @@ void ModService::close_sync() {
     metadata_cache_.reset();
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

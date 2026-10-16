@@ -8,16 +8,16 @@
 class QQmlEngine;
 class QQuickWidget;
 class QLineEdit;
-namespace px::core { class CoreContext; }
-namespace px::ui {
+namespace px::modrim { class CoreContext; }
+namespace px::modrim {
 class ModListPanel : public QWidget {
     Q_OBJECT
     Q_PROPERTY(bool compactMode READ compactMode WRITE setCompactMode NOTIFY compact_mode_changed)
     Q_PROPERTY(int highlightRevision READ highlightRevision NOTIFY highlighted_changed)
 public:
-    ModListPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent = nullptr);
+    ModListPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent = nullptr);
     ~ModListPanel() override;
-    void load_mods(const QHash<QString, core::ListedModPtr>& mods, const QStringList& active);
+    void load_mods(const QHash<QString, ListedModPtr>& mods, const QStringList& active);
     QStringList active_uuids() const;
     ModListModel* model() const { return model_; }
     ModListProxyModel* proxy_model() const { return proxy_; }
@@ -58,7 +58,7 @@ private:
     int proxy_to_source_row(int row) const;
     void core_state_changed(const QStringList& uuids);
     void set_highlighted(const QStringList& uuids);
-    core::CoreContext& ctx_;
+    CoreContext& ctx_;
     ModListModel* model_;
     ModListProxyModel* proxy_;
     QQuickWidget* qml_;

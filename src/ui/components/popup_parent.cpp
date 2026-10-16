@@ -6,7 +6,7 @@
 #include <QWidget>
 #include <QWindow>
 
-namespace px::ui {
+namespace px::modrim {
 
 QuickPopupParenting::QuickPopupParenting(QObject* parent) : QObject(parent) {}
 
@@ -21,4 +21,4 @@ bool QuickPopupParenting::eventFilter(QObject* watched, QEvent* event) {
     return false;
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

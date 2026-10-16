@@ -5,7 +5,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-namespace px::ui {
+namespace px::modrim {
 
 // State and commands behind Header.qml, exposed to it as `headerController`. The
 // QML-facing names (properties and invokables) match the legacy HeaderController;
@@ -112,4 +112,4 @@ private:
     int downloads_total_ = 0;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

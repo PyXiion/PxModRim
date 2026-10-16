@@ -10,7 +10,7 @@
 #include <QStringList>
 #include <QtGlobal>
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 inline constexpr qint64 ROOT_ID = 1;
 inline constexpr int MAX_DEPTH = 3;
@@ -114,4 +114,4 @@ inline QStringList clean_package_ids(const QStringList& package_ids) {
     return cleaned;
 }
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

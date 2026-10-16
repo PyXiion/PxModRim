@@ -4,7 +4,7 @@
 #include <QFileInfo>
 #include <spdlog/spdlog.h>
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 namespace {
 
@@ -113,4 +113,4 @@ SteamWorkshopModProvider::SteamWorkshopModProvider(QString workshopPath, QThread
     : DownloadedModProvider(QStringLiteral("steam"), std::move(workshopPath), pool,
                             metadataCache) {}
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

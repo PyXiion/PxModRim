@@ -12,9 +12,9 @@
 #include "core/providers/core.h"
 #include "core/providers/local.h"
 
-using namespace px::core::providers;
-using px::core::ListedModPtr;
-using px::core::Result;
+using namespace px::modrim::providers;
+using px::modrim::ListedModPtr;
+using px::modrim::Result;
 
 namespace {
 
@@ -72,10 +72,10 @@ public:
     int getCalls = 0;
     QList<CachedMod> stored;
 
-    QCoro::Task<px::core::providers::CacheLookup> get_mods(
+    QCoro::Task<px::modrim::providers::CacheLookup> get_mods(
         QList<ModCandidate> candidates, QString /*target_version*/) override {
         ++getCalls;
-        px::core::providers::CacheLookup lookup;
+        px::modrim::providers::CacheLookup lookup;
         if (serveCached) {
             lookup.cached.append(cachedMod);
         } else {
@@ -182,7 +182,7 @@ TEST_CASE("cached metadata is returned without parsing") {
 
     FakeCache cache;
     cache.serveCached = true;
-    cache.cachedMod = std::make_shared<px::core::AboutXmlMod>();
+    cache.cachedMod = std::make_shared<px::modrim::AboutXmlMod>();
     REQUIRE(cache.cachedMod->set_mod_path(plain));
 
     LocalModProvider provider(root.path(), nullptr, &cache);
@@ -218,7 +218,7 @@ TEST_CASE("force_reparse bypasses the cache lookup") {
 
     FakeCache cache;
     cache.serveCached = true;
-    cache.cachedMod = std::make_shared<px::core::AboutXmlMod>();
+    cache.cachedMod = std::make_shared<px::modrim::AboutXmlMod>();
 
     LocalModProvider provider(root.path(), nullptr, &cache);
     const auto discovered = runToCompletion(provider.discover(QStringLiteral("1.5"), nullptr,

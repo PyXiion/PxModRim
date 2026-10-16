@@ -4,7 +4,7 @@
 
 #include "core/models/metadata/structures.h"
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 using PackageId = CaseInsensitiveStr;
 
@@ -30,4 +30,4 @@ struct SortSettings {
     bool operator==(const SortSettings&) const = default;
 };
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

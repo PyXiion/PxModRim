@@ -7,7 +7,7 @@
 #include <QMap>
 #include <QString>
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 enum class Phase : std::uint8_t {
     Content,
@@ -34,4 +34,4 @@ Phase metric_phase(const QString& key);
 // Sums metric seconds per phase. Every phase is present, even when it has no metrics.
 PhaseTotals phase_totals(const QMap<QString, double>& metrics);
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

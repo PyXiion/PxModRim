@@ -8,7 +8,7 @@
 
 #include "core/error.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // Loads and parses an XML file into `doc`. Fails if the file is missing, unreadable, malformed,
 // or has no root element.
@@ -31,4 +31,4 @@ Result<glz::json_t> xmlFileToJson(const QString& path);
 // elementToJson). Fails unless `data` is an object with exactly one key.
 Result<void> appendJsonAsXml(pugi::xml_node parent, const glz::json_t& data);
 
-}  // namespace px::core
+}  // namespace px::modrim

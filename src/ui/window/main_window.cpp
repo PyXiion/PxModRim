@@ -53,7 +53,7 @@
 #include "ui/views/mods_view.h"
 #include "ui/window/menu_bar.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 UnsavedChangesDialog::UnsavedChangesDialog(QWidget* parent) : QMessageBox(parent) {
     setIcon(Question);
@@ -81,7 +81,7 @@ bool LaunchConfirmDialog::dontAskAgain() const { return checkBox()->isChecked();
 MainWindow::MainWindow(AppContext& app, QWidget* parent)
     : QMainWindow(parent), app_(app), ctx_(app.coreContext()),
       engine_(createQmlEngine(this)), saved_active_(ctx_.loadedActiveUuids()),
-      updates_(core::appVersion(), ctx_.network()) {
+      updates_(appVersion(), ctx_.network()) {
     setWindowTitle(QStringLiteral("PxModRim[*]"));
     setWindowIcon(QIcon(QStringLiteral(":/qt/qml/PxModRim/assets/logo.svg")));
     resize(1400, 850);
@@ -97,7 +97,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
         {"update_mods", actionSpec(ActionId::UpdateMods).tooltip()},
     };
     header_controller_ = new HeaderController(windowFlags().testFlag(Qt::FramelessWindowHint),
-        static_cast<int>(app_.uiPrefs().launch_strategy), core::appVersion(), tooltips,
+        static_cast<int>(app_.uiPrefs().launch_strategy), appVersion(), tooltips,
         ctx_.downloads().available(), this);
     header_ = new HeaderPanel(*header_controller_, engine_, this);
     setupActions();
@@ -118,7 +118,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
         if (windowHandle()) windowHandle()->startSystemMove();
     });
     connect(header_controller_, &HeaderController::strategyChanged, this, [this](int index) {
-        const auto strategy = static_cast<core::LaunchStrategy>(index);
+        const auto strategy = static_cast<LaunchStrategy>(index);
         if (app_.uiPrefs().launch_strategy != strategy) {
             app_.uiPrefs().launch_strategy = strategy;
             savePrefs();
@@ -175,7 +175,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
     }
     if (mods_view_) {
         selection_ = std::make_unique<ModSelectionPresenter>(ctx_, *mods_view_->mod_info);
-        connect(mods_view_, &ModsViewPanel::entry_selected, this, [this](const core::view::SidebarEntry& entry) {
+        connect(mods_view_, &ModsViewPanel::entry_selected, this, [this](const view::SidebarEntry& entry) {
             mods_view_->apply_sidebar_entry(entry);
         });
         connect(mods_view_, &ModsViewPanel::mod_selected, this, [this](const QString& uuid) { selectMod(uuid); });
@@ -204,7 +204,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
             actions_.at(ActionId::UpdateMods)->setEnabled(!busy);
             if (busy) header_controller_->setDownloadsProgress(QStringLiteral("Updating mods…"), 0, 0);
         });
-        download_progress_connection_ = downloads.download_progress.connect([this](const core::DownloadProgress& progress) {
+        download_progress_connection_ = downloads.download_progress.connect([this](const DownloadProgress& progress) {
             header_controller_->setDownloadsProgress(
                 QStringLiteral("Updating mods: %1 / %2 · %3 MB").arg(progress.completed).arg(progress.total)
                     .arg(progress.bytes_done / 1048576.0, 0, 'f', 0), progress.completed, progress.total);
@@ -255,7 +255,7 @@ void MainWindow::setupActions() {
     bind(ActionId::PrevView, [this] { cycleView(-1); });
     bind(ActionId::Fullscreen, [this] { isFullScreen() ? showNormal() : showFullScreen(); });
     bind(ActionId::ReportIssue, [] { QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/PyXiion/PxModRim/issues"))); });
-    bind(ActionId::OpenLogs, [] { QDesktopServices::openUrl(QUrl::fromLocalFile(QDir(core::config_dir()).filePath(QStringLiteral("logs")))); });
+    bind(ActionId::OpenLogs, [] { QDesktopServices::openUrl(QUrl::fromLocalFile(QDir(config_dir()).filePath(QStringLiteral("logs")))); });
     bind(ActionId::UploadLogs, [this] { uploadReport(); });
     bind(ActionId::Shortcuts, [this] { showShortcuts(); });
     bind(ActionId::CheckUpdates, [this] { checkUpdates(true); });
@@ -413,7 +413,7 @@ QCoro::Task<void> MainWindow::updateMods() {
     if (!result) toasts_->error(result.error().message);
 }
 
-void MainWindow::onDownloadsFinished(const core::DownloadResult& result) {
+void MainWindow::onDownloadsFinished(const DownloadResult& result) {
     const auto ok = result.succeeded.size(), failed = result.failed.size(), changed = result.changed.size();
     if (!ok && !failed) { toasts_->info(QStringLiteral("Download cancelled")); return; }
     const QString summary = QStringLiteral("%1 updated, %2 unchanged").arg(changed).arg(ok - changed);
@@ -501,7 +501,7 @@ QCoro::Task<bool> MainWindow::saveActiveMods() {
     co_return true;
 }
 
-QCoro::Task<bool> MainWindow::confirmLaunch(bool core::AppConfig::* setting, const QString& title,
+QCoro::Task<bool> MainWindow::confirmLaunch(bool AppConfig::* setting, const QString& title,
         const QString& text, const QString& info, const QString& accept) {
     const auto [result, dialog] = co_await awaitDialog<LaunchConfirmDialog>(this, title, text, info, accept);
     if (result != QMessageBox::Ok) co_return false;
@@ -525,13 +525,13 @@ QCoro::Task<void> MainWindow::launchGame() {
     if (!guard || closing_) co_return;
     const int errors = ctx_.diagnosticsService().active_error_count();
     const auto abort = [this] { header_controller_->setLaunchState(QStringLiteral("idle")); };
-    if (running && !co_await confirmLaunch(&core::AppConfig::launch_confirm_running,
+    if (running && !co_await confirmLaunch(&AppConfig::launch_confirm_running,
             QStringLiteral("Game Already Running"), QStringLiteral("RimWorld is already running."),
             QStringLiteral("A second copy can overwrite the first one's saves and settings."), QStringLiteral("Launch Anyway"))) { abort(); co_return; }
-    if (config.launch_confirm_errors && errors > 0 && !co_await confirmLaunch(&core::AppConfig::launch_confirm_errors,
+    if (config.launch_confirm_errors && errors > 0 && !co_await confirmLaunch(&AppConfig::launch_confirm_errors,
             QStringLiteral("Mod List Has Errors"), QStringLiteral("%1 active mod(s) have errors.").arg(errors),
             QStringLiteral("Missing dependencies or wrong load order can crash the game."), QStringLiteral("Launch Anyway"))) { abort(); co_return; }
-    if (config.launch_confirm_unsaved && unsaved_ && !co_await confirmLaunch(&core::AppConfig::launch_confirm_unsaved,
+    if (config.launch_confirm_unsaved && unsaved_ && !co_await confirmLaunch(&AppConfig::launch_confirm_unsaved,
             QStringLiteral("Unsaved Changes"), QStringLiteral("The active mod list has unsaved changes."),
             QStringLiteral("The list is saved to ModsConfig.xml before the game starts."), QStringLiteral("Save and Launch"))) { abort(); co_return; }
     if (!co_await writeActiveLayout()) toasts_->warning(QStringLiteral("Config folder not set — mod list won't be saved"));
@@ -546,13 +546,13 @@ QCoro::Task<void> MainWindow::launchGame() {
     }
     if (!guard || closing_) co_return;
     header_controller_->setLaunchState(QStringLiteral("running"));
-    if (after == core::AfterLaunch::Close && !unsaved_) { close_confirmed_ = true; close(); co_return; }
-    if (after == core::AfterLaunch::Minimize) showMinimized();
+    if (after == AfterLaunch::Close && !unsaved_) { close_confirmed_ = true; close(); co_return; }
+    if (after == AfterLaunch::Minimize) showMinimized();
     const auto code = co_await launcher.wait_for_exit();
     if (!guard || closing_) co_return;
     if (code && *code) toasts_->warning(QStringLiteral("Game exited with code %1").arg(*code));
     else toasts_->info(QStringLiteral("Game closed"));
-    if (after == core::AfterLaunch::Minimize) { showNormal(); activateWindow(); }
+    if (after == AfterLaunch::Minimize) { showNormal(); activateWindow(); }
     abort();
 }
 
@@ -571,4 +571,4 @@ QCoro::Task<void> MainWindow::requestMod(QString uuid) {
     if (!mods_view_->mod_list->select_uuid(uuid)) co_await selectMod(std::move(uuid));
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

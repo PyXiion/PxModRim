@@ -6,7 +6,7 @@
 #include <QPair>
 #include <QString>
 
-namespace px::ui {
+namespace px::modrim {
 
 using CheckedDownloads = QList<QPair<QString, QString>>;
 
@@ -32,4 +32,4 @@ private:
     QList<Item> items_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

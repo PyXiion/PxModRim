@@ -2,7 +2,7 @@
 
 #include "ui/context.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 class DownloadsUiPlugin final : public UiPlugin {
 public:
@@ -10,4 +10,4 @@ public:
     void setup(AppContext& ctx) override;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

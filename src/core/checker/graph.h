@@ -13,7 +13,7 @@
 #include "core/sort/config.h"
 #include "core/sort/models.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 enum class EdgeType : std::uint8_t {
     Dependency,
@@ -108,4 +108,4 @@ private:
     std::optional<QList<QList<PackageId>>> cycle_components_;
 };
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

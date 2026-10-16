@@ -8,13 +8,13 @@
 #include "core/models/metadata/structures.h"
 #include "core/models/view/diagnostics.h"
 
-namespace px::core { class DiagnosticsService; }
-namespace px::ui {
+namespace px::modrim { class DiagnosticsService; }
+namespace px::modrim {
 QString provider_label(const QString& provider_id, const QString& package_id = {});
 QString section_name(bool checked, int active_count, int inactive_count);
 
 struct ModItem {
-    core::ListedModPtr mod;
+    ListedModPtr mod;
     QString uuid;
     bool checked = false;
     QString provider_color;
@@ -35,7 +35,7 @@ public:
     };
     Q_ENUM(Role)
     explicit ModListModel(QHash<QString, QString> provider_colors = {},
-                          core::DiagnosticsService* diagnostics = nullptr, QObject* parent = nullptr);
+                          DiagnosticsService* diagnostics = nullptr, QObject* parent = nullptr);
     ~ModListModel() override;
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
@@ -43,7 +43,7 @@ public:
     Qt::ItemFlags flags(const QModelIndex& index) const override;
     QHash<int, QByteArray> roleNames() const override;
     void update_provider_colors(QHash<QString, QString> colors);
-    void load_mods(const QHash<QString, core::ListedModPtr>& mods, const QStringList& active_uuids);
+    void load_mods(const QHash<QString, ListedModPtr>& mods, const QStringList& active_uuids);
     QStringList active_uuids() const;
     int active_count() const { return active_count_; }
     const ModItem* get_item(int row) const;
@@ -58,13 +58,13 @@ signals:
     void active_count_changed();
 private:
     QList<int> update_load_indices();
-    ModItem make_item(const QString& uuid, core::ListedModPtr mod, bool checked) const;
-    void diagnostics_changed(const QHash<QString, core::view::ModDiagnosticsView>& summaries);
+    ModItem make_item(const QString& uuid, ListedModPtr mod, bool checked) const;
+    void diagnostics_changed(const QHash<QString, view::ModDiagnosticsView>& summaries);
     QHash<QString, QString> provider_colors_;
     QList<ModItem> items_;
     int active_count_ = 0;
-    core::DiagnosticsService* diagnostics_;
+    DiagnosticsService* diagnostics_;
     std::uint64_t diagnostics_connection_ = 0;
-    QHash<QString, core::view::ModDiagnosticsView> last_diagnostics_;
+    QHash<QString, view::ModDiagnosticsView> last_diagnostics_;
 };
 }

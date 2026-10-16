@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace px::ui {
+namespace px::modrim {
 QString escape_html(const QString& text) {
     QString out = text.toHtmlEscaped();
     return out.replace('\'', QStringLiteral("&#x27;"));

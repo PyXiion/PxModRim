@@ -8,8 +8,8 @@
 #include "ui/panels/mod_info_data.h"
 #include "ui/plugins/workshop/models.h"
 
-using namespace px::core::workshop;
-using namespace px::ui::workshop;
+using namespace px::modrim::workshop;
+using namespace px::modrim::workshop;
 
 namespace {
 CatalogMod mod(std::string id = "1") {
@@ -121,7 +121,7 @@ TEST_CASE("workshop mod rows preserve state sizes versions descriptions and comp
     REQUIRE(row.value("fileSize").toString() == "1.0 MB");
     REQUIRE(row.value("description").toString().isEmpty());
     REQUIRE(item_row(value, missing, "1.5", true).value("description").toString()
-            == px::ui::description_to_html(QString::fromStdString(value.description), "bbcode"));
+            == px::modrim::description_to_html(QString::fromStdString(value.description), "bbcode"));
     value.supported_versions = {"1.5", "1.10", "1.2", "1.5", "1.2.1"};
     value.tags = {"Mod", "1.5", "Utility", "1.10", "1.2", "1.2.1"};
     row = item_row(value, missing, "1.5");
@@ -193,7 +193,7 @@ TEST_CASE("workshop collection rows select previews filter collage and display s
     REQUIRE(row.value("sourceLabel").toString() == "PxModRim pick");
     REQUIRE(row.value("actionLabel").toString() == "Download all");
     REQUIRE(row.value("memberCount").toInt() == 1);
-    REQUIRE(row.value("description").toString() == px::ui::description_to_html("[b]Description[/b]", "text"));
+    REQUIRE(row.value("description").toString() == px::modrim::description_to_html("[b]Description[/b]", "text"));
     value.total_size = "3145728";
     value.preview_url = "https://images.test/explicit.png";
     value.source = CollectionSource::steam;

@@ -9,7 +9,7 @@
 
 #include "core/file_io.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -157,4 +157,4 @@ Result<void> ensure_schema(QSqlDatabase& db, const QString& schema_sql, int sche
     return {};
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

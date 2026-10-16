@@ -12,31 +12,31 @@
 #include "core/downloads/manager.h"
 #include "ui/panels/mod_info_data.h"
 
-namespace px::ui {
+namespace px::modrim {
 namespace {
 
-std::shared_ptr<core::AboutXmlMod> make_mod(const QString& name, const QString& pid) {
-    auto mod = std::make_shared<core::AboutXmlMod>();
+std::shared_ptr<AboutXmlMod> make_mod(const QString& name, const QString& pid) {
+    auto mod = std::make_shared<AboutXmlMod>();
     mod->name = name;
-    mod->package_id = core::CaseInsensitiveStr(pid);
+    mod->package_id = CaseInsensitiveStr(pid);
     mod->description.clear();
     return mod;
 }
 
-void add_dependency(core::AboutXmlMod& mod, const QString& pid,
+void add_dependency(AboutXmlMod& mod, const QString& pid,
                     const QStringList& alternatives = {}) {
-    core::DependencyMod dependency;
+    DependencyMod dependency;
     dependency.name = pid;
-    dependency.package_id = core::CaseInsensitiveStr(pid);
-    dependency.alternative_package_ids = core::CaseInsensitiveSet(alternatives);
+    dependency.package_id = CaseInsensitiveStr(pid);
+    dependency.alternative_package_ids = CaseInsensitiveSet(alternatives);
     mod.about_rules.dependencies.append(std::move(dependency));
 }
 
 struct ModInfoContext {
     QTemporaryDir game;
-    std::unique_ptr<core::CoreContext> ctx;
+    std::unique_ptr<CoreContext> ctx;
 
-    ModInfoContext(const QList<core::ListedModPtr>& mods, QStringList active) {
+    ModInfoContext(const QList<ListedModPtr>& mods, QStringList active) {
         if (!QCoreApplication::instance()) {
             if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) qputenv("QT_QPA_PLATFORM", "offscreen");
             static int argc = 1;
@@ -49,12 +49,12 @@ struct ModInfoContext {
         REQUIRE(version.open(QIODevice::WriteOnly));
         REQUIRE(version.write("1.5.4297") == 8);
         version.close();
-        core::AppConfig config;
+        AppConfig config;
         config.paths.game = game.path().toStdString();
         ctx = px::ui_test::makeCore(config);
         // CoreContext registers the real, empty DownloadManager during construction.
         REQUIRE_FALSE(ctx->downloads().available());
-        QHash<QString, core::ListedModPtr> indexed;
+        QHash<QString, ListedModPtr> indexed;
         for (const auto& mod : mods) indexed.insert(mod->uuid(), mod);
         ctx->load(std::move(indexed), std::move(active));
     }
@@ -184,7 +184,7 @@ TEST_CASE("Mod info conflicts include only active mods sorted by name", "[ui][mo
     auto alpha = make_mod("Alpha", "x.a");
     auto off = make_mod("Off", "x.off");
     auto main = make_mod("Main", "x.main");
-    main->about_rules.incompatible_with = core::CaseInsensitiveSet(
+    main->about_rules.incompatible_with = CaseInsensitiveSet(
         QStringList{"X.B", "x.a", "x.off", "x.no"});
     ModInfoContext context({main, alpha, beta, off}, {alpha->uuid(), beta->uuid()});
     CHECK(build_mod_info(*context.ctx, *main, {}).value("conflicts").toStringList() ==
@@ -214,7 +214,7 @@ TEST_CASE("Mod info builds active mod status issues dependencies and description
     main->authors = {"Ann"};
     auto other = make_mod("Other", "o.other");
     ModInfoContext context({dep, main, other}, {other->uuid(), main->uuid()});
-    const core::view::ModIssueView issue{"c", "Cat", std::nullopt, false};
+    const view::ModIssueView issue{"c", "Cat", std::nullopt, false};
     const auto info = build_mod_info(*context.ctx, *main, {issue});
     CHECK(info.value("name").toString() == "Main");
     CHECK(info.value("author").toString() == "Ann");
@@ -268,4 +268,4 @@ TEST_CASE("Mod info age formatting has deterministic boundaries and plurals", "[
     }
 }
 
-} // namespace px::ui
+} // namespace px::modrim

@@ -7,7 +7,7 @@
 class QQmlEngine;
 class QQuickWidget;
 
-namespace px::ui {
+namespace px::modrim {
 
 class DownloadSidebar final : public QWidget {
     Q_OBJECT
@@ -30,4 +30,4 @@ private:
     QQuickWidget* qml_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

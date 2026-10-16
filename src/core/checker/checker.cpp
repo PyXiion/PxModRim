@@ -5,7 +5,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 namespace {
 
 ModDiagnostics compose(const std::vector<QList<ModIssue>>& per_checker) {
@@ -287,4 +287,4 @@ void ModChecker::emit_diagnostics() const {
     on_diagnostics_changed_(by_uuid);
 }
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

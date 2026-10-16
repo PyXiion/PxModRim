@@ -6,7 +6,7 @@
 
 #include "core/xml.h"
 
-using namespace px::core;
+using namespace px::modrim;
 
 namespace {
 

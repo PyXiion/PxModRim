@@ -9,7 +9,7 @@
 
 #include "core/checker/models.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 class ModIssueChecker {
 public:
@@ -94,4 +94,4 @@ public:
     QList<ModIssue> check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
 };
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

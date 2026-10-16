@@ -17,7 +17,7 @@
 #include "core/services/metadata_cache.h"
 #include "core/services/startup_impact_service/service.h"
 
-namespace px::core {
+namespace px::modrim {
 
 class CoreContext;
 
@@ -74,4 +74,4 @@ private:
     mutable QMutex save_mutex_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

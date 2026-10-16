@@ -18,7 +18,7 @@
 #include "core/sort/config.h"
 #include "core/sort/models.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 // Diagnostics with at least one issue, keyed by mod uuid.
 using DiagnosticsByUuid = QHash<QString, ModDiagnostics>;
@@ -101,4 +101,4 @@ private:
     std::optional<CheckerResults> checker_results_;
 };
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

@@ -10,7 +10,7 @@
 #include "core/services/startup_impact_service/parser.h"
 #include "../../test_support.h"
 
-using namespace px::core::startup_impact;
+using namespace px::modrim::startup_impact;
 using Catch::Matchers::WithinAbs;
 using test_support::write_bytes;
 

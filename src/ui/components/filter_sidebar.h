@@ -1,7 +1,7 @@
 #pragma once
 #include <QQuickWidget>
 class QAbstractItemModel;
-namespace px::ui {
+namespace px::modrim {
 class FilterSidebar : public QQuickWidget {
     Q_OBJECT
 public:

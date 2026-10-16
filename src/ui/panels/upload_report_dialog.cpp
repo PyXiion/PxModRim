@@ -16,7 +16,7 @@
 #include "ui/components/dialogs.h"
 #include "ui/context.h"
 
-namespace px::ui {
+namespace px::modrim {
 UploadConfirmDialog::UploadConfirmDialog(QWidget* parent) : QDialog(parent) {
     setObjectName(QStringLiteral("uploadConfirmDialog"));
     setWindowTitle(tr("Upload Log & System Info"));
@@ -102,7 +102,7 @@ QCoro::Task<void> saveReport(QWidget* parent, QString report, Notifier& toast) {
     const QStringList files = dialog->selectedFiles();
     if (result != QDialog::Accepted || files.isEmpty()) co_return;
     const QString path = files.first();
-    const QString error = co_await core::providers::runOnPool<QString>(nullptr,
+    const QString error = co_await providers::runOnPool<QString>(nullptr,
         [path, report = std::move(report)] {
             QSaveFile file(path);
             if (!file.open(QIODevice::WriteOnly)) return file.errorString();
@@ -115,16 +115,16 @@ QCoro::Task<void> saveReport(QWidget* parent, QString report, Notifier& toast) {
 }
 }  // namespace
 
-QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, core::CoreContext& ctx,
+QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, CoreContext& ctx,
                                                         Notifier& toast) {
     QPointer<QWidget> owner(parent);
     auto [choice, dialog] = co_await awaitDialog<UploadConfirmDialog>(parent);
     Q_UNUSED(dialog);
     if (choice == static_cast<int>(UploadChoice::CANCEL)) co_return std::nullopt;
-    core::support::ReportSource source{ctx.gameVersion(), ctx.config().paths,
+    support::ReportSource source{ctx.gameVersion(), ctx.config().paths,
                                        ctx.allMods(), ctx.activeUuids()};
-    const QString report = co_await core::providers::runOnPool<QString>(nullptr,
-        [source = std::move(source)] { return core::support::build_report(source); });
+    const QString report = co_await providers::runOnPool<QString>(nullptr,
+        [source = std::move(source)] { return support::build_report(source); });
     if (parent && !owner) co_return std::nullopt;
     if (choice == static_cast<int>(UploadChoice::SAVE_TO_FILE)) {
         co_await saveReport(owner, report, toast);
@@ -132,8 +132,8 @@ QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, core::
     }
     toast.info(QObject::tr("Uploading log & system info…"), 2000);
     QString endpoint = QString::fromStdString(ctx.config().log_upload_endpoint);
-    if (endpoint.isEmpty()) endpoint = QString(core::support::DEFAULT_UPLOAD_ENDPOINT);
-    core::support::PasteUploader uploader(ctx.network(), std::move(endpoint));
+    if (endpoint.isEmpty()) endpoint = QString(support::DEFAULT_UPLOAD_ENDPOINT);
+    support::PasteUploader uploader(ctx.network(), std::move(endpoint));
     auto uploaded = co_await uploader.upload(report);
     if (parent && !owner) co_return std::nullopt;
     if (!uploaded) {
@@ -146,4 +146,4 @@ QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, core::
     toast.success(QObject::tr("Link copied: %1").arg(*uploaded), 5000);
     co_return *uploaded;
 }
-}  // namespace px::ui
+}  // namespace px::modrim

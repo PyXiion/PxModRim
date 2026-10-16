@@ -5,9 +5,9 @@
 #include "ui/models/mod_list_model.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 namespace {
-using namespace core::organizer;
+using namespace organizer;
 
 QString provider_icon(const QString& id) {
     if (id == "steam" || id == "downloaded") return QStringLiteral("steam");
@@ -39,7 +39,7 @@ std::unique_ptr<TreeNode> build(const FolderNode& root, const ModsByUuid& mods, 
                 const auto& mod = **it;
                 item->provider_id = mod.provider_id;
                 item->provider_label = provider_label(mod.provider_id, mod_package_id(mod).value_or(QString{}));
-                if (const auto* about = dynamic_cast<const core::AboutXmlMod*>(&mod))
+                if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod))
                     item->mod_version = about->mod_version;
             }
             parent->add(std::move(item));
@@ -106,7 +106,7 @@ QList<TreeNode*> TreeNode::walk() const {
     return result;
 }
 TreeNode::TreeNode(QString kind, QString key, TreeNode* parent,
-    const core::organizer::FolderNode* folder, const core::organizer::ModLeaf* leaf,
+    const organizer::FolderNode* folder, const organizer::ModLeaf* leaf,
     QString provider_id)
     : kind(std::move(kind)), key(std::move(key)), parent(parent), folder(folder), leaf(leaf),
       provider_id(std::move(provider_id)) {}
@@ -115,7 +115,7 @@ TreeNode::TreeNode(QString kind, QString key, TreeNode* parent,
 qint64 TreeNode::folder_id() const {
     if (kind == "folder" && folder) return folder->folder.id;
     if (kind == "mod" && parent) return parent->folder_id();
-    return core::organizer::ROOT_ID;
+    return organizer::ROOT_ID;
 }
 
 bool TreeNode::is_container() const { return kind == "folder" || kind == "ungrouped"; }
@@ -212,10 +212,10 @@ QHash<int, QByteArray> ModTreeModel::roleNames() const {
 
 bool ModTreeModel::filtering() const { return filtering_; }
 
-void ModTreeModel::set_tree(const core::organizer::FolderNode& root,
-    const core::organizer::ModsByUuid& mods, const QHash<QString, QString>& provider_colors,
-    bool filtering, const QHash<qint64, core::organizer::Tag>& tags) {
-    auto payload = std::make_unique<core::organizer::FolderNode>(root);
+void ModTreeModel::set_tree(const organizer::FolderNode& root,
+    const organizer::ModsByUuid& mods, const QHash<QString, QString>& provider_colors,
+    bool filtering, const QHash<qint64, organizer::Tag>& tags) {
+    auto payload = std::make_unique<organizer::FolderNode>(root);
     auto fresh = build(*payload, mods, filtering);
     provider_colors_ = provider_colors;
     tag_rows_.clear();
@@ -312,4 +312,4 @@ void ModTreeModel::notify_selection(const QSet<QString>& changed) {
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

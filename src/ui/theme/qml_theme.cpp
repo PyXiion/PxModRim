@@ -8,7 +8,7 @@
 #include "ui/theme/constants.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -88,4 +88,4 @@ int Theme::sidebarWidth() const { return SIDEBAR_WIDTH; }
 QStringList Theme::logoVariants() const { return logo_variants_; }
 QString Theme::logoFileDataUri() const { return logo_data_uri_; }
 
-}  // namespace px::ui
+}  // namespace px::modrim

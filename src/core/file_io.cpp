@@ -5,7 +5,7 @@
 #include <QFileInfo>
 #include <QSaveFile>
 
-namespace px::core {
+namespace px::modrim {
 
 Result<std::string> read_file_bytes(const QString& path) {
     QFile file(path);
@@ -43,4 +43,4 @@ Result<void> copy_file_replacing(const QString& source, const QString& target) {
     return {};
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -11,7 +11,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/organizer/models.h"
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 // Discovered mods keyed by uuid.
 using ModsByUuid = QHash<QString, ListedModPtr>;
@@ -101,4 +101,4 @@ QList<TreeFilter> tree_filters(const ModsByUuid& mods, const QSet<QString>& acti
 FolderNode build_tree(const OrganizerState& state, const ModsByUuid& mods, const QSet<QString>& active,
                       const std::optional<TreeQuery>& query = std::nullopt);
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

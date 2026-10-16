@@ -6,7 +6,7 @@
 #include <QJsonValue>
 #include <QObject>
 
-namespace px::ui {
+namespace px::modrim {
 
 class SteamWorkshopUiPlugin;
 
@@ -23,5 +23,5 @@ private:
     SteamWorkshopUiPlugin& plugin_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim
 #endif

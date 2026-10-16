@@ -7,16 +7,16 @@
 class QQmlEngine;
 class QQuickWidget;
 class QLabel;
-namespace px::ui {
+namespace px::modrim {
 class ModInfoBanner;
 class StartupImpactDialog;
 class ModInfoPanel : public QWidget, public ModInfoSink {
     Q_OBJECT
 public:
-    ModInfoPanel(core::CoreContext& ctx, QQmlEngine* engine, UiPrefs& prefs, QWidget* parent = nullptr);
+    ModInfoPanel(CoreContext& ctx, QQmlEngine* engine, UiPrefs& prefs, QWidget* parent = nullptr);
     ~ModInfoPanel() override;
-    void showMod(const core::ListedMod& mod, const QList<core::view::ModIssueView>& issues) override;
-    void setIssues(const QList<core::view::ModIssueView>& issues);
+    void showMod(const ListedMod& mod, const QList<view::ModIssueView>& issues) override;
+    void setIssues(const QList<view::ModIssueView>& issues);
     void clear() override;
     QCoro::Task<void> setTimeAnalytics(const std::optional<QString>& pid, const QStringList& activePids) override;
 signals:
@@ -34,10 +34,10 @@ private:
     QCoro::Task<void> loadPreview(std::optional<QString> path, QString title, quint64 token);
     QCoro::Task<void> performUpdate(QString id);
     QCoro::Task<void> showStartupDetails();
-    core::CoreContext& ctx_;
+    CoreContext& ctx_;
     QQmlEngine* engine_;
     UiPrefs& prefs_;
-    core::ListedModPtr mod_;
+    ListedModPtr mod_;
     ModInfoBanner* banner_;
     QLabel* placeholder_;
     QQuickWidget* qml_;
@@ -47,6 +47,6 @@ private:
     std::optional<QString> startupPid_;
     QStringList startupActivePids_;
     QPointer<StartupImpactDialog> startupDialog_;
-    core::Event<bool>::Id busyConnection_;
+    Event<bool>::Id busyConnection_;
 };
 }

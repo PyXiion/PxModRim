@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 FavouriteCollections::FavouriteCollections(ConfigService* service)
     : config_(service, QStringLiteral("workshop_favourites")) {
@@ -57,4 +57,4 @@ void FavouriteCollections::save(std::vector<CatalogCollection> collections) {
     config_.update(FavouritesState{std::move(collections)});
 }
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop

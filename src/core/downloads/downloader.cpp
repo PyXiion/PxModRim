@@ -4,7 +4,7 @@
 
 #include "core/downloads/manager.h"
 
-namespace px::core {
+namespace px::modrim {
 
 Downloader::Downloader(QString name, QString label, DownloadManager& manager)
     : Plugin(std::move(name), QStringList{kDownloadsManagerName}),
@@ -28,4 +28,4 @@ QStringList Downloader::updatable_ids(const QList<ListedModPtr>& mods) const {
     return ids;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

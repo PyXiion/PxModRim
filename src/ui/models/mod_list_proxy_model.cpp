@@ -1,7 +1,7 @@
 #include "ui/models/mod_list_proxy_model.h"
 #include <algorithm>
 #include <utility>
-namespace px::ui {
+namespace px::modrim {
 ModListProxyModel::ModListProxyModel(ModListModel* source, QObject* parent) : QAbstractListModel(parent), source_(source) {
     connect(source_, &QAbstractItemModel::dataChanged, this, &ModListProxyModel::source_data_changed);
     connect(source_, &QAbstractItemModel::layoutChanged, this, [this] { if (!in_proxy_move_) layout_rebuild(); });
@@ -19,7 +19,7 @@ void ModListProxyModel::rebuild_source_mapping() {
 bool ModListProxyModel::accept_item(const ModItem& item) const {
     if (sidebar_uuids_ && !sidebar_uuids_->contains(item.uuid)) return false;
     if (search_text_.isEmpty() || item.mod->name.trimmed().toCaseFolded().contains(search_text_)) return true;
-    const auto* about = dynamic_cast<const core::AboutXmlMod*>(item.mod.get());
+    const auto* about = dynamic_cast<const AboutXmlMod*>(item.mod.get());
     return about && about->package_id.str().trimmed().toCaseFolded().contains(search_text_);
 }
 void ModListProxyModel::rebuild() {

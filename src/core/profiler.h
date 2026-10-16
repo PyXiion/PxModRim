@@ -7,7 +7,7 @@
 #include <QAnyStringView>
 #include <QString>
 
-namespace px::core {
+namespace px::modrim {
 
 // Hierarchical wall-clock timer. Scopes nest according to their lifetimes; `render()` prints
 // the resulting tree.
@@ -67,4 +67,4 @@ private:
     std::unique_ptr<Profiler::Scope> scope_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

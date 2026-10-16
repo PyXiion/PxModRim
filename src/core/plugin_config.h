@@ -13,7 +13,7 @@
 #include "core/config.h"
 #include "core/events.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // A plugin's own settings, kept in plugins/<name>.json. `legacy` maps keys of
 // the old shared config.json to fields of T; they seed the file the first time
@@ -107,4 +107,4 @@ void PluginConfig<T>::store(const T& value) const {
     }
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

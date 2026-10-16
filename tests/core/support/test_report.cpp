@@ -18,9 +18,9 @@
 #include "core/support/report.h"
 #include "core/version.h"
 
-using namespace px::core;
-using namespace px::core::support;
-using px::core::Result;
+using namespace px::modrim;
+using namespace px::modrim::support;
+using px::modrim::Result;
 using test_support::TestApplication;
 using test_support::write_bytes;
 

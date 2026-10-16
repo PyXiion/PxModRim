@@ -6,7 +6,7 @@
 
 #include "core/services/startup_impact_service/models.h"
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 // The report lives next to the game's config folder, not inside it.
 QString get_startup_impact_path(const QString& config_folder);
@@ -15,4 +15,4 @@ QString get_startup_impact_path(const QString& config_folder);
 // or not a JSON object. Malformed entries are skipped rather than failing the whole report.
 std::optional<StartupImpactReport> parse_startup_impact(const QString& path);
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

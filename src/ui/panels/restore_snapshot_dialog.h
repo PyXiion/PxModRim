@@ -15,7 +15,7 @@ class QListWidget;
 class QListWidgetItem;
 class QPushButton;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Lists saved mod lists (ModsConfig snapshots, in the order given, newest first) and
 // lets the user pick one to restore. Snapshots that cannot be parsed are listed but
@@ -36,7 +36,7 @@ private slots:
 private:
     struct Snapshot {
         QString path;
-        std::optional<core::ModsConfig> parsed;
+        std::optional<ModsConfig> parsed;
     };
 
     void populateList();
@@ -54,4 +54,4 @@ public:
     explicit ConfirmRestoreDialog(const QString& snapshotName, QWidget* parent = nullptr);
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

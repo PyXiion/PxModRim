@@ -18,8 +18,8 @@
 #include <QQuickWidget>
 #include <QVBoxLayout>
 #include <utility>
-namespace px::ui {
-ModListPanel::ModListPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent)
+namespace px::modrim {
+ModListPanel::ModListPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent)
     : QWidget(parent), ctx_(ctx), model_(new ModListModel({}, &ctx.diagnosticsService(), this)),
       proxy_(new ModListProxyModel(model_, this)), qml_(new QQuickWidget(engine, this)),
       compact_mode_(ctx.config().compact_mod_list), highlight_timer_(new QTimer(this)) {
@@ -56,7 +56,7 @@ ModListPanel::~ModListPanel() {
     // QML bindings refer to the models and panel during destruction.
     delete qml_;
 }
-void ModListPanel::load_mods(const QHash<QString, core::ListedModPtr>& mods, const QStringList& active) { model_->load_mods(mods,active); }
+void ModListPanel::load_mods(const QHash<QString, ListedModPtr>& mods, const QStringList& active) { model_->load_mods(mods,active); }
 QStringList ModListPanel::active_uuids() const { return model_->active_uuids(); }
 void ModListPanel::set_sidebar_filter(std::optional<QSet<QString>> uuids) { proxy_->set_sidebar_filter(std::move(uuids)); }
 void ModListPanel::set_search_filter(const QString& text) { proxy_->set_search_filter(text); }

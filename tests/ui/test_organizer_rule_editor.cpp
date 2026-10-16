@@ -23,9 +23,9 @@
 #include "../core/organizer/test_util.h"
 
 namespace {
-using namespace px::core;
-using namespace px::core::organizer;
-using namespace px::ui;
+using namespace px::modrim;
+using namespace px::modrim::organizer;
+using namespace px::modrim;
 using organizer_test::expect;
 using organizer_test::wait;
 

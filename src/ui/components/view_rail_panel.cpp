@@ -8,7 +8,7 @@
 #include "ui/theme/constants.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 ViewRailPanel::ViewRailPanel(const QVariantList& tabs, const QVariantList& helpEntries, QQmlEngine* engine,
                              QWidget* parent)
@@ -39,4 +39,4 @@ void ViewRailPanel::setCurrent(int index) {
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

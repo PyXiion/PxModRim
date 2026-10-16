@@ -15,7 +15,7 @@
 #include <unistd.h>
 #endif
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 namespace {
 
@@ -127,4 +127,4 @@ QCoro::Task<Result<QString>> GameLauncher::launch_steam() {
     co_return QStringLiteral("Launching via Steam...");
 }
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

@@ -2,17 +2,17 @@
 #include <QPersistentModelIndex>
 #include <QSignalSpy>
 #include "ui/models/mod_list_proxy_model.h"
-using namespace px::ui;
+using namespace px::modrim;
 namespace {
 struct ProxyFixture {
     ModListModel source;
     ModListProxyModel proxy{&source};
     ProxyFixture() {
-        QHash<QString,px::core::ListedModPtr> mods;
+        QHash<QString,px::modrim::ListedModPtr> mods;
         for (int i = 0; i < 5; ++i) {
-            auto mod = std::make_shared<px::core::AboutXmlMod>();
+            auto mod = std::make_shared<px::modrim::AboutXmlMod>();
             mod->name = QStringLiteral("Mod %1").arg(i);
-            mod->package_id = px::core::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(i));
+            mod->package_id = px::modrim::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(i));
             mods.insert(QStringLiteral("uuid-%1").arg(i),mod);
         }
         source.load_mods(mods,{"uuid-0","uuid-2"});
@@ -49,12 +49,12 @@ TEST_CASE("mod proxy search normalizes case whitespace package IDs and Unicode")
     f.proxy.set_search_filter("MOD 2"); CHECK(f.source_rows() == QList<int>{1});
     f.proxy.set_search_filter("zzzz"); CHECK(f.proxy.rowCount() == 0);
     f.proxy.set_search_filter(" \t \n "); CHECK(f.proxy.rowCount() == 5);
-    auto unicode = std::make_shared<px::core::AboutXmlMod>();
+    auto unicode = std::make_shared<px::modrim::AboutXmlMod>();
     unicode->name = QStringLiteral("Große Mod");
-    unicode->package_id = px::core::CaseInsensitiveStr(QStringLiteral("grosse.mod"));
-    auto padded = std::make_shared<px::core::AboutXmlMod>();
+    unicode->package_id = px::modrim::CaseInsensitiveStr(QStringLiteral("grosse.mod"));
+    auto padded = std::make_shared<px::modrim::AboutXmlMod>();
     padded->name = QStringLiteral("  Padded Mod  ");
-    padded->package_id = px::core::CaseInsensitiveStr(QStringLiteral("  padded.pkg  "));
+    padded->package_id = px::modrim::CaseInsensitiveStr(QStringLiteral("  padded.pkg  "));
     f.source.load_mods({{"u",unicode},{"p",padded}},{"u","p"});
     f.proxy.set_search_filter(QStringLiteral("  GROßE  ")); CHECK(f.source_rows() == QList<int>{0});
     f.proxy.set_search_filter("  padded.pkg  "); CHECK(f.source_rows() == QList<int>{1});
@@ -106,9 +106,9 @@ TEST_CASE("mod proxy clamped move stays inside the unfiltered active block") {
 }
 TEST_CASE("mod proxy emits data changes only after move completion") {
     ProxyFixture f;
-    f.source.load_mods({{"u0",std::make_shared<px::core::ListedMod>()},
-                        {"u1",std::make_shared<px::core::ListedMod>()},
-                        {"u2",std::make_shared<px::core::ListedMod>()}},{"u0","u1","u2"});
+    f.source.load_mods({{"u0",std::make_shared<px::modrim::ListedMod>()},
+                        {"u1",std::make_shared<px::modrim::ListedMod>()},
+                        {"u2",std::make_shared<px::modrim::ListedMod>()}},{"u0","u1","u2"});
     QStringList events;
     QObject::connect(&f.proxy,&QAbstractItemModel::rowsAboutToBeMoved,&f.proxy,[&] { events.append("begin"); });
     QObject::connect(&f.proxy,&QAbstractItemModel::rowsMoved,&f.proxy,[&] { events.append("end"); });

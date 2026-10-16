@@ -8,7 +8,7 @@
 class QObject;
 class QQmlEngine;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Serves named SVG icons to QML via image://icons/<name>?color=<hex>.
 // An unknown name renders an empty SVG, so the image is transparent.
@@ -23,4 +23,4 @@ public:
 // carries the `icons` provider, so image://icons/… URLs resolve.
 QQmlEngine* createQmlEngine(QObject* parent);
 
-}  // namespace px::ui
+}  // namespace px::modrim

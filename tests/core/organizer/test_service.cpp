@@ -14,8 +14,8 @@
 #include "core/organizer/service.h"
 #include "test_util.h"
 
-using namespace px::core;
-using namespace px::core::organizer;
+using namespace px::modrim;
+using namespace px::modrim::organizer;
 using organizer_test::expect;
 using organizer_test::expect_error;
 using organizer_test::wait;

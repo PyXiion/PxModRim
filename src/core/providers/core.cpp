@@ -4,7 +4,7 @@
 #include <QFileInfo>
 #include <spdlog/spdlog.h>
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 CoreModProvider::CoreModProvider(QString gamePath, MetadataCacheStore* metadataCache)
     : BaseModProvider(QStringLiteral("core"), QStringLiteral("#e67e22"), std::move(gamePath),
@@ -37,4 +37,4 @@ QCoro::Task<Result<ModMap>> CoreModProvider::discover(QString target_version, Pr
     co_return discovered;
 }
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

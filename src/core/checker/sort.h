@@ -11,7 +11,7 @@
 #include "core/sort/config.h"
 #include "core/sort/models.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 // Orders active mods by tier, then by dependencies and load-order constraints, breaking ties by
 // the tier config priority and then by package id. Mods caught in a cycle are appended at the
@@ -22,4 +22,4 @@ QList<PackageId> topological_sort(const QHash<PackageId, std::shared_ptr<AboutXm
                                   const sort::CommunityRules* community_rules = nullptr,
                                   Profiler* timer = nullptr);
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

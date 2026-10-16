@@ -9,7 +9,7 @@
 #include "core/plugin_config.h"
 #include "core/workshop/types.h"
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 // The persisted form, plugins/workshop_favourites.json.
 struct FavouritesState {
@@ -40,4 +40,4 @@ private:
     std::unordered_set<std::string> ids_;
 };
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop

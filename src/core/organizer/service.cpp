@@ -11,7 +11,7 @@
 #include "core/context.h"
 #include "core/organizer/defaults.h"
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 namespace {
 
 const QHash<QString, ListedModPtr> kEmptyMods;
@@ -586,4 +586,4 @@ QList<TreeFilter> OrganizerService::tree_filters() const {
     return organizer::tree_filters(all_mods(), active_set(), &state());
 }
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

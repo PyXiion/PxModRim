@@ -1,6 +1,6 @@
 #include "ui/models/sidebar_model.h"
 #include "ui/theme/palette.h"
-namespace px::ui {
+namespace px::modrim {
 SidebarModel::SidebarModel(QObject* parent) : QAbstractListModel(parent) {}
 int SidebarModel::rowCount(const QModelIndex& parent) const { return parent.isValid() ? 0 : static_cast<int>(items_.size()); }
 QVariant SidebarModel::data(const QModelIndex& index, int role) const {
@@ -21,8 +21,8 @@ QHash<int,QByteArray> SidebarModel::roleNames() const {
     return {{LabelRole,"filterLabel"},{CountRole,"count"},{BadgeBgRole,"badgeBg"},{BadgeFgRole,"badgeFg"},
         {IconRole,"iconName"},{IconColorRole,"iconColor"},{SectionRole,"sectionName"}};
 }
-SidebarItem SidebarModel::make_item(const core::view::SidebarEntry& entry) {
-    using Kind = core::view::SidebarEntry::Kind;
+SidebarItem SidebarModel::make_item(const view::SidebarEntry& entry) {
+    using Kind = view::SidebarEntry::Kind;
     SidebarItem item{entry,paletteValue(u"ELEVATE_4"),paletteValue(u"TEXT_MUTED"),QStringLiteral("grid"),paletteValue(u"TEXT_DIM"),QStringLiteral("Status")};
     switch (entry.kind) {
     case Kind::All: break;
@@ -45,12 +45,12 @@ SidebarItem SidebarModel::make_item(const core::view::SidebarEntry& entry) {
     }
     return item;
 }
-void SidebarModel::set_entries(const QList<core::view::SidebarEntry>& entries) {
+void SidebarModel::set_entries(const QList<view::SidebarEntry>& entries) {
     beginResetModel(); items_.clear(); items_.reserve(entries.size());
     for (const auto& entry : entries) items_.append(make_item(entry));
     endResetModel();
 }
-void SidebarModel::update_entries(const QList<core::view::SidebarEntry>& entries) {
+void SidebarModel::update_entries(const QList<view::SidebarEntry>& entries) {
     if (entries.size() != items_.size()) { set_entries(entries); return; }
     QSet<int> changed;
     for (int row = 0; row < entries.size(); ++row) {
@@ -67,7 +67,7 @@ void SidebarModel::update_entries(const QList<core::view::SidebarEntry>& entries
     }
     if (!changed.isEmpty() && !items_.isEmpty()) emit dataChanged(index(0), index(rowCount()-1), changed.values());
 }
-std::optional<core::view::SidebarEntry> SidebarModel::get_entry(int row) const {
+std::optional<view::SidebarEntry> SidebarModel::get_entry(int row) const {
     if (row < 0 || row >= items_.size()) return std::nullopt;
     return items_[row].entry;
 }

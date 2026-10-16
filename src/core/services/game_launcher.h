@@ -10,11 +10,11 @@
 #include "core/error.h"
 #include "core/services/game_process.h"
 
-namespace px::core {
+namespace px::modrim {
 class CoreContext;
 }
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 // Starts RimWorld directly or through Steam, and tracks the game until it exits.
 class GameLauncher {
@@ -44,4 +44,4 @@ private:
     GameProcessMonitor monitor_;
 };
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

@@ -13,8 +13,8 @@
 #include "core/services/update_service.h"
 #include "services_support.h"
 
-using namespace px::core;
-using namespace px::core::services;
+using namespace px::modrim;
+using namespace px::modrim::services;
 using services_test::EventLoop;
 using services_test::run_async;
 

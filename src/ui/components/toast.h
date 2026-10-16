@@ -9,7 +9,7 @@ class QGraphicsOpacityEffect;
 class QPropertyAnimation;
 class QVBoxLayout;
 
-namespace px::ui {
+namespace px::modrim {
 
 enum class ToastLevel { Info, Success, Warning, Error };
 
@@ -57,4 +57,4 @@ private:
     QVBoxLayout* layout_ = nullptr;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

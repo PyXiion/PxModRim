@@ -8,7 +8,7 @@
 #include "core/constants.h"
 #include "core/utils.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -218,4 +218,4 @@ std::optional<QString> AboutXmlMod::get_dlc_name() const {
     return std::nullopt;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

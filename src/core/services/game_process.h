@@ -15,7 +15,7 @@
 
 #include "core/error.h"
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 enum class Platform {
     Linux,
@@ -119,4 +119,4 @@ private:
     std::unique_ptr<QProcess> proc_;
 };
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

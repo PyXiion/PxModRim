@@ -17,7 +17,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/plugin.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // The one download entry point for the UI; routes to registered downloaders.
 // With no downloader registered nothing is updatable and `available()` is false,
@@ -65,4 +65,4 @@ private:
     bool cancelled_ = false;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

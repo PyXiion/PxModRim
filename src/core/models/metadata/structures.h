@@ -18,7 +18,7 @@
 
 #include "core/error.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // Package id that compares and hashes without regard to case. Stored lowercased.
 class CaseInsensitiveStr {
@@ -266,23 +266,23 @@ struct WorkshopUpdateResult {
     QStringList errors;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim
 
 // Package ids are JSON strings on the wire.
 template <>
-struct glz::to<glz::JSON, px::core::CaseInsensitiveStr> {
+struct glz::to<glz::JSON, px::modrim::CaseInsensitiveStr> {
     template <auto Opts>
-    static void op(const px::core::CaseInsensitiveStr& value, auto&& ctx, auto&& b, auto&& ix) {
+    static void op(const px::modrim::CaseInsensitiveStr& value, auto&& ctx, auto&& b, auto&& ix) {
         glz::to<glz::JSON, std::string>::template op<Opts>(value.str().toStdString(), ctx, b, ix);
     }
 };
 
 template <>
-struct glz::from<glz::JSON, px::core::CaseInsensitiveStr> {
+struct glz::from<glz::JSON, px::modrim::CaseInsensitiveStr> {
     template <auto Opts>
-    static void op(px::core::CaseInsensitiveStr& value, auto&& ctx, auto&& it, auto&& end) {
+    static void op(px::modrim::CaseInsensitiveStr& value, auto&& ctx, auto&& it, auto&& end) {
         std::string text;
         glz::from<glz::JSON, std::string>::template op<Opts>(text, ctx, it, end);
-        value = px::core::CaseInsensitiveStr(QString::fromStdString(text));
+        value = px::modrim::CaseInsensitiveStr(QString::fromStdString(text));
     }
 };

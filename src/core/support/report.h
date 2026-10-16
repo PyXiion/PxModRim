@@ -15,7 +15,7 @@
 
 class QNetworkAccessManager;
 
-namespace px::core::support {
+namespace px::modrim::support {
 
 inline constexpr qint64 MAX_LOG_BYTES = 2 * 1024 * 1024;
 inline constexpr QLatin1StringView DEFAULT_UPLOAD_ENDPOINT{"https://paste.rs/"};
@@ -63,4 +63,4 @@ private:
     std::chrono::milliseconds timeout_;
 };
 
-}  // namespace px::core::support
+}  // namespace px::modrim::support

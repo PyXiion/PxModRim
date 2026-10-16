@@ -15,7 +15,7 @@
 
 #include "ui/components/dialog_chrome.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 // Resumes from inside `finished` itself. A queued resume could run after the dialog, and the
 // window owning it, are gone; the coroutine must not outlive the emission.
@@ -57,4 +57,4 @@ QCoro::Task<std::pair<int, T*>> awaitDialog(Args&&... args) {
     co_return std::pair<int, T*>{code, dialog};
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

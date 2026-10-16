@@ -5,9 +5,9 @@
 
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
-BaseViewPanel::BaseViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+BaseViewPanel::BaseViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
     : RailView(ctx, engine, parent, app) {
     setAutoFillBackground(true);
     root_ = new QVBoxLayout(this);
@@ -22,4 +22,4 @@ void BaseViewPanel::setClearColor(const QString& color) {
     setPalette(palette);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

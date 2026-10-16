@@ -9,7 +9,7 @@
 #include "core/error.h"
 #include "core/models/metadata/structures.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // Builds a mod for the directory `path`, parsing its About.xml (found automatically, or the
 // explicit `aboutXmlPath`). Returns Err only when `path` is not a directory. A mod whose metadata
@@ -27,4 +27,4 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
                                                        const QString& targetVersion,
                                                        bool preferVersioned = true);
 
-}  // namespace px::core
+}  // namespace px::modrim

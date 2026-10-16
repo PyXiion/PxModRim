@@ -5,7 +5,7 @@
 class QQmlEngine;
 class QWidget;
 
-namespace px::ui {
+namespace px::modrim {
 
 class HeaderController;
 
@@ -16,4 +16,4 @@ public:
     HeaderPanel(HeaderController& controller, QQmlEngine* engine, QWidget* parent = nullptr);
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

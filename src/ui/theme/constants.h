@@ -2,7 +2,7 @@
 
 #include <QEasingCurve>
 
-namespace px::ui {
+namespace px::modrim {
 
 // Animation
 inline constexpr int ACCORDION_ANIMATION_DURATION_MS = 200;
@@ -23,4 +23,4 @@ inline constexpr int SIDEBAR_WIDTH = 240;
 // Interaction
 inline constexpr int TOOLTIP_DELAY_MS = 400;
 
-}  // namespace px::ui
+}  // namespace px::modrim

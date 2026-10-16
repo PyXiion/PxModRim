@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "ui/panels/startup_impact_data.h"
-using namespace px::ui;
-using namespace px::core::startup_impact;
+using namespace px::modrim;
+using namespace px::modrim::startup_impact;
 namespace {
 StartupImpactReport report() {
     StartupImpactReport result;

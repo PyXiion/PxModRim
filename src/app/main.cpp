@@ -94,7 +94,7 @@ int smokeExitMs() {
 }
 
 // Shuts UI plugins down, then the core context. Used once the app has started.
-QCoro::Task<void> teardown(px::ui::AppContext& appContext, px::core::CoreContext& ctx) {
+QCoro::Task<void> teardown(px::modrim::AppContext& appContext, px::modrim::CoreContext& ctx) {
     if (auto shut = co_await appContext.shutdownAll(); !shut) {
         spdlog::error("Shutdown failed: {}", shut.error().message.toStdString());
     }
@@ -107,9 +107,9 @@ QCoro::Task<void> teardown(px::ui::AppContext& appContext, px::core::CoreContext
 QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
     spdlog::info("Starting PxModRim");
 
-    px::core::ConfigService configService(px::core::config_dir());
-    px::core::AppConfigService appConfigService(configService);
-    px::ui::UiPrefsService uiPrefsService(configService);
+    px::modrim::ConfigService configService(px::modrim::config_dir());
+    px::modrim::AppConfigService appConfigService(configService);
+    px::modrim::UiPrefsService uiPrefsService(configService);
 
     if (auto setup = co_await appConfigService.setup(); !setup) {
         spdlog::error("Failed to initialize configuration: {}", setup.error().message.toStdString());
@@ -120,13 +120,13 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
         co_return 1;
     }
 
-    px::core::AppConfig cfg = appConfigService.cfg();
+    px::modrim::AppConfig cfg = appConfigService.cfg();
     spdlog::info("Configuration loaded: game={}, local={}, workshop={}", cfg.paths.game, cfg.paths.local,
                  cfg.paths.workshop);
 
     if (cfg.paths.game.empty()) {
         spdlog::info("No game path in config, attempting auto-detect");
-        if (auto detected = px::core::detect_game_paths(); !detected.game.empty()) {
+        if (auto detected = px::modrim::detect_game_paths(); !detected.game.empty()) {
             cfg.paths = detected;
             if (auto saved = configService.save(QStringLiteral("config.json"), cfg); !saved) {
                 spdlog::warn("Cannot save detected game paths: {}", saved.error().message.toStdString());
@@ -135,13 +135,13 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
     }
 
     // Declared before the context, so it outlives the organizer service that holds it.
-    px::core::organizer::OrganizerDb organizerDb(px::core::organizer::db_path(configService.directory()));
-    auto ctx = px::core::CoreContext::create(cfg, &configService);
-    const QStringList downloaders = px::app::registerCorePlugins(*ctx, configService, organizerDb, disabled);
+    px::modrim::organizer::OrganizerDb organizerDb(px::modrim::organizer::db_path(configService.directory()));
+    auto ctx = px::modrim::CoreContext::create(cfg, &configService);
+    const QStringList downloaders = px::modrim::registerCorePlugins(*ctx, configService, organizerDb, disabled);
 
-    px::ui::AppContext appContext(*ctx, uiPrefsService.prefs());
-    px::app::PluginSelection selection{std::move(disabled), downloaders};
-    px::app::registerUiPlugins(appContext, selection);
+    px::modrim::AppContext appContext(*ctx, uiPrefsService.prefs());
+    px::modrim::PluginSelection selection{std::move(disabled), downloaders};
+    px::modrim::registerUiPlugins(appContext, selection);
 
     if (auto setup = appContext.setupAll(); !setup) {
         spdlog::error("Plugin setup failed: {}", setup.error().message.toStdString());
@@ -151,7 +151,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
     spdlog::info("Services initialized for game version {}", ctx->gameVersion().toStdString());
 
     // The window opens before mods load, as in the legacy app.
-    auto window = std::make_unique<px::ui::MainWindow>(appContext);
+    auto window = std::make_unique<px::modrim::MainWindow>(appContext);
     window->setAppQuitCallback([] { QCoreApplication::quit(); });
     window->show();
 
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
 
     QApplication qtApp(argc, argv);
     qtApp.setApplicationName(QStringLiteral("PxModRim"));
-    qtApp.setApplicationVersion(px::core::appVersion());
+    qtApp.setApplicationVersion(px::modrim::appVersion());
     qtApp.setOrganizationName(QStringLiteral("PxModRim"));
     qtApp.setApplicationDisplayName(QStringLiteral("PxModRim"));
     qtApp.setDesktopFileName(QStringLiteral("pxmodrim"));
@@ -195,10 +195,10 @@ int main(int argc, char* argv[]) {
     // The app quits when its run finishes, not when the last window closes.
     qtApp.setQuitOnLastWindowClosed(false);
     qtApp.styleHints()->setWheelScrollLines(kWheelScrollLines);
-    px::ui::applyAppTheme(qtApp);
-    qtApp.installEventFilter(new px::ui::QuickPopupParenting(&qtApp));
+    px::modrim::applyAppTheme(qtApp);
+    qtApp.installEventFilter(new px::modrim::QuickPopupParenting(&qtApp));
 
-    configureLogging(QDir(px::core::config_dir()).filePath(QStringLiteral("logs")));
+    configureLogging(QDir(px::modrim::config_dir()).filePath(QStringLiteral("logs")));
 
     if (const int smokeMs = smokeExitMs(); smokeMs > 0) {
         QTimer::singleShot(smokeMs, &qtApp, &QCoreApplication::quit);
@@ -206,7 +206,7 @@ int main(int argc, char* argv[]) {
 
     const QString manifest =
         QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("workshop-variant.txt"));
-    auto disabled = px::app::parseDisabledPlugins(qEnvironmentVariable("PX_DISABLED_PLUGINS"), manifest);
+    auto disabled = px::modrim::parseDisabledPlugins(qEnvironmentVariable("PX_DISABLED_PLUGINS"), manifest);
     if (!disabled) {
         spdlog::critical("{}", disabled.error().message.toStdString());
         return 1;

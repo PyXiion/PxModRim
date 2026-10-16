@@ -6,9 +6,9 @@
 
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
-DownloadsViewPanel::DownloadsViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+DownloadsViewPanel::DownloadsViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
     : BaseViewPanel(ctx, engine, parent, app), downloads_(ctx.downloads()), model_(new DownloadsModel(this)) {
     auto* qml = new QQuickWidget(engine, this);
     qml->setObjectName(QStringLiteral("downloadsView"));
@@ -22,10 +22,10 @@ DownloadsViewPanel::DownloadsViewPanel(core::CoreContext& ctx, QQmlEngine* engin
     batch_id_ = downloads_.batch_started.connect([this](const QStringList& ids) {
         model_->begin(ids, downloads_.names_by_id(ctx_.allMods().values()));
     });
-    status_id_ = downloads_.download_item_status_changed.connect([this](const core::DownloadItemStatus& status) { model_->apply(status); });
-    title_id_ = downloads_.download_item_titled.connect([this](const core::DownloadItemTitle& item) { model_->set_title(item); });
+    status_id_ = downloads_.download_item_status_changed.connect([this](const DownloadItemStatus& status) { model_->apply(status); });
+    title_id_ = downloads_.download_item_titled.connect([this](const DownloadItemTitle& item) { model_->set_title(item); });
     phase_id_ = downloads_.download_phase_changed.connect([this](const QString& phase) { model_->set_phase(phase); });
-    finished_id_ = downloads_.download_finished.connect([this](const core::DownloadResult& result) { model_->finish(result); });
+    finished_id_ = downloads_.download_finished.connect([this](const DownloadResult& result) { model_->finish(result); });
     busy_id_ = downloads_.busy_changed.connect([this](bool busy) { model_->set_busy(busy); });
 }
 
@@ -49,4 +49,4 @@ QCoro::Task<void> DownloadsViewPanel::retry_failed() {
     if (!result) spdlog::warn("downloads retry not started: {}", result.error().message.toStdString());
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

@@ -5,7 +5,7 @@
 
 #include "core/providers/labels.h"
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 namespace {
 
@@ -381,4 +381,4 @@ FolderNode build_tree(const OrganizerState& state, const ModsByUuid& mods, const
     return builder.build(state.folders.value(ROOT_ID), 0);
 }
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

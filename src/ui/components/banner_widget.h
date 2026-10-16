@@ -9,7 +9,7 @@
 class QPaintEvent;
 class QResizeEvent;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Fixed 16:9 banner (capped at max height) that crops the pixmap to fill it, with an optional
 // title and subtitle over a gradient at the bottom.
@@ -43,4 +43,4 @@ private:
     bool show_overlay_ = true;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

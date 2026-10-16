@@ -14,8 +14,8 @@
 #include "core/sort/config.h"
 #include "core/sort/models.h"
 
-using namespace px::core;
-using namespace px::core::checker;
+using namespace px::modrim;
+using namespace px::modrim::checker;
 
 namespace {
 

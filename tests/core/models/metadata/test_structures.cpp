@@ -5,11 +5,11 @@
 
 #include "core/models/metadata/structures.h"
 
-using px::core::AboutXmlMod;
-using px::core::CaseInsensitiveSet;
-using px::core::CaseInsensitiveStr;
-using px::core::ListedMod;
-using px::core::ModsConfig;
+using px::modrim::AboutXmlMod;
+using px::modrim::CaseInsensitiveSet;
+using px::modrim::CaseInsensitiveStr;
+using px::modrim::ListedMod;
+using px::modrim::ModsConfig;
 
 TEST_CASE("CaseInsensitiveStr stores the lowercased package id") {
     const CaseInsensitiveStr pid(QStringLiteral("Test.Mod.PackageId"));

@@ -11,7 +11,7 @@
 
 #include "core/providers/base.h"
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 // The cache database inside the config directory.
 QString metadata_cache_path(const QString& config_dir);
@@ -61,4 +61,4 @@ private:
     bool disabled_ = false;                   // worker thread only
 };
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

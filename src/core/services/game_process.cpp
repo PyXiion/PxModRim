@@ -36,7 +36,7 @@
 #include <vector>
 #endif
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 namespace {
 
@@ -450,4 +450,4 @@ QCoro::Task<std::optional<int>> GameProcessMonitor::wait_for_exit() {
     co_return code;
 }
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

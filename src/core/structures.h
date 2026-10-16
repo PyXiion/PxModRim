@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace px::core {
+namespace px::modrim {
 
 struct CollectionStats {
     std::int64_t total = 0;
@@ -11,4 +11,4 @@ struct CollectionStats {
     std::int64_t errors = 0;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

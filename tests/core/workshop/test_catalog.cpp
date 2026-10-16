@@ -30,8 +30,8 @@
 #include "core/workshop/types.h"
 #include "support.h"
 
-using namespace px::core;
-using namespace px::core::workshop;
+using namespace px::modrim;
+using namespace px::modrim::workshop;
 using test_support::TestApplication;
 using test_support::write_bytes;
 using workshop_test::FakeCatalog;

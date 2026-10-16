@@ -10,7 +10,7 @@
 #include "core/organizer/defaults.h"
 #include "core/organizer/models.h"
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 // The organizer database file inside the config directory.
 QString db_path(const QString& config_dir);
@@ -65,4 +65,4 @@ private:
     QThreadPool pool_;
 };
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

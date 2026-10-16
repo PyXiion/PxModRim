@@ -8,8 +8,8 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
-namespace px::ui {
-UpdateDialog::UpdateDialog(const core::services::ReleaseInfo& release,
+namespace px::modrim {
+UpdateDialog::UpdateDialog(const services::ReleaseInfo& release,
                            const QString& currentVersion, QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Update Available"));
     resize(560, 460);
@@ -49,4 +49,4 @@ UpdateDialog::UpdateDialog(const core::services::ReleaseInfo& release,
     buttons->addWidget(download);
     layout->addLayout(buttons);
 }
-}  // namespace px::ui
+}  // namespace px::modrim

@@ -35,13 +35,13 @@
 #include "ui/theme/constants.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
-using namespace core::organizer;
+namespace px::modrim {
+using namespace organizer;
 namespace {
 QString plural(qsizetype count, const QString& word) {
     return QStringLiteral("%1 %2%3").arg(count).arg(word, count == 1 ? QString{} : QStringLiteral("s"));
 }
-OrganizerService& organizer(core::CoreContext& ctx) {
+OrganizerService& organizerService(CoreContext& ctx) {
     auto* service = dynamic_cast<OrganizerService*>(ctx.plugins().get(QStringLiteral("organizer")));
     Q_ASSERT(service);
     return *service;
@@ -55,8 +55,8 @@ QPushButton* button(const QString& text, QWidget* parent, QHBoxLayout* layout) {
 }
 }
 
-OrganizerViewPanel::OrganizerViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
-    : BaseViewPanel(ctx, engine, parent, app), service_(organizer(ctx)),
+OrganizerViewPanel::OrganizerViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+    : BaseViewPanel(ctx, engine, parent, app), service_(organizerService(ctx)),
       model_(new ModTreeModel([&ctx](const QString& uuid) { return ctx.diagnosticsService().summary_for(uuid); }, this)),
       filters_(new OrganizerFilterModel(this)) {
     auto* content = new QWidget(this);
@@ -278,14 +278,14 @@ QVariantList OrganizerViewPanel::ruleFolders() const {
         result.append(QVariantMap{{QStringLiteral("id"), id}, {QStringLiteral("name"), name}});
     return result;
 }
-core::Result<QList<RuleSpec>> OrganizerViewPanel::ruleSpecs(const QVariantList& rows) const {
+Result<QList<RuleSpec>> OrganizerViewPanel::ruleSpecs(const QVariantList& rows) const {
     QList<RuleSpec> specs;
     specs.reserve(rows.size());
     for (const auto& value : rows) {
         const auto row = value.toMap();
         const auto field = parse_rule_field(row.value(QStringLiteral("field")).toString());
         const auto op = parse_rule_op(row.value(QStringLiteral("op")).toString());
-        if (!field || !op) return std::unexpected(core::Error{QStringLiteral("Invalid rule field or operator")});
+        if (!field || !op) return std::unexpected(Error{QStringLiteral("Invalid rule field or operator")});
         specs.append(RuleSpec{*field, *op, row.value(QStringLiteral("pattern")).toString(), row.value(QStringLiteral("folder_id")).toLongLong()});
     }
     return specs;
@@ -310,7 +310,7 @@ QCoro::Task<void> OrganizerViewPanel::calculateRulePreview(QVariantList rows, in
 void OrganizerViewPanel::setEditorError(QString message) {
     if (message != editor_error_) { editor_error_ = std::move(message); Q_EMIT editorChanged(); }
 }
-void OrganizerViewPanel::reportError(const core::Error& error) {
+void OrganizerViewPanel::reportError(const Error& error) {
     if (auto* toasts = app_.toasts()) toasts->error(error.message);
     else spdlog::warn("organizer: {}", error.message.toStdString());
 }
@@ -345,7 +345,7 @@ QCoro::Task<void> OrganizerViewPanel::mutateTag(QString operation, qint64 id, QS
         if (!result) { setEditorError(result.error().message); co_return; }
         Q_EMIT tagCreated();
     } else {
-        core::Result<void> result;
+        Result<void> result;
         if (operation == QStringLiteral("update")) result = co_await service_.update_tag(id, std::move(name), std::move(color));
         else if (operation == QStringLiteral("delete")) result = co_await service_.delete_tag(id);
         else result = co_await service_.set_mod_tags(selectedPackageIds(), add ? QSet<qint64>{id} : QSet<qint64>{}, add ? QSet<qint64>{} : QSet<qint64>{id});
@@ -436,7 +436,7 @@ QCoro::Task<void> OrganizerViewPanel::runSelectionAction(QString action) {
 QCoro::QmlTask OrganizerViewPanel::newFolder() { return editFolder(QStringLiteral("new")); }
 QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStringList pids) {
     const QPointer<OrganizerViewPanel> alive(this);
-    core::Result<void> result;
+    Result<void> result;
     if (action == QStringLiteral("new") || action == QStringLiteral("create") || action == QStringLiteral("rename")) {
         const bool rename = action == QStringLiteral("rename");
         const QString initial = rename ? service_.state().folders.value(id).name : QString{};
@@ -452,7 +452,7 @@ QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStr
         const auto name = dialog->textValue();
         if (rename) result = co_await service_.rename_folder(id, name);
         else {
-            core::Result<core::organizer::Folder> created;
+            Result<organizer::Folder> created;
             if (action == QStringLiteral("create")) created = co_await service_.create_folder_from(name, pids);
             else created = co_await service_.create_folder(name, id);
             if (!alive) co_return;
@@ -488,7 +488,7 @@ QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStr
 }
 QCoro::Task<void> OrganizerViewPanel::placeMods(QStringList pids, qint64 destination) {
     const QPointer<OrganizerViewPanel> alive(this);
-    core::Result<void> result;
+    Result<void> result;
     if (destination == ROOT_ID) result = co_await service_.ungroup(pids);
     else result = co_await service_.place(pids, destination);
     if (!alive) co_return;

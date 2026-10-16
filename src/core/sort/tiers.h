@@ -8,7 +8,7 @@
 #include "core/sort/config.h"
 #include "core/sort/models.h"
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 // Assigns each canonical id to a Tier from load order and dependency constraints. Ids outside
 // `canonical_ids` are never returned.
@@ -29,4 +29,4 @@ QSet<PackageId> get_reverse_deps_recursive(const PackageId& start, const Package
 // form a DAG. Edges leaving `nodes` are ignored.
 std::optional<QList<PackageId>> find_cycle(const QSet<PackageId>& nodes, const PackageGraph& deps);
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

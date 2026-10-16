@@ -1,6 +1,6 @@
 #include "ui/plugins/steam_workshop/download_queue_model.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 DownloadQueueModel::DownloadQueueModel(QObject* parent) : QAbstractListModel(parent) {}
 
@@ -48,4 +48,4 @@ void DownloadQueueModel::update_status(const QString& id, const QString& status,
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

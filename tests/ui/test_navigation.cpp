@@ -5,9 +5,9 @@
 
 #include "ui/navigation.h"
 
-using px::ui::Route;
-using px::ui::buildRoute;
-using px::ui::parseRoute;
+using px::modrim::Route;
+using px::modrim::buildRoute;
+using px::modrim::parseRoute;
 
 TEST_CASE("route round-trips ids with reserved characters") {
     const QString url = buildRoute(QStringLiteral("workshop"),

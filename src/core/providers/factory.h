@@ -8,7 +8,7 @@
 #include "core/config.h"
 #include "core/providers/base.h"
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 using ProviderList = std::vector<std::unique_ptr<BaseModProvider>>;
 
@@ -17,4 +17,4 @@ using ProviderList = std::vector<std::unique_ptr<BaseModProvider>>;
 // null uses the global pool.
 ProviderList create_providers(const PathConfig& paths, QThreadPool* pool = nullptr);
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

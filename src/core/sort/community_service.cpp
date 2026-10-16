@@ -19,7 +19,7 @@
 
 #include "core/file_io.h"
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 namespace {
 
@@ -211,4 +211,4 @@ Result<CommunityRules> CommunityRulesService::load_rules() const {
     return load_community_rules(json_path_);
 }
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

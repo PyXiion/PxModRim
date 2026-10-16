@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace px::core {
+namespace px::modrim {
 
 struct DownloadProgress {
     int total = 0;
@@ -35,4 +35,4 @@ struct DownloadResult {
     bool operator==(const DownloadResult&) const = default;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

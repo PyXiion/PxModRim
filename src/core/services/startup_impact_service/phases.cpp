@@ -8,7 +8,7 @@
 
 #include "core/services/startup_impact_service/labels.h"
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 namespace {
 
@@ -90,4 +90,4 @@ PhaseTotals phase_totals(const QMap<QString, double>& metrics) {
     return totals;
 }
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

@@ -4,16 +4,16 @@
 
 #include "core/constants.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 // Persisted UI state (ui_prefs.json). Field names are the JSON keys.
 struct UiPrefs {
     bool desc_expanded = false;
-    core::LaunchStrategy launch_strategy = core::LaunchStrategy::Direct;
+    LaunchStrategy launch_strategy = LaunchStrategy::Direct;
     std::string skipped_update_tag;
     bool rail_collapsed = false;
 
     bool operator==(const UiPrefs&) const = default;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

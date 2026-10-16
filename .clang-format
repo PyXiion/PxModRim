@@ -1,3 +1,35 @@
+---
+Language: Cpp
 BasedOnStyle: Google
-IndentWidth: 4
-ColumnLimit: 100
+Standard: c++20
+
+# Google puts everything in <> that has no dot into the "C++ standard library" group, which
+# would swallow every Qt header. Regroup explicitly: std, Qt, other libraries, then ours.
+# The header a .cpp implements stays first (priority 0 is automatic).
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<[a-z_0-9]+(\.h)?>$'
+    Priority: 1
+  - Regex: '^<Q'
+    Priority: 2
+  - Regex: '^<'
+    Priority: 3
+  - Regex: '^"'
+    Priority: 4
+
+StatementMacros:
+  - Q_OBJECT
+  - Q_GADGET
+  - Q_NAMESPACE
+  - Q_UNUSED
+  - QML_ELEMENT
+  - QML_ANONYMOUS
+  - QML_SINGLETON
+  - QML_UNCREATABLE
+  - QML_NAMED_ELEMENT
+  - Q_DISABLE_COPY
+  - Q_DISABLE_COPY_MOVE
+  - Q_INTERFACES
+ForEachMacros:
+  - foreach
+  - Q_FOREACH

@@ -1,6 +1,6 @@
 #include "ui/plugins/downloads/model.h"
 
-namespace px::ui {
+namespace px::modrim {
 namespace {
 bool is_active(const QString& state) {
     return state == QLatin1String("queued") || state == QLatin1String("checking") || state == QLatin1String("downloading");
@@ -41,7 +41,7 @@ void DownloadsModel::begin(const QStringList& ids, const QHash<QString, QString>
     emit summary_changed();
 }
 
-void DownloadsModel::apply(const core::DownloadItemStatus& status) {
+void DownloadsModel::apply(const DownloadItemStatus& status) {
     const auto found = by_id_.constFind(status.mod_id);
     if (found == by_id_.cend()) return;
     auto& row = rows_[*found];
@@ -65,7 +65,7 @@ void DownloadsModel::apply(const core::DownloadItemStatus& status) {
     mark(row);
 }
 
-void DownloadsModel::set_title(const core::DownloadItemTitle& item) {
+void DownloadsModel::set_title(const DownloadItemTitle& item) {
     const auto found = by_id_.constFind(item.mod_id);
     if (found == by_id_.cend()) return;
     auto& row = rows_[*found];
@@ -80,7 +80,7 @@ void DownloadsModel::set_phase(const QString& phase) {
     emit phase_changed();
 }
 
-void DownloadsModel::finish(const core::DownloadResult&) {
+void DownloadsModel::finish(const DownloadResult&) {
     for (auto& row : rows_) {
         if (is_active(row.state)) {
             row.state = QStringLiteral("cancelled");
@@ -199,4 +199,4 @@ QHash<int, QByteArray> DownloadsModel::roleNames() const {
     return {{IdRole, "id"}, {TitleRole, "title"}, {StateRole, "state"}, {ProgressRole, "progress"}, {ErrorRole, "error"}};
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

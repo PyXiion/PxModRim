@@ -12,12 +12,12 @@
 #include "core/organizer/models.h"
 #include "core/organizer/resolve.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
-using px::core::organizer::FolderNode;
-using px::core::organizer::ROOT_ID;
+using px::modrim::organizer::FolderNode;
+using px::modrim::organizer::ROOT_ID;
 
 QPushButton* makeButton(const QString& text, QWidget* parent, const QString& object_name) {
     auto* button = new QPushButton(text, parent);
@@ -141,4 +141,4 @@ qint64 FolderPickerDialog::folder_id() const {
     return item->data(0, Qt::UserRole).toLongLong();
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

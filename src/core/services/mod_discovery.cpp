@@ -8,7 +8,7 @@
 
 #include "core/mods_config.h"
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 namespace {
 
@@ -58,4 +58,4 @@ QStringList resolve_active_uuids(const QHash<QString, ListedModPtr>& all_mods,
     return active;
 }
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

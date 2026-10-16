@@ -11,7 +11,7 @@
 #include "core/error.h"
 #include "core/services/startup_impact_service/models.h"
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 // Average on-thread and off-thread seconds for one package id.
 struct ThreadAverages {
@@ -70,4 +70,4 @@ private:
     Connection conn_;
 };
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

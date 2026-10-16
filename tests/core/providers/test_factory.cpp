@@ -7,9 +7,9 @@
 #include "core/providers/factory.h"
 #include "core/providers/local.h"
 
-using px::core::PathConfig;
-using px::core::providers::create_providers;
-using px::core::providers::SteamWorkshopModProvider;
+using px::modrim::PathConfig;
+using px::modrim::providers::create_providers;
+using px::modrim::providers::SteamWorkshopModProvider;
 
 TEST_CASE("no configured paths produce no providers") {
     CHECK(create_providers(PathConfig{}).empty());

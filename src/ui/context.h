@@ -21,13 +21,13 @@
 
 class QQmlEngine;
 
-namespace px::ui {
+namespace px::modrim {
 
 class AppContext;
 
 // UI-layer plugins: same lifecycle as core plugins, but their context is the AppContext.
-using UiPlugin = core::BasicPlugin<AppContext>;
-using UiPluginRegistry = core::BasicPluginRegistry<AppContext>;
+using UiPlugin = BasicPlugin<AppContext>;
+using UiPluginRegistry = BasicPluginRegistry<AppContext>;
 
 // Toast sink. Durations are milliseconds; the defaults match the legacy toast manager.
 class Notifier {
@@ -56,7 +56,7 @@ class RailView : public QWidget {
     Q_OBJECT
 
 public:
-    RailView(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app);
+    RailView(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app);
 
     // Handles the part of a `modrim://<viewId>/…` link after the view id.
     virtual void openRoute(const QStringList& path);
@@ -67,12 +67,12 @@ public:
     virtual void teardown();
 
 protected:
-    core::CoreContext& ctx_;
+    CoreContext& ctx_;
     QQmlEngine* engine_;
     AppContext& app_;
 };
 
-using RailViewFactory = std::function<RailView*(core::CoreContext&, QQmlEngine*, QWidget*, AppContext&)>;
+using RailViewFactory = std::function<RailView*(CoreContext&, QQmlEngine*, QWidget*, AppContext&)>;
 
 struct RailViewSpec {
     RailViewMeta meta;
@@ -89,7 +89,7 @@ concept RailViewType = std::derived_from<V, RailView> && requires {
 // coreContext(), which must outlive this object.
 class AppContext {
 public:
-    AppContext(core::CoreContext& core, UiPrefs prefs = {});
+    AppContext(CoreContext& core, UiPrefs prefs = {});
     AppContext(const AppContext&) = delete;
     AppContext& operator=(const AppContext&) = delete;
     AppContext(AppContext&&) = delete;
@@ -126,19 +126,19 @@ public:
     const UiPrefs& uiPrefs() const noexcept { return ui_prefs_; }
 
     // ── Core access ───────────────────────────────────
-    core::CoreContext& coreContext() const noexcept { return core_; }
+    CoreContext& coreContext() const noexcept { return core_; }
 
     // ── Lifecycle ─────────────────────────────────────
     // Core plugins first, then UI plugins; UI plugins may depend on core plugin names.
-    core::Result<void> setupAll();
-    QCoro::Task<core::Result<void>> initAll();
+    Result<void> setupAll();
+    QCoro::Task<Result<void>> initAll();
     // Reloads mods and resolves to how many are now loaded.
-    QCoro::Task<core::Result<int>> refreshMods(bool full = false);
+    QCoro::Task<Result<int>> refreshMods(bool full = false);
     // UI plugins shut down before core plugins.
-    QCoro::Task<core::Result<void>> shutdownAll();
+    QCoro::Task<Result<void>> shutdownAll();
 
 private:
-    core::CoreContext& core_;
+    CoreContext& core_;
     UiPluginRegistry plugins_;
     std::vector<RailViewSpec> rail_views_;
     std::vector<SettingsSectionFactory> settings_sections_;
@@ -151,7 +151,7 @@ template <RailViewType V>
 void AppContext::addRailView(std::optional<std::size_t> position) {
     RailViewSpec spec{
         V::kRailMeta,
-        [](core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app) -> RailView* {
+        [](CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app) -> RailView* {
             return new V(ctx, engine, parent, app);
         },
     };
@@ -162,4 +162,4 @@ void AppContext::addRailView(std::optional<std::size_t> position) {
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

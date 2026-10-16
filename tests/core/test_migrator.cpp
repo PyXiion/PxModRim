@@ -16,9 +16,9 @@
 
 namespace {
 
-using px::core::ensure_schema;
-using px::core::MigrationSteps;
-using px::core::Result;
+using px::modrim::ensure_schema;
+using px::modrim::MigrationSteps;
+using px::modrim::Result;
 using test_support::read_bytes;
 
 // Owns one named SQLite connection and closes it when it goes out of scope.

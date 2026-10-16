@@ -30,55 +30,55 @@ void ensureApplication() {
     if (!QApplication::instance()) app = std::make_unique<QApplication>(argc, argv);
 }
 
-class FirstView : public px::ui::RailView {
+class FirstView : public px::modrim::RailView {
 public:
     using RailView::RailView;
-    static constexpr px::ui::RailViewMeta kRailMeta{QLatin1StringView("first"), QLatin1StringView("mods"), QLatin1StringView("First")};
+    static constexpr px::modrim::RailViewMeta kRailMeta{QLatin1StringView("first"), QLatin1StringView("mods"), QLatin1StringView("First")};
 };
-class SecondView : public px::ui::RailView {
+class SecondView : public px::modrim::RailView {
 public:
     using RailView::RailView;
-    static constexpr px::ui::RailViewMeta kRailMeta{QLatin1StringView("second"), QLatin1StringView("mods"), QLatin1StringView("Second")};
+    static constexpr px::modrim::RailViewMeta kRailMeta{QLatin1StringView("second"), QLatin1StringView("mods"), QLatin1StringView("Second")};
     void openRoute(const QStringList& path) override { opened = path; }
     QStringList opened;
 };
-class ThirdView : public px::ui::RailView {
+class ThirdView : public px::modrim::RailView {
 public:
     using RailView::RailView;
-    static constexpr px::ui::RailViewMeta kRailMeta{QLatin1StringView("third"), QLatin1StringView("mods"), QLatin1StringView("Third")};
+    static constexpr px::modrim::RailViewMeta kRailMeta{QLatin1StringView("third"), QLatin1StringView("mods"), QLatin1StringView("Third")};
 };
 
 struct Fixture {
     QTemporaryDir directory;
-    px::core::ConfigService configService{directory.path()};
-    std::unique_ptr<px::core::CoreContext> core;
-    std::unique_ptr<px::ui::AppContext> app;
+    px::modrim::ConfigService configService{directory.path()};
+    std::unique_ptr<px::modrim::CoreContext> core;
+    std::unique_ptr<px::modrim::AppContext> app;
     explicit Fixture(bool canSave = true) {
         ensureApplication();
-        px::core::AppConfig config;
+        px::modrim::AppConfig config;
         if (canSave) {
             config.paths.config_folder = QDir(directory.path()).filePath(QStringLiteral("game-config")).toStdString();
             QDir().mkpath(QString::fromStdString(config.paths.config_folder));
         }
-        core = px::core::CoreContext::create(config, &configService);
-        core->registerPlugin(std::make_unique<px::core::DownloadManager>());
-        auto a = std::make_shared<px::core::AboutXmlMod>();
-        a->package_id = px::core::CaseInsensitiveStr(u"test.a");
-        auto b = std::make_shared<px::core::AboutXmlMod>();
-        b->package_id = px::core::CaseInsensitiveStr(u"test.b");
+        core = px::modrim::CoreContext::create(config, &configService);
+        core->registerPlugin(std::make_unique<px::modrim::DownloadManager>());
+        auto a = std::make_shared<px::modrim::AboutXmlMod>();
+        a->package_id = px::modrim::CaseInsensitiveStr(u"test.a");
+        auto b = std::make_shared<px::modrim::AboutXmlMod>();
+        b->package_id = px::modrim::CaseInsensitiveStr(u"test.b");
         core->load({{QStringLiteral("a"), a}, {QStringLiteral("b"), b}}, {QStringLiteral("a"), QStringLiteral("b")});
-        app = std::make_unique<px::ui::AppContext>(*core);
+        app = std::make_unique<px::modrim::AppContext>(*core);
         app->addRailView<FirstView>();
         app->addRailView<SecondView>();
         app->addRailView<ThirdView>();
     }
 };
 
-QStackedWidget* stackOf(px::ui::MainWindow& window) {
+QStackedWidget* stackOf(px::modrim::MainWindow& window) {
     return window.findChild<QStackedWidget*>(QStringLiteral("viewStack"));
 }
 
-QMessageBox* closePrompt(px::ui::MainWindow& window) {
+QMessageBox* closePrompt(px::modrim::MainWindow& window) {
     for (auto* dialog : window.findChildren<QMessageBox*>())
         if (dialog->windowTitle() == QStringLiteral("Unsaved Changes") && dialog->isVisible()) return dialog;
     return nullptr;
@@ -87,7 +87,7 @@ QMessageBox* closePrompt(px::ui::MainWindow& window) {
 
 TEST_CASE("View shortcuts wrap and ignore invalid indexes", "[ui][window]") {
     Fixture fixture;
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     auto* stack = stackOf(window);
     REQUIRE(stack != nullptr);
     window.cycleView(-1);
@@ -101,7 +101,7 @@ TEST_CASE("View shortcuts wrap and ignore invalid indexes", "[ui][window]") {
 
 TEST_CASE("Routes select their view before handing it the path", "[ui][window]") {
     Fixture fixture;
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     auto* stack = stackOf(window);
     REQUIRE(stack != nullptr);
     window.openRoute(QStringLiteral("modrim://second/mod/42"));
@@ -114,7 +114,7 @@ TEST_CASE("Routes select their view before handing it the path", "[ui][window]")
 
 TEST_CASE("Settings route leaves the selected view unchanged", "[ui][window]") {
     Fixture fixture;
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     window.selectView(1);
     window.openRoute(QStringLiteral("modrim://settings"));
     CHECK(stackOf(window)->currentIndex() == 1);
@@ -127,7 +127,7 @@ TEST_CASE("Settings route leaves the selected view unchanged", "[ui][window]") {
 
 TEST_CASE("Dirty state tracks active list order and disk reload baseline", "[ui][window]") {
     Fixture fixture;
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     CHECK_FALSE(window.hasUnsavedChanges());
     fixture.core->setActive({QStringLiteral("b"), QStringLiteral("a")});
     CHECK(window.hasUnsavedChanges());
@@ -141,7 +141,7 @@ TEST_CASE("Dirty state tracks active list order and disk reload baseline", "[ui]
 
 TEST_CASE("Successful saves clear the unsaved state", "[ui][window]") {
     Fixture fixture;
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     fixture.core->setActive({QStringLiteral("b"), QStringLiteral("a")});
     REQUIRE(window.hasUnsavedChanges());
     CHECK(QCoro::waitFor(window.saveActiveMods()));
@@ -152,7 +152,7 @@ TEST_CASE("Successful saves clear the unsaved state", "[ui][window]") {
 TEST_CASE("Dirty close prompts once and honors Save Discard and Cancel", "[ui][window]") {
     const auto choice = GENERATE(QMessageBox::Save, QMessageBox::Discard, QMessageBox::Cancel);
     Fixture fixture;
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     fixture.core->setActive({QStringLiteral("a")});
     int closed = 0;
     QEventLoop loop;
@@ -175,7 +175,7 @@ TEST_CASE("Dirty close prompts once and honors Save Discard and Cancel", "[ui][w
 
 TEST_CASE("A failed close-time save leaves the window open", "[ui][window]") {
     Fixture fixture(false);
-    px::ui::MainWindow window(*fixture.app);
+    px::modrim::MainWindow window(*fixture.app);
     fixture.core->setActive({QStringLiteral("a")});
     bool closed = false;
     window.setAppQuitCallback([&] { closed = true; });

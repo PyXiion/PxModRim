@@ -17,11 +17,11 @@
 #include "core/organizer/resolve.h"
 #include "core/plugin.h"
 
-namespace px::core {
+namespace px::modrim {
 class CoreContext;
 }
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 struct FolderToggle {
     QStringList enable;
@@ -115,4 +115,4 @@ private:
     std::optional<OrganizerState> state_;
 };
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

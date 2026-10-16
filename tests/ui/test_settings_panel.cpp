@@ -33,12 +33,12 @@ void settle(int milliseconds) {
 TEST_CASE("Cancel settings unloads QML without binding errors") {
     ensureApplication();
     QWidget host;
-    auto* engine = px::ui::createQmlEngine(&host);
-    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
+    auto* engine = px::modrim::createQmlEngine(&host);
+    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::modrim::Theme(engine));
     QList<QQmlError> warnings;
     QObject::connect(engine, &QQmlEngine::warnings, &host, [&](const QList<QQmlError>& values) { warnings.append(values); });
     auto context = px::ui_test::makeCore();
-    px::ui::SettingsPanel panel(*context, engine, &host);
+    px::modrim::SettingsPanel panel(*context, engine, &host);
     panel.resize(760, 640);
     panel.show();
     settle(300);

@@ -20,12 +20,12 @@
 
 namespace {
 
-using px::core::Downloader;
-using px::core::DownloadManager;
-using px::core::DownloadResult;
-using px::core::ListedMod;
-using px::core::ListedModPtr;
-using px::core::Result;
+using px::modrim::Downloader;
+using px::modrim::DownloadManager;
+using px::modrim::DownloadResult;
+using px::modrim::ListedMod;
+using px::modrim::ListedModPtr;
+using px::modrim::Result;
 using test_support::run_sync;
 
 // Claims ids that start with `prefix`, and records each batch it was asked to download.

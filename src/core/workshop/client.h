@@ -14,7 +14,7 @@
 
 #include "core/workshop/types.h"
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 // Trims whitespace and trailing slashes, so "https://x/" and "https://x" name the same catalog.
 QString normalize_base_url(QString url);
@@ -63,4 +63,4 @@ private:
     QSet<QNetworkReply*> pending_;
 };
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop

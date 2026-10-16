@@ -2,7 +2,7 @@
 
 #include <QHash>
 
-namespace px::core::view {
+namespace px::modrim::view {
 
 QString provider_label(const QString& provider_id) {
     static const QHash<QString, QString> labels{
@@ -14,4 +14,4 @@ QString provider_label(const QString& provider_id) {
     return labels.value(provider_id, provider_id);
 }
 
-}  // namespace px::core::view
+}  // namespace px::modrim::view

@@ -4,7 +4,7 @@
 
 #include "ui/window/actions.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 struct MenuSpec {
     QString title;
@@ -19,4 +19,4 @@ public:
     explicit MenuBar(const ActionMap& actions, QWidget* parent = nullptr);
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

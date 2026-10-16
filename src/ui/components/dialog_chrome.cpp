@@ -20,7 +20,7 @@
 #include "ui/components/icons.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -176,4 +176,4 @@ void installDialogChrome(QDialog* dialog, bool closable, std::optional<bool> res
     new Chrome(dialog, closable, grip);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

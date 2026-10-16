@@ -4,7 +4,7 @@
 #include <array>
 #include <vector>
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 namespace {
 
 constexpr std::size_t index_of_type(EdgeType type) {
@@ -327,4 +327,4 @@ void ConstraintGraph::add_load_rules(const PackageId& pid,
     }
 }
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

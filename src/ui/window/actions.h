@@ -12,7 +12,7 @@
 class QAction;
 class QWidget;
 
-namespace px::ui {
+namespace px::modrim {
 
 enum class ActionId {
     Save, Restore, Settings, Quit, Refresh, FullRescan, AutoSort, UpdateMods,
@@ -35,4 +35,4 @@ const ActionSpec& actionSpec(ActionId id);
 ActionMap createActions(QWidget& window);
 QList<QPair<QString, QString>> shortcutRows();
 
-}  // namespace px::ui
+}  // namespace px::modrim

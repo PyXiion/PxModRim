@@ -18,7 +18,7 @@
 
 #include "core/migrator.h"
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 namespace {
 
@@ -609,4 +609,4 @@ void StartupImpactDb::close_sync() {
     QtConcurrent::run(&pool_, [this] { close_connection(conn_); }).waitForFinished();
 }
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

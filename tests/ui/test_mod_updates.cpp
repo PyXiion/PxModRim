@@ -8,7 +8,7 @@
 
 TEST_CASE("small updates skip confirmation") {
     QWidget parent;
-    CHECK(services_test::run_async(px::ui::confirm_update(px::ui::CONFIRM_THRESHOLD-1,&parent)));
+    CHECK(services_test::run_async(px::modrim::confirm_update(px::modrim::CONFIRM_THRESHOLD-1,&parent)));
     CHECK(parent.findChildren<QMessageBox*>().isEmpty());
 }
 TEST_CASE("large updates follow the actual confirmation dialog answer") {
@@ -22,6 +22,6 @@ TEST_CASE("large updates follow the actual confirmation dialog answer") {
             }
         });
         click.start();
-        CHECK(services_test::run_async(px::ui::confirm_update(px::ui::CONFIRM_THRESHOLD,&parent)) == (answer == QMessageBox::Yes));
+        CHECK(services_test::run_async(px::modrim::confirm_update(px::modrim::CONFIRM_THRESHOLD,&parent)) == (answer == QMessageBox::Yes));
     }
 }

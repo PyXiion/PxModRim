@@ -3,7 +3,7 @@
 #include "core/providers/core.h"
 #include "core/providers/local.h"
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 ProviderList create_providers(const PathConfig& paths, QThreadPool* pool) {
     ProviderList providers;
@@ -22,4 +22,4 @@ ProviderList create_providers(const PathConfig& paths, QThreadPool* pool) {
     return providers;
 }
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

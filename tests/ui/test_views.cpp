@@ -19,7 +19,7 @@
 
 namespace {
 // The embedded browser exists only in WebEngine builds; without it there is no "workshopWeb" object.
-QObject* web_of(const px::ui::SteamWorkshopViewPanel& view) {
+QObject* web_of(const px::modrim::SteamWorkshopViewPanel& view) {
     for (auto* quick : view.findChildren<QQuickWidget*>()) {
         if (auto* root = quick->rootObject()) {
             if (auto* web = root->findChild<QObject*>(QStringLiteral("workshopWeb"))) return web;
@@ -31,21 +31,21 @@ QObject* web_of(const px::ui::SteamWorkshopViewPanel& view) {
 
 TEST_CASE("steam workshop view preloads without error") {
     QWidget host;
-    auto* engine = px::ui::createQmlEngine(&host);
-    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
+    auto* engine = px::modrim::createQmlEngine(&host);
+    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::modrim::Theme(engine));
     auto core = px::ui_test::makeCore();
-    px::ui::AppContext app(*core);
-    px::ui::SteamWorkshopViewPanel view(*core, engine, &host, app);
+    px::modrim::AppContext app(*core);
+    px::modrim::SteamWorkshopViewPanel view(*core, engine, &host, app);
     view.preload();
 }
 
 TEST_CASE("steam workshop view has no web view before initialization") {
     QWidget host;
-    auto* engine = px::ui::createQmlEngine(&host);
-    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
+    auto* engine = px::modrim::createQmlEngine(&host);
+    engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::modrim::Theme(engine));
     auto core = px::ui_test::makeCore();
-    px::ui::AppContext app(*core);
-    px::ui::SteamWorkshopViewPanel view(*core, engine, &host, app);
+    px::modrim::AppContext app(*core);
+    px::modrim::SteamWorkshopViewPanel view(*core, engine, &host, app);
     CHECK(web_of(view) == nullptr);
 }
 #endif

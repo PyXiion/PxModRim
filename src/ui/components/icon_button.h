@@ -5,7 +5,7 @@
 
 class QWidget;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Square icon-only button (QSS `iconBtn`). `primary` paints it in the accent color.
 class IconButton : public QPushButton {
@@ -20,4 +20,4 @@ private:
     int icon_px_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

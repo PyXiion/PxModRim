@@ -5,7 +5,7 @@
 
 #include "ui/context.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 // Whole-window view contributed to the left icon rail. Core never includes this:
 // views are discovered entirely within ui/. Subclasses declare `kRailMeta`.
@@ -13,7 +13,7 @@ class BaseViewPanel : public RailView {
     Q_OBJECT
 
 public:
-    BaseViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app);
+    BaseViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app);
 
 protected:
     void setClearColor(const QString& color);
@@ -21,4 +21,4 @@ protected:
     QVBoxLayout* root_ = nullptr;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

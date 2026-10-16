@@ -17,7 +17,7 @@
 
 #include "core/mods_config.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -79,7 +79,7 @@ RestoreSnapshotDialog::RestoreSnapshotDialog(const QStringList& snapshots, QWidg
 
     snapshots_.reserve(static_cast<std::size_t>(snapshots.size()));
     for (const QString& path : snapshots) {
-        snapshots_.push_back(Snapshot{path, core::parse_mods_config(path)});
+        snapshots_.push_back(Snapshot{path, parse_mods_config(path)});
     }
 
     auto* layout = new QVBoxLayout(this);
@@ -194,4 +194,4 @@ ConfirmRestoreDialog::ConfirmRestoreDialog(const QString& snapshotName, QWidget*
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

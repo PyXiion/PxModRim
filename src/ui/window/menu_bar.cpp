@@ -2,7 +2,7 @@
 
 #include <QMenu>
 
-namespace px::ui {
+namespace px::modrim {
 
 const std::array<MenuSpec, 4>& menuLayout() {
     static const std::array<MenuSpec, 4> layout{{
@@ -25,4 +25,4 @@ MenuBar::MenuBar(const ActionMap& actions, QWidget* parent) : QMenuBar(parent) {
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

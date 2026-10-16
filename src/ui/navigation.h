@@ -6,7 +6,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace px::ui {
+namespace px::modrim {
 
 // modrim://<view_id>[/<part>…] links that open a view and optionally a sub-route inside it.
 inline constexpr QLatin1StringView kRouteScheme{"modrim"};
@@ -28,4 +28,4 @@ QString buildRoute(const QString& viewId, const QStringList& path = {});
 // Parses `modrim://<view>[/<part>…]`; anything else is not a route.
 std::optional<Route> parseRoute(const QString& url);
 
-}  // namespace px::ui
+}  // namespace px::modrim

@@ -2,7 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -55,4 +55,4 @@ ProfileSession::~ProfileSession() {
     spdlog::debug("Profile report:\n{}", timer_.render().toStdString());
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

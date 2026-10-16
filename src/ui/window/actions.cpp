@@ -4,7 +4,7 @@
 #include <QKeySequence>
 #include <QWidget>
 
-namespace px::ui {
+namespace px::modrim {
 
 QString ActionSpec::tooltip() const {
     return shortcut.isEmpty() ? label
@@ -63,4 +63,4 @@ QList<QPair<QString, QString>> shortcutRows() {
     return rows;
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

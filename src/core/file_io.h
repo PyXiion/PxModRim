@@ -7,7 +7,7 @@
 
 #include "core/error.h"
 
-namespace px::core {
+namespace px::modrim {
 
 Result<std::string> read_file_bytes(const QString& path);
 
@@ -19,4 +19,4 @@ Result<void> write_file_atomically(const QString& path, std::string_view data);
 // Copies `source` to `target`, replacing `target` if it exists.
 Result<void> copy_file_replacing(const QString& source, const QString& target);
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -14,7 +14,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/plugin.h"
 
-namespace px::core {
+namespace px::modrim {
 
 inline const QString kDownloadsManagerName = QStringLiteral("downloads");
 
@@ -65,4 +65,4 @@ private:
     DownloadManager& manager_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

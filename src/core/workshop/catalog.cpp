@@ -12,7 +12,7 @@
 #include "core/context.h"
 #include "core/mod_service.h"
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 namespace {
 
@@ -338,4 +338,4 @@ void WorkshopCatalog::on_busy_changed(bool busy) {
     }
 }
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop

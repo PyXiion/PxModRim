@@ -13,7 +13,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 // Catalog responses are strict: every key is present (nullable ones may be null), unknown keys are
 // ignored and a value of the wrong type fails. Writing emits nulls so payloads round-trip exactly.
@@ -178,46 +178,46 @@ struct CatalogError {
 template <class T>
 using CatalogResult = std::expected<T, CatalogError>;
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop
 
 template <>
-struct glz::meta<px::core::workshop::PreviewType> {
-    using enum px::core::workshop::PreviewType;
+struct glz::meta<px::modrim::workshop::PreviewType> {
+    using enum px::modrim::workshop::PreviewType;
     static constexpr auto value = glz::enumerate(image, video);
 };
 
 template <>
-struct glz::meta<px::core::workshop::ModSource> {
-    using enum px::core::workshop::ModSource;
+struct glz::meta<px::modrim::workshop::ModSource> {
+    using enum px::modrim::workshop::ModSource;
     static constexpr auto value = glz::enumerate(steam);
 };
 
 template <>
-struct glz::meta<px::core::workshop::ModDescriptionFormat> {
-    using enum px::core::workshop::ModDescriptionFormat;
+struct glz::meta<px::modrim::workshop::ModDescriptionFormat> {
+    using enum px::modrim::workshop::ModDescriptionFormat;
     static constexpr auto value = glz::enumerate(bbcode);
 };
 
 template <>
-struct glz::meta<px::core::workshop::ModKind> {
-    using enum px::core::workshop::ModKind;
+struct glz::meta<px::modrim::workshop::ModKind> {
+    using enum px::modrim::workshop::ModKind;
     static constexpr auto value = glz::enumerate(mod);
 };
 
 template <>
-struct glz::meta<px::core::workshop::CollectionSource> {
-    using enum px::core::workshop::CollectionSource;
+struct glz::meta<px::modrim::workshop::CollectionSource> {
+    using enum px::modrim::workshop::CollectionSource;
     static constexpr auto value = glz::enumerate(steam, picked);
 };
 
 template <>
-struct glz::meta<px::core::workshop::CollectionDescriptionFormat> {
-    using enum px::core::workshop::CollectionDescriptionFormat;
+struct glz::meta<px::modrim::workshop::CollectionDescriptionFormat> {
+    using enum px::modrim::workshop::CollectionDescriptionFormat;
     static constexpr auto value = glz::enumerate(bbcode, text);
 };
 
 template <>
-struct glz::meta<px::core::workshop::CollectionKind> {
-    using enum px::core::workshop::CollectionKind;
+struct glz::meta<px::modrim::workshop::CollectionKind> {
+    using enum px::modrim::workshop::CollectionKind;
     static constexpr auto value = glz::enumerate(collection);
 };

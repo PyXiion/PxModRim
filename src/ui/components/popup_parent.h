@@ -4,7 +4,7 @@
 
 class QEvent;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Gives every QQuickWidget's offscreen window its top-level window as transient
 // parent when shown. Without it Wayland refuses Popup.Window popups (menus,
@@ -20,4 +20,4 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

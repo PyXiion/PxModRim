@@ -11,7 +11,7 @@
 
 class QNetworkAccessManager;
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 inline constexpr QLatin1StringView LATEST_RELEASE_URL{
     "https://api.github.com/repos/PyXiion/PxModRim/releases/latest"};
@@ -52,4 +52,4 @@ private:
     QString release_url_;
 };
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

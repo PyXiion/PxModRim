@@ -2,7 +2,7 @@
 
 #include <initializer_list>
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 namespace {
 
@@ -83,4 +83,4 @@ const QList<StandardRule>& standard_rules() {
     return rules;
 }
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

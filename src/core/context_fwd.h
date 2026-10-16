@@ -1,7 +1,7 @@
 #pragma once
 
-namespace px::core {
+namespace px::modrim {
 
 class CoreContext;
 
-}  // namespace px::core
+}  // namespace px::modrim

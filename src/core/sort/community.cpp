@@ -7,7 +7,7 @@
 #include "core/config.h"
 #include "core/file_io.h"
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 namespace {
 
@@ -54,4 +54,4 @@ Result<CommunityRules> load_community_rules(const QString& json_path) {
     return to_community_rules(schema);
 }
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

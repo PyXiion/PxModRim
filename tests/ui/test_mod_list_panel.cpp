@@ -19,33 +19,33 @@
 #include "ui/panels/mod_list_panel.h"
 #include "ui/theme/qml_theme.h"
 #include "../core/services/services_support.h"
-using px::ui::ModListPanel;
+using px::modrim::ModListPanel;
 namespace {
 struct PanelFixture {
-    std::unique_ptr<px::core::CoreContext> ctx;
+    std::unique_ptr<px::modrim::CoreContext> ctx;
     QWidget parent;
     QQmlEngine* engine;
     std::unique_ptr<ModListPanel> panel;
     PanelFixture(bool active = true, bool dependencies = false) {
         ctx = px::ui_test::makeCore();
-        QHash<QString,px::core::ListedModPtr> mods;
+        QHash<QString,px::modrim::ListedModPtr> mods;
         for (int i = 0; i < 3; ++i) {
             const auto letter = QChar('a'+i);
-            auto mod = std::make_shared<px::core::AboutXmlMod>();
+            auto mod = std::make_shared<px::modrim::AboutXmlMod>();
             mod->name = QStringLiteral("Mod %1").arg(QChar('A'+i));
-            mod->package_id = px::core::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(letter));
+            mod->package_id = px::modrim::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(letter));
             mod->provider_id = QStringLiteral("stub");
             if (dependencies && i > 0) {
-                px::core::DependencyMod dependency;
-                dependency.package_id = px::core::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(QChar('a'+i-1)));
+                px::modrim::DependencyMod dependency;
+                dependency.package_id = px::modrim::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(QChar('a'+i-1)));
                 mod->about_rules.dependencies.append(dependency);
             }
             mods.insert(QStringLiteral("uuid-%1").arg(letter),mod);
         }
         ctx->load(mods,active ? QStringList{"uuid-a","uuid-b","uuid-c"} : QStringList{});
         ctx->diagnosticsService().rebuild();
-        engine = px::ui::createQmlEngine(&parent);
-        engine->rootContext()->setContextProperty(QStringLiteral("Theme"),new px::ui::Theme(engine));
+        engine = px::modrim::createQmlEngine(&parent);
+        engine->rootContext()->setContextProperty(QStringLiteral("Theme"),new px::modrim::Theme(engine));
         panel = std::make_unique<ModListPanel>(*ctx,engine,&parent);
         panel->load_mods(mods,ctx->activeUuids());
     }

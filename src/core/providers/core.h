@@ -2,7 +2,7 @@
 
 #include "core/providers/base.h"
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 // Base-game and DLC mods under the game's `Data/` directory.
 class CoreModProvider final : public BaseModProvider {
@@ -15,4 +15,4 @@ public:
                                          bool force_reparse = false) override;
 };
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

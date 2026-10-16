@@ -15,7 +15,7 @@
 #include "ui/components/icons.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -152,4 +152,4 @@ void ToastManager::remove(Toast* toast) {
     toast->deleteLater();
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

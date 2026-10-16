@@ -15,10 +15,10 @@
 
 namespace {
 
-using px::ui::ProgressDialog;
-using px::ui::Toast;
-using px::ui::ToastLevel;
-using px::ui::ToastManager;
+using px::modrim::ProgressDialog;
+using px::modrim::Toast;
+using px::modrim::ToastLevel;
+using px::modrim::ToastManager;
 
 QApplication& application() {
     if (auto* app = qobject_cast<QApplication*>(QCoreApplication::instance())) {
@@ -72,7 +72,7 @@ TEST_CASE("timed toast dismisses itself after its duration") {
 TEST_CASE("progress dialog stays visible when a new task starts before it hides") {
     application();
     QWidget parent;
-    px::core::LoadingState loading(&parent);
+    px::modrim::LoadingState loading(&parent);
     ProgressDialog dialog(loading, &parent);
 
     { auto first = loading.task(QStringLiteral("first")); }

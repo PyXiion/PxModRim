@@ -23,9 +23,9 @@
 #include "core/downloads/steam.h"
 #endif
 
-namespace px::app {
+namespace px::modrim {
 
-std::expected<QSet<QString>, px::core::Error> parseDisabledPlugins(const QString& envValue,
+std::expected<QSet<QString>, px::modrim::Error> parseDisabledPlugins(const QString& envValue,
                                                                   const QString& manifestPath) {
     QSet<QString> disabled;
     for (const QString& part : envValue.split(QLatin1Char(','))) {
@@ -40,7 +40,7 @@ std::expected<QSet<QString>, px::core::Error> parseDisabledPlugins(const QString
     }
     QFile manifest(manifestPath);
     if (!manifest.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return std::unexpected(px::core::Error{QStringLiteral("Cannot read %1").arg(manifestPath)});
+        return std::unexpected(px::modrim::Error{QStringLiteral("Cannot read %1").arg(manifestPath)});
     }
 
     const QString variant = QString::fromUtf8(manifest.readAll()).trimmed();
@@ -53,19 +53,19 @@ std::expected<QSet<QString>, px::core::Error> parseDisabledPlugins(const QString
     } else if (variant == QLatin1StringView("SteamWorkshop")) {
         disabled.unite(QSet<QString>{QStringLiteral("workshop_catalog"), QStringLiteral("workshop_ui")});
     } else {
-        return std::unexpected(px::core::Error{QStringLiteral("Unknown workshop variant: %1").arg(variant)});
+        return std::unexpected(px::modrim::Error{QStringLiteral("Unknown workshop variant: %1").arg(variant)});
     }
     return disabled;
 }
 
-QStringList registerCorePlugins(px::core::CoreContext& ctx, px::core::ConfigService& config,
-                                px::core::organizer::OrganizerDb& organizerDb, const QSet<QString>& disabled) {
-    ctx.registerPlugin(std::make_unique<px::core::organizer::OrganizerService>(ctx, organizerDb));
+QStringList registerCorePlugins(px::modrim::CoreContext& ctx, px::modrim::ConfigService& config,
+                                px::modrim::organizer::OrganizerDb& organizerDb, const QSet<QString>& disabled) {
+    ctx.registerPlugin(std::make_unique<px::modrim::organizer::OrganizerService>(ctx, organizerDb));
 
     QStringList downloaders;
     if (!disabled.contains(QStringLiteral("steam_downloader"))) {
 #ifdef PX_HAS_STEAM
-        ctx.registerPlugin(std::make_unique<px::core::SteamDownloader>(px::core::SteamDownloaderDeps{
+        ctx.registerPlugin(std::make_unique<px::modrim::SteamDownloader>(px::modrim::SteamDownloaderDeps{
             ctx.downloads(),
             config,
             [&ctx] { return QString::fromStdString(ctx.config().paths.local); },
@@ -79,7 +79,7 @@ QStringList registerCorePlugins(px::core::CoreContext& ctx, px::core::ConfigServ
 
     // The catalog is only useful with a downloader to fetch items.
     if (!downloaders.isEmpty() && !disabled.contains(QStringLiteral("workshop_catalog"))) {
-        ctx.registerPlugin(std::make_unique<px::core::workshop::WorkshopCatalog>());
+        ctx.registerPlugin(std::make_unique<px::modrim::workshop::WorkshopCatalog>());
     }
     return downloaders;
 }
@@ -87,19 +87,19 @@ QStringList registerCorePlugins(px::core::CoreContext& ctx, px::core::ConfigServ
 // How to add a UI plugin (mirrors the legacy _app.py `_setup`):
 //   - Guard it exactly as _app.py did, e.g.
 //       if (!selection.disabled.contains(QStringLiteral("workshop_ui")) && selection.downloaders.contains("steam"))
-//           app.registerPlugin(std::make_unique<px::ui::WorkshopUiPlugin>());
+//           app.registerPlugin(std::make_unique<px::modrim::WorkshopUiPlugin>());
 //   - Rail views go through app.addRailView<View>(), and must come before the plugins
 //     that read the rail.
 // Each port adds one line here; no other file changes.
-void registerUiPlugins(px::ui::AppContext& ctx, const PluginSelection& selection) {
-    ctx.addRailView<px::ui::ModsViewPanel>();
-    ctx.registerPlugin(std::make_unique<px::ui::OrganizerUiPlugin>());
+void registerUiPlugins(px::modrim::AppContext& ctx, const PluginSelection& selection) {
+    ctx.addRailView<px::modrim::ModsViewPanel>();
+    ctx.registerPlugin(std::make_unique<px::modrim::OrganizerUiPlugin>());
 #ifdef PX_HAS_STEAM
-    if (selection.downloaders.contains(QStringLiteral("steam"))) ctx.registerPlugin(std::make_unique<px::ui::SteamDownloaderUiPlugin>());
-    if (selection.downloaders.contains(QStringLiteral("steam")) && !selection.disabled.contains(QStringLiteral("steamworkshop"))) ctx.registerPlugin(std::make_unique<px::ui::SteamWorkshopUiPlugin>());
+    if (selection.downloaders.contains(QStringLiteral("steam"))) ctx.registerPlugin(std::make_unique<px::modrim::SteamDownloaderUiPlugin>());
+    if (selection.downloaders.contains(QStringLiteral("steam")) && !selection.disabled.contains(QStringLiteral("steamworkshop"))) ctx.registerPlugin(std::make_unique<px::modrim::SteamWorkshopUiPlugin>());
 #endif
-    if (!selection.downloaders.isEmpty() && !selection.disabled.contains(QStringLiteral("downloads_ui"))) ctx.registerPlugin(std::make_unique<px::ui::DownloadsUiPlugin>());
-    if (!selection.downloaders.isEmpty() && !selection.disabled.contains(QStringLiteral("workshop_catalog")) && !selection.disabled.contains(QStringLiteral("workshop_ui"))) ctx.registerPlugin(std::make_unique<px::ui::workshop::WorkshopUiPlugin>());
+    if (!selection.downloaders.isEmpty() && !selection.disabled.contains(QStringLiteral("downloads_ui"))) ctx.registerPlugin(std::make_unique<px::modrim::DownloadsUiPlugin>());
+    if (!selection.downloaders.isEmpty() && !selection.disabled.contains(QStringLiteral("workshop_catalog")) && !selection.disabled.contains(QStringLiteral("workshop_ui"))) ctx.registerPlugin(std::make_unique<px::modrim::workshop::WorkshopUiPlugin>());
 }
 
-}  // namespace px::app
+}  // namespace px::modrim

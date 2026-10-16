@@ -14,7 +14,7 @@
 #include <QUrl>
 #include <spdlog/spdlog.h>
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 namespace {
 
@@ -163,4 +163,4 @@ QCoro::Task<Result<std::optional<ReleaseInfo>>> UpdateService::check() {
         ReleaseInfo{tag, name, string_field(data, "body"), url});
 }
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-namespace px::core {
+namespace px::modrim {
 
 // Synchronous, single-threaded callback list. `connect` returns an id that
 // `disconnect` takes back: std::function is not comparable, so the legacy
@@ -47,4 +47,4 @@ private:
     Id next_id_ = 1;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -6,10 +6,10 @@
 #include "ui/plugins/organizer/filter_model.h"
 #include "ui/plugins/organizer/tree_model.h"
 
-using namespace px::core;
-using namespace px::core::organizer;
-using px::ui::ModTreeModel;
-using px::ui::OrganizerFilterModel;
+using namespace px::modrim;
+using namespace px::modrim::organizer;
+using px::modrim::ModTreeModel;
+using px::modrim::OrganizerFilterModel;
 
 namespace {
 struct OrganizerFixture {

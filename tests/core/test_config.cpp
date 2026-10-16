@@ -17,7 +17,7 @@
 
 namespace {
 
-using namespace px::core;
+using namespace px::modrim;
 using test_support::read_bytes;
 using test_support::run_sync;
 using test_support::write_bytes;

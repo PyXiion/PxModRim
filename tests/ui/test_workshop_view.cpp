@@ -21,10 +21,10 @@
 #include "ui/plugins/workshop/view.h"
 
 namespace {
-using namespace px::core;
-using namespace px::core::workshop;
-using namespace px::ui;
-using namespace px::ui::workshop;
+using namespace px::modrim;
+using namespace px::modrim::workshop;
+using namespace px::modrim;
+using namespace px::modrim::workshop;
 using workshop_test::HttpRequest;
 using workshop_test::HttpResponse;
 using workshop_test::run;
@@ -87,7 +87,7 @@ struct PanelFixture {
         collection.supported_versions = {"1.6"}; collection.member_ids = {"1", "missing"}; collection.member_count = 2;
         catalog.set_base_url(server.url());
         engine = createQmlEngine(&owner);
-        engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::ui::Theme(engine));
+        engine->rootContext()->setContextProperty(QStringLiteral("Theme"), new px::modrim::Theme(engine));
         view = std::make_unique<WorkshopViewPanel>(*core, engine, &owner, app, catalog);
         view->resize(1100, 800);
         run(view->load());

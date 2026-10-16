@@ -15,8 +15,8 @@
 #include "core/checker/databases.h"
 #include "core/config.h"
 
-using namespace px::core;
-using namespace px::core::checker;
+using namespace px::modrim;
+using namespace px::modrim::checker;
 
 namespace {
 

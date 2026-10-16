@@ -4,16 +4,16 @@
 #include "ui/models/mod_list_model.h"
 #include "ui/models/impact.h"
 #include "ui/theme/palette.h"
-using namespace px::ui;
+using namespace px::modrim;
 namespace {
 struct ListFixture {
-    QHash<QString, px::core::ListedModPtr> mods;
+    QHash<QString, px::modrim::ListedModPtr> mods;
     ModListModel model{{{QStringLiteral("stub"),QStringLiteral("#abcdef")}}};
     ListFixture() {
         for (int i = 0; i < 5; ++i) {
-            auto mod = std::make_shared<px::core::AboutXmlMod>();
+            auto mod = std::make_shared<px::modrim::AboutXmlMod>();
             mod->name = QStringLiteral("Mod %1").arg(i);
-            mod->package_id = px::core::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(i));
+            mod->package_id = px::modrim::CaseInsensitiveStr(QStringLiteral("mod.%1").arg(i));
             mod->provider_id = QStringLiteral("stub");
             mods.insert(QStringLiteral("uuid-%1").arg(i),mod);
         }

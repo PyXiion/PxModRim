@@ -1,6 +1,6 @@
 #include "ui/plugins/workshop/details.h"
 
-namespace px::ui::workshop {
+namespace px::modrim::workshop {
 namespace {
 QString joined(const std::vector<std::string>& ids) {
     QStringList values;
@@ -10,9 +10,9 @@ QString joined(const std::vector<std::string>& ids) {
 }
 }
 
-QCoro::Task<core::workshop::CatalogResult<Detail>> fetch_detail(
-    core::workshop::WorkshopCatalog& catalog, QString item_id, QString kind) {
-    using namespace core::workshop;
+QCoro::Task<workshop::CatalogResult<Detail>> fetch_detail(
+    workshop::WorkshopCatalog& catalog, QString item_id, QString kind) {
+    using namespace workshop;
     if (kind == QStringLiteral("collection")) {
         auto result = co_await catalog.collection(item_id);
         if (!result) co_return std::unexpected(result.error());
@@ -44,7 +44,7 @@ QCoro::Task<core::workshop::CatalogResult<Detail>> fetch_detail(
     co_return Detail{std::move(mod), std::move(members), warning.toStdString(), missing.isEmpty()};
 }
 
-QString incomplete_plan_notice(const core::workshop::DownloadPlan& plan) {
+QString incomplete_plan_notice(const workshop::DownloadPlan& plan) {
     QStringList parts{QStringLiteral("The download plan is incomplete.")};
     if (!plan.unavailable_ids.isEmpty()) parts.append(QStringLiteral("Unavailable: ") + plan.unavailable_ids.join(QStringLiteral(", ")));
     if (!plan.incomplete_collection_ids.isEmpty()) parts.append(QStringLiteral("Incomplete collections: ") + plan.incomplete_collection_ids.join(QStringLiteral(", ")));
@@ -56,4 +56,4 @@ QString queued_notice(qsizetype count) {
         .arg(count).arg(count == 1 ? QString{} : QStringLiteral("s"));
 }
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

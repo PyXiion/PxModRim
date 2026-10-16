@@ -9,11 +9,11 @@
 class QLineEdit;
 class QTreeWidget;
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 struct FolderNode;
 }
 
-namespace px::ui {
+namespace px::modrim {
 
 // Asks for a folder name. Enter confirms; the confirm button is disabled while the
 // name is blank. Without `verb`, the first word of `title` names the confirm button.
@@ -40,7 +40,7 @@ public:
 // entry for ROOT_ID. Folders not in `allowed` are shown but cannot be chosen.
 class FolderPickerDialog : public QDialog {
 public:
-    FolderPickerDialog(const px::core::organizer::FolderNode& tree, const QString& title,
+    FolderPickerDialog(const px::modrim::organizer::FolderNode& tree, const QString& title,
                        const QSet<qint64>& allowed, QWidget* parent,
                        const QString& verb = QStringLiteral("Move"));
 
@@ -51,4 +51,4 @@ private:
     QTreeWidget* tree_ = nullptr;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

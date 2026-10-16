@@ -19,7 +19,7 @@ class QQuickWidget;
 class QTimer;
 class QShowEvent;
 
-namespace px::ui {
+namespace px::modrim {
 class ModTreeModel;
 class OrganizerFilterModel;
 class ModInfoPanel;
@@ -36,7 +36,7 @@ class OrganizerViewPanel final : public BaseViewPanel {
     Q_PROPERTY(QString editorError READ editorError NOTIFY editorChanged)
 public:
     static constexpr RailViewMeta kRailMeta{QLatin1StringView("organizer"), QLatin1StringView("folder"), QLatin1StringView("Organizer")};
-    OrganizerViewPanel(core::CoreContext&, QQmlEngine*, QWidget*, AppContext&);
+    OrganizerViewPanel(CoreContext&, QQmlEngine*, QWidget*, AppContext&);
     ~OrganizerViewPanel() override;
     bool ready() const;
     int selectedTagCount() const;
@@ -80,10 +80,10 @@ private:
     void syncInfo(bool force = false);
     void treeCommand(const char*);
     void setEditorError(QString message = {});
-    void reportError(const core::Error&);
+    void reportError(const Error&);
     QStringList selectedPackageIds() const;
     QStringList selectedUuids() const;
-    core::Result<QList<core::organizer::RuleSpec>> ruleSpecs(const QVariantList&) const;
+    Result<QList<organizer::RuleSpec>> ruleSpecs(const QVariantList&) const;
     QCoro::Task<void> calculateRulePreview(QVariantList, int);
     QCoro::Task<void> mutateTag(QString operation, qint64 id, QString name = {}, QString color = {}, bool add = false);
     QCoro::Task<void> persistRules(QVariantList);
@@ -92,14 +92,14 @@ private:
     QCoro::Task<void> persistAllCollapse(bool);
     QCoro::Task<void> toggle(QModelIndex);
     QCoro::Task<void> runSelectionAction(QString);
-    QCoro::Task<void> editFolder(QString action, qint64 id = core::organizer::ROOT_ID, QStringList pids = {});
+    QCoro::Task<void> editFolder(QString action, qint64 id = organizer::ROOT_ID, QStringList pids = {});
     QCoro::Task<void> placeMods(QStringList, qint64);
     QCoro::Task<void> resetRules(QStringList);
     QCoro::Task<void> performDrop(QModelIndex, QModelIndex);
     void modMenu();
     void folderMenu(const TreeNode&);
 
-    core::organizer::OrganizerService& service_;
+    organizer::OrganizerService& service_;
     ModTreeModel* model_;
     OrganizerFilterModel* filters_;
     ModInfoPanel* info_;

@@ -13,15 +13,15 @@
 #include "core/models/metadata/structures.h"
 #include "core/sort/config.h"
 
-using px::core::AboutXmlMod;
-using px::core::CaseInsensitiveSet;
-using px::core::CaseInsensitiveStr;
-using px::core::checker::ConstraintGraph;
-using px::core::checker::topological_sort;
-using px::core::sort::PackageId;
-using px::core::sort::SortSettings;
-using px::core::sort::Tier;
-using px::core::sort::TierConfig;
+using px::modrim::AboutXmlMod;
+using px::modrim::CaseInsensitiveSet;
+using px::modrim::CaseInsensitiveStr;
+using px::modrim::checker::ConstraintGraph;
+using px::modrim::checker::topological_sort;
+using px::modrim::sort::PackageId;
+using px::modrim::sort::SortSettings;
+using px::modrim::sort::Tier;
+using px::modrim::sort::TierConfig;
 
 namespace {
 

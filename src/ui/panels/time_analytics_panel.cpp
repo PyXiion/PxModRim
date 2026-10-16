@@ -7,8 +7,8 @@
 #include "ui/components/dialog_chrome.h"
 #include "ui/panels/startup_impact_data.h"
 #include "ui/theme/palette.h"
-namespace px::ui {
-TimeAnalyticsPanel::TimeAnalyticsPanel(core::startup_impact::StartupImpactService* service, QQmlEngine* engine, QWidget* parent)
+namespace px::modrim {
+TimeAnalyticsPanel::TimeAnalyticsPanel(startup_impact::StartupImpactService* service, QQmlEngine* engine, QWidget* parent)
     : QWidget(parent), service_(service), qml_(new QQuickWidget(engine, this)) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -35,7 +35,7 @@ void TimeAnalyticsPanel::clear() {
     ++requestToken_;
     if (auto* root = qml_->rootObject()) root->setProperty("sourceData", QVariant{});
 }
-StartupImpactDialog::StartupImpactDialog(core::startup_impact::StartupImpactService* service, QQmlEngine* engine, QWidget* parent)
+StartupImpactDialog::StartupImpactDialog(startup_impact::StartupImpactService* service, QQmlEngine* engine, QWidget* parent)
     : QDialog(parent), panel(new TimeAnalyticsPanel(service, engine, this)) {
     setWindowTitle(QStringLiteral("Startup impact"));
     setAttribute(Qt::WA_DeleteOnClose);
@@ -45,4 +45,4 @@ StartupImpactDialog::StartupImpactDialog(core::startup_impact::StartupImpactServ
     layout->addWidget(panel);
     installDialogChrome(this);
 }
-} // namespace px::ui
+} // namespace px::modrim

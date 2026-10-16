@@ -7,7 +7,7 @@
 #include "core/workshop/types.h"
 #include "support.h"
 
-using namespace px::core::workshop;
+using namespace px::modrim::workshop;
 using workshop_test::decode_collection;
 using workshop_test::decode_mod;
 using workshop_test::wire;

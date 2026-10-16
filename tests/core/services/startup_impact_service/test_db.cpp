@@ -14,9 +14,9 @@
 #include "../../test_support.h"
 #include "core/services/startup_impact_service/db.h"
 
-using namespace px::core::startup_impact;
+using namespace px::modrim::startup_impact;
 using Catch::Matchers::WithinAbs;
-using px::core::Result;
+using px::modrim::Result;
 using test_support::TestApplication;
 
 namespace {

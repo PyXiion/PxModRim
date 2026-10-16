@@ -27,7 +27,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
 
-namespace px::ui {
+namespace px::modrim {
 class ModInfoBanner final : public QWidget {
 public:
     explicit ModInfoBanner(QWidget* parent) : QWidget(parent) { setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed); }
@@ -84,7 +84,7 @@ QString first_sentence(QString text) {
     return text;
 }
 }
-ModInfoPanel::ModInfoPanel(core::CoreContext& ctx, QQmlEngine* engine, UiPrefs& prefs, QWidget* parent)
+ModInfoPanel::ModInfoPanel(CoreContext& ctx, QQmlEngine* engine, UiPrefs& prefs, QWidget* parent)
     : QWidget(parent), ctx_(ctx), engine_(engine), prefs_(prefs), banner_(new ModInfoBanner(this)),
       placeholder_(new QLabel("Select a mod to view details", this)), qml_(engine ? new QQuickWidget(engine, this) : new QQuickWidget(this)) {
     auto* layout = new QVBoxLayout(this);
@@ -111,22 +111,22 @@ ModInfoPanel::ModInfoPanel(core::CoreContext& ctx, QQmlEngine* engine, UiPrefs& 
 }
 ModInfoPanel::~ModInfoPanel() { ctx_.downloads().busy_changed.disconnect(busyConnection_); }
 void ModInfoPanel::setQml(const char* name, const QVariant& value) { if (auto* root = qml_->rootObject()) root->setProperty(name, value); }
-void ModInfoPanel::showMod(const core::ListedMod& mod, const QList<core::view::ModIssueView>& issues) {
+void ModInfoPanel::showMod(const ListedMod& mod, const QList<view::ModIssueView>& issues) {
     const auto token = ++previewToken_;
     mod_ = ctx_.allMods().value(mod.uuid());
     if (!mod_) {
-        if (const auto* about = dynamic_cast<const core::AboutXmlMod*>(&mod)) mod_ = std::make_shared<core::AboutXmlMod>(*about);
-        else mod_ = std::make_shared<core::ListedMod>(mod);
+        if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) mod_ = std::make_shared<AboutXmlMod>(*about);
+        else mod_ = std::make_shared<ListedMod>(mod);
     }
     placeholder_->hide(); banner_->show(); qml_->show();
-    const auto* about = dynamic_cast<const core::AboutXmlMod*>(&mod);
+    const auto* about = dynamic_cast<const AboutXmlMod*>(&mod);
     banner_->setTitle(mod.name, !mod.description.isEmpty() ? first_sentence(mod.description) : about ? about->package_id.str() : QString{});
     ++startupToken_;
     setQml("startup", QVariant{}); setIssues(issues); syncUpdating();
     if (auto* root = qml_->rootObject()) QMetaObject::invokeMethod(root, "resetScroll");
     loadPreview(mod.mod_path(), mod.name, token);
 }
-void ModInfoPanel::setIssues(const QList<core::view::ModIssueView>& issues) {
+void ModInfoPanel::setIssues(const QList<view::ModIssueView>& issues) {
     if (!mod_) return;
     auto data = build_mod_info(ctx_, *mod_, issues);
     const QString description = data.take("description").toString();
@@ -145,7 +145,7 @@ void ModInfoPanel::syncUpdating() {
 }
 void ModInfoPanel::openFolder() { if (mod_ && mod_->mod_path()) QDesktopServices::openUrl(QUrl::fromLocalFile(*mod_->mod_path())); }
 void ModInfoPanel::openUrl() {
-    const auto* about = dynamic_cast<const core::AboutXmlMod*>(mod_.get());
+    const auto* about = dynamic_cast<const AboutXmlMod*>(mod_.get());
     if (!about) return;
     const QUrl url(about->url);
     const auto scheme = url.scheme().toLower();
@@ -199,7 +199,7 @@ QCoro::Task<void> ModInfoPanel::setTimeAnalytics(const std::optional<QString>& p
     std::stable_sort(metrics.begin(), metrics.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
     QVariantList rows;
     for (qsizetype i = 0; i < std::min<qsizetype>(3, metrics.size()); ++i) if (metrics[i].second >= .001)
-        rows.append(QVariantMap{{"label", core::startup_impact::metric_label(metrics[i].first)}, {"value", format_duration(metrics[i].second)}, {"fraction", std::min(1.0, metrics[i].second / own)}});
+        rows.append(QVariantMap{{"label", startup_impact::metric_label(metrics[i].first)}, {"value", format_duration(metrics[i].second)}, {"fraction", std::min(1.0, metrics[i].second / own)}});
     guard->setQml("startup", QVariantMap{{"available", true}, {"own", format_duration(own)}, {"rank", QString("#%1 slowest of %2 mods").arg(rank).arg(report.mods.size())},
         {"estimated", !active.contains(selectedPid, Qt::CaseInsensitive)}, {"color", impact_color(own)}, {"rows", rows}});
 }

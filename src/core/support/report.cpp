@@ -27,7 +27,7 @@
 #include <unistd.h>
 #endif
 
-namespace px::core::support {
+namespace px::modrim::support {
 
 namespace {
 
@@ -365,4 +365,4 @@ QCoro::Task<Result<QString>> PasteUploader::upload(QString text) {
     co_return body;
 }
 
-}  // namespace px::core::support
+}  // namespace px::modrim::support

@@ -4,7 +4,7 @@
 #include <QLatin1StringView>
 #include <QString>
 
-namespace px::core {
+namespace px::modrim {
 
 // Display name for a mod provider, mirroring the legacy PROVIDER_LABELS table. Unknown ids
 // fall back to the id with underscores as spaces and each word title-cased, as Python's
@@ -34,4 +34,4 @@ inline QString providerLabel(const QString& providerId) {
     return label;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

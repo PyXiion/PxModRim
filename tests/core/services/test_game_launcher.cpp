@@ -21,22 +21,22 @@
 #include "core/services/game_process.h"
 #include "services_support.h"
 
-using px::core::AppConfig;
-using px::core::CoreContext;
-using px::core::LaunchStrategy;
-using px::core::PathConfig;
-using px::core::Result;
-using px::core::services::build_direct_command;
-using px::core::services::find_executable;
-using px::core::services::GameLauncher;
-using px::core::services::GameProcessMonitor;
-using px::core::services::is_game_running;
-using px::core::services::MonitorTiming;
-using px::core::services::Platform;
-using px::core::services::ProcessInfo;
-using px::core::services::ProcessLister;
-using px::core::services::split_arguments;
-using px::core::services::steam_run_url;
+using px::modrim::AppConfig;
+using px::modrim::CoreContext;
+using px::modrim::LaunchStrategy;
+using px::modrim::PathConfig;
+using px::modrim::Result;
+using px::modrim::services::build_direct_command;
+using px::modrim::services::find_executable;
+using px::modrim::services::GameLauncher;
+using px::modrim::services::GameProcessMonitor;
+using px::modrim::services::is_game_running;
+using px::modrim::services::MonitorTiming;
+using px::modrim::services::Platform;
+using px::modrim::services::ProcessInfo;
+using px::modrim::services::ProcessLister;
+using px::modrim::services::split_arguments;
+using px::modrim::services::steam_run_url;
 using services_test::EventLoop;
 using services_test::run_async;
 
@@ -84,7 +84,7 @@ void make_executable(const QString& path) {
 
 std::unique_ptr<CoreContext> context_for(const QString& game_path) {
     static QTemporaryDir configDir;
-    static px::core::ConfigService configService(configDir.path());
+    static px::modrim::ConfigService configService(configDir.path());
     AppConfig cfg;
     cfg.paths.game = game_path.toStdString();
     return CoreContext::create(cfg, &configService);

@@ -3,7 +3,7 @@
 #include "ui/context.h"
 #include "ui/plugins/organizer/view.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 class OrganizerUiPlugin final : public UiPlugin {
 public:
@@ -11,4 +11,4 @@ public:
     void setup(AppContext& ctx) override { ctx.addRailView<OrganizerViewPanel>(0); }
 };
 
-} // namespace px::ui
+} // namespace px::modrim

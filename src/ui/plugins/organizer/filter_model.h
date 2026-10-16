@@ -4,7 +4,7 @@
 
 #include "core/organizer/resolve.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 class OrganizerFilterModel : public QAbstractListModel {
     Q_OBJECT
@@ -15,12 +15,12 @@ public:
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
-    void update(const QList<core::organizer::TreeFilter>& entries);
+    void update(const QList<organizer::TreeFilter>& entries);
     std::optional<QString> key_at(int row) const;
-    core::organizer::TreeFilter for_key(const QString& key) const;
+    organizer::TreeFilter for_key(const QString& key) const;
 
 private:
-    QList<core::organizer::TreeFilter> items_;
+    QList<organizer::TreeFilter> items_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

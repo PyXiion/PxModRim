@@ -13,7 +13,7 @@ namespace {
 QApplication& application() { return *static_cast<QApplication*>(QApplication::instance()); }
 
 void clickClose(QDialog& dialog) {
-    px::ui::installDialogChrome(&dialog);
+    px::modrim::installDialogChrome(&dialog);
     auto* button = dialog.findChild<QPushButton*>(QStringLiteral("dialogCloseBtn"));
     REQUIRE(button != nullptr);
     button->click();

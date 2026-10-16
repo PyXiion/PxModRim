@@ -6,7 +6,7 @@
 
 #include "core/models/metadata/structures.h"
 
-using namespace px::core;
+using namespace px::modrim;
 
 TEST_CASE("CaseInsensitiveStr serializes as a lowercased JSON string") {
     const CaseInsensitiveStr pid(QStringLiteral("Ludeon.RimWorld"));

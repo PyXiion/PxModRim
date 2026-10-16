@@ -8,7 +8,7 @@
 
 #include "core/sort/tiers.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 namespace {
 
 using sort::PackageGraph;
@@ -245,4 +245,4 @@ QList<PackageId> topological_sort(const QHash<PackageId, std::shared_ptr<AboutXm
     return order;
 }
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

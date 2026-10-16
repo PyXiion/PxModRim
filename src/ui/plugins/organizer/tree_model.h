@@ -10,7 +10,7 @@
 #include "core/models/view/diagnostics.h"
 #include "core/organizer/resolve.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 inline const QString UNGROUPED_KEY = QStringLiteral("ungrouped");
 
@@ -18,8 +18,8 @@ struct TreeNode {
     QString kind;
     QString key;
     TreeNode* parent = nullptr;
-    const core::organizer::FolderNode* folder = nullptr;
-    const core::organizer::ModLeaf* leaf = nullptr;
+    const organizer::FolderNode* folder = nullptr;
+    const organizer::ModLeaf* leaf = nullptr;
     QString provider_id;
     QString provider_label;
     QString mod_version;
@@ -30,8 +30,8 @@ struct TreeNode {
     QList<TreeNode*> walk() const;
     qint64 folder_id() const;
     TreeNode(QString kind = QStringLiteral("root"), QString key = {}, TreeNode* parent = nullptr,
-             const core::organizer::FolderNode* folder = nullptr,
-             const core::organizer::ModLeaf* leaf = nullptr, QString provider_id = {});
+             const organizer::FolderNode* folder = nullptr,
+             const organizer::ModLeaf* leaf = nullptr, QString provider_id = {});
     bool is_container() const;
 };
 
@@ -46,7 +46,7 @@ public:
         HasWarningRole, WarningTooltipRole, TagsRole, ProviderLabelRole, ModVersionRole
     };
     Q_ENUM(Role)
-    using SummaryFor = std::function<std::optional<core::view::ModDiagnosticsView>(const QString&)>;
+    using SummaryFor = std::function<std::optional<view::ModDiagnosticsView>(const QString&)>;
     explicit ModTreeModel(SummaryFor summary_for, QObject* parent = nullptr);
     QModelIndex index(int row, int column, const QModelIndex& parent = {}) const override;
     QModelIndex parent(const QModelIndex& child) const override;
@@ -56,10 +56,10 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     bool filtering() const;
-    void set_tree(const core::organizer::FolderNode& root,
-                  const core::organizer::ModsByUuid& mods,
+    void set_tree(const organizer::FolderNode& root,
+                  const organizer::ModsByUuid& mods,
                   const QHash<QString, QString>& provider_colors, bool filtering,
-                  const QHash<qint64, core::organizer::Tag>& tags = {});
+                  const QHash<qint64, organizer::Tag>& tags = {});
     void refresh_diagnostics();
     TreeNode* node_at(const QModelIndex& index) const;
     QModelIndex index_for_key(const QString& key) const;
@@ -77,11 +77,11 @@ private:
     void notify_selection(const QSet<QString>& changed);
     SummaryFor summary_for_;
     std::unique_ptr<TreeNode> root_;
-    std::unique_ptr<core::organizer::FolderNode> payload_;
+    std::unique_ptr<organizer::FolderNode> payload_;
     bool filtering_ = false;
     QHash<QString, QString> provider_colors_;
     QHash<QString, QVariantList> tag_rows_;
     QSet<QString> selected_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

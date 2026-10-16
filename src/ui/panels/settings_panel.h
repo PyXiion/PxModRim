@@ -7,7 +7,7 @@
 #include "ui/settings_section.h"
 class QQmlEngine;
 class QQuickWidget;
-namespace px::ui {
+namespace px::modrim {
 class AppContext;
 class SettingsBackend : public QObject {
     Q_OBJECT
@@ -19,7 +19,7 @@ class SettingsBackend : public QObject {
     Q_PROPERTY(bool cacheAvailable READ cacheAvailable CONSTANT)
     Q_PROPERTY(bool cacheBusy READ cacheBusy NOTIFY cacheChanged)
 public:
-    SettingsBackend(core::CoreContext& ctx, QDialog* dialog, const std::vector<SettingsSection*>& sections);
+    SettingsBackend(CoreContext& ctx, QDialog* dialog, const std::vector<SettingsSection*>& sections);
     QVariantMap initial() const { return initial_; }
     QVariantList sections() const { return sections_; }
     QString communityStatus() const { return communityStatus_; }
@@ -42,7 +42,7 @@ signals:
     void communityChanged();
     void cacheChanged();
 private:
-    core::CoreContext& ctx_;
+    CoreContext& ctx_;
     QDialog* dialog_;
     QVariantMap initial_;
     QVariantList sections_;
@@ -52,16 +52,16 @@ private:
 class SettingsPanel : public QDialog {
     Q_OBJECT
 public:
-    SettingsPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
+    SettingsPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
                   const std::vector<SettingsSectionFactory>& sections = {});
     SettingsPanel(AppContext& app, QQmlEngine* engine, QWidget* parent);
     ~SettingsPanel() override;
-    const core::AppConfig& getConfig() const { return config_; }
+    const AppConfig& getConfig() const { return config_; }
 private:
     void save(const QVariantMap& values);
-    core::AppConfig config_;
+    AppConfig config_;
     std::vector<SettingsSection*> sections_;
     SettingsBackend* backend_;
     QQuickWidget* qml_;
 };
-} // namespace px::ui
+} // namespace px::modrim

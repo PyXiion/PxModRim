@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QFileInfo>
 
-namespace px::core {
+namespace px::modrim {
 
 std::optional<QString> findAboutXml(const QString& modPath) {
     if (!QFileInfo(modPath).isDir()) {
@@ -48,4 +48,4 @@ bool isAsciiDigits(QStringView text) {
     return true;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -17,7 +17,7 @@
 #include "core/plugin.h"
 #include "core/structures.h"
 
-namespace px::core {
+namespace px::modrim {
 
 class ActivationService;
 class ConfigService;
@@ -114,4 +114,4 @@ private:
     PluginRegistry plugins_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -23,7 +23,7 @@
 
 class QNetworkAccessManager;
 
-namespace px::core {
+namespace px::modrim {
 
 class CoreContext;
 
@@ -100,4 +100,4 @@ private:
     std::optional<SidebarBase> sidebar_base_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

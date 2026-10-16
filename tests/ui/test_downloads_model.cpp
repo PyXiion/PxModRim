@@ -5,19 +5,19 @@
 #include "ui/plugins/downloads/model.h"
 
 namespace {
-QHash<QString, QString> states(const px::ui::DownloadsModel& model) {
+QHash<QString, QString> states(const px::modrim::DownloadsModel& model) {
     QHash<QString, QString> result;
     for (int row = 0; row < model.rowCount(); ++row) {
         const auto index = model.index(row);
-        result.insert(model.data(index, px::ui::DownloadsModel::IdRole).toString(),
-                      model.data(index, px::ui::DownloadsModel::StateRole).toString());
+        result.insert(model.data(index, px::modrim::DownloadsModel::IdRole).toString(),
+                      model.data(index, px::modrim::DownloadsModel::StateRole).toString());
     }
     return result;
 }
 }
 
 TEST_CASE("download item events resolve states and cancel leftover rows") {
-    px::ui::DownloadsModel model;
+    px::modrim::DownloadsModel model;
     model.begin({"1", "2", "3", "4", "5"}, {{"1", "One"}});
     model.apply({"1", "downloading", 0, 0});
     model.apply({"2", "downloading", 5, 10});
@@ -37,13 +37,13 @@ TEST_CASE("download item events resolve states and cancel leftover rows") {
 }
 
 TEST_CASE("download filters limit visible rows and keep fallback titles") {
-    px::ui::DownloadsModel model;
+    px::modrim::DownloadsModel model;
     model.begin({"1", "2"}, {{"1", "One"}});
     model.apply({"2", "error", 0, 0, "x"});
     model.flush();
     model.setFilter(QStringLiteral("failed"));
     REQUIRE(model.rowCount() == 1);
-    CHECK(model.data(model.index(0), px::ui::DownloadsModel::TitleRole).toString() == "2");
+    CHECK(model.data(model.index(0), px::modrim::DownloadsModel::TitleRole).toString() == "2");
     model.setFilter(QStringLiteral("all"));
     CHECK(model.rowCount() == 2);
 }

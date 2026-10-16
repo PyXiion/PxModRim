@@ -2,7 +2,7 @@
 
 #include "core/providers/base.h"
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 // Mods the user keeps in the local mods folder: directories without a published file id.
 class LocalModProvider final : public BaseModProvider {
@@ -37,4 +37,4 @@ public:
                              MetadataCacheStore* metadataCache = nullptr);
 };
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

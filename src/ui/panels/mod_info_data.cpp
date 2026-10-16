@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <array>
 
-namespace px::ui {
+namespace px::modrim {
 namespace {
 template<class F> QString substitute(const QString& text, const QRegularExpression& re, F replacement) {
     QString out;
@@ -105,8 +105,8 @@ QString format_age(double mtime, std::optional<double> now) {
     }
     return "just now";
 }
-QVariantMap build_mod_info(core::CoreContext& ctx, const core::ListedMod& mod, const QList<core::view::ModIssueView>& issues) {
-    const auto* about = dynamic_cast<const core::AboutXmlMod*>(&mod);
+QVariantMap build_mod_info(CoreContext& ctx, const ListedMod& mod, const QList<view::ModIssueView>& issues) {
+    const auto* about = dynamic_cast<const AboutXmlMod*>(&mod);
     const auto& active = ctx.activeUuids();
     const auto position = active.indexOf(mod.uuid());
     QVariantList issue_rows, needs, needed_by, details;
@@ -121,8 +121,8 @@ QVariantMap build_mod_info(core::CoreContext& ctx, const core::ListedMod& mod, c
     const auto count = errors ? errors : warnings;
     const QString title = count ? QString::number(count) + (errors ? " error" : " warning") + (count == 1 ? "" : "s") : QStringLiteral("No issues");
     if (about) {
-        QHash<QString, const core::AboutXmlMod*> index;
-        for (const auto& entry : ctx.allMods()) if (const auto* other = dynamic_cast<const core::AboutXmlMod*>(entry.get()))
+        QHash<QString, const AboutXmlMod*> index;
+        for (const auto& entry : ctx.allMods()) if (const auto* other = dynamic_cast<const AboutXmlMod*>(entry.get()))
             if (!index.contains(other->package_id.str())) index.insert(other->package_id.str(), other);
         for (const auto& dep : about->about_rules.dependencies) {
             auto* found = index.value(dep.package_id.str(), nullptr);
@@ -138,8 +138,8 @@ QVariantMap build_mod_info(core::CoreContext& ctx, const core::ListedMod& mod, c
             if (other && active.contains(other->uuid())) conflicts.append(other->name);
         }
         std::sort(conflicts.begin(), conflicts.end(), [](const auto& a, const auto& b) { return a.toLower() < b.toLower(); });
-        QList<const core::AboutXmlMod*> dependents;
-        for (const auto& entry : ctx.allMods()) if (const auto* other = dynamic_cast<const core::AboutXmlMod*>(entry.get()); other && other->uuid() != mod.uuid()) {
+        QList<const AboutXmlMod*> dependents;
+        for (const auto& entry : ctx.allMods()) if (const auto* other = dynamic_cast<const AboutXmlMod*>(entry.get()); other && other->uuid() != mod.uuid()) {
             for (const auto& dep : other->about_rules.dependencies)
                 if (dep.package_id == about->package_id || dep.alternative_package_ids.contains(about->package_id)) { dependents.append(other); break; }
         }

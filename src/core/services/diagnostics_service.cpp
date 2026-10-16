@@ -14,7 +14,7 @@
 #include "core/context.h"
 #include "core/sort/community.h"
 
-namespace px::core {
+namespace px::modrim {
 namespace {
 
 // Cached databases older than this are refreshed in the background.
@@ -348,4 +348,4 @@ bool DiagnosticsService::SidebarBase::matches(const QHash<QString, ListedModPtr>
     return true;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

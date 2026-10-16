@@ -8,7 +8,7 @@
 
 #include "ui/plugins/organizer/dialogs.h"
 
-using px::ui::DeleteFolderDialog;
+using px::modrim::DeleteFolderDialog;
 
 namespace {
 

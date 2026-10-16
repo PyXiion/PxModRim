@@ -8,7 +8,7 @@
 #include "core/error.h"
 #include "core/models/metadata/structures.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // Parses ModsConfig.xml. nullopt when the file is unreadable, malformed, or not a ModsConfig document.
 std::optional<ModsConfig> parse_mods_config(const QString& path);
@@ -31,4 +31,4 @@ Result<void> restore_snapshot(const QString& snapshot_path, const QString& targe
 Result<void> write_mods_config(const QString& path, const ModsConfig& data, const QString& snapshots_dir,
                                int max_snapshots = 10);
 
-}  // namespace px::core
+}  // namespace px::modrim

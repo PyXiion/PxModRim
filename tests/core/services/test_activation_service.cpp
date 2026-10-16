@@ -19,7 +19,7 @@
 #include "core/services/diagnostics_service.h"
 #include "services_support.h"
 
-using namespace px::core;
+using namespace px::modrim;
 
 namespace {
 

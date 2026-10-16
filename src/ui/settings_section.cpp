@@ -3,7 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-namespace px::ui {
+namespace px::modrim {
 
 PluginConfigSectionBase::PluginConfigSectionBase(QVariantMap initial, QObject* parent)
     : SettingsSection(parent), initial_(std::move(initial)) {}
@@ -18,7 +18,7 @@ bool PluginConfigSectionBase::set(const QString& key, const QVariant& value) {
     return true;
 }
 
-core::Result<void> PluginConfigSectionBase::apply() {
+Result<void> PluginConfigSectionBase::apply() {
     if (draft_.isEmpty()) {
         return {};
     }
@@ -29,4 +29,4 @@ core::Result<void> PluginConfigSectionBase::apply() {
     return commit(QJsonObject::fromVariantMap(merged));
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

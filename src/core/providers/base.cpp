@@ -7,7 +7,7 @@
 #include "core/models/metadata/parsing.h"
 #include "core/utils.h"
 
-namespace px::core::providers {
+namespace px::modrim::providers {
 
 namespace {
 
@@ -159,4 +159,4 @@ QCoro::Task<Result<QList<ParsedMod>>> BaseModProvider::parse_candidates(
     co_return parsed;
 }
 
-}  // namespace px::core::providers
+}  // namespace px::modrim::providers

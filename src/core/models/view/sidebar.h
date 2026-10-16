@@ -5,7 +5,7 @@
 #include <QSet>
 #include <QString>
 
-namespace px::core::view {
+namespace px::modrim::view {
 
 // Display name of a mod provider; an unknown provider is shown by its id.
 QString provider_label(const QString& provider_id);
@@ -23,4 +23,4 @@ struct SidebarEntry {
     int count() const noexcept { return static_cast<int>(visible_uuids.size()); }
 };
 
-}  // namespace px::core::view
+}  // namespace px::modrim::view

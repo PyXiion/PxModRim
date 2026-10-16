@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 namespace {
 
@@ -161,4 +161,4 @@ std::optional<QList<PackageId>> find_cycle(const QSet<PackageId>& nodes, const P
     return std::nullopt;
 }
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

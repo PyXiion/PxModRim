@@ -9,7 +9,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/sort/config.h"
 
-namespace px::core {
+namespace px::modrim {
 
 class CoreContext;
 class DiagnosticsService;
@@ -43,4 +43,4 @@ private:
     DiagnosticsService& diagnostics_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

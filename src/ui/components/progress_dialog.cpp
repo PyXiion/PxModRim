@@ -14,7 +14,7 @@
 #include "ui/components/icons.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -31,7 +31,7 @@ QIcon requireIcon(QStringView name, int size, QStringView color) {
 
 }  // namespace
 
-ProgressDialog::ProgressDialog(core::LoadingState& loading, QWidget* parent)
+ProgressDialog::ProgressDialog(LoadingState& loading, QWidget* parent)
     : QDialog(parent, Qt::WindowStaysOnTopHint | Qt::CustomizeWindowHint | Qt::WindowTitleHint),
       loading_(loading) {
     setWindowTitle(QStringLiteral("Loading"));
@@ -63,10 +63,10 @@ ProgressDialog::ProgressDialog(core::LoadingState& loading, QWidget* parent)
     connect(fade_, &QPropertyAnimation::finished, this, &ProgressDialog::onFadeFinished);
 
     connections_.push_back(QObject::connect(
-        &loading_, &core::LoadingState::changed, this,
+        &loading_, &LoadingState::changed, this,
         [this](const QString&, int pct, int, int) { onChanged(pct); }));
     connections_.push_back(
-        QObject::connect(&loading_, &core::LoadingState::finished, this, &ProgressDialog::onFinished));
+        QObject::connect(&loading_, &LoadingState::finished, this, &ProgressDialog::onFinished));
 }
 
 ProgressDialog::~ProgressDialog() {
@@ -145,4 +145,4 @@ void ProgressDialog::onFadeFinished() {
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

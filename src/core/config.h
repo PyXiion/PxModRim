@@ -18,7 +18,7 @@
 #include "core/file_io.h"
 #include "core/sort/config.h"
 
-namespace px::core {
+namespace px::modrim {
 
 inline constexpr int kCurrentConfigSchemaVersion = 1;
 inline constexpr std::string_view kSchemaVersionKey = "schema_version";
@@ -189,4 +189,4 @@ private:
     std::optional<AppConfig> cfg_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

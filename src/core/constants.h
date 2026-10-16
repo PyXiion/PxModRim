@@ -7,7 +7,7 @@
 #include <QStringList>
 #include <QStringView>
 
-namespace px::core {
+namespace px::modrim {
 
 inline constexpr QLatin1StringView RIMWORLD_STEAM_APP_ID{"294100"};
 
@@ -79,4 +79,4 @@ inline const RimWorldDlc* findRimWorldDlcByPackageId(QStringView packageId) {
     return nullptr;
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

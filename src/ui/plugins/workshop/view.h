@@ -16,7 +16,7 @@
 
 class QQuickWidget;
 
-namespace px::ui::workshop {
+namespace px::modrim::workshop {
 
 class WorkshopViewPanel : public BaseViewPanel {
     Q_OBJECT
@@ -40,9 +40,9 @@ class WorkshopViewPanel : public BaseViewPanel {
 
 public:
     static constexpr RailViewMeta kRailMeta{QLatin1StringView("workshop"), QLatin1StringView("steam"), QLatin1StringView("Workshop")};
-    WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app);
-    WorkshopViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app,
-                      core::workshop::WorkshopCatalog& catalog);
+    WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app);
+    WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app,
+                      workshop::WorkshopCatalog& catalog);
     ~WorkshopViewPanel() override;
     void openRoute(const QStringList& path) override;
     Q_INVOKABLE void teardown() override;
@@ -106,14 +106,14 @@ signals:
 private:
     template<class T>
     QCoro::Task<void> run_cached(QString key,
-        std::function<QCoro::Task<core::workshop::CatalogResult<T>>()> produce,
+        std::function<QCoro::Task<workshop::CatalogResult<T>>()> produce,
         std::function<void(const T&)> apply, bool cached = true);
     QCoro::Task<void> load_pack();
     QCoro::Task<void> download(QStringList ids, QStringList collections);
     QCoro::Task<void> installed_changed();
     QCoro::Task<void> url_changed();
     void refresh_mod_ids();
-    QVariantMap row(const core::workshop::CatalogEntry& item, bool detail = false);
+    QVariantMap row(const workshop::CatalogEntry& item, bool detail = false);
     QVariantMap detail_row(const Detail& detail);
     template<class T> QList<QVariantMap> rows(const std::vector<T>& items) {
         refresh_mod_ids();
@@ -129,15 +129,15 @@ private:
     void show_installed();
     void recount();
     std::optional<QString> installed_cursor() const;
-    void queue_plan(const core::workshop::DownloadPlan& plan);
+    void queue_plan(const workshop::DownloadPlan& plan);
     void go(const QStringList& path);
 
-    core::workshop::WorkshopCatalog& catalog_;
-    core::DownloadManager& downloads_;
-    core::workshop::FavouriteCollections& favourites_;
+    workshop::WorkshopCatalog& catalog_;
+    DownloadManager& downloads_;
+    workshop::FavouriteCollections& favourites_;
     QQuickWidget* qml_ = nullptr;
     QString tab_ = QStringLiteral("Discover");
-    core::workshop::CatalogQuery criteria_;
+    workshop::CatalogQuery criteria_;
     bool busy_ = false;
     bool torn_down_ = false;
     bool installed_dirty_ = false;
@@ -151,20 +151,20 @@ private:
     InstalledList installed_;
     std::optional<std::pair<QString, QString>> current_;
     std::vector<std::tuple<QString, QString, QString>> trail_;
-    std::optional<core::workshop::DownloadPlan> pending_;
+    std::optional<workshop::DownloadPlan> pending_;
     QSet<QString> preparing_, pack_ids_, installed_ids_, active_ids_, known_tags_;
     QHash<QString, QSet<QString>> collection_mods_;
-    QHash<QString, core::workshop::CatalogEntry> items_;
-    core::Event<bool>::Id busy_id_ = 0;
-    core::Event<std::monostate>::Id queue_id_ = 0, installed_id_ = 0;
-    core::Event<QString>::Id url_id_ = 0;
-    core::Event<core::workshop::FavouritesState>::Id favourites_id_ = 0;
-    core::Event<QStringList>::Id active_id_ = 0;
+    QHash<QString, workshop::CatalogEntry> items_;
+    Event<bool>::Id busy_id_ = 0;
+    Event<std::monostate>::Id queue_id_ = 0, installed_id_ = 0;
+    Event<QString>::Id url_id_ = 0;
+    Event<workshop::FavouritesState>::Id favourites_id_ = 0;
+    Event<QStringList>::Id active_id_ = 0;
 };
 
 template<class T>
 QCoro::Task<void> WorkshopViewPanel::run_cached(QString key,
-    std::function<QCoro::Task<core::workshop::CatalogResult<T>>()> produce,
+    std::function<QCoro::Task<workshop::CatalogResult<T>>()> produce,
     std::function<void(const T&)> apply, bool cached) {
     if (torn_down_) co_return;
     QPointer<WorkshopViewPanel> self(this);
@@ -183,8 +183,8 @@ QCoro::Task<void> WorkshopViewPanel::run_cached(QString key,
         self->busy_ = false;
         emit self->changed();
     };
-    core::workshop::CatalogResult<void> result;
-    if (cached) result = co_await catalog_.cached<T>(key, std::move(produce), show, core::workshop::kFreshSeconds, true);
+    workshop::CatalogResult<void> result;
+    if (cached) result = co_await catalog_.cached<T>(key, std::move(produce), show, workshop::kFreshSeconds, true);
     else {
         auto fetched = co_await produce();
         if (fetched) show(*fetched);
@@ -199,4 +199,4 @@ QCoro::Task<void> WorkshopViewPanel::run_cached(QString key,
         co_await self->load();
 }
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

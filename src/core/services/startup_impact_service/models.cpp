@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 namespace {
 
@@ -76,4 +76,4 @@ QString format_impact(double seconds) {
     return QStringLiteral("%1ms").arg(ms);
 }
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

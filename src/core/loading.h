@@ -7,7 +7,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace px::core {
+namespace px::modrim {
 
 // Stack of progress frames for one async operation. Each frame is a subtask;
 // signals describe the innermost (top) frame.
@@ -61,4 +61,4 @@ private:
     std::vector<Frame> stack_;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim

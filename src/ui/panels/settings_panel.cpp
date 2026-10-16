@@ -14,7 +14,7 @@
 #include "ui/components/dialogs.h"
 #include "ui/context.h"
 #include "ui/theme/palette.h"
-namespace px::ui {
+namespace px::modrim {
 namespace {
 class FolderDialog : public QFileDialog {
 public:
@@ -24,7 +24,7 @@ public:
     }
 };
 }
-SettingsBackend::SettingsBackend(core::CoreContext& ctx, QDialog* dialog, const std::vector<SettingsSection*>& sections)
+SettingsBackend::SettingsBackend(CoreContext& ctx, QDialog* dialog, const std::vector<SettingsSection*>& sections)
     : QObject(dialog), ctx_(ctx), dialog_(dialog) {
     for (auto* section : sections)
         sections_.append(QVariantMap{{"title", section->title()}, {"source", section->source().toString()},
@@ -38,7 +38,7 @@ SettingsBackend::SettingsBackend(core::CoreContext& ctx, QDialog* dialog, const 
         {"confirmUnsaved", cfg.launch_confirm_unsaved}, {"confirmRunning", cfg.launch_confirm_running},
         {"useAltIds", cfg.sort.use_alternative_package_ids}, {"checkMissing", cfg.sort.check_missing_dependencies},
         {"useCommunity", cfg.sort.use_community_rules}};
-    const auto path = core::community_rules_file();
+    const auto path = community_rules_file();
     communityStatus_ = QFileInfo::exists(path) ? "Found: " + path : QStringLiteral("Not downloaded");
     cacheAvailable_ = !cfg.paths.config_folder.empty();
     cacheStatus_ = cacheAvailable_ ? QStringLiteral("Cache ready") : QStringLiteral("No config folder — not available");
@@ -57,7 +57,7 @@ QString SettingsBackend::localCandidate(const QString& gamePath) const {
     return QFileInfo(path).isDir() ? path : QString{};
 }
 void SettingsBackend::autoDetect() {
-    const auto paths = core::detect_game_paths();
+    const auto paths = detect_game_paths();
     const std::pair<const char*, const std::string*> values[]{{"game", &paths.game}, {"local", &paths.local},
         {"workshop", &paths.workshop}, {"config", &paths.config_folder}};
     for (const auto& [key, value] : values)
@@ -73,15 +73,15 @@ QCoro::Task<void> SettingsBackend::downloadCommunityRules() {
         emit communityChanged();
         co_return;
     }
-    core::LoadingState loading;
+    LoadingState loading;
     auto* progress = new QProgressDialog(QStringLiteral("Downloading community rules…"), QString{}, 0, 100, dialog_);
     progress->setWindowModality(Qt::WindowModal);
     progress->setCancelButton(nullptr);
     progress->setMinimumDuration(0);
-    connect(&loading, &core::LoadingState::changed, progress,
+    connect(&loading, &LoadingState::changed, progress,
         [progress](const QString& status, int percent, int, int) { progress->setLabelText(status); progress->setValue(percent); });
     progress->show();
-    core::sort::CommunityRulesService service(ctx_.configService(), ctx_.network());
+    sort::CommunityRulesService service(ctx_.configService(), ctx_.network());
     QPointer<SettingsBackend> guard(this);
     QPointer<QProgressDialog> progressGuard(progress);
     const auto path = co_await service.ensure_rules(loading, true);
@@ -107,7 +107,7 @@ void SettingsBackend::reportSaveError(const QString& message) {
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->open();
 }
-SettingsPanel::SettingsPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
+SettingsPanel::SettingsPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
                              const std::vector<SettingsSectionFactory>& factories)
     : QDialog(parent), config_(ctx.config()), backend_(nullptr), qml_(new QQuickWidget(engine, this)) {
     setObjectName(QStringLiteral("settingsPanel"));
@@ -145,7 +145,7 @@ void SettingsPanel::save(const QVariantMap& values) {
     updated.compact_mod_list = values.value("compact").toBool();
     updated.launch_args = text("launchArgs");
     updated.launch_wrapper = text("launchWrapper");
-    updated.after_launch = static_cast<core::AfterLaunch>(values.value("afterLaunch").toInt());
+    updated.after_launch = static_cast<AfterLaunch>(values.value("afterLaunch").toInt());
     updated.launch_confirm_errors = values.value("confirmErrors").toBool();
     updated.launch_confirm_unsaved = values.value("confirmUnsaved").toBool();
     updated.launch_confirm_running = values.value("confirmRunning").toBool();
@@ -156,4 +156,4 @@ void SettingsPanel::save(const QVariantMap& values) {
     config_ = std::move(updated);
     accept();
 }
-} // namespace px::ui
+} // namespace px::modrim

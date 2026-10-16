@@ -9,7 +9,7 @@
 #include <QSvgRenderer>
 #include <QtGlobal>
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -81,4 +81,4 @@ std::optional<QIcon> icon(QStringView name, int size, QStringView color) {
     return QIcon(*pixmap);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

@@ -2,7 +2,7 @@
 #include <QAbstractListModel>
 #include <optional>
 #include "ui/models/mod_list_model.h"
-namespace px::ui {
+namespace px::modrim {
 class ModListProxyModel : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(bool isFiltered READ is_filtered NOTIFY is_filtered_changed)

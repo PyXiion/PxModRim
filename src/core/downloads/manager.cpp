@@ -4,7 +4,7 @@
 #include <iterator>
 #include <utility>
 
-namespace px::core {
+namespace px::modrim {
 
 DownloadManager::DownloadManager() : Plugin(kDownloadsManagerName) {}
 
@@ -149,4 +149,4 @@ void DownloadManager::cancel() {
     }
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -4,7 +4,7 @@
 
 #include <QString>
 
-namespace px::core::view {
+namespace px::modrim::view {
 
 // UI-agnostic diagnostics summary for one mod.
 struct ModDiagnosticsView {
@@ -25,4 +25,4 @@ struct ModIssueView {
     bool operator==(const ModIssueView&) const = default;
 };
 
-}  // namespace px::core::view
+}  // namespace px::modrim::view

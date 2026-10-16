@@ -7,7 +7,7 @@
 class QQmlEngine;
 class QWidget;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Hosts IconRail.qml, the left navigation rail. `tabs` are maps with `icon` and `label`
 // keys; `helpEntries` are maps with `id` and `label` keys for the Help menu.
@@ -28,4 +28,4 @@ signals:
     void helpActionRequested(const QString& actionId);
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

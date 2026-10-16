@@ -34,7 +34,7 @@
 #include "core/workshop/favourites.h"
 #include "core/workshop/types.h"
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 inline constexpr std::string_view kDefaultCatalogUrl = "https://api.modrim.pyxiion.dev";
 
@@ -263,4 +263,4 @@ QCoro::Task<CatalogResult<void>> WorkshopCatalog::cached(QString key,
     co_return {};
 }
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop

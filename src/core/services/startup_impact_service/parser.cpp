@@ -10,7 +10,7 @@
 #include <QJsonParseError>
 #include <spdlog/spdlog.h>
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 namespace {
 
@@ -141,4 +141,4 @@ std::optional<StartupImpactReport> parse_startup_impact(const QString& path) {
     return report;
 }
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

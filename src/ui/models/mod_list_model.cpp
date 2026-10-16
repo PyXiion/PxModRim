@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace px::ui {
+namespace px::modrim {
 QString provider_label(const QString& provider_id, const QString& package_id) {
     const auto pid = provider_id.trimmed().toLower();
     const auto pkg = package_id.trimmed().toLower();
@@ -19,7 +19,7 @@ QString provider_label(const QString& provider_id, const QString& package_id) {
 QString section_name(bool checked, int active_count, int inactive_count) {
     return checked || active_count == 0 || inactive_count == 0 ? QString{} : QStringLiteral("Inactive (%1)").arg(inactive_count);
 }
-ModListModel::ModListModel(QHash<QString, QString> colors, core::DiagnosticsService* diagnostics, QObject* parent)
+ModListModel::ModListModel(QHash<QString, QString> colors, DiagnosticsService* diagnostics, QObject* parent)
     : QAbstractListModel(parent), provider_colors_(std::move(colors)), diagnostics_(diagnostics) {
     if (diagnostics_) diagnostics_connection_ = diagnostics_->diagnostics_summary_changed.connect(
         [this](const auto& summaries) { diagnostics_changed(summaries); });
@@ -36,7 +36,7 @@ const ModItem* ModListModel::get_item_by_uuid(const QString& uuid) const {
 QVariant ModListModel::data(const QModelIndex& index, int role) const {
     const auto* item = index.isValid() ? get_item(index.row()) : nullptr;
     if (!item) return {};
-    const auto* about = dynamic_cast<const core::AboutXmlMod*>(item->mod.get());
+    const auto* about = dynamic_cast<const AboutXmlMod*>(item->mod.get());
     switch (role) {
     case Qt::DisplayRole: return item->mod->name;
     case Qt::ToolTipRole: return item->mod->description;
@@ -80,13 +80,13 @@ QHash<int, QByteArray> ModListModel::roleNames() const {
         {StartupImpactColorRole,"startupImpactColor"},{StartupImpactTextRole,"startupImpactText"},{Qt::ToolTipRole,"toolTip"}};
 }
 void ModListModel::update_provider_colors(QHash<QString, QString> colors) { provider_colors_ = std::move(colors); }
-ModItem ModListModel::make_item(const QString& uuid, core::ListedModPtr mod, bool checked) const {
-    const auto* about = dynamic_cast<const core::AboutXmlMod*>(mod.get());
+ModItem ModListModel::make_item(const QString& uuid, ListedModPtr mod, bool checked) const {
+    const auto* about = dynamic_cast<const AboutXmlMod*>(mod.get());
     auto label = provider_label(mod->provider_id, about ? about->package_id.str() : QString{});
     auto color = provider_colors_.value(mod->provider_id, paletteValue(u"TEXT_DIM"));
     return {std::move(mod), uuid, checked, std::move(color), 0, -1, std::move(label)};
 }
-void ModListModel::load_mods(const QHash<QString, core::ListedModPtr>& mods, const QStringList& active_uuids) {
+void ModListModel::load_mods(const QHash<QString, ListedModPtr>& mods, const QStringList& active_uuids) {
     beginResetModel();
     items_.clear();
     items_.reserve(mods.size());
@@ -180,12 +180,12 @@ void ModListModel::set_check_states(const QList<int>& rows, bool checked) {
 void ModListModel::set_startup_impact(const QHash<QString, double>& impacts) {
     if (items_.isEmpty()) return;
     for (auto& item : items_) {
-        const auto* about = dynamic_cast<const core::AboutXmlMod*>(item.mod.get());
+        const auto* about = dynamic_cast<const AboutXmlMod*>(item.mod.get());
         item.startup_impact_s = about ? impacts.value(about->package_id.str()) : 0;
     }
     emit dataChanged(index(0), index(rowCount()-1), {StartupImpactRole,StartupImpactColorRole,StartupImpactTextRole});
 }
-void ModListModel::diagnostics_changed(const QHash<QString, core::view::ModDiagnosticsView>& summaries) {
+void ModListModel::diagnostics_changed(const QHash<QString, view::ModDiagnosticsView>& summaries) {
     if (items_.isEmpty()) return;
     int first = rowCount(), last = -1;
     for (int row = 0; row < items_.size(); ++row) {

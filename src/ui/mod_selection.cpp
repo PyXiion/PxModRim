@@ -4,9 +4,9 @@
 
 #include "core/services/diagnostics_service.h"
 
-namespace px::ui {
+namespace px::modrim {
 
-ModSelectionPresenter::ModSelectionPresenter(core::CoreContext& ctx, ModInfoSink& sink)
+ModSelectionPresenter::ModSelectionPresenter(CoreContext& ctx, ModInfoSink& sink)
     : ctx_(ctx), sink_(sink) {}
 
 QCoro::Task<void> ModSelectionPresenter::show(QString uuid) {
@@ -24,11 +24,11 @@ QCoro::Task<void> ModSelectionPresenter::show(QString uuid) {
         co_return;
     }
 
-    const core::ListedMod& mod = *found.value();
+    const ListedMod& mod = *found.value();
     sink_.showMod(mod, ctx_.diagnosticsService().issues_for(uuid));
 
     std::optional<QString> packageId;
-    if (const auto* about = dynamic_cast<const core::AboutXmlMod*>(&mod)) {
+    if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) {
         packageId = about->package_id.str();
     }
     const QStringList activePackageIds = resolveActivePackageIds();
@@ -47,8 +47,8 @@ void ModSelectionPresenter::clear() {
 QStringList ModSelectionPresenter::resolveActivePackageIds() const {
     const QSet<QString> active(ctx_.activeUuids().cbegin(), ctx_.activeUuids().cend());
     QStringList packageIds;
-    for (const core::ListedModPtr& mod : ctx_.allMods()) {
-        const auto* about = dynamic_cast<const core::AboutXmlMod*>(mod.get());
+    for (const ListedModPtr& mod : ctx_.allMods()) {
+        const auto* about = dynamic_cast<const AboutXmlMod*>(mod.get());
         if (about && active.contains(about->uuid())) {
             packageIds.append(about->package_id.str());
         }
@@ -56,4 +56,4 @@ QStringList ModSelectionPresenter::resolveActivePackageIds() const {
     return packageIds;
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

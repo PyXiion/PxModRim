@@ -16,12 +16,12 @@
 #include "core/models/metadata/structures.h"
 #include "services/services_support.h"
 
-using px::core::AboutXmlMod;
-using px::core::AppConfig;
-using px::core::CaseInsensitiveStr;
-using px::core::CoreContext;
-using px::core::DependencyMod;
-using px::core::ListedModPtr;
+using px::modrim::AboutXmlMod;
+using px::modrim::AppConfig;
+using px::modrim::CaseInsensitiveStr;
+using px::modrim::CoreContext;
+using px::modrim::DependencyMod;
+using px::modrim::ListedModPtr;
 using services_test::EventLoop;
 using services_test::run_async;
 
@@ -38,7 +38,7 @@ std::shared_ptr<AboutXmlMod> about(const QString& package_id, bool valid = true)
 
 std::unique_ptr<CoreContext> make_context(const QString& game_path = {}) {
     static QTemporaryDir configDir;
-    static px::core::ConfigService configService(configDir.path());
+    static px::modrim::ConfigService configService(configDir.path());
     AppConfig cfg;
     cfg.paths.game = game_path.toStdString();
     return CoreContext::create(cfg, &configService);

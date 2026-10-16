@@ -8,7 +8,7 @@
 #include <QString>
 #include <QStringView>
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 inline constexpr double IMPACT_WARN_THRESHOLD_S = 1.0;
 inline constexpr double IMPACT_HIGH_THRESHOLD_S = 5.0;
@@ -53,4 +53,4 @@ QString normalize_package_id(QStringView package_id);
 // Rounds half to even, as Python's round() does, so displayed values match the legacy app.
 QString format_impact(double seconds);
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

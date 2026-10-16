@@ -20,7 +20,7 @@
 
 #include "core/utils.h"
 
-namespace px::core {
+namespace px::modrim {
 namespace {
 
 constexpr auto kProgressLogInterval = std::chrono::seconds(15);
@@ -565,6 +565,6 @@ QCoro::Task<void> SteamDownloader::run_scheduled_auto_update() {
     arm_auto_update(kAutoUpdateCheckInterval);
 }
 
-}  // namespace px::core
+}  // namespace px::modrim
 
 #endif  // PX_HAS_STEAM

@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -203,4 +203,4 @@ Result<void> appendJsonAsXml(pugi::xml_node parent, const glz::json_t& data) {
     return fillElement(root, rootValue);
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

@@ -11,7 +11,7 @@
 #include "ui/context.h"
 #include "ui/plugins/steam_workshop/download_queue_model.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 struct SidebarSync {
     CheckedDownloads checked_ids;
@@ -36,36 +36,36 @@ public:
     void clear_queue();
     void sync_all();
     bool is_downloading() const;
-    QCoro::Task<core::Result<QJsonValue>> fetch_mod_deps(QString id);
+    QCoro::Task<Result<QJsonValue>> fetch_mod_deps(QString id);
 
-    core::Event<QStringList> badges_refresh_requested;
-    core::Event<QStringList> active_refresh_requested;
-    core::Event<SidebarSync> sidebar_sync_requested;
-    core::Event<core::DownloadItemStatus> item_status_changed;
-    core::Event<bool> download_busy_changed;
-    core::Event<QString> uncheck_mod_requested;
-    core::Event<std::monostate> clear_checked_requested;
+    Event<QStringList> badges_refresh_requested;
+    Event<QStringList> active_refresh_requested;
+    Event<SidebarSync> sidebar_sync_requested;
+    Event<DownloadItemStatus> item_status_changed;
+    Event<bool> download_busy_changed;
+    Event<QString> uncheck_mod_requested;
+    Event<std::monostate> clear_checked_requested;
 
 private:
     void disconnect_events();
     void refresh_cached_ids();
     void notify_sidebar();
-    void on_item_status(const core::DownloadItemStatus& status);
-    void on_download_finished(const core::DownloadResult& result);
-    core::CoreContext* core_ = nullptr;
+    void on_item_status(const DownloadItemStatus& status);
+    void on_download_finished(const DownloadResult& result);
+    CoreContext* core_ = nullptr;
     AppContext* app_ = nullptr;
-    core::SteamDownloader* service_ = nullptr;
+    SteamDownloader* service_ = nullptr;
     QSet<QString> installed_ids_;
     QSet<QString> active_ids_;
     CheckedDownloads checked_ids_;
     QHash<QString, QString> statuses_;
     bool own_download_ = false;
-    core::Event<std::monostate>::Id mods_id_ = 0;
-    core::Event<QStringList>::Id active_id_ = 0;
-    core::Event<core::DownloadItemStatus>::Id status_id_ = 0;
-    core::Event<core::DownloadResult>::Id finished_id_ = 0;
-    core::Event<bool>::Id busy_id_ = 0;
+    Event<std::monostate>::Id mods_id_ = 0;
+    Event<QStringList>::Id active_id_ = 0;
+    Event<DownloadItemStatus>::Id status_id_ = 0;
+    Event<DownloadResult>::Id finished_id_ = 0;
+    Event<bool>::Id busy_id_ = 0;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim
 #endif

@@ -1,6 +1,6 @@
 #include "core/checker/models.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 QString ModDiagnostics::error_tooltip() const {
     if (errors.isEmpty()) {
@@ -22,4 +22,4 @@ QString ModDiagnostics::warning_tooltip() const {
     return QStringLiteral("%1 warnings").arg(warnings.size());
 }
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

@@ -12,7 +12,7 @@
 
 #include "ui/plugins/steam_workshop/plugin.h"
 
-namespace px::ui {
+namespace px::modrim {
 namespace {
 bool is_published_file_id(const QJsonValue& value) {
     if (!value.isString()) return false;
@@ -95,5 +95,5 @@ QCoro::Task<void> PxModRimBridge::handle(QString request_id, QString method, QSt
     respond(request_id, true);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim
 #endif

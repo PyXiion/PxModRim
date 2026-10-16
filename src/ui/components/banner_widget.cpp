@@ -12,7 +12,7 @@
 
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
@@ -132,4 +132,4 @@ void AspectRatioBanner::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

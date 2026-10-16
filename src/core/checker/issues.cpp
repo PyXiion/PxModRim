@@ -4,7 +4,7 @@
 
 #include "core/checker/graph.h"
 
-namespace px::core::checker {
+namespace px::modrim::checker {
 
 bool DependencyIssueChecker::should_check(const AboutXmlMod& mod, const CheckContext&) const {
     return !mod.about_rules.dependencies.isEmpty();
@@ -266,4 +266,4 @@ QList<ModIssue> ReplacementIssueChecker::check(const AboutXmlMod& mod,
     }};
 }
 
-}  // namespace px::core::checker
+}  // namespace px::modrim::checker

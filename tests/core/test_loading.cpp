@@ -21,14 +21,14 @@ struct Emission {
 }  // namespace
 
 TEST_CASE("loading state reports the innermost frame and pops back to its parent") {
-    px::core::LoadingState state;
+    px::modrim::LoadingState state;
     QList<Emission> emissions;
     int finished = 0;
-    QObject::connect(&state, &px::core::LoadingState::changed,
+    QObject::connect(&state, &px::modrim::LoadingState::changed,
                      [&](const QString& status, int pct, int current, int total) {
                          emissions.append(Emission{status, pct, current, total});
                      });
-    QObject::connect(&state, &px::core::LoadingState::finished, [&] { ++finished; });
+    QObject::connect(&state, &px::modrim::LoadingState::finished, [&] { ++finished; });
 
     {
         auto outer = state.task(QStringLiteral("outer"), 4);
@@ -49,9 +49,9 @@ TEST_CASE("loading state reports the innermost frame and pops back to its parent
 }
 
 TEST_CASE("percent truncates the float quotient, as the legacy progress did") {
-    px::core::LoadingState state;
+    px::modrim::LoadingState state;
     QList<Emission> emissions;
-    QObject::connect(&state, &px::core::LoadingState::changed,
+    QObject::connect(&state, &px::modrim::LoadingState::changed,
                      [&](const QString& status, int pct, int current, int total) {
                          emissions.append(Emission{status, pct, current, total});
                      });
@@ -61,9 +61,9 @@ TEST_CASE("percent truncates the float quotient, as the legacy progress did") {
 }
 
 TEST_CASE("set_total clamps to at least one step and progress stays within bounds") {
-    px::core::LoadingState state;
+    px::modrim::LoadingState state;
     QList<Emission> emissions;
-    QObject::connect(&state, &px::core::LoadingState::changed,
+    QObject::connect(&state, &px::modrim::LoadingState::changed,
                      [&](const QString& status, int pct, int current, int total) {
                          emissions.append(Emission{status, pct, current, total});
                      });
@@ -77,9 +77,9 @@ TEST_CASE("set_total clamps to at least one step and progress stays within bound
 }
 
 TEST_CASE("popping an empty stack still reports completion") {
-    px::core::LoadingState state;
+    px::modrim::LoadingState state;
     int finished = 0;
-    QObject::connect(&state, &px::core::LoadingState::finished, [&] { ++finished; });
+    QObject::connect(&state, &px::modrim::LoadingState::finished, [&] { ++finished; });
     state.pop();
     REQUIRE(finished == 1);
 }

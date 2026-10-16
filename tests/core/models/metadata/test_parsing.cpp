@@ -8,11 +8,11 @@
 #include "core/models/metadata/parsing.h"
 #include "core/models/metadata/structures.h"
 
-using px::core::AboutXmlMod;
-using px::core::CaseInsensitiveStr;
-using px::core::createAboutModFromElement;
-using px::core::createListedModFromPath;
-using px::core::ListedMod;
+using px::modrim::AboutXmlMod;
+using px::modrim::CaseInsensitiveStr;
+using px::modrim::createAboutModFromElement;
+using px::modrim::createListedModFromPath;
+using px::modrim::ListedMod;
 
 namespace {
 

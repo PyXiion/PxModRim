@@ -17,7 +17,7 @@
 #include "ui/navigation.h"
 #include "ui/plugins/steam_workshop/view.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 SteamWorkshopUiPlugin::SteamWorkshopUiPlugin()
     : UiPlugin(QStringLiteral("steamworkshop"), {QStringLiteral("steam_downloader")}) {}
@@ -26,7 +26,7 @@ SteamWorkshopUiPlugin::~SteamWorkshopUiPlugin() { disconnect_events(); }
 void SteamWorkshopUiPlugin::setup(AppContext& ctx) {
     core_ = &ctx.coreContext();
     app_ = &ctx;
-    service_ = static_cast<core::SteamDownloader*>(core_->plugins().get(QStringLiteral("steam_downloader")));
+    service_ = static_cast<SteamDownloader*>(core_->plugins().get(QStringLiteral("steam_downloader")));
     ctx.addRailView<SteamWorkshopViewPanel>();
     mods_id_ = core_->modService().mods_changed.connect([this](const std::monostate&) {
         refresh_cached_ids();
@@ -38,8 +38,8 @@ void SteamWorkshopUiPlugin::setup(AppContext& ctx) {
         badges_refresh_requested.notify(installed_ids_.values());
         active_refresh_requested.notify(active_ids_.values());
     });
-    status_id_ = service_->download_item_status_changed.connect([this](const core::DownloadItemStatus& status) { on_item_status(status); });
-    finished_id_ = service_->download_finished.connect([this](const core::DownloadResult& result) { on_download_finished(result); });
+    status_id_ = service_->download_item_status_changed.connect([this](const DownloadItemStatus& status) { on_item_status(status); });
+    finished_id_ = service_->download_finished.connect([this](const DownloadResult& result) { on_download_finished(result); });
     busy_id_ = service_->busy_changed.connect([this](bool busy) { download_busy_changed.notify(busy); });
 }
 
@@ -172,13 +172,13 @@ void SteamWorkshopUiPlugin::sync_all() {
     notify_sidebar();
 }
 
-void SteamWorkshopUiPlugin::on_item_status(const core::DownloadItemStatus& status) {
+void SteamWorkshopUiPlugin::on_item_status(const DownloadItemStatus& status) {
     if (!own_download_) return;
     statuses_.insert(status.mod_id, status.status);
     item_status_changed.notify(status);
 }
 
-void SteamWorkshopUiPlugin::on_download_finished(const core::DownloadResult& result) {
+void SteamWorkshopUiPlugin::on_download_finished(const DownloadResult& result) {
     if (!own_download_) return;
     for (const auto& id : result.succeeded) {
         checked_ids_.removeIf([&id](const auto& item) { return item.first == id; });
@@ -204,7 +204,7 @@ void SteamWorkshopUiPlugin::refresh_cached_ids() {
     }
 }
 
-QCoro::Task<core::Result<QJsonValue>> SteamWorkshopUiPlugin::fetch_mod_deps(QString id) {
+QCoro::Task<Result<QJsonValue>> SteamWorkshopUiPlugin::fetch_mod_deps(QString id) {
     QUrl url(QStringLiteral("https://deps.modrim.pyxiion.ru/deps"));
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("id"), id);
@@ -216,22 +216,22 @@ QCoro::Task<core::Result<QJsonValue>> SteamWorkshopUiPlugin::fetch_mod_deps(QStr
     if (!co_await qCoro(reply).waitForFinished(std::chrono::seconds{30})) {
         reply->abort();
         reply->deleteLater();
-        co_return std::unexpected(core::Error{QStringLiteral("Timeout")});
+        co_return std::unexpected(Error{QStringLiteral("Timeout")});
     }
     const auto error = reply->error();
     const auto status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const auto bytes = reply->readAll();
     const auto message = reply->errorString();
     reply->deleteLater();
-    if (error == QNetworkReply::TimeoutError) co_return std::unexpected(core::Error{QStringLiteral("Timeout")});
+    if (error == QNetworkReply::TimeoutError) co_return std::unexpected(Error{QStringLiteral("Timeout")});
     if (status && status != 200) co_return QJsonValue(QJsonValue::Null);
-    if (error != QNetworkReply::NoError) co_return std::unexpected(core::Error{message});
+    if (error != QNetworkReply::NoError) co_return std::unexpected(Error{message});
     if (bytes.isEmpty()) co_return QJsonValue(QJsonValue::Null);
     QJsonParseError parse_error;
     const auto document = QJsonDocument::fromJson(QByteArray("[") + bytes + ']', &parse_error);
-    if (parse_error.error != QJsonParseError::NoError) co_return std::unexpected(core::Error{parse_error.errorString()});
+    if (parse_error.error != QJsonParseError::NoError) co_return std::unexpected(Error{parse_error.errorString()});
     co_return document.array().at(0);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim
 #endif

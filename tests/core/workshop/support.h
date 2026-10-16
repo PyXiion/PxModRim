@@ -83,22 +83,22 @@ inline constexpr std::string_view kCollectionJson = R"JSON({
   "no_common_version": false
 })JSON";
 
-inline px::core::workshop::CatalogMod decode_mod(std::string_view json) {
-    px::core::workshop::CatalogMod mod;
-    REQUIRE_FALSE(glz::read<px::core::workshop::kWireOpts>(mod, std::string(json)));
+inline px::modrim::workshop::CatalogMod decode_mod(std::string_view json) {
+    px::modrim::workshop::CatalogMod mod;
+    REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(mod, std::string(json)));
     return mod;
 }
 
-inline px::core::workshop::CatalogCollection decode_collection(std::string_view json) {
-    px::core::workshop::CatalogCollection collection;
-    REQUIRE_FALSE(glz::read<px::core::workshop::kWireOpts>(collection, std::string(json)));
+inline px::modrim::workshop::CatalogCollection decode_collection(std::string_view json) {
+    px::modrim::workshop::CatalogCollection collection;
+    REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(collection, std::string(json)));
     return collection;
 }
 
 // The wire form of any catalog type, for building responses.
 template <class T>
 std::string wire(const T& value) {
-    auto text = glz::write<px::core::workshop::kWireOpts>(value);
+    auto text = glz::write<px::modrim::workshop::kWireOpts>(value);
     REQUIRE(text.has_value());
     return *text;
 }

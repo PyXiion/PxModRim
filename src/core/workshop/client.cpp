@@ -13,7 +13,7 @@
 #include <QNetworkRequest>
 #include <QVariant>
 
-namespace px::core::workshop {
+namespace px::modrim::workshop {
 
 namespace {
 
@@ -285,4 +285,4 @@ QCoro::Task<CatalogResult<ResolvedDownload>> CatalogClient::resolve(QStringList 
     co_return merged;
 }
 
-}  // namespace px::core::workshop
+}  // namespace px::modrim::workshop

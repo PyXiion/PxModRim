@@ -3,7 +3,7 @@
 #include <QHash>
 #include <QLatin1StringView>
 
-namespace px::core::startup_impact {
+namespace px::modrim::startup_impact {
 
 namespace {
 
@@ -118,4 +118,4 @@ QString metric_label(const QString& key) {
     return QStringLiteral("%1 (%2)").arg(label, shown);
 }
 
-}  // namespace px::core::startup_impact
+}  // namespace px::modrim::startup_impact

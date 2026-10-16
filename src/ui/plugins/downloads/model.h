@@ -8,7 +8,7 @@
 
 #include "core/downloads/types.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 class DownloadsModel final : public QAbstractListModel {
     Q_OBJECT
@@ -36,10 +36,10 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void begin(const QStringList& ids, const QHash<QString, QString>& titles);
-    void apply(const core::DownloadItemStatus& status);
-    void set_title(const core::DownloadItemTitle& item);
+    void apply(const DownloadItemStatus& status);
+    void set_title(const DownloadItemTitle& item);
     void set_phase(const QString& phase);
-    void finish(const core::DownloadResult& result);
+    void finish(const DownloadResult& result);
     void set_busy(bool busy);
     QStringList failed_ids() const;
     void flush();
@@ -95,4 +95,4 @@ private:
     QVariantList history_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

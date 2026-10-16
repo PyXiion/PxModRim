@@ -11,8 +11,8 @@
 #include "core/services/startup_impact_service/phases.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
-using namespace core::startup_impact;
+namespace px::modrim {
+using namespace startup_impact;
 namespace {
 constexpr double minSeconds = 0.001;
 QString phaseColor(std::size_t i) {
@@ -139,4 +139,4 @@ QVariantMap build_startup_impact(const StartupImpactReport& report, const QStrin
         {"legend", legend}, {"mods", rows}, {"active_count", activeCount}, {"selected_key", selectedKey},
         {"phases_with_base", phaseRows(entries, selected)}, {"phases_mods_only", modsPhases}};
 }
-} // namespace px::ui
+} // namespace px::modrim

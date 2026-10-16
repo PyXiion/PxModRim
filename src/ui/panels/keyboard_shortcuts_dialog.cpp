@@ -6,7 +6,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-namespace px::ui {
+namespace px::modrim {
 KeyboardShortcutsDialog::KeyboardShortcutsDialog(const QList<QPair<QString, QString>>& rows,
                                                  QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Keyboard Shortcuts"));
@@ -33,4 +33,4 @@ KeyboardShortcutsDialog::KeyboardShortcutsDialog(const QList<QPair<QString, QStr
     buttons->addWidget(close);
     layout->addLayout(buttons);
 }
-}  // namespace px::ui
+}  // namespace px::modrim

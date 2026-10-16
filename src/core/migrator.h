@@ -9,7 +9,7 @@
 
 #include "core/error.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // Applies one schema step, leaving the database at the step's version.
 using MigrationStep = std::function<Result<void>()>;
@@ -25,4 +25,4 @@ Result<void> ensure_schema(QSqlDatabase& db, const QString& schema_sql, int sche
                            const MigrationSteps& steps, const std::optional<QString>& backup_path = std::nullopt,
                            const QString& label = QStringLiteral("schema"));
 
-}  // namespace px::core
+}  // namespace px::modrim

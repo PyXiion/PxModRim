@@ -5,15 +5,15 @@
 
 #include "core/constants.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 namespace {
 
-QString strategyLabel(core::LaunchStrategy strategy) {
+QString strategyLabel(LaunchStrategy strategy) {
     switch (strategy) {
-        case core::LaunchStrategy::Direct:
+        case LaunchStrategy::Direct:
             return QStringLiteral("Direct executable");
-        case core::LaunchStrategy::Steam:
+        case LaunchStrategy::Steam:
             return QStringLiteral("Steam");
     }
     return {};
@@ -32,7 +32,7 @@ HeaderController::HeaderController(bool isFrameless, int initialStrategy, QStrin
 
 QVariantList HeaderController::strategies() const {
     QVariantList list;
-    for (const auto strategy : {core::LaunchStrategy::Direct, core::LaunchStrategy::Steam}) {
+    for (const auto strategy : {LaunchStrategy::Direct, LaunchStrategy::Steam}) {
         list.append(QVariantMap{{QStringLiteral("index"), static_cast<int>(strategy)},
                                 {QStringLiteral("label"), strategyLabel(strategy)}});
     }
@@ -115,4 +115,4 @@ void HeaderController::setStrategy(int index) {
 
 void HeaderController::dragStarted() { emit dragStartRequested(); }
 
-}  // namespace px::ui
+}  // namespace px::modrim

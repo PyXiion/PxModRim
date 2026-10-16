@@ -9,13 +9,13 @@
 
 #include "core/services/sort_service.h"
 
-using px::core::AboutXmlMod;
-using px::core::CaseInsensitiveStr;
-using px::core::DependencyMod;
-using px::core::ListedMod;
-using px::core::ListedModPtr;
-using px::core::SortService;
-using px::core::sort::PackageId;
+using px::modrim::AboutXmlMod;
+using px::modrim::CaseInsensitiveStr;
+using px::modrim::DependencyMod;
+using px::modrim::ListedMod;
+using px::modrim::ListedModPtr;
+using px::modrim::SortService;
+using px::modrim::sort::PackageId;
 
 namespace {
 

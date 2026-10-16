@@ -4,7 +4,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace px::ui {
+namespace px::modrim {
 
 // Design tokens for QML, exposed as the `Theme` root context property (see
 // createQmlEngine). Color values come from the same PALETTE as the stylesheet;
@@ -119,4 +119,4 @@ private:
     QString logo_data_uri_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

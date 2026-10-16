@@ -11,11 +11,11 @@ TEST_CASE("coroutine resumes on the Qt event loop") {
 
     QString result;
     auto run = [&]() -> QCoro::Task<> {
-        result = co_await px::core::delayedVersion(5);
+        result = co_await px::modrim::delayedVersion(5);
         app.quit();
     };
     run();
     app.exec();
 
-    REQUIRE(result == px::core::appVersion());
+    REQUIRE(result == px::modrim::appVersion());
 }

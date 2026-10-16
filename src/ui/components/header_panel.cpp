@@ -8,7 +8,7 @@
 #include "ui/components/header_controller.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 HeaderPanel::HeaderPanel(HeaderController& controller, QQmlEngine* engine, QWidget* parent)
     : QQuickWidget(engine, parent) {
@@ -21,4 +21,4 @@ HeaderPanel::HeaderPanel(HeaderController& controller, QQmlEngine* engine, QWidg
     }
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

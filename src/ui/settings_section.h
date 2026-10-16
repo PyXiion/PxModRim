@@ -20,7 +20,7 @@
 #include "core/error.h"
 #include "core/plugin_config.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 // A plugin's group on the Settings dialog. `source()` is loaded into a group titled
 // `title()` with this object as its required `section` property. Edits stay on the
@@ -35,7 +35,7 @@ public:
     virtual QString title() const = 0;
     virtual QUrl source() const = 0;
 
-    virtual core::Result<void> apply() = 0;
+    virtual Result<void> apply() = 0;
 };
 
 // Builds a plugin's section for one dialog, parented to that dialog.
@@ -55,13 +55,13 @@ public:
     // Returns false when `key` is not a field of the settings, so QML can tell the edit was dropped.
     Q_INVOKABLE bool set(const QString& key, const QVariant& value);
 
-    core::Result<void> apply() final;
+    Result<void> apply() final;
 
 protected:
     PluginConfigSectionBase(QVariantMap initial, QObject* parent);
 
     // Commits the merged settings; an error leaves the stored config unchanged.
-    virtual core::Result<void> commit(const QJsonObject& merged) = 0;
+    virtual Result<void> commit(const QJsonObject& merged) = 0;
 
 private:
     QVariantMap initial_;
@@ -72,15 +72,15 @@ private:
 template <class T>
 class PluginConfigSection : public PluginConfigSectionBase {
 public:
-    PluginConfigSection(core::PluginConfig<T>& config, QObject* parent)
+    PluginConfigSection(PluginConfig<T>& config, QObject* parent)
         : PluginConfigSectionBase(toVariantMap(config.value()), parent), config_(config) {}
 
 protected:
-    core::Result<void> commit(const QJsonObject& merged) override {
+    Result<void> commit(const QJsonObject& merged) override {
         const std::string text = QJsonDocument(merged).toJson(QJsonDocument::Compact).toStdString();
         T value{};
-        if (auto error = glz::read<core::kJsonReadOpts>(value, text)) {
-            return std::unexpected(core::Error{QString::fromStdString(glz::format_error(error, text))});
+        if (auto error = glz::read<kJsonReadOpts>(value, text)) {
+            return std::unexpected(Error{QString::fromStdString(glz::format_error(error, text))});
         }
         config_.update(std::move(value));
         return {};
@@ -96,7 +96,7 @@ private:
         return QJsonDocument::fromJson(QByteArray::fromStdString(*text)).object().toVariantMap();
     }
 
-    core::PluginConfig<T>& config_;
+    PluginConfig<T>& config_;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

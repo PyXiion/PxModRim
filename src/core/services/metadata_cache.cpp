@@ -20,7 +20,7 @@
 #include "core/migrator.h"
 #include "core/models/metadata/structures.h"
 
-namespace px::core::services {
+namespace px::modrim::services {
 
 using providers::CacheLookup;
 using providers::CachedMod;
@@ -621,4 +621,4 @@ void MetadataCache::prune(const QSet<QString>& live_mod_paths) {
     }
 }
 
-}  // namespace px::core::services
+}  // namespace px::modrim::services

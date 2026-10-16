@@ -4,7 +4,7 @@
 
 class QDialog;
 
-namespace px::ui {
+namespace px::modrim {
 
 // Gives `dialog` the frameless title-bar look of the main window. Call after the
 // dialog's layout is built and before it is shown. Native file pickers keep the
@@ -13,4 +13,4 @@ namespace px::ui {
 void installDialogChrome(QDialog* dialog, bool closable = true,
                          std::optional<bool> resizable = std::nullopt);
 
-}  // namespace px::ui
+}  // namespace px::modrim

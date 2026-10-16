@@ -13,7 +13,7 @@
 #include "core/workshop/types.h"
 #include "support.h"
 
-using namespace px::core::workshop;
+using namespace px::modrim::workshop;
 using test_support::TestApplication;
 using workshop_test::FakeCatalog;
 using workshop_test::HttpRequest;

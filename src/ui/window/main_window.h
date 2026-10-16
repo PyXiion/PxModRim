@@ -20,7 +20,7 @@ class QQmlEngine;
 class QSplitter;
 class QStackedWidget;
 
-namespace px::ui {
+namespace px::modrim {
 
 class HeaderController;
 class HeaderPanel;
@@ -73,7 +73,7 @@ private:
     void snapRail();
     void savePrefs();
     void onModsReloaded();
-    void onDownloadsFinished(const core::DownloadResult& result);
+    void onDownloadsFinished(const DownloadResult& result);
     QCoro::Task<void> confirmClose();
     QCoro::Task<void> reloadMods(bool full = false);
     QCoro::Task<void> autoSort();
@@ -85,14 +85,14 @@ private:
     QCoro::Task<void> restoreSnapshot();
     QCoro::Task<void> checkUpdates(bool manual);
     QCoro::Task<std::optional<QStringList>> writeActiveLayout();
-    QCoro::Task<bool> confirmLaunch(bool core::AppConfig::* setting, const QString& title,
+    QCoro::Task<bool> confirmLaunch(bool AppConfig::* setting, const QString& title,
                                    const QString& text, const QString& info, const QString& accept);
     QCoro::Task<void> launchGame();
     QCoro::Task<void> selectMod(QString uuid);
     QCoro::Task<void> requestMod(QString uuid);
 
     AppContext& app_;
-    core::CoreContext& ctx_;
+    CoreContext& ctx_;
     QQmlEngine* engine_;
     HeaderController* header_controller_ = nullptr;
     HeaderPanel* header_ = nullptr;
@@ -108,7 +108,7 @@ private:
     QStringList saved_active_;
     ActionMap actions_;
     std::function<void()> quit_;
-    core::services::UpdateService updates_;
+    services::UpdateService updates_;
     bool unsaved_ = false;
     bool close_prompt_open_ = false;
     bool close_confirmed_ = false;
@@ -126,4 +126,4 @@ private:
     std::uint64_t download_status_connection_ = 0;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim

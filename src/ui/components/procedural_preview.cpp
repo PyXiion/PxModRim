@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace px::ui {
+namespace px::modrim {
 QString initials(const QString& title) {
     static const QRegularExpression tags(R"([\[(][^\])]*[\])])");
     static const QRegularExpression words(R"([^\W_]+)", QRegularExpression::UseUnicodePropertiesOption);

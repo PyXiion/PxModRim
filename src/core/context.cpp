@@ -16,7 +16,7 @@
 #include "core/services/game_launcher.h"
 #include "core/services/sort_service.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -176,4 +176,4 @@ void CoreContext::registerPlugin(std::unique_ptr<Plugin> plugin) {
     plugins_.register_plugin(std::move(plugin));
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

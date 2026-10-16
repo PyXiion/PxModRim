@@ -15,7 +15,7 @@
 
 #include "core/migrator.h"
 
-namespace px::core::organizer {
+namespace px::modrim::organizer {
 
 namespace {
 
@@ -624,4 +624,4 @@ QCoro::Task<void> OrganizerDb::close() {
     co_await QtConcurrent::run(&pool_, [name = connection_name_] { discard_connection(name); });
 }
 
-}  // namespace px::core::organizer
+}  // namespace px::modrim::organizer

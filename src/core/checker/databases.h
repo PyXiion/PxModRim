@@ -12,7 +12,7 @@
 
 class QNetworkAccessManager;
 
-namespace px::core {
+namespace px::modrim {
 
 class ConfigService;
 
@@ -79,4 +79,4 @@ private:
 };
 
 }  // namespace checker
-}  // namespace px::core
+}  // namespace px::modrim

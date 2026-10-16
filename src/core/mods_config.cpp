@@ -22,7 +22,7 @@
 #include "core/file_io.h"
 #include "core/xml.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -288,4 +288,4 @@ Result<void> write_mods_config(const QString& path, const ModsConfig& data, cons
     return {};
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

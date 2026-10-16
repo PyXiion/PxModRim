@@ -3,7 +3,7 @@
 #include <QByteArray>
 #include <QUrl>
 
-namespace px::ui {
+namespace px::modrim {
 
 QString Route::url() const { return buildRoute(view_id, path); }
 
@@ -31,4 +31,4 @@ std::optional<Route> parseRoute(const QString& url) {
     return route;
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

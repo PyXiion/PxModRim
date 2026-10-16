@@ -18,8 +18,8 @@ struct TestContext {
     QStringList log;
 };
 
-using Plugin = px::core::BasicPlugin<TestContext>;
-using PluginRegistry = px::core::BasicPluginRegistry<TestContext>;
+using Plugin = px::modrim::BasicPlugin<TestContext>;
+using PluginRegistry = px::modrim::BasicPluginRegistry<TestContext>;
 using test_support::run_sync;
 
 class RecorderPlugin : public Plugin {

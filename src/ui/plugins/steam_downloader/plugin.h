@@ -6,11 +6,11 @@
 #include "core/downloads/steam.h"
 #include "ui/settings_section.h"
 
-namespace px::ui {
+namespace px::modrim {
 
-class SteamSettingsSection final : public PluginConfigSection<core::SteamSettings> {
+class SteamSettingsSection final : public PluginConfigSection<SteamSettings> {
 public:
-    SteamSettingsSection(core::PluginConfig<core::SteamSettings>& settings, QObject* parent);
+    SteamSettingsSection(PluginConfig<SteamSettings>& settings, QObject* parent);
     QString title() const override;
     QUrl source() const override;
 };
@@ -21,5 +21,5 @@ public:
     void setup(AppContext& ctx) override;
 };
 
-}  // namespace px::ui
+}  // namespace px::modrim
 #endif

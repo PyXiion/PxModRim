@@ -8,7 +8,7 @@
 #include "ui/theme/constants.h"
 #include "ui/theme/palette.h"
 
-namespace px::ui {
+namespace px::modrim {
 
 DownloadSidebar::DownloadSidebar(QQmlEngine* engine, QWidget* parent)
     : QWidget(parent), model_(new DownloadQueueModel(this)), qml_(new QQuickWidget(engine, this)) {
@@ -39,4 +39,4 @@ void DownloadSidebar::update_status(const QString& id, const QString& status, qi
     model_->update_status(id, status, done, total);
 }
 
-}  // namespace px::ui
+}  // namespace px::modrim

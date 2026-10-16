@@ -6,9 +6,9 @@
 #include <QAction>
 #include <QDebug>
 #include <QMenu>
-namespace px::ui {
-QStringList updatable_ids(core::CoreContext& ctx, const QStringList& uuids) {
-    QList<core::ListedModPtr> mods;
+namespace px::modrim {
+QStringList updatable_ids(CoreContext& ctx, const QStringList& uuids) {
+    QList<ListedModPtr> mods;
     mods.reserve(uuids.size());
     for (const auto& uuid : uuids) {
         const auto it = ctx.allMods().constFind(uuid);
@@ -16,7 +16,7 @@ QStringList updatable_ids(core::CoreContext& ctx, const QStringList& uuids) {
     }
     return ctx.downloads().updatable_ids(mods);
 }
-UpdateState update_state(core::CoreContext& ctx, const QStringList& uuids) {
+UpdateState update_state(CoreContext& ctx, const QStringList& uuids) {
     const auto ids = updatable_ids(ctx, uuids);
     QString label = QStringLiteral("Update");
     if (uuids.size() > 1) label += QStringLiteral(" (%1 of %2)").arg(ids.size()).arg(uuids.size());
@@ -26,7 +26,7 @@ UpdateState update_state(core::CoreContext& ctx, const QStringList& uuids) {
     if (ids.isEmpty()) return {label, false, QStringLiteral("None of these mods were downloaded by PxModRim")};
     return {label, true, {}};
 }
-QAction* add_update_action(QMenu* menu, core::CoreContext& ctx, const QStringList& uuids, std::function<void()> handler) {
+QAction* add_update_action(QMenu* menu, CoreContext& ctx, const QStringList& uuids, std::function<void()> handler) {
     if (!ctx.downloads().available()) return nullptr;
     const auto state = update_state(ctx, uuids);
     auto* action = menu->addAction(state.label);
@@ -48,7 +48,7 @@ QCoro::Task<bool> confirm_update(int count, QWidget* parent) {
     const auto [result, dialog] = co_await awaitDialog<ConfirmUpdateDialog>(count, parent);
     co_return result == QMessageBox::Yes;
 }
-QCoro::Task<void> update_mods(core::CoreContext& ctx, const QStringList& uuids, QWidget* parent) {
+QCoro::Task<void> update_mods(CoreContext& ctx, const QStringList& uuids, QWidget* parent) {
     const auto ids = updatable_ids(ctx, uuids);
     if (ids.isEmpty() || !(co_await confirm_update(static_cast<int>(ids.size()), parent))) co_return;
     const auto result = co_await ctx.downloads().download_mods(ids);

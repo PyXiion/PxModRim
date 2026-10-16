@@ -12,7 +12,7 @@
 
 class QNetworkAccessManager;
 
-namespace px::core::sort {
+namespace px::modrim::sort {
 
 // Keeps the community rules file in the config directory, downloading the Community-Rules-Database
 // archive when the file is missing.
@@ -36,4 +36,4 @@ private:
     QNetworkAccessManager& network_;
 };
 
-}  // namespace px::core::sort
+}  // namespace px::modrim::sort

@@ -10,7 +10,7 @@
 #include "core/utils.h"
 #include "core/xml.h"
 
-namespace px::core {
+namespace px::modrim {
 
 namespace {
 
@@ -407,4 +407,4 @@ Result<ListedModPtr> createListedModFromPath(const QString& path, const QString&
     return invalidListedMod(path);
 }
 
-}  // namespace px::core
+}  // namespace px::modrim

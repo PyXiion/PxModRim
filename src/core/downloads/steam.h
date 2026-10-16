@@ -34,7 +34,7 @@
 #include "core/models/metadata/structures.h"
 #include "core/plugin_config.h"
 
-namespace px::core {
+namespace px::modrim {
 
 // PxSteamDL runs one shared pool of parallel_items * threads_per_item workers.
 inline constexpr int kSteamMaxParallelItems = 8;
@@ -192,6 +192,6 @@ private:
     bool stopping_ = false;
 };
 
-}  // namespace px::core
+}  // namespace px::modrim
 
 #endif  // PX_HAS_STEAM

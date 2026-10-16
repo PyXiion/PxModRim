@@ -3,7 +3,7 @@
 #include "core/context.h"
 #include "core/services/activation_service.h"
 #include <QAbstractButton>
-namespace px::ui {
+namespace px::modrim {
 DependentModsDialog::DependentModsDialog(const QStringList& dependents, QWidget* parent) : QMessageBox(parent) {
     setIcon(QMessageBox::Warning);
     setWindowTitle(QStringLiteral("Disable Dependent Mods"));
@@ -17,7 +17,7 @@ DependentModsDialog::DependentModsDialog(const QStringList& dependents, QWidget*
     button(QMessageBox::No)->setText(QStringLiteral("Disable selected only"));
     button(QMessageBox::Yes)->setObjectName(QStringLiteral("primaryAction"));
 }
-QCoro::Task<bool> apply_activation(core::CoreContext& ctx, QWidget* parent, const QStringList& enable, const QStringList& disable) {
+QCoro::Task<bool> apply_activation(CoreContext& ctx, QWidget* parent, const QStringList& enable, const QStringList& disable) {
     // Copy before suspension: callers often pass temporary batches.
     const QStringList enabling = enable;
     QStringList disabling = disable;
@@ -26,7 +26,7 @@ QCoro::Task<bool> apply_activation(core::CoreContext& ctx, QWidget* parent, cons
         QStringList details;
         for (const auto& uuid : dependents) {
             const auto& mod = ctx.allMods().value(uuid);
-            const auto* about = dynamic_cast<const core::AboutXmlMod*>(mod.get());
+            const auto* about = dynamic_cast<const AboutXmlMod*>(mod.get());
             details.append(about ? QStringLiteral("%1 (%2)").arg(mod->name, about->package_id.str()) : mod->name);
         }
         const auto [result, dialog] = co_await awaitDialog<DependentModsDialog>(details, parent);
@@ -35,7 +35,7 @@ QCoro::Task<bool> apply_activation(core::CoreContext& ctx, QWidget* parent, cons
     }
     co_return ctx.activation().apply(enabling, disabling);
 }
-QCoro::Task<bool> toggle_mods(core::CoreContext& ctx, QWidget* parent, const QStringList& uuids) {
+QCoro::Task<bool> toggle_mods(CoreContext& ctx, QWidget* parent, const QStringList& uuids) {
     QStringList enable, disable;
     for (const auto& uuid : uuids) (ctx.activeUuids().contains(uuid) ? disable : enable).append(uuid);
     co_return co_await apply_activation(ctx, parent, enable, disable);

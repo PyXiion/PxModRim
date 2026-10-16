@@ -8,14 +8,14 @@
 
 #include "core/workshop/types.h"
 
-namespace px::ui::workshop {
+namespace px::modrim::workshop {
 
-using core::workshop::CatalogEntry;
+using workshop::CatalogEntry;
 
 QString safe_url(const QString& value);
 QString summarize(const QString& text, const QString& format = QStringLiteral("bbcode"));
 QVariantMap item_row(const CatalogEntry& item,
-                     const std::function<core::workshop::InstallState(const core::workshop::CatalogMod&)>& install_state,
+                     const std::function<workshop::InstallState(const workshop::CatalogMod&)>& install_state,
                      const QString& game_version, bool detail = false);
 
 class CatalogListModel : public QAbstractListModel {
@@ -48,4 +48,4 @@ private:
     int total_ = 0;
 };
 
-}  // namespace px::ui::workshop
+}  // namespace px::modrim::workshop

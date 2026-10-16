@@ -7,8 +7,8 @@
 #include "core/organizer/models.h"
 #include "core/organizer/resolve.h"
 
-using namespace px::core;
-using namespace px::core::organizer;
+using namespace px::modrim;
+using namespace px::modrim::organizer;
 
 namespace {
 

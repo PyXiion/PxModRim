@@ -1,8 +1,8 @@
 #include "ui/views/mods_view.h"
 #include "ui/theme/constants.h"
 #include <QHBoxLayout>
-namespace px::ui {
-ModsViewPanel::ModsViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+namespace px::modrim {
+ModsViewPanel::ModsViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
     : BaseViewPanel(ctx,engine,parent,app) {
     auto* content = new QWidget(this); content->setObjectName(QStringLiteral("contentArea"));
     auto* layout = new QHBoxLayout(content); layout->setContentsMargins(0,0,0,0); layout->setSpacing(0);
@@ -16,7 +16,7 @@ ModsViewPanel::ModsViewPanel(core::CoreContext& ctx, QQmlEngine* engine, QWidget
     mod_info = new ModInfoPanel(ctx,engine,app.uiPrefs(),content); mod_info->setObjectName(QStringLiteral("modInfoPanel")); mod_info->setMinimumWidth(300);
     layout->addWidget(mod_info,2); root_->addWidget(content,1);
 }
-void ModsViewPanel::apply_sidebar_entry(const core::view::SidebarEntry& entry) {
+void ModsViewPanel::apply_sidebar_entry(const view::SidebarEntry& entry) {
     mod_list->clearSelection();
     mod_list->set_sidebar_filter(entry.visible_uuids);
 }
