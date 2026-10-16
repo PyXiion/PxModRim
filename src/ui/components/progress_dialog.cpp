@@ -1,4 +1,4 @@
-#include "ui/components/progress_dialog.h"
+#include "ui/components/progress_dialog.hpp"
 
 #include <QFont>
 #include <QHBoxLayout>
@@ -10,9 +10,9 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include "ui/components/dialog_chrome.h"
-#include "ui/components/icons.h"
-#include "ui/theme/palette.h"
+#include "ui/components/dialog_chrome.hpp"
+#include "ui/components/icons.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

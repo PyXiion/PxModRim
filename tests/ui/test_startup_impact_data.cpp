@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include "ui/panels/startup_impact_data.h"
+#include "ui/panels/startup_impact_data.hpp"
 using namespace px::modrim;
 using namespace px::modrim::startup_impact;
 namespace {

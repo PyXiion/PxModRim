@@ -1,4 +1,4 @@
-#include "core/providers/core.h"
+#include "core/providers/core.hpp"
 
 #include <QDir>
 #include <QFileInfo>

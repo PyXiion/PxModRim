@@ -1,6 +1,6 @@
 #ifdef PX_HAS_STEAM
 
-#include "core/downloads/steam.h"
+#include "core/downloads/steam.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -18,7 +18,7 @@
 #include <QtConcurrent>
 #include <spdlog/spdlog.h>
 
-#include "core/utils.h"
+#include "core/utils.hpp"
 
 namespace px::modrim {
 namespace {

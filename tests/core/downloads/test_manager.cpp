@@ -12,11 +12,11 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/downloads/downloader.h"
-#include "core/downloads/manager.h"
-#include "core/downloads/types.h"
-#include "core/models/metadata/structures.h"
-#include "../test_support.h"
+#include "core/downloads/downloader.hpp"
+#include "core/downloads/manager.hpp"
+#include "core/downloads/types.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "../test_support.hpp"
 
 namespace {
 

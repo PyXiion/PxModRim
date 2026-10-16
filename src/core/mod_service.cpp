@@ -1,4 +1,4 @@
-#include "core/mod_service.h"
+#include "core/mod_service.hpp"
 
 #include <algorithm>
 #include <utility>
@@ -9,10 +9,10 @@
 #include <QSet>
 #include <spdlog/spdlog.h>
 
-#include "core/context.h"
-#include "core/mods_config.h"
-#include "core/services/diagnostics_service.h"
-#include "core/services/mod_discovery.h"
+#include "core/context.hpp"
+#include "core/mods_config.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "core/services/mod_discovery.hpp"
 
 namespace px::modrim {
 

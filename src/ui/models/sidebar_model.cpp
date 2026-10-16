@@ -1,5 +1,5 @@
-#include "ui/models/sidebar_model.h"
-#include "ui/theme/palette.h"
+#include "ui/models/sidebar_model.hpp"
+#include "ui/theme/palette.hpp"
 namespace px::modrim {
 SidebarModel::SidebarModel(QObject* parent) : QAbstractListModel(parent) {}
 int SidebarModel::rowCount(const QModelIndex& parent) const { return parent.isValid() ? 0 : static_cast<int>(items_.size()); }

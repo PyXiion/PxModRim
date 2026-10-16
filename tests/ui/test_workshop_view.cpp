@@ -8,17 +8,17 @@
 #include <QQuickWidget>
 #include <QTemporaryDir>
 
-#include "test_support.h"
-#include "ui/theme/qml_theme.h"
-#include "../core/workshop/support.h"
-#include "core/context.h"
-#include "core/downloads/downloader.h"
-#include "core/mod_service.h"
-#include "ui/components/svg_provider.h"
-#include "ui/context.h"
-#include "ui/navigation.h"
-#include "ui/plugins/workshop/plugin.h"
-#include "ui/plugins/workshop/view.h"
+#include "test_support.hpp"
+#include "ui/theme/qml_theme.hpp"
+#include "../core/workshop/support.hpp"
+#include "core/context.hpp"
+#include "core/downloads/downloader.hpp"
+#include "core/mod_service.hpp"
+#include "ui/components/svg_provider.hpp"
+#include "ui/context.hpp"
+#include "ui/navigation.hpp"
+#include "ui/plugins/workshop/plugin.hpp"
+#include "ui/plugins/workshop/view.hpp"
 
 namespace {
 using namespace px::modrim;

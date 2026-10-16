@@ -2,7 +2,7 @@
 
 #include <QHash>
 
-#include "ui/plugins/downloads/model.h"
+#include "ui/plugins/downloads/model.hpp"
 
 namespace {
 QHash<QString, QString> states(const px::modrim::DownloadsModel& model) {

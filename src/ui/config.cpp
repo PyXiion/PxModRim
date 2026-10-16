@@ -1,4 +1,4 @@
-#include "ui/config.h"
+#include "ui/config.hpp"
 
 #include <QtGlobal>
 

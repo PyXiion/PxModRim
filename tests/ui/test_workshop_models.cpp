@@ -5,8 +5,8 @@
 
 #include <QSet>
 
-#include "ui/panels/mod_info_data.h"
-#include "ui/plugins/workshop/models.h"
+#include "ui/panels/mod_info_data.hpp"
+#include "ui/plugins/workshop/models.hpp"
 
 using namespace px::modrim::workshop;
 using namespace px::modrim::workshop;

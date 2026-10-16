@@ -1,4 +1,4 @@
-#include "core/version.h"
+#include "core/version.hpp"
 
 #include <QCoro/QCoroTimer>
 #include <QTimer>

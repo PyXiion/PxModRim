@@ -1,4 +1,4 @@
-#include "core/workshop/favourites.h"
+#include "core/workshop/favourites.hpp"
 
 #include <algorithm>
 #include <utility>

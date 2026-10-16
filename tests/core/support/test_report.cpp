@@ -13,10 +13,10 @@
 #include <QTcpSocket>
 #include <QTemporaryDir>
 
-#include "../test_support.h"
-#include "core/models/metadata/structures.h"
-#include "core/support/report.h"
-#include "core/version.h"
+#include "../test_support.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "core/support/report.hpp"
+#include "core/version.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::support;

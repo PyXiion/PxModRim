@@ -1,9 +1,9 @@
-#include "core/organizer/resolve.h"
+#include "core/organizer/resolve.hpp"
 
 #include <algorithm>
 #include <utility>
 
-#include "core/providers/labels.h"
+#include "core/providers/labels.hpp"
 
 namespace px::modrim::organizer {
 

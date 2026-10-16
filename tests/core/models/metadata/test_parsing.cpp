@@ -5,8 +5,8 @@
 #include <QTemporaryDir>
 #include <pugixml.hpp>
 
-#include "core/models/metadata/parsing.h"
-#include "core/models/metadata/structures.h"
+#include "core/models/metadata/parsing.hpp"
+#include "core/models/metadata/structures.hpp"
 
 using px::modrim::AboutXmlMod;
 using px::modrim::CaseInsensitiveStr;

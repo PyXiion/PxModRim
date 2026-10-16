@@ -1,4 +1,4 @@
-#include "ui/components/banner_widget.h"
+#include "ui/components/banner_widget.hpp"
 
 #include <algorithm>
 
@@ -10,7 +10,7 @@
 #include <QResizeEvent>
 #include <QSizePolicy>
 
-#include "ui/theme/palette.h"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

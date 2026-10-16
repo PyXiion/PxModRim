@@ -3,7 +3,7 @@
 #include <QHash>
 #include <QSet>
 
-#include "core/models/metadata/structures.h"
+#include "core/models/metadata/structures.hpp"
 
 using px::modrim::AboutXmlMod;
 using px::modrim::CaseInsensitiveSet;

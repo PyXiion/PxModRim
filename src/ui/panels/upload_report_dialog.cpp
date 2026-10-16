@@ -1,4 +1,4 @@
-#include "ui/panels/upload_report_dialog.h"
+#include "ui/panels/upload_report_dialog.hpp"
 
 #include <QClipboard>
 #include <QFileDialog>
@@ -11,10 +11,10 @@
 #include <QSaveFile>
 #include <QVBoxLayout>
 
-#include "core/providers/base.h"
-#include "core/support/report.h"
-#include "ui/components/dialogs.h"
-#include "ui/context.h"
+#include "core/providers/base.hpp"
+#include "core/support/report.hpp"
+#include "ui/components/dialogs.hpp"
+#include "ui/context.hpp"
 
 namespace px::modrim {
 UploadConfirmDialog::UploadConfirmDialog(QWidget* parent) : QDialog(parent) {

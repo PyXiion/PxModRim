@@ -3,9 +3,9 @@
 #include <memory>
 #include <optional>
 
-#include "core/models/metadata/structures.h"
-#include "core/organizer/models.h"
-#include "core/organizer/resolve.h"
+#include "core/models/metadata/structures.hpp"
+#include "core/organizer/models.hpp"
+#include "core/organizer/resolve.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::organizer;

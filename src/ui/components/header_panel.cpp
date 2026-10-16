@@ -1,12 +1,12 @@
-#include "ui/components/header_panel.h"
+#include "ui/components/header_panel.hpp"
 
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QUrl>
 #include <spdlog/spdlog.h>
 
-#include "ui/components/header_controller.h"
-#include "ui/theme/palette.h"
+#include "ui/components/header_controller.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

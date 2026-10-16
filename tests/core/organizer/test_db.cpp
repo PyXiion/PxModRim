@@ -4,10 +4,10 @@
 #include <QFile>
 #include <QTemporaryDir>
 
-#include "core/organizer/db.h"
-#include "core/organizer/defaults.h"
-#include "core/organizer/models.h"
-#include "test_util.h"
+#include "core/organizer/db.hpp"
+#include "core/organizer/defaults.hpp"
+#include "core/organizer/models.hpp"
+#include "test_util.hpp"
 
 using namespace px::modrim::organizer;
 using organizer_test::expect;

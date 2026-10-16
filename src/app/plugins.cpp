@@ -1,4 +1,4 @@
-#include "app/plugins.h"
+#include "app/plugins.hpp"
 
 #include <memory>
 
@@ -7,20 +7,20 @@
 #include <QStringList>
 #include <spdlog/spdlog.h>
 
-#include "core/config.h"
-#include "core/context.h"
-#include "core/organizer/db.h"
-#include "core/organizer/service.h"
-#include "core/workshop/catalog.h"
-#include "ui/plugins/downloads/plugin.h"
-#include "ui/plugins/steam_downloader/plugin.h"
-#include "ui/plugins/steam_workshop/plugin.h"
-#include "ui/plugins/workshop/plugin.h"
-#include "ui/plugins/organizer/plugin.h"
-#include "ui/views/mods_view.h"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/organizer/db.hpp"
+#include "core/organizer/service.hpp"
+#include "core/workshop/catalog.hpp"
+#include "ui/plugins/downloads/plugin.hpp"
+#include "ui/plugins/steam_downloader/plugin.hpp"
+#include "ui/plugins/steam_workshop/plugin.hpp"
+#include "ui/plugins/workshop/plugin.hpp"
+#include "ui/plugins/organizer/plugin.hpp"
+#include "ui/views/mods_view.hpp"
 
 #ifdef PX_HAS_STEAM
-#include "core/downloads/steam.h"
+#include "core/downloads/steam.hpp"
 #endif
 
 namespace px::modrim {

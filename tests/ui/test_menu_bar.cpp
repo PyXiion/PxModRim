@@ -9,8 +9,8 @@
 #include <QMainWindow>
 #include <QMenu>
 
-#include "ui/window/actions.h"
-#include "ui/window/menu_bar.h"
+#include "ui/window/actions.hpp"
+#include "ui/window/menu_bar.hpp"
 
 namespace {
 void ensureApplication() {

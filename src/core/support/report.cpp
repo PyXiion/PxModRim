@@ -1,4 +1,4 @@
-#include "core/support/report.h"
+#include "core/support/report.hpp"
 
 #include <algorithm>
 #include <array>
@@ -19,8 +19,8 @@
 #include <QUrl>
 #include <QtGlobal>
 
-#include "core/models/metadata/structures.h"
-#include "core/version.h"
+#include "core/models/metadata/structures.hpp"
+#include "core/version.hpp"
 
 #if defined(Q_OS_UNIX)
 #include <pwd.h>

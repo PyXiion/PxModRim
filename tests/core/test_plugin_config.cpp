@@ -7,9 +7,9 @@
 #include <QString>
 #include <QTemporaryDir>
 
-#include "core/config.h"
-#include "core/plugin_config.h"
-#include "test_support.h"
+#include "core/config.hpp"
+#include "core/plugin_config.hpp"
+#include "test_support.hpp"
 
 namespace {
 

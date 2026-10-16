@@ -27,12 +27,12 @@
 #include <QTemporaryDir>
 #include <QTimer>
 
-#include "../test_support.h"
-#include "core/config.h"
-#include "core/downloads/manager.h"
-#include "core/downloads/steam.h"
-#include "core/downloads/types.h"
-#include "core/models/metadata/structures.h"
+#include "../test_support.hpp"
+#include "core/config.hpp"
+#include "core/downloads/manager.hpp"
+#include "core/downloads/steam.hpp"
+#include "core/downloads/types.hpp"
+#include "core/models/metadata/structures.hpp"
 
 namespace {
 

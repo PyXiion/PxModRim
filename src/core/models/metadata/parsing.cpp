@@ -1,4 +1,4 @@
-#include "core/models/metadata/parsing.h"
+#include "core/models/metadata/parsing.hpp"
 
 #include <variant>
 
@@ -6,9 +6,9 @@
 #include <QFileInfo>
 #include <spdlog/spdlog.h>
 
-#include "core/constants.h"
-#include "core/utils.h"
-#include "core/xml.h"
+#include "core/constants.hpp"
+#include "core/utils.hpp"
+#include "core/xml.hpp"
 
 namespace px::modrim {
 

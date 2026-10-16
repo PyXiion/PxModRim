@@ -3,8 +3,8 @@
 #include <QMessageBox>
 #include <QTimer>
 #include <QWidget>
-#include "ui/components/mod_updates.h"
-#include "../core/services/services_support.h"
+#include "ui/components/mod_updates.hpp"
+#include "../core/services/services_support.hpp"
 
 TEST_CASE("small updates skip confirmation") {
     QWidget parent;

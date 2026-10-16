@@ -1,4 +1,4 @@
-#include "core/organizer/service.h"
+#include "core/organizer/service.hpp"
 
 #include <algorithm>
 #include <set>
@@ -8,8 +8,8 @@
 #include <QRegularExpression>
 #include <spdlog/spdlog.h>
 
-#include "core/context.h"
-#include "core/organizer/defaults.h"
+#include "core/context.hpp"
+#include "core/organizer/defaults.hpp"
 
 namespace px::modrim::organizer {
 namespace {

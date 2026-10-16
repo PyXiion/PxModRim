@@ -5,7 +5,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 
-#include "ui/components/dialog_chrome.h"
+#include "ui/components/dialog_chrome.hpp"
 
 namespace {
 

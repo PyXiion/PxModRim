@@ -1,13 +1,13 @@
-#include "core/services/startup_impact_service/service.h"
+#include "core/services/startup_impact_service/service.hpp"
 
 #include <algorithm>
 #include <numeric>
 
 #include <spdlog/spdlog.h>
 
-#include "core/config.h"
-#include "core/context.h"
-#include "core/services/startup_impact_service/parser.h"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/services/startup_impact_service/parser.hpp"
 
 namespace px::modrim::startup_impact {
 

@@ -11,14 +11,14 @@
 #include <QTest>
 #include <QTimer>
 #include <memory>
-#include "test_support.h"
-#include "core/context.h"
-#include "core/services/diagnostics_service.h"
-#include "ui/components/mod_activation.h"
-#include "ui/components/svg_provider.h"
-#include "ui/panels/mod_list_panel.h"
-#include "ui/theme/qml_theme.h"
-#include "../core/services/services_support.h"
+#include "test_support.hpp"
+#include "core/context.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "ui/components/mod_activation.hpp"
+#include "ui/components/svg_provider.hpp"
+#include "ui/panels/mod_list_panel.hpp"
+#include "ui/theme/qml_theme.hpp"
+#include "../core/services/services_support.hpp"
 using px::modrim::ModListPanel;
 namespace {
 struct PanelFixture {

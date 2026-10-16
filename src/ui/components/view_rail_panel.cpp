@@ -1,12 +1,12 @@
-#include "ui/components/view_rail_panel.h"
+#include "ui/components/view_rail_panel.hpp"
 
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QUrl>
 #include <spdlog/spdlog.h>
 
-#include "ui/theme/constants.h"
-#include "ui/theme/palette.h"
+#include "ui/theme/constants.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

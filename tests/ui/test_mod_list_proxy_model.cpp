@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <QPersistentModelIndex>
 #include <QSignalSpy>
-#include "ui/models/mod_list_proxy_model.h"
+#include "ui/models/mod_list_proxy_model.hpp"
 using namespace px::modrim;
 namespace {
 struct ProxyFixture {

@@ -7,7 +7,7 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/services/sort_service.h"
+#include "core/services/sort_service.hpp"
 
 using px::modrim::AboutXmlMod;
 using px::modrim::CaseInsensitiveStr;

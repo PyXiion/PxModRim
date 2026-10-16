@@ -1,4 +1,4 @@
-#include "ui/panels/about_panel.h"
+#include "ui/panels/about_panel.hpp"
 
 #include <QApplication>
 #include <QClipboard>
@@ -20,10 +20,10 @@
 #include <spdlog/version.h>
 #include <zip.h>
 
-#include "core/version.h"
-#include "ui/components/dialog_chrome.h"
-#include "ui/context.h"
-#include "ui/panels/upload_report_dialog.h"
+#include "core/version.hpp"
+#include "ui/components/dialog_chrome.hpp"
+#include "ui/context.hpp"
+#include "ui/panels/upload_report_dialog.hpp"
 
 namespace px::modrim {
 QStringList AboutPanel::environment() {

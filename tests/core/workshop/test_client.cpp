@@ -8,10 +8,10 @@
 #include <QString>
 #include <QUrlQuery>
 
-#include "../test_support.h"
-#include "core/workshop/client.h"
-#include "core/workshop/types.h"
-#include "support.h"
+#include "../test_support.hpp"
+#include "core/workshop/client.hpp"
+#include "core/workshop/types.hpp"
+#include "support.hpp"
 
 using namespace px::modrim::workshop;
 using test_support::TestApplication;

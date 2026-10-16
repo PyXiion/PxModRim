@@ -1,5 +1,5 @@
-#include "ui/components/procedural_preview.h"
-#include "ui/theme/constants.h"
+#include "ui/components/procedural_preview.hpp"
+#include "ui/theme/constants.hpp"
 #include <QCache>
 #include <QCryptographicHash>
 #include <QMutex>

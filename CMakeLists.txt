@@ -26,8 +26,6 @@ include(cmake/CPM.cmake)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Concurrent Network Sql Gui Quick QuickControls2 QuickWidgets Svg Widgets Test)
 qt_standard_project_setup(REQUIRES 6.8)
-# No .ui files; AUTOUIC would misread ui/ui_prefs.h as a generated uic header.
-set(CMAKE_AUTOUIC OFF)
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml")
 
 if(NOT PX_WORKSHOP_VARIANT STREQUAL "NativeWorkshop" AND NOT PX_WORKSHOP_VARIANT STREQUAL "NoWorkshop")

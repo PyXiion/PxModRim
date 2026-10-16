@@ -1,7 +1,7 @@
-#include "core/providers/factory.h"
+#include "core/providers/factory.hpp"
 
-#include "core/providers/core.h"
-#include "core/providers/local.h"
+#include "core/providers/core.hpp"
+#include "core/providers/local.hpp"
 
 namespace px::modrim::providers {
 

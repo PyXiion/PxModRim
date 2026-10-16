@@ -1,4 +1,4 @@
-#include "ui/plugins/workshop/view.h"
+#include "ui/plugins/workshop/view.hpp"
 
 #include <algorithm>
 #include <QCryptographicHash>
@@ -10,9 +10,9 @@
 #include <QUrl>
 #include <spdlog/spdlog.h>
 
-#include "ui/components/mod_activation.h"
-#include "ui/navigation.h"
-#include "ui/theme/palette.h"
+#include "ui/components/mod_activation.hpp"
+#include "ui/navigation.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim::workshop {
 using namespace workshop;

@@ -1,4 +1,4 @@
-#include "ui/components/icons.h"
+#include "ui/components/icons.hpp"
 
 #include <algorithm>
 

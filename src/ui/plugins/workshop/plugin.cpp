@@ -1,6 +1,6 @@
-#include "ui/plugins/workshop/plugin.h"
+#include "ui/plugins/workshop/plugin.hpp"
 
-#include "ui/plugins/workshop/view.h"
+#include "ui/plugins/workshop/view.hpp"
 
 namespace px::modrim::workshop {
 

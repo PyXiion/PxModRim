@@ -4,8 +4,8 @@
 #include <QMap>
 #include <QString>
 
-#include "core/services/startup_impact_service/labels.h"
-#include "core/services/startup_impact_service/phases.h"
+#include "core/services/startup_impact_service/labels.hpp"
+#include "core/services/startup_impact_service/phases.hpp"
 
 using namespace px::modrim::startup_impact;
 using Catch::Matchers::WithinAbs;

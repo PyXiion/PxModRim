@@ -1,4 +1,4 @@
-#include "core/services/activation_service.h"
+#include "core/services/activation_service.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -11,12 +11,12 @@
 #include <QHash>
 #include <QSet>
 
-#include "core/checker/graph.h"
-#include "core/context.h"
-#include "core/models/metadata/structures.h"
-#include "core/services/diagnostics_service.h"
-#include "core/sort/config.h"
-#include "core/sort/models.h"
+#include "core/checker/graph.hpp"
+#include "core/context.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "core/sort/config.hpp"
+#include "core/sort/models.hpp"
 
 namespace px::modrim {
 namespace {

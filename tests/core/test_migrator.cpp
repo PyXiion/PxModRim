@@ -11,8 +11,8 @@
 #include <QTemporaryDir>
 #include <QVariant>
 
-#include "core/migrator.h"
-#include "test_support.h"
+#include "core/migrator.hpp"
+#include "test_support.hpp"
 
 namespace {
 

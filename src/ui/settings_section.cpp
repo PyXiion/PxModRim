@@ -1,4 +1,4 @@
-#include "ui/settings_section.h"
+#include "ui/settings_section.hpp"
 
 #include <QJsonDocument>
 #include <QJsonObject>

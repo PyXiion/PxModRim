@@ -5,7 +5,7 @@
 #include <QImage>
 #include <QString>
 
-#include "ui/components/procedural_preview.h"
+#include "ui/components/procedural_preview.hpp"
 
 namespace {
 

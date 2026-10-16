@@ -1,9 +1,9 @@
-#include "ui/views/base.h"
+#include "ui/views/base.hpp"
 
 #include <QColor>
 #include <QPalette>
 
-#include "ui/theme/palette.h"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

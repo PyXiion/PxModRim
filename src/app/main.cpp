@@ -17,16 +17,16 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include "app/plugins.h"
-#include "core/config.h"
-#include "core/context.h"
-#include "core/organizer/db.h"
-#include "core/version.h"
-#include "ui/components/popup_parent.h"
-#include "ui/config.h"
-#include "ui/context.h"
-#include "ui/theme/palette.h"
-#include "ui/window/main_window.h"
+#include "app/plugins.hpp"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/organizer/db.hpp"
+#include "core/version.hpp"
+#include "ui/components/popup_parent.hpp"
+#include "ui/config.hpp"
+#include "ui/context.hpp"
+#include "ui/theme/palette.hpp"
+#include "ui/window/main_window.hpp"
 
 Q_IMPORT_QML_PLUGIN(PxModRimPlugin)
 

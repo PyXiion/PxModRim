@@ -8,10 +8,10 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include "core/file_io.h"
-#include "core/mods_config.h"
-#include "core/models/metadata/structures.h"
-#include "test_support.h"
+#include "core/file_io.hpp"
+#include "core/mods_config.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "test_support.hpp"
 
 namespace {
 

@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <QPersistentModelIndex>
 #include <QSignalSpy>
-#include "ui/models/mod_list_model.h"
-#include "ui/models/impact.h"
-#include "ui/theme/palette.h"
+#include "ui/models/mod_list_model.hpp"
+#include "ui/models/impact.hpp"
+#include "ui/theme/palette.hpp"
 using namespace px::modrim;
 namespace {
 struct ListFixture {

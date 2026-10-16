@@ -1,11 +1,11 @@
-#include "core/sort/community.h"
+#include "core/sort/community.hpp"
 
 #include <QFileInfo>
 
 #include <glaze/glaze.hpp>
 
-#include "core/config.h"
-#include "core/file_io.h"
+#include "core/config.hpp"
+#include "core/file_io.hpp"
 
 namespace px::modrim::sort {
 

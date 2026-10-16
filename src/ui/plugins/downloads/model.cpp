@@ -1,4 +1,4 @@
-#include "ui/plugins/downloads/model.h"
+#include "ui/plugins/downloads/model.hpp"
 
 namespace px::modrim {
 namespace {

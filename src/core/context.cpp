@@ -1,4 +1,4 @@
-#include "core/context.h"
+#include "core/context.hpp"
 
 #include <chrono>
 #include <utility>
@@ -6,15 +6,15 @@
 #include <QSet>
 #include <spdlog/spdlog.h>
 
-#include "core/downloads/downloader.h"
-#include "core/downloads/manager.h"
-#include "core/mod_service.h"
-#include "core/profiler.h"
-#include "core/providers/factory.h"
-#include "core/services/activation_service.h"
-#include "core/services/diagnostics_service.h"
-#include "core/services/game_launcher.h"
-#include "core/services/sort_service.h"
+#include "core/downloads/downloader.hpp"
+#include "core/downloads/manager.hpp"
+#include "core/mod_service.hpp"
+#include "core/profiler.hpp"
+#include "core/providers/factory.hpp"
+#include "core/services/activation_service.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "core/services/game_launcher.hpp"
+#include "core/services/sort_service.hpp"
 
 namespace px::modrim {
 

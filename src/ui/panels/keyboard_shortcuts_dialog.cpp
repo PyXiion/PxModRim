@@ -1,4 +1,4 @@
-#include "ui/panels/keyboard_shortcuts_dialog.h"
+#include "ui/panels/keyboard_shortcuts_dialog.hpp"
 
 #include <QHeaderView>
 #include <QHBoxLayout>

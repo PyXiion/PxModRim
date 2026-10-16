@@ -3,8 +3,8 @@
 #include <QPersistentModelIndex>
 #include <QSignalSpy>
 
-#include "ui/plugins/organizer/filter_model.h"
-#include "ui/plugins/organizer/tree_model.h"
+#include "ui/plugins/organizer/filter_model.hpp"
+#include "ui/plugins/organizer/tree_model.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::organizer;

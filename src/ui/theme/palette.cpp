@@ -1,4 +1,4 @@
-#include "ui/theme/palette.h"
+#include "ui/theme/palette.hpp"
 
 
 #include <QApplication>

@@ -1,4 +1,4 @@
-#include "ui/components/dialog_chrome.h"
+#include "ui/components/dialog_chrome.hpp"
 
 #include <QAbstractButton>
 #include <QDialog>
@@ -17,8 +17,8 @@
 #include <QStringView>
 #include <QWindow>
 
-#include "ui/components/icons.h"
-#include "ui/theme/palette.h"
+#include "ui/components/icons.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

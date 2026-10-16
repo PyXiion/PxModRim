@@ -1,4 +1,4 @@
-#include "ui/panels/startup_impact_data.h"
+#include "ui/panels/startup_impact_data.hpp"
 
 #include <algorithm>
 #include <array>
@@ -7,9 +7,9 @@
 #include <tuple>
 #include <QDateTime>
 #include <QSet>
-#include "core/services/startup_impact_service/labels.h"
-#include "core/services/startup_impact_service/phases.h"
-#include "ui/theme/palette.h"
+#include "core/services/startup_impact_service/labels.hpp"
+#include "core/services/startup_impact_service/phases.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 using namespace startup_impact;

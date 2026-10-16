@@ -1,9 +1,9 @@
-#include "ui/plugins/organizer/tree_model.h"
+#include "ui/plugins/organizer/tree_model.hpp"
 
 #include <algorithm>
 
-#include "ui/models/mod_list_model.h"
-#include "ui/theme/palette.h"
+#include "ui/models/mod_list_model.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 namespace {

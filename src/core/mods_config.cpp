@@ -1,4 +1,4 @@
-#include "core/mods_config.h"
+#include "core/mods_config.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -18,9 +18,9 @@
 #include <pugixml.hpp>
 #include <spdlog/spdlog.h>
 
-#include "core/constants.h"
-#include "core/file_io.h"
-#include "core/xml.h"
+#include "core/constants.hpp"
+#include "core/file_io.hpp"
+#include "core/xml.hpp"
 
 namespace px::modrim {
 

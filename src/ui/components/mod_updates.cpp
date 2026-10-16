@@ -1,7 +1,7 @@
-#include "ui/components/mod_updates.h"
-#include "ui/components/dialogs.h"
-#include "core/context.h"
-#include "core/downloads/manager.h"
+#include "ui/components/mod_updates.hpp"
+#include "ui/components/dialogs.hpp"
+#include "core/context.hpp"
+#include "core/downloads/manager.hpp"
 #include <QAbstractButton>
 #include <QAction>
 #include <QDebug>

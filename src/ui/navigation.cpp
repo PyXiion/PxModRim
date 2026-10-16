@@ -1,4 +1,4 @@
-#include "ui/navigation.h"
+#include "ui/navigation.hpp"
 
 #include <QByteArray>
 #include <QUrl>

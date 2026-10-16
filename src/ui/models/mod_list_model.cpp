@@ -1,7 +1,7 @@
-#include "ui/models/mod_list_model.h"
-#include "core/services/diagnostics_service.h"
-#include "ui/models/impact.h"
-#include "ui/theme/palette.h"
+#include "ui/models/mod_list_model.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "ui/models/impact.hpp"
+#include "ui/theme/palette.hpp"
 #include <algorithm>
 #include <utility>
 

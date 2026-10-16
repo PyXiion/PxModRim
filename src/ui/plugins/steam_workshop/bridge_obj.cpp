@@ -1,4 +1,4 @@
-#include "ui/plugins/steam_workshop/bridge_obj.h"
+#include "ui/plugins/steam_workshop/bridge_obj.hpp"
 
 #ifdef PX_HAS_STEAM
 
@@ -10,7 +10,7 @@
 #include <QJsonParseError>
 #include <QPointer>
 
-#include "ui/plugins/steam_workshop/plugin.h"
+#include "ui/plugins/steam_workshop/plugin.hpp"
 
 namespace px::modrim {
 namespace {

@@ -1,4 +1,4 @@
-#include "core/services/startup_impact_service/models.h"
+#include "core/services/startup_impact_service/models.hpp"
 
 #include <cmath>
 

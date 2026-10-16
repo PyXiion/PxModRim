@@ -7,11 +7,11 @@
 #include <QQuickItem>
 #include <QQuickWidget>
 #include <QTimer>
-#include "test_support.h"
-#include "ui/theme/qml_theme.h"
-#include "core/context.h"
-#include "ui/components/svg_provider.h"
-#include "ui/panels/settings_panel.h"
+#include "test_support.hpp"
+#include "ui/theme/qml_theme.hpp"
+#include "core/context.hpp"
+#include "ui/components/svg_provider.hpp"
+#include "ui/panels/settings_panel.hpp"
 namespace {
 void ensureApplication() {
     if (QCoreApplication::instance()) return;

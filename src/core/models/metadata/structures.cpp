@@ -1,12 +1,12 @@
-#include "core/models/metadata/structures.h"
+#include "core/models/metadata/structures.hpp"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QUuid>
 
-#include "core/constants.h"
-#include "core/utils.h"
+#include "core/constants.hpp"
+#include "core/utils.hpp"
 
 namespace px::modrim {
 

@@ -1,4 +1,4 @@
-#include "core/services/game_process.h"
+#include "core/services/game_process.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -14,9 +14,9 @@
 #include <QUrl>
 #include <spdlog/spdlog.h>
 
-#include "core/constants.h"
-#include "core/file_io.h"
-#include "core/providers/base.h"
+#include "core/constants.hpp"
+#include "core/file_io.hpp"
+#include "core/providers/base.hpp"
 
 #if defined(Q_OS_LINUX)
 #include <dirent.h>

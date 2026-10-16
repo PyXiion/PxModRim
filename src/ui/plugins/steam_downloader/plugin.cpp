@@ -1,4 +1,4 @@
-#include "ui/plugins/steam_downloader/plugin.h"
+#include "ui/plugins/steam_downloader/plugin.hpp"
 
 #ifdef PX_HAS_STEAM
 namespace px::modrim {

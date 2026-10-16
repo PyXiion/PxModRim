@@ -9,10 +9,10 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
-#include "core/models/metadata/parsing.h"
-#include "core/providers/local.h"
-#include "core/services/metadata_cache.h"
-#include "services_support.h"
+#include "core/models/metadata/parsing.hpp"
+#include "core/providers/local.hpp"
+#include "core/services/metadata_cache.hpp"
+#include "services_support.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::providers;

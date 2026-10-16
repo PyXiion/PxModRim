@@ -1,4 +1,4 @@
-#include "core/config.h"
+#include "core/config.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,7 +15,7 @@
 #include <QtGlobal>
 #include <spdlog/spdlog.h>
 
-#include "core/constants.h"
+#include "core/constants.hpp"
 
 namespace px::modrim {
 

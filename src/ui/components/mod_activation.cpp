@@ -1,7 +1,7 @@
-#include "ui/components/mod_activation.h"
-#include "ui/components/dialogs.h"
-#include "core/context.h"
-#include "core/services/activation_service.h"
+#include "ui/components/mod_activation.hpp"
+#include "ui/components/dialogs.hpp"
+#include "core/context.hpp"
+#include "core/services/activation_service.hpp"
 #include <QAbstractButton>
 namespace px::modrim {
 DependentModsDialog::DependentModsDialog(const QStringList& dependents, QWidget* parent) : QMessageBox(parent) {

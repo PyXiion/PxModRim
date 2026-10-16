@@ -1,4 +1,4 @@
-#include "core/services/game_launcher.h"
+#include "core/services/game_launcher.hpp"
 
 #include <memory>
 #include <utility>
@@ -8,8 +8,8 @@
 #include <QProcessEnvironment>
 #include <spdlog/spdlog.h>
 
-#include "core/context.h"
-#include "core/providers/base.h"
+#include "core/context.hpp"
+#include "core/providers/base.hpp"
 
 #if defined(Q_OS_UNIX)
 #include <unistd.h>

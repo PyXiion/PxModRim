@@ -4,7 +4,7 @@
 
 #include <QStringList>
 
-#include "ui/plugins/workshop/installed.h"
+#include "ui/plugins/workshop/installed.hpp"
 
 using px::modrim::workshop::CatalogMod;
 using px::modrim::workshop::InstalledList;

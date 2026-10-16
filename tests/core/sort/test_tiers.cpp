@@ -4,7 +4,7 @@
 #include <QSet>
 #include <QString>
 
-#include "core/sort/tiers.h"
+#include "core/sort/tiers.hpp"
 
 using px::modrim::sort::assign_tiers;
 using px::modrim::sort::find_cycle;

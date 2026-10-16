@@ -3,7 +3,7 @@
 #include <QCoreApplication>
 #include <QCoro/QCoroTask>
 
-#include "core/version.h"
+#include "core/version.hpp"
 
 TEST_CASE("coroutine resumes on the Qt event loop") {
     int argc = 0;

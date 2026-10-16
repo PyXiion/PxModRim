@@ -4,7 +4,7 @@
 
 #include <glaze/glaze.hpp>
 
-#include "core/models/metadata/structures.h"
+#include "core/models/metadata/structures.hpp"
 
 using namespace px::modrim;
 

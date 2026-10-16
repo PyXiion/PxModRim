@@ -11,13 +11,13 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include "core/config.h"
-#include "core/context.h"
-#include "core/models/metadata/structures.h"
-#include "core/models/view/sidebar.h"
-#include "core/services/activation_service.h"
-#include "core/services/diagnostics_service.h"
-#include "services_support.h"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "core/models/view/sidebar.hpp"
+#include "core/services/activation_service.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "services_support.hpp"
 
 using namespace px::modrim;
 

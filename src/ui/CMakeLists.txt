@@ -4,7 +4,7 @@
 # type names only resolve within one flat module.
 
 file(GLOB_RECURSE PX_UI_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
-file(GLOB_RECURSE PX_UI_HEADERS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
+file(GLOB_RECURSE PX_UI_HEADERS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
 file(GLOB PX_UI_QML CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.qml ${CMAKE_CURRENT_SOURCE_DIR}/*.js)
 
 # Resources are addressed relative to this directory: the stylesheet is

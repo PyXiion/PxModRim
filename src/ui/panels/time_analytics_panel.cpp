@@ -1,12 +1,12 @@
-#include "ui/panels/time_analytics_panel.h"
+#include "ui/panels/time_analytics_panel.hpp"
 #include <QPointer>
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWidget>
 #include <QVBoxLayout>
-#include "ui/components/dialog_chrome.h"
-#include "ui/panels/startup_impact_data.h"
-#include "ui/theme/palette.h"
+#include "ui/components/dialog_chrome.hpp"
+#include "ui/panels/startup_impact_data.hpp"
+#include "ui/theme/palette.hpp"
 namespace px::modrim {
 TimeAnalyticsPanel::TimeAnalyticsPanel(startup_impact::StartupImpactService* service, QQmlEngine* engine, QWidget* parent)
     : QWidget(parent), service_(service), qml_(new QQuickWidget(engine, this)) {

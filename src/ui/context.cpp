@@ -1,9 +1,9 @@
-#include "ui/context.h"
+#include "ui/context.hpp"
 
 #include <expected>
 #include <utility>
 
-#include "core/mod_service.h"
+#include "core/mod_service.hpp"
 
 namespace px::modrim {
 

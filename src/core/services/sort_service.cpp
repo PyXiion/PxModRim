@@ -1,4 +1,4 @@
-#include "core/services/sort_service.h"
+#include "core/services/sort_service.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -6,10 +6,10 @@
 #include <QCoro/QCoroFuture>
 #include <QtConcurrent>
 
-#include "core/checker/sort.h"
-#include "core/context.h"
-#include "core/profiler.h"
-#include "core/services/diagnostics_service.h"
+#include "core/checker/sort.hpp"
+#include "core/context.hpp"
+#include "core/profiler.hpp"
+#include "core/services/diagnostics_service.hpp"
 
 namespace px::modrim {
 

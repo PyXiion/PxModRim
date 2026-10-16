@@ -6,9 +6,9 @@
 #include <QString>
 #include <QTemporaryDir>
 
-#include "core/services/startup_impact_service/models.h"
-#include "core/services/startup_impact_service/parser.h"
-#include "../../test_support.h"
+#include "core/services/startup_impact_service/models.hpp"
+#include "core/services/startup_impact_service/parser.hpp"
+#include "../../test_support.hpp"
 
 using namespace px::modrim::startup_impact;
 using Catch::Matchers::WithinAbs;

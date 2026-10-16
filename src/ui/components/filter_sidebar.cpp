@@ -1,5 +1,5 @@
-#include "ui/components/filter_sidebar.h"
-#include "ui/theme/palette.h"
+#include "ui/components/filter_sidebar.hpp"
+#include "ui/theme/palette.hpp"
 #include <QAbstractItemModel>
 #include <QQmlContext>
 #include <QQuickItem>

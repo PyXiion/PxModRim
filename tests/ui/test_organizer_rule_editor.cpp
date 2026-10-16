@@ -12,15 +12,15 @@
 #include <QTemporaryDir>
 #include <QTest>
 
-#include "test_support.h"
-#include "core/context.h"
-#include "core/organizer/defaults.h"
-#include "ui/components/svg_provider.h"
-#include "ui/context.h"
-#include "ui/plugins/organizer/tree_model.h"
-#include "ui/plugins/organizer/view.h"
-#include "ui/theme/qml_theme.h"
-#include "../core/organizer/test_util.h"
+#include "test_support.hpp"
+#include "core/context.hpp"
+#include "core/organizer/defaults.hpp"
+#include "ui/components/svg_provider.hpp"
+#include "ui/context.hpp"
+#include "ui/plugins/organizer/tree_model.hpp"
+#include "ui/plugins/organizer/view.hpp"
+#include "ui/theme/qml_theme.hpp"
+#include "../core/organizer/test_util.hpp"
 
 namespace {
 using namespace px::modrim;

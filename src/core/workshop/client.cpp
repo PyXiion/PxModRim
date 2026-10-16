@@ -1,4 +1,4 @@
-#include "core/workshop/client.h"
+#include "core/workshop/client.hpp"
 
 #include <algorithm>
 #include <expected>

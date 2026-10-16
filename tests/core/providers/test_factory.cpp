@@ -3,9 +3,9 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/config.h"
-#include "core/providers/factory.h"
-#include "core/providers/local.h"
+#include "core/config.hpp"
+#include "core/providers/factory.hpp"
+#include "core/providers/local.hpp"
 
 using px::modrim::PathConfig;
 using px::modrim::providers::create_providers;

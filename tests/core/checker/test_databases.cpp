@@ -12,8 +12,8 @@
 #include <QNetworkAccessManager>
 #include <QTemporaryDir>
 
-#include "core/checker/databases.h"
-#include "core/config.h"
+#include "core/checker/databases.hpp"
+#include "core/config.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::checker;

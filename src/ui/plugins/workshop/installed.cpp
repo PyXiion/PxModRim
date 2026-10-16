@@ -1,4 +1,4 @@
-#include "ui/plugins/workshop/installed.h"
+#include "ui/plugins/workshop/installed.hpp"
 
 #include <algorithm>
 #include <utility>

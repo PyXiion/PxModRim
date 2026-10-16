@@ -5,10 +5,10 @@
 
 #include <QTemporaryDir>
 
-#include "core/config.h"
-#include "core/workshop/favourites.h"
-#include "core/workshop/types.h"
-#include "support.h"
+#include "core/config.hpp"
+#include "core/workshop/favourites.hpp"
+#include "core/workshop/types.hpp"
+#include "support.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::workshop;

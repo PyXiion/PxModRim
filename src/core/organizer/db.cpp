@@ -1,4 +1,4 @@
-#include "core/organizer/db.h"
+#include "core/organizer/db.hpp"
 
 #include <type_traits>
 #include <utility>
@@ -13,7 +13,7 @@
 #include <QVariant>
 #include <QtConcurrent/QtConcurrentRun>
 
-#include "core/migrator.h"
+#include "core/migrator.hpp"
 
 namespace px::modrim::organizer {
 

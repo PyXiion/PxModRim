@@ -1,7 +1,7 @@
-#include "ui/panels/mod_info_data.h"
-#include "ui/components/unity_rich_text.h"
-#include "ui/models/mod_list_model.h"
-#include "core/downloads/manager.h"
+#include "ui/panels/mod_info_data.hpp"
+#include "ui/components/unity_rich_text.hpp"
+#include "ui/models/mod_list_model.hpp"
+#include "core/downloads/manager.hpp"
 #include <QDateTime>
 #include <QFileInfo>
 #include <QRegularExpression>

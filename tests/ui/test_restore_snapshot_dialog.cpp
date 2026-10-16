@@ -15,9 +15,9 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include "core/mods_config.h"
-#include "core/models/metadata/structures.h"
-#include "ui/panels/restore_snapshot_dialog.h"
+#include "core/mods_config.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "ui/panels/restore_snapshot_dialog.hpp"
 
 namespace {
 

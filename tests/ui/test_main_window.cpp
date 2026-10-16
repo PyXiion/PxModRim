@@ -13,13 +13,13 @@
 #include <QTemporaryDir>
 #include <QTimer>
 
-#include "core/config.h"
-#include "core/context.h"
-#include "core/downloads/manager.h"
-#include "core/mod_service.h"
-#include "core/models/metadata/structures.h"
-#include "ui/context.h"
-#include "ui/window/main_window.h"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/downloads/manager.hpp"
+#include "core/mod_service.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "ui/context.hpp"
+#include "ui/window/main_window.hpp"
 
 namespace {
 void ensureApplication() {

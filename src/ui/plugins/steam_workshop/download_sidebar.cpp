@@ -1,12 +1,12 @@
-#include "ui/plugins/steam_workshop/download_sidebar.h"
+#include "ui/plugins/steam_workshop/download_sidebar.hpp"
 
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QQuickWidget>
 #include <QVBoxLayout>
 
-#include "ui/theme/constants.h"
-#include "ui/theme/palette.h"
+#include "ui/theme/constants.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

@@ -18,17 +18,17 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include "../test_support.h"
-#include "core/config.h"
-#include "core/downloads/downloader.h"
-#include "core/downloads/manager.h"
-#include "core/downloads/types.h"
-#include "core/file_io.h"
-#include "core/models/metadata/structures.h"
-#include "core/workshop/catalog.h"
-#include "core/workshop/client.h"
-#include "core/workshop/types.h"
-#include "support.h"
+#include "../test_support.hpp"
+#include "core/config.hpp"
+#include "core/downloads/downloader.hpp"
+#include "core/downloads/manager.hpp"
+#include "core/downloads/types.hpp"
+#include "core/file_io.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "core/workshop/catalog.hpp"
+#include "core/workshop/client.hpp"
+#include "core/workshop/types.hpp"
+#include "support.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::workshop;

@@ -1,4 +1,4 @@
-#include "ui/models/mod_list_proxy_model.h"
+#include "ui/models/mod_list_proxy_model.hpp"
 #include <algorithm>
 #include <utility>
 namespace px::modrim {

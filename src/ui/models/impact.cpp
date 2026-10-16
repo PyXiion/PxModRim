@@ -1,6 +1,6 @@
-#include "ui/models/impact.h"
-#include "core/services/startup_impact_service/models.h"
-#include "ui/theme/palette.h"
+#include "ui/models/impact.hpp"
+#include "core/services/startup_impact_service/models.hpp"
+#include "ui/theme/palette.hpp"
 #include <cmath>
 namespace px::modrim {
 QString format_duration(double seconds) {

@@ -1,11 +1,11 @@
-#include "core/providers/base.h"
+#include "core/providers/base.hpp"
 
 #include <QDir>
 #include <QFileInfo>
 #include <spdlog/spdlog.h>
 
-#include "core/models/metadata/parsing.h"
-#include "core/utils.h"
+#include "core/models/metadata/parsing.hpp"
+#include "core/utils.hpp"
 
 namespace px::modrim::providers {
 

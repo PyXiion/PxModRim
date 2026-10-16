@@ -1,11 +1,11 @@
-#include "ui/components/icon_button.h"
+#include "ui/components/icon_button.hpp"
 
 #include <algorithm>
 
 #include <QIcon>
 
-#include "ui/components/icons.h"
-#include "ui/theme/palette.h"
+#include "ui/components/icons.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

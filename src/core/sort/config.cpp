@@ -1,4 +1,4 @@
-#include "core/sort/config.h"
+#include "core/sort/config.hpp"
 
 #include <QString>
 

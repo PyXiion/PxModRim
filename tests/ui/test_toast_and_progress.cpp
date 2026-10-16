@@ -9,9 +9,9 @@
 #include <QTimer>
 #include <QWidget>
 
-#include "core/loading.h"
-#include "ui/components/progress_dialog.h"
-#include "ui/components/toast.h"
+#include "core/loading.hpp"
+#include "ui/components/progress_dialog.hpp"
+#include "ui/components/toast.hpp"
 
 namespace {
 

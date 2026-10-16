@@ -1,4 +1,4 @@
-#include "core/services/startup_impact_service/phases.h"
+#include "core/services/startup_impact_service/phases.hpp"
 
 #include <array>
 #include <utility>
@@ -6,7 +6,7 @@
 #include <QHash>
 #include <QLatin1StringView>
 
-#include "core/services/startup_impact_service/labels.h"
+#include "core/services/startup_impact_service/labels.hpp"
 
 namespace px::modrim::startup_impact {
 

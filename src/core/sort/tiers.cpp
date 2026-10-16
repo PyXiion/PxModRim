@@ -1,4 +1,4 @@
-#include "core/sort/tiers.h"
+#include "core/sort/tiers.hpp"
 
 #include <algorithm>
 #include <vector>

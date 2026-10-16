@@ -4,8 +4,8 @@
 
 #include <glaze/glaze.hpp>
 
-#include "core/workshop/types.h"
-#include "support.h"
+#include "core/workshop/types.hpp"
+#include "support.hpp"
 
 using namespace px::modrim::workshop;
 using workshop_test::decode_collection;

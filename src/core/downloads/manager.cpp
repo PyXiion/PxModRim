@@ -1,4 +1,4 @@
-#include "core/downloads/manager.h"
+#include "core/downloads/manager.hpp"
 
 #include <algorithm>
 #include <iterator>

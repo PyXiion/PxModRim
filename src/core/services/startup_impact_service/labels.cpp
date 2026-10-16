@@ -1,4 +1,4 @@
-#include "core/services/startup_impact_service/labels.h"
+#include "core/services/startup_impact_service/labels.hpp"
 
 #include <QHash>
 #include <QLatin1StringView>

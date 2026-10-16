@@ -1,4 +1,4 @@
-#include "core/models/view/sidebar.h"
+#include "core/models/view/sidebar.hpp"
 
 #include <QHash>
 

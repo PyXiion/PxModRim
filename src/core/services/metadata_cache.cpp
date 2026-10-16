@@ -1,4 +1,4 @@
-#include "core/services/metadata_cache.h"
+#include "core/services/metadata_cache.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -17,8 +17,8 @@
 #include <QUuid>
 #include <spdlog/spdlog.h>
 
-#include "core/migrator.h"
-#include "core/models/metadata/structures.h"
+#include "core/migrator.hpp"
+#include "core/models/metadata/structures.hpp"
 
 namespace px::modrim::services {
 

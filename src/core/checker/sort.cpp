@@ -1,4 +1,4 @@
-#include "core/checker/sort.h"
+#include "core/checker/sort.hpp"
 
 #include <algorithm>
 #include <array>
@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/sort/tiers.h"
+#include "core/sort/tiers.hpp"
 
 namespace px::modrim::checker {
 namespace {

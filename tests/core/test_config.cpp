@@ -10,10 +10,10 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include "core/config.h"
-#include "core/constants.h"
-#include "core/file_io.h"
-#include "test_support.h"
+#include "core/config.hpp"
+#include "core/constants.hpp"
+#include "core/file_io.hpp"
+#include "test_support.hpp"
 
 namespace {
 

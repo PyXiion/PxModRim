@@ -1,4 +1,4 @@
-#include "core/checker/graph.h"
+#include "core/checker/graph.hpp"
 
 #include <algorithm>
 #include <array>

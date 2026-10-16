@@ -8,10 +8,10 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/checker/graph.h"
-#include "core/checker/sort.h"
-#include "core/models/metadata/structures.h"
-#include "core/sort/config.h"
+#include "core/checker/graph.hpp"
+#include "core/checker/sort.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "core/sort/config.hpp"
 
 using px::modrim::AboutXmlMod;
 using px::modrim::CaseInsensitiveSet;

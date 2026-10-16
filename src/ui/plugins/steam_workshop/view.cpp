@@ -1,4 +1,4 @@
-#include "ui/plugins/steam_workshop/view.h"
+#include "ui/plugins/steam_workshop/view.hpp"
 
 #ifdef PX_HAS_STEAM
 
@@ -13,9 +13,9 @@
 #include <QShowEvent>
 #include <spdlog/spdlog.h>
 
-#include "ui/plugins/steam_workshop/bridge_obj.h"
-#include "ui/plugins/steam_workshop/download_sidebar.h"
-#include "ui/theme/palette.h"
+#include "ui/plugins/steam_workshop/bridge_obj.hpp"
+#include "ui/plugins/steam_workshop/download_sidebar.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 namespace {

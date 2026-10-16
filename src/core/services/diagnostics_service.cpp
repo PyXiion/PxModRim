@@ -1,4 +1,4 @@
-#include "core/services/diagnostics_service.h"
+#include "core/services/diagnostics_service.hpp"
 
 #include <memory>
 #include <utility>
@@ -10,9 +10,9 @@
 #include <QNetworkAccessManager>
 #include <QtConcurrent/QtConcurrentRun>
 
-#include "core/config.h"
-#include "core/context.h"
-#include "core/sort/community.h"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/sort/community.hpp"
 
 namespace px::modrim {
 namespace {

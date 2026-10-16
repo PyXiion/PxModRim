@@ -8,9 +8,9 @@
 #include <QHash>
 #include <QTemporaryDir>
 
-#include "test_support.h"
-#include "core/downloads/manager.h"
-#include "ui/panels/mod_info_data.h"
+#include "test_support.hpp"
+#include "core/downloads/manager.hpp"
+#include "ui/panels/mod_info_data.hpp"
 
 namespace px::modrim {
 namespace {

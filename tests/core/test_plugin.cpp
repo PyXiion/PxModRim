@@ -8,8 +8,8 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/plugin.h"
-#include "test_support.h"
+#include "core/plugin.hpp"
+#include "test_support.hpp"
 
 // Stand-in for a composition root's context: records what each plugin did.
 namespace {

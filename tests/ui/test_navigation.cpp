@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-#include "ui/navigation.h"
+#include "ui/navigation.hpp"
 
 using px::modrim::Route;
 using px::modrim::buildRoute;

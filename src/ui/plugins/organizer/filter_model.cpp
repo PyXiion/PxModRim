@@ -1,4 +1,4 @@
-#include "ui/plugins/organizer/filter_model.h"
+#include "ui/plugins/organizer/filter_model.hpp"
 
 namespace px::modrim {
 

@@ -1,4 +1,4 @@
-#include "core/services/mod_discovery.h"
+#include "core/services/mod_discovery.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -6,7 +6,7 @@
 #include <QDir>
 #include <QHash>
 
-#include "core/mods_config.h"
+#include "core/mods_config.hpp"
 
 namespace px::modrim::services {
 

@@ -1,4 +1,4 @@
-#include "core/checker/databases.h"
+#include "core/checker/databases.hpp"
 
 #include <array>
 #include <cmath>
@@ -24,10 +24,10 @@
 #include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
 
-#include "core/config.h"
-#include "core/error.h"
-#include "core/file_io.h"
-#include "core/xml.h"
+#include "core/config.hpp"
+#include "core/error.hpp"
+#include "core/file_io.hpp"
+#include "core/xml.hpp"
 
 namespace px::modrim::checker {
 namespace {

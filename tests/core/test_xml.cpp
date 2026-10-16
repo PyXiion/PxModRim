@@ -4,7 +4,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 
-#include "core/xml.h"
+#include "core/xml.hpp"
 
 using namespace px::modrim;
 

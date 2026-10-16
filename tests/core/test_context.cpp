@@ -11,10 +11,10 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
-#include "core/config.h"
-#include "core/context.h"
-#include "core/models/metadata/structures.h"
-#include "services/services_support.h"
+#include "core/config.hpp"
+#include "core/context.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "services/services_support.hpp"
 
 using px::modrim::AboutXmlMod;
 using px::modrim::AppConfig;

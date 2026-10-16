@@ -1,8 +1,8 @@
-#include "core/checker/issues.h"
+#include "core/checker/issues.hpp"
 
 #include <algorithm>
 
-#include "core/checker/graph.h"
+#include "core/checker/graph.hpp"
 
 namespace px::modrim::checker {
 

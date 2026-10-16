@@ -6,7 +6,7 @@
 #include <QWidget>
 #include <QtGlobal>
 
-#include "ui/plugins/organizer/dialogs.h"
+#include "ui/plugins/organizer/dialogs.hpp"
 
 using px::modrim::DeleteFolderDialog;
 

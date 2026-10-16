@@ -1,8 +1,8 @@
-#include "core/downloads/downloader.h"
+#include "core/downloads/downloader.hpp"
 
 #include <utility>
 
-#include "core/downloads/manager.h"
+#include "core/downloads/manager.hpp"
 
 namespace px::modrim {
 

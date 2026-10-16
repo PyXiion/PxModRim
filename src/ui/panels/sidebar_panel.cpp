@@ -1,6 +1,6 @@
-#include "ui/panels/sidebar_panel.h"
-#include "core/context.h"
-#include "core/services/diagnostics_service.h"
+#include "ui/panels/sidebar_panel.hpp"
+#include "core/context.hpp"
+#include "core/services/diagnostics_service.hpp"
 #include <QQuickItem>
 namespace px::modrim {
 SidebarPanel::SidebarPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent)

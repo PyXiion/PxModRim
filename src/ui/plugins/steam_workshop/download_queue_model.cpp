@@ -1,4 +1,4 @@
-#include "ui/plugins/steam_workshop/download_queue_model.h"
+#include "ui/plugins/steam_workshop/download_queue_model.hpp"
 
 namespace px::modrim {
 

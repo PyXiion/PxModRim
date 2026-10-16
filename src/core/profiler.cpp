@@ -1,4 +1,4 @@
-#include "core/profiler.h"
+#include "core/profiler.hpp"
 
 #include <spdlog/spdlog.h>
 

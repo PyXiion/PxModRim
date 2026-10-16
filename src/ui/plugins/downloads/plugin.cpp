@@ -1,6 +1,6 @@
-#include "ui/plugins/downloads/plugin.h"
+#include "ui/plugins/downloads/plugin.hpp"
 
-#include "ui/plugins/downloads/view.h"
+#include "ui/plugins/downloads/view.hpp"
 
 namespace px::modrim {
 

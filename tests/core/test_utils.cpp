@@ -4,7 +4,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 
-#include "core/utils.h"
+#include "core/utils.hpp"
 
 namespace {
 

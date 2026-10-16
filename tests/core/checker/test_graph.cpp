@@ -7,9 +7,9 @@
 #include <QSet>
 #include <QString>
 
-#include "core/checker/graph.h"
-#include "core/models/metadata/structures.h"
-#include "core/sort/config.h"
+#include "core/checker/graph.hpp"
+#include "core/models/metadata/structures.hpp"
+#include "core/sort/config.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::checker;

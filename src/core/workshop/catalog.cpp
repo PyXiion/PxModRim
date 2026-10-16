@@ -1,4 +1,4 @@
-#include "core/workshop/catalog.h"
+#include "core/workshop/catalog.hpp"
 
 #include <algorithm>
 #include <utility>
@@ -9,8 +9,8 @@
 #include <QFile>
 #include <QFileInfo>
 
-#include "core/context.h"
-#include "core/mod_service.h"
+#include "core/context.hpp"
+#include "core/mod_service.hpp"
 
 namespace px::modrim::workshop {
 

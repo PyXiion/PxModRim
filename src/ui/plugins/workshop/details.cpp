@@ -1,4 +1,4 @@
-#include "ui/plugins/workshop/details.h"
+#include "ui/plugins/workshop/details.hpp"
 
 namespace px::modrim::workshop {
 namespace {

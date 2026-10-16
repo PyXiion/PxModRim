@@ -5,7 +5,7 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/loading.h"
+#include "core/loading.hpp"
 
 namespace {
 

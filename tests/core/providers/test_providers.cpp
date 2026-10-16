@@ -9,8 +9,8 @@
 #include <QTemporaryDir>
 #include <QThreadPool>
 
-#include "core/providers/core.h"
-#include "core/providers/local.h"
+#include "core/providers/core.hpp"
+#include "core/providers/local.hpp"
 
 using namespace px::modrim::providers;
 using px::modrim::ListedModPtr;

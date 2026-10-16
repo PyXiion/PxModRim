@@ -10,8 +10,8 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 
-#include "core/services/update_service.h"
-#include "services_support.h"
+#include "core/services/update_service.hpp"
+#include "services_support.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::services;

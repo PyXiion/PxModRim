@@ -1,8 +1,8 @@
-#include "ui/mod_selection.h"
+#include "ui/mod_selection.hpp"
 
 #include <QSet>
 
-#include "core/services/diagnostics_service.h"
+#include "core/services/diagnostics_service.hpp"
 
 namespace px::modrim {
 

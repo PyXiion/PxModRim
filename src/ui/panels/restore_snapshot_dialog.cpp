@@ -1,4 +1,4 @@
-#include "ui/panels/restore_snapshot_dialog.h"
+#include "ui/panels/restore_snapshot_dialog.hpp"
 
 #include <algorithm>
 
@@ -15,7 +15,7 @@
 #include <QTimeZone>
 #include <QVBoxLayout>
 
-#include "core/mods_config.h"
+#include "core/mods_config.hpp"
 
 namespace px::modrim {
 

@@ -1,4 +1,4 @@
-#include "ui/panels/settings_panel.h"
+#include "ui/panels/settings_panel.hpp"
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -9,11 +9,11 @@
 #include <QQmlEngine>
 #include <QQuickWidget>
 #include <QVBoxLayout>
-#include "core/mod_service.h"
-#include "core/sort/community_service.h"
-#include "ui/components/dialogs.h"
-#include "ui/context.h"
-#include "ui/theme/palette.h"
+#include "core/mod_service.hpp"
+#include "core/sort/community_service.hpp"
+#include "ui/components/dialogs.hpp"
+#include "ui/context.hpp"
+#include "ui/theme/palette.hpp"
 namespace px::modrim {
 namespace {
 class FolderDialog : public QFileDialog {

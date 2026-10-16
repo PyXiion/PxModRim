@@ -3,8 +3,8 @@
 #include <QString>
 #include <QTemporaryDir>
 
-#include "core/sort/community.h"
-#include "../test_support.h"
+#include "core/sort/community.hpp"
+#include "../test_support.hpp"
 
 using px::modrim::sort::load_community_rules;
 using px::modrim::sort::PackageId;

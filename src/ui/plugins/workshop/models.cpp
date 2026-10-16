@@ -1,4 +1,4 @@
-#include "ui/plugins/workshop/models.h"
+#include "ui/plugins/workshop/models.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,7 +10,7 @@
 #include <QSet>
 #include <QUrl>
 
-#include "ui/panels/mod_info_data.h"
+#include "ui/panels/mod_info_data.hpp"
 
 namespace px::modrim::workshop {
 namespace {

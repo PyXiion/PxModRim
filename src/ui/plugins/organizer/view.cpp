@@ -1,4 +1,4 @@
-#include "ui/plugins/organizer/view.h"
+#include "ui/plugins/organizer/view.hpp"
 
 #include <algorithm>
 #include <QtConcurrent/QtConcurrentRun>
@@ -19,21 +19,21 @@
 #include <QScreen>
 #include <QShowEvent>
 #include <QTimer>
-#include "core/downloads/manager.h"
-#include "core/mod_service.h"
-#include "core/services/diagnostics_service.h"
-#include "ui/components/dialog_chrome.h"
-#include "ui/components/dialogs.h"
-#include "ui/components/filter_sidebar.h"
-#include "ui/components/mod_activation.h"
-#include "ui/components/mod_updates.h"
-#include "ui/mod_selection.h"
-#include "ui/panels/mod_info_panel.h"
-#include "ui/plugins/organizer/dialogs.h"
-#include "ui/plugins/organizer/filter_model.h"
-#include "ui/plugins/organizer/tree_model.h"
-#include "ui/theme/constants.h"
-#include "ui/theme/palette.h"
+#include "core/downloads/manager.hpp"
+#include "core/mod_service.hpp"
+#include "core/services/diagnostics_service.hpp"
+#include "ui/components/dialog_chrome.hpp"
+#include "ui/components/dialogs.hpp"
+#include "ui/components/filter_sidebar.hpp"
+#include "ui/components/mod_activation.hpp"
+#include "ui/components/mod_updates.hpp"
+#include "ui/mod_selection.hpp"
+#include "ui/panels/mod_info_panel.hpp"
+#include "ui/plugins/organizer/dialogs.hpp"
+#include "ui/plugins/organizer/filter_model.hpp"
+#include "ui/plugins/organizer/tree_model.hpp"
+#include "ui/theme/constants.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 using namespace organizer;

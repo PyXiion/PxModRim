@@ -1,12 +1,12 @@
-#include "ui/theme/qml_theme.h"
+#include "ui/theme/qml_theme.hpp"
 
 #include <QFile>
 #include <QRandomGenerator>
 #include <QStringView>
 #include <spdlog/spdlog.h>
 
-#include "ui/theme/constants.h"
-#include "ui/theme/palette.h"
+#include "ui/theme/constants.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

@@ -1,5 +1,5 @@
-#include "ui/views/mods_view.h"
-#include "ui/theme/constants.h"
+#include "ui/views/mods_view.hpp"
+#include "ui/theme/constants.hpp"
 #include <QHBoxLayout>
 namespace px::modrim {
 ModsViewPanel::ModsViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)

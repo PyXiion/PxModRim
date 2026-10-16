@@ -6,13 +6,13 @@
 #include <QDir>
 #include <QTemporaryDir>
 
-#include "core/models/metadata/structures.h"
-#include "core/organizer/db.h"
-#include "core/organizer/defaults.h"
-#include "core/organizer/models.h"
-#include "core/organizer/resolve.h"
-#include "core/organizer/service.h"
-#include "test_util.h"
+#include "core/models/metadata/structures.hpp"
+#include "core/organizer/db.hpp"
+#include "core/organizer/defaults.hpp"
+#include "core/organizer/models.hpp"
+#include "core/organizer/resolve.hpp"
+#include "core/organizer/service.hpp"
+#include "test_util.hpp"
 
 using namespace px::modrim;
 using namespace px::modrim::organizer;

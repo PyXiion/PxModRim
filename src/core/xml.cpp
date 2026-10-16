@@ -1,4 +1,4 @@
-#include "core/xml.h"
+#include "core/xml.hpp"
 
 #include <QFile>
 #include <QFileInfo>

@@ -1,4 +1,4 @@
-#include "ui/plugins/steam_workshop/plugin.h"
+#include "ui/plugins/steam_workshop/plugin.hpp"
 
 #ifdef PX_HAS_STEAM
 
@@ -13,9 +13,9 @@
 #include <QNetworkRequest>
 #include <QUrlQuery>
 
-#include "core/mod_service.h"
-#include "ui/navigation.h"
-#include "ui/plugins/steam_workshop/view.h"
+#include "core/mod_service.hpp"
+#include "ui/navigation.hpp"
+#include "ui/plugins/steam_workshop/view.hpp"
 
 namespace px::modrim {
 

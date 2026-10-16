@@ -1,4 +1,4 @@
-#include "ui/components/svg_provider.h"
+#include "ui/components/svg_provider.hpp"
 
 #include <QPainter>
 #include <QQmlEngine>
@@ -6,8 +6,8 @@
 #include <QSvgRenderer>
 #include <QUrl>
 
-#include "ui/components/icons.h"
-#include "ui/theme/palette.h"
+#include "ui/components/icons.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

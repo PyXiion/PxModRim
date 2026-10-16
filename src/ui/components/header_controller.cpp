@@ -1,9 +1,9 @@
-#include "ui/components/header_controller.h"
+#include "ui/components/header_controller.hpp"
 
 #include <initializer_list>
 #include <utility>
 
-#include "core/constants.h"
+#include "core/constants.hpp"
 
 namespace px::modrim {
 

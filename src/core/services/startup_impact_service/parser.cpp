@@ -1,4 +1,4 @@
-#include "core/services/startup_impact_service/parser.h"
+#include "core/services/startup_impact_service/parser.hpp"
 
 #include <QDir>
 #include <QFile>

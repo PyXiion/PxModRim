@@ -1,4 +1,4 @@
-#include "ui/window/actions.h"
+#include "ui/window/actions.hpp"
 
 #include <QAction>
 #include <QKeySequence>

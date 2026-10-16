@@ -1,4 +1,4 @@
-#include "ui/components/toast.h"
+#include "ui/components/toast.hpp"
 
 #include <cstddef>
 
@@ -12,8 +12,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include "ui/components/icons.h"
-#include "ui/theme/palette.h"
+#include "ui/components/icons.hpp"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

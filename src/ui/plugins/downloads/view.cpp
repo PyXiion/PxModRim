@@ -1,10 +1,10 @@
-#include "ui/plugins/downloads/view.h"
+#include "ui/plugins/downloads/view.hpp"
 
 #include <QQmlContext>
 #include <QQuickWidget>
 #include <spdlog/spdlog.h>
 
-#include "ui/theme/palette.h"
+#include "ui/theme/palette.hpp"
 
 namespace px::modrim {
 

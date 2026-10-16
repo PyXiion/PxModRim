@@ -1,4 +1,4 @@
-#include "ui/components/popup_parent.h"
+#include "ui/components/popup_parent.hpp"
 
 #include <QEvent>
 #include <QQuickWidget>

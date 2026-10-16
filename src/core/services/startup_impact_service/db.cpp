@@ -1,4 +1,4 @@
-#include "core/services/startup_impact_service/db.h"
+#include "core/services/startup_impact_service/db.hpp"
 
 #include <initializer_list>
 
@@ -16,7 +16,7 @@
 #include <QVariant>
 #include <QtConcurrent/QtConcurrentRun>
 
-#include "core/migrator.h"
+#include "core/migrator.hpp"
 
 namespace px::modrim::startup_impact {
 

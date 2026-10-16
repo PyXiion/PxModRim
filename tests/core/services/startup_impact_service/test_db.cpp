@@ -11,8 +11,8 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
-#include "../../test_support.h"
-#include "core/services/startup_impact_service/db.h"
+#include "../../test_support.hpp"
+#include "core/services/startup_impact_service/db.hpp"
 
 using namespace px::modrim::startup_impact;
 using Catch::Matchers::WithinAbs;

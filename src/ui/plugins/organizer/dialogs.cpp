@@ -1,4 +1,4 @@
-#include "ui/plugins/organizer/dialogs.h"
+#include "ui/plugins/organizer/dialogs.hpp"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -9,8 +9,8 @@
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
 
-#include "core/organizer/models.h"
-#include "core/organizer/resolve.h"
+#include "core/organizer/models.hpp"
+#include "core/organizer/resolve.hpp"
 
 namespace px::modrim {
 

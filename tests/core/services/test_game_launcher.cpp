@@ -14,12 +14,12 @@
 #include <QString>
 #include <QStringList>
 
-#include "core/config.h"
-#include "core/constants.h"
-#include "core/context.h"
-#include "core/services/game_launcher.h"
-#include "core/services/game_process.h"
-#include "services_support.h"
+#include "core/config.hpp"
+#include "core/constants.hpp"
+#include "core/context.hpp"
+#include "core/services/game_launcher.hpp"
+#include "core/services/game_process.hpp"
+#include "services_support.hpp"
 
 using px::modrim::AppConfig;
 using px::modrim::CoreContext;

@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <QSignalSpy>
-#include "ui/models/sidebar_model.h"
-#include "ui/theme/palette.h"
+#include "ui/models/sidebar_model.hpp"
+#include "ui/theme/palette.hpp"
 TEST_CASE("sidebar entry updates refresh provider icons without resetting") {
     using px::modrim::view::SidebarEntry;
     px::modrim::SidebarModel model;

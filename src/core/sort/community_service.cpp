@@ -1,6 +1,6 @@
-#include "core/sort/community_service.h"
+#include "core/sort/community_service.hpp"
 
-#include "core/sort/community.h"
+#include "core/sort/community.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -17,7 +17,7 @@
 #include <spdlog/spdlog.h>
 #include <zip.h>
 
-#include "core/file_io.h"
+#include "core/file_io.hpp"
 
 namespace px::modrim::sort {
 

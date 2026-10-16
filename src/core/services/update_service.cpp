@@ -1,4 +1,4 @@
-#include "core/services/update_service.h"
+#include "core/services/update_service.hpp"
 
 #include <algorithm>
 #include <memory>

@@ -1,4 +1,4 @@
-#include "ui/components/unity_rich_text.h"
+#include "ui/components/unity_rich_text.hpp"
 #include <QHash>
 #include <QRegularExpression>
 #include <QStringList>

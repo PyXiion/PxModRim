@@ -1,4 +1,4 @@
-#include "core/migrator.h"
+#include "core/migrator.hpp"
 
 #include <QDateTime>
 #include <QDir>
@@ -7,7 +7,7 @@
 #include <QSqlQuery>
 #include <spdlog/spdlog.h>
 
-#include "core/file_io.h"
+#include "core/file_io.hpp"
 
 namespace px::modrim {
 

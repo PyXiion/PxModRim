@@ -1,4 +1,4 @@
-#include "ui/panels/update_dialog.h"
+#include "ui/panels/update_dialog.hpp"
 
 #include <QDesktopServices>
 #include <QHBoxLayout>

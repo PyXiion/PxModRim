@@ -5,7 +5,7 @@
 #include <QLatin1Char>
 #include <QString>
 
-#include "ui/components/unity_rich_text.h"
+#include "ui/components/unity_rich_text.hpp"
 
 namespace {
 

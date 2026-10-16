@@ -8,14 +8,14 @@
 #include <QString>
 #include <QWidget>
 
-#include "test_support.h"
-#include "core/context.h"
-#include "ui/components/svg_provider.h"
-#include "ui/context.h"
-#include "ui/theme/qml_theme.h"
+#include "test_support.hpp"
+#include "core/context.hpp"
+#include "ui/components/svg_provider.hpp"
+#include "ui/context.hpp"
+#include "ui/theme/qml_theme.hpp"
 
 #ifdef PX_HAS_STEAM
-#include "ui/plugins/steam_workshop/view.h"
+#include "ui/plugins/steam_workshop/view.hpp"
 
 namespace {
 // The embedded browser exists only in WebEngine builds; without it there is no "workshopWeb" object.
