@@ -94,7 +94,8 @@ jobs:
         run: |
           extra=()
           if [ "$RUNNER_OS" = "Windows" ]; then
-            extra+=(-DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md)
+            # QCoro is built Release (/MD); a Debug build (/MDd) would not link.
+            extra+=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md)
           fi
           cmake --preset default \
             -DPX_WORKSHOP_VARIANT=${{ matrix.workshop }} \
