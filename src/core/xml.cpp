@@ -3,134 +3,93 @@
 #include <QFile>
 #include <QFileInfo>
 #include <string>
-#include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace px::modrim {
-
 namespace {
 
-glz::json_t jsonString(std::string value) {
-  glz::json_t out;
-  out.data = std::move(value);
-  return out;
-}
-
-QString scalarToString(const glz::json_t& value) {
-  return std::visit(
-      [](const auto& v) -> QString {
-        using T = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<T, std::string>) {
-          return QString::fromStdString(v);
-        } else if constexpr (std::is_same_v<T, bool>) {
-          // Python's str(True) spelling, matching the legacy writer.
-          return v ? QStringLiteral("True") : QStringLiteral("False");
-        } else if constexpr (std::is_same_v<T, double>) {
-          return QString::number(v, 'g', 17);
-        } else {
-          return {};
-        }
-      },
-      value.data);
-}
-
-// The value part of `{tag: value}` for one element.
-glz::json_t elementValue(pugi::xml_node element) {
-  glz::json_t::object_t container;
-  bool hasChildren = false;
-  for (pugi::xml_node child = element.first_child(); child;
-       child = child.next_sibling()) {
-    if (child.type() != pugi::node_element) {
-      continue;
-    }
-    hasChildren = true;
-    const std::string key = child.name();
-    glz::json_t value = elementValue(child);
-    auto existing = container.find(key);
-    if (existing == container.end()) {
-      container.emplace(key, std::move(value));
-      continue;
-    }
-    if (auto* items =
-            std::get_if<glz::json_t::array_t>(&existing->second.data)) {
-      items->push_back(std::move(value));
+glz::json_t nodeValue(pugi::xml_node node) {
+  glz::json_t::object_t fields;
+  bool hasElements = false;
+  for (const auto child : node.children()) {
+    if (child.type() != pugi::node_element) continue;
+    hasElements = true;
+    auto value = nodeValue(child);
+    auto [position, inserted] =
+        fields.try_emplace(child.name(), std::move(value));
+    if (inserted) continue;
+    if (auto* repeated =
+            std::get_if<glz::json_t::array_t>(&position->second.data)) {
+      repeated->push_back(std::move(value));
     } else {
-      glz::json_t::array_t merged;
-      merged.push_back(std::move(existing->second));
-      merged.push_back(std::move(value));
-      existing->second.data = std::move(merged);
+      glz::json_t::array_t entries;
+      entries.push_back(std::move(position->second));
+      entries.push_back(std::move(value));
+      position->second.data = std::move(entries);
     }
   }
-
-  bool hasAttributes = false;
-  for (pugi::xml_attribute attribute = element.first_attribute(); attribute;
-       attribute = attribute.next_attribute()) {
-    hasAttributes = true;
-    container["@" + std::string(attribute.name())] =
-        jsonString(attribute.value());
-  }
-
-  // lxml's `if t.text:` is a truthiness check on the raw text; the stored value
-  // is stripped.
-  const QString text = rawText(element);
-  const QString trimmed = text.trimmed();
-
+  const QString text = rawText(node).trimmed();
   glz::json_t result;
-  if (hasChildren || hasAttributes) {
-    if (!trimmed.isEmpty()) {
-      container["#text"] = jsonString(trimmed.toStdString());
+  if (!hasElements && !node.first_attribute()) {
+    const auto first = node.first_child();
+    if (first.type() == pugi::node_pcdata || first.type() == pugi::node_cdata) {
+      result.data = text.toStdString();
+    } else {
+      result.data = glz::json_t::object_t{};
     }
-    result.data = std::move(container);
-  } else if (!text.isEmpty()) {
-    result = jsonString(trimmed.toStdString());
-  } else {
-    result.data = std::move(container);
+    return result;
   }
+  for (const auto attribute : node.attributes()) {
+    fields[std::string("@") + attribute.name()].data =
+        std::string(attribute.value());
+  }
+  if (!text.isEmpty()) fields["#text"].data = text.toStdString();
+  result.data = std::move(fields);
   return result;
 }
 
-// Fills `element` from a JSON value: objects describe children/attributes/text,
-// arrays become anonymous `li` children, and scalars become the element's text.
-Result<void> fillElement(pugi::xml_node element, const glz::json_t& value) {
-  if (const auto* object = std::get_if<glz::json_t::object_t>(&value.data)) {
-    for (const auto& [key, child] : *object) {
+std::string scalarText(const glz::json_t& value) {
+  if (const auto* text = std::get_if<std::string>(&value.data)) return *text;
+  if (const auto* boolean = std::get_if<bool>(&value.data)) {
+    return *boolean ? "True" : "False";
+  }
+  if (std::holds_alternative<std::nullptr_t>(value.data)) return "None";
+  return value.dump().value_or(std::string{});
+}
+
+void populateNode(pugi::xml_node node, const glz::json_t& value) {
+  if (const auto* fields = std::get_if<glz::json_t::object_t>(&value.data)) {
+    for (const auto& [key, item] : *fields) {
       if (key.starts_with('@')) {
-        const std::string name = key.substr(1);
-        pugi::xml_attribute attribute = element.attribute(name.c_str());
-        if (!attribute) {
-          attribute = element.append_attribute(name.c_str());
-        }
-        attribute.set_value(scalarToString(child).toUtf8().constData());
+        node.append_attribute(key.c_str() + 1)
+            .set_value(scalarText(item).c_str());
       } else if (key == "#text") {
-        element.text().set(scalarToString(child).toUtf8().constData());
-      } else if (const auto* items =
-                     std::get_if<glz::json_t::array_t>(&child.data)) {
-        for (const glz::json_t& item : *items) {
-          pugi::xml_node repeated = element.append_child(key.c_str());
-          if (auto filled = fillElement(repeated, item); !filled) {
-            return filled;
-          }
+        // A leading text node must remain before children regardless of map
+        // order.
+        auto first = node.first_child();
+        if (first.type() != pugi::node_pcdata &&
+            first.type() != pugi::node_cdata) {
+          first = node.prepend_child(pugi::node_pcdata);
+        }
+        first.set_value(scalarText(item).c_str());
+      } else if (const auto* entries =
+                     std::get_if<glz::json_t::array_t>(&item.data)) {
+        for (const auto& entry : *entries) {
+          populateNode(node.append_child(key.c_str()), entry);
         }
       } else {
-        pugi::xml_node single = element.append_child(key.c_str());
-        if (auto filled = fillElement(single, child); !filled) {
-          return filled;
-        }
+        populateNode(node.append_child(key.c_str()), item);
       }
     }
-    return {};
-  }
-  if (const auto* items = std::get_if<glz::json_t::array_t>(&value.data)) {
-    for (const glz::json_t& item : *items) {
-      pugi::xml_node li = element.append_child("li");
-      if (auto filled = fillElement(li, item); !filled) {
-        return filled;
-      }
+  } else if (const auto* entries =
+                 std::get_if<glz::json_t::array_t>(&value.data)) {
+    for (const auto& entry : *entries) {
+      populateNode(node.append_child("li"), entry);
     }
-    return {};
+  } else {
+    node.append_child(pugi::node_pcdata).set_value(scalarText(value).c_str());
   }
-  element.text().set(scalarToString(value).toUtf8().constData());
-  return {};
 }
 
 }  // namespace
@@ -142,56 +101,49 @@ Result<void> loadXmlFile(pugi::xml_document& doc, const QString& path) {
   }
   QFile file(path);
   if (!file.open(QIODevice::ReadOnly)) {
-    return std::unexpected(Error{QStringLiteral("Error parsing XML file %1: %2")
-                                     .arg(path, file.errorString())});
-  }
-  const QByteArray bytes = file.readAll();
-
-  const pugi::xml_parse_result parsed =
-      doc.load_buffer(bytes.constData(), bytes.size());
-  if (!parsed) {
     return std::unexpected(
-        Error{QStringLiteral("Error parsing XML file %1: %2")
+        Error{QStringLiteral("Failed to read XML file %1: %2")
+                  .arg(path, file.errorString())});
+  }
+  const QByteArray contents = file.readAll();
+  if (file.error() != QFileDevice::NoError) {
+    return std::unexpected(
+        Error{QStringLiteral("Failed to read XML file %1: %2")
+                  .arg(path, file.errorString())});
+  }
+  // Keep whitespace text, comments, and PIs so .text never crosses a node.
+  const auto parsed = doc.load_buffer(
+      contents.constData(), static_cast<std::size_t>(contents.size()),
+      pugi::parse_default | pugi::parse_ws_pcdata | pugi::parse_comments |
+          pugi::parse_pi);
+  if (!parsed || !doc.document_element()) {
+    return std::unexpected(
+        Error{QStringLiteral("Failed to parse XML file %1: %2")
                   .arg(path, QString::fromUtf8(parsed.description()))});
-  }
-  if (!doc.document_element()) {
-    return std::unexpected(
-        Error{QStringLiteral("Error parsing XML file %1: no root element")
-                  .arg(path)});
   }
   return {};
 }
 
 QString rawText(pugi::xml_node node) {
   QString text;
-  for (pugi::xml_node child = node.first_child(); child;
-       child = child.next_sibling()) {
-    if (child.type() != pugi::node_pcdata && child.type() != pugi::node_cdata) {
+  for (const auto child : node.children()) {
+    if (child.type() != pugi::node_pcdata && child.type() != pugi::node_cdata)
       break;
-    }
     text += QString::fromUtf8(child.value());
   }
   return text;
 }
 
 std::optional<QString> childText(pugi::xml_node parent, const char* tag) {
-  const pugi::xml_node found = parent.child(tag);
-  if (!found) {
-    return std::nullopt;
-  }
-  const QString text = rawText(found).trimmed();
-  if (text.isEmpty()) {
-    return std::nullopt;
-  }
+  const QString text = rawText(parent.child(tag)).trimmed();
+  if (text.isEmpty()) return std::nullopt;
   return text;
 }
 
 glz::json_t elementToJson(pugi::xml_node element) {
-  glz::json_t::object_t wrapped;
-  wrapped.emplace(std::string(element.name()), elementValue(element));
-  glz::json_t out;
-  out.data = std::move(wrapped);
-  return out;
+  glz::json_t result;
+  result.data = glz::json_t::object_t{{element.name(), nodeValue(element)}};
+  return result;
 }
 
 Result<glz::json_t> xmlFileToJson(const QString& path) {
@@ -203,14 +155,14 @@ Result<glz::json_t> xmlFileToJson(const QString& path) {
 }
 
 Result<void> appendJsonAsXml(pugi::xml_node parent, const glz::json_t& data) {
-  const auto* object = std::get_if<glz::json_t::object_t>(&data.data);
-  if (object == nullptr || object->size() != 1) {
+  const auto* roots = std::get_if<glz::json_t::object_t>(&data.data);
+  if (!roots || roots->size() != 1) {
     return std::unexpected(
         Error{QStringLiteral("Dictionary must have exactly one root key")});
   }
-  const auto& [rootKey, rootValue] = *object->begin();
-  pugi::xml_node root = parent.append_child(rootKey.c_str());
-  return fillElement(root, rootValue);
+  const auto& [name, value] = *roots->begin();
+  populateNode(parent.append_child(name.c_str()), value);
+  return {};
 }
 
 }  // namespace px::modrim

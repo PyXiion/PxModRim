@@ -20,27 +20,23 @@
 
 namespace px::modrim {
 
-// Package id that compares and hashes without regard to case. Stored
-// lowercased.
 class CaseInsensitiveStr {
  public:
   CaseInsensitiveStr() = default;
-  explicit CaseInsensitiveStr(QStringView pid)
-      : m_value(pid.toString().toLower()) {}
+  explicit CaseInsensitiveStr(QStringView pid);
 
-  const QString& str() const noexcept { return m_value; }
+  const QString& str() const noexcept { return m_text; }
 
   friend bool operator==(const CaseInsensitiveStr&,
                          const CaseInsensitiveStr&) = default;
   friend size_t qHash(const CaseInsensitiveStr& key, size_t seed = 0) noexcept {
-    return qHash(key.m_value, seed);
+    return qHash(key.m_text, seed);
   }
 
  private:
-  QString m_value;
+  QString m_text;
 };
 
-// Set of CaseInsensitiveStr with string-friendly membership tests.
 class CaseInsensitiveSet {
  public:
   CaseInsensitiveSet() = default;
@@ -53,24 +49,102 @@ class CaseInsensitiveSet {
   void add(const CaseInsensitiveStr& value);
   void discard(QStringView value);
   void discard(const CaseInsensitiveStr& value);
-
-  qsizetype size() const noexcept { return m_data.size(); }
-  bool empty() const noexcept { return m_data.isEmpty(); }
-
-  // Set union; the result keeps the elements of both operands.
   CaseInsensitiveSet operator|(const CaseInsensitiveSet& other) const;
 
-  auto begin() const { return m_data.cbegin(); }
-  auto end() const { return m_data.cend(); }
+  qsizetype size() const noexcept { return m_members.size(); }
+  bool empty() const noexcept { return m_members.isEmpty(); }
+  auto begin() const { return m_members.cbegin(); }
+  auto end() const { return m_members.cend(); }
 
   friend bool operator==(const CaseInsensitiveSet&,
                          const CaseInsensitiveSet&) = default;
 
  private:
-  QSet<CaseInsensitiveStr> m_data;
+  QSet<CaseInsensitiveStr> m_members;
 };
 
-// Parsed ModsConfig.xml data with active mods and known expansions.
+struct DependencyMod {
+  QString name = QStringLiteral("Unknown Mod Name");
+  CaseInsensitiveStr packageId{QStringLiteral("invalid.mod")};
+  QString workshopUrl;
+  CaseInsensitiveSet alternativePackageIds;
+};
+
+struct BaseRules {
+  CaseInsensitiveSet loadAfter;
+  CaseInsensitiveSet loadBefore;
+  CaseInsensitiveSet incompatibleWith;
+  QList<DependencyMod> dependencies;
+
+  const DependencyMod* findDependency(
+      const CaseInsensitiveStr& packageId) const;
+  bool hasDependency(const CaseInsensitiveStr& packageId) const {
+    return findDependency(packageId) != nullptr;
+  }
+  void setDependency(DependencyMod dependency);
+};
+
+class ListedMod {
+ public:
+  ListedMod() = default;
+  ListedMod(const ListedMod&) = default;
+  ListedMod& operator=(const ListedMod&) = default;
+  virtual ~ListedMod() = default;
+
+  QString name = QStringLiteral("Unknown Mod Name");
+  bool valid = true;
+  QSet<QString> supportedVersions;
+  QString description = QStringLiteral(
+      "This mod is considered invalid by PxModRim and by the game itself. "
+      "It has no About/About.xml file, so it is most likely a leftover "
+      "from earlier usage (for example a removed mod whose folder stayed "
+      "behind).");
+  QString providerId;
+  bool obsolete = false;
+  bool dbBuilderNoName = false;
+
+  virtual QString uuid() const;
+  const std::optional<QString>& modPath() const noexcept { return m_directory; }
+  Result<void> setModPath(const QString& path);
+  std::optional<QString> modFolder() const;
+  qint64 internalTimeTouched() const;
+  std::optional<QString> publishedFileId() const;
+  bool cSharpMod() const;
+  bool xmlPatchMod() const;
+  std::optional<QString> previewImgPath() const;
+
+ private:
+  QString m_identity = makeIdentity();
+  std::optional<QString> m_directory;
+  mutable bool m_workshopIdReady = false;
+  mutable std::optional<QString> m_workshopId;
+  mutable std::optional<bool> m_hasAssemblies;
+  mutable std::optional<bool> m_hasPatches;
+
+  static QString makeIdentity();
+};
+
+class AboutXmlMod : public ListedMod {
+ public:
+  CaseInsensitiveStr packageId{QStringLiteral("invalid.mod")};
+  QStringList authors;
+  QString modVersion;
+  std::optional<QString> modIconPath;
+  qint64 steamAppId = -1;
+  QString url;
+  double mtime = 0.0;
+  BaseRules aboutRules;
+
+  std::optional<QString> getDlcName() const;
+};
+
+class ScenarioMod : public ListedMod {
+ public:
+  QString summary;
+};
+
+using ListedModPtr = std::shared_ptr<ListedMod>;
+
 struct ModsConfig {
   QString version;
   QList<CaseInsensitiveStr> activeMods;
@@ -94,110 +168,6 @@ struct ReplacementInfo {
   QString source = QStringLiteral("database");
 };
 
-// Dependency declared by a mod's About.xml (or synthesized, e.g. the RimWorld
-// base game for DLC).
-struct DependencyMod {
-  QString name;
-  CaseInsensitiveStr packageId{QStringLiteral("invalid.mod")};
-  QString workshopUrl;
-  CaseInsensitiveSet alternativePackageIds;
-};
-
-// Load-order rules and dependencies. Dependencies keep declaration order.
-struct BaseRules {
-  CaseInsensitiveSet loadAfter;
-  CaseInsensitiveSet loadBefore;
-  CaseInsensitiveSet incompatibleWith;
-  QList<DependencyMod> dependencies;
-
-  const DependencyMod* findDependency(
-      const CaseInsensitiveStr& packageId) const;
-  bool hasDependency(const CaseInsensitiveStr& packageId) const {
-    return findDependency(packageId) != nullptr;
-  }
-  // Inserts, or replaces the dependency with the same package id in place.
-  void setDependency(DependencyMod dependency);
-};
-
-// Mod discovered by any provider. Polymorphic so providers can hand out
-// AboutXmlMod (and ScenarioMod) through a shared base pointer.
-class ListedMod {
- public:
-  ListedMod() = default;
-  ListedMod(const ListedMod&) = default;
-  ListedMod& operator=(const ListedMod&) = default;
-  virtual ~ListedMod() = default;
-
-  QString name = QStringLiteral("Unknown Mod Name");
-  bool valid = true;
-  QSet<QString> supportedVersions;
-  QString description = QStringLiteral(
-      "This mod is considered invalid by PxModRim (and the RimWorld game).\n\n"
-      "This mod does NOT contain an ./About/About.xml and is likely leftover "
-      "from previous "
-      "usage.");
-  QString providerId;
-  bool obsolete = false;
-  bool dbBuilderNoName = false;
-
-  // Identity: the mod path once it is known, otherwise a random id assigned at
-  // construction.
-  virtual QString uuid() const;
-
-  const std::optional<QString>& modPath() const noexcept { return m_modPath; }
-  // Fails if a path was already set; a mod's directory is fixed after
-  // discovery.
-  Result<void> setModPath(const QString& path);
-
-  // Folder name without its last extension (Python's Path.stem); nullopt
-  // without a path.
-  std::optional<QString> modFolder() const;
-  // Modification time of the mod folder in seconds since the epoch, or -1 if
-  // unavailable.
-  qint64 internalTimeTouched() const;
-
-  // Published file id from About/PublishedFileId.txt or a numeric folder name.
-  // Cached on first use; this touches the disk, so callers may warm it off the
-  // UI thread.
-  std::optional<QString> publishedFileId() const;
-  bool cSharpMod() const;
-  bool xmlPatchMod() const;
-  std::optional<QString> previewImgPath() const;
-
- private:
-  static QString newUuid();
-
-  QString m_uuid = newUuid();
-  std::optional<QString> m_modPath;
-  mutable std::optional<std::optional<QString>> m_publishedFileIdCache;
-  mutable std::optional<bool> m_cSharpModCache;
-  mutable std::optional<bool> m_xmlPatchModCache;
-};
-
-class ScenarioMod : public ListedMod {
- public:
-  QString summary;
-};
-
-// A mod with an About.xml: authors, version, rules, and DLC metadata.
-class AboutXmlMod : public ListedMod {
- public:
-  CaseInsensitiveStr packageId{QStringLiteral("invalid.mod")};
-  QStringList authors;
-  QString modVersion;
-  std::optional<QString> modIconPath;
-  qint64 steamAppId = -1;
-  QString url;
-  double mtime = 0.0;
-  BaseRules aboutRules;
-
-  // Display name of the RimWorld DLC this package id belongs to, if any.
-  std::optional<QString> getDlcName() const;
-};
-
-using ListedModPtr = std::shared_ptr<ListedMod>;
-
-// Pre-computed dependency graphs and tier classification for sorting.
 struct CompiledDependencyData {
   QHash<QString, QSet<QString>> depsGraph;
   QHash<QString, QSet<QString>> revDepsGraph;
@@ -207,10 +177,6 @@ struct CompiledDependencyData {
   QHash<QString, QSet<QString>> incompatibilities;
   QHash<QString, QSet<QString>> declaredIncompatibilities;
 };
-
-// Glaze schemas for community rules and the Steam Workshop database. Fields the
-// upstream JSON may write either as a single value or as a list use
-// std::variant.
 
 // NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or
 // on the wire
@@ -308,14 +274,13 @@ struct WorkshopUpdateResult {
 
 }  // namespace px::modrim
 
-// Package ids are JSON strings on the wire.
 template <>
 struct glz::to<glz::JSON, px::modrim::CaseInsensitiveStr> {
   template <auto Opts>
   static void op(const px::modrim::CaseInsensitiveStr& value, auto&& ctx,
                  auto&& b, auto&& ix) {
-    glz::to<glz::JSON, std::string>::template op<Opts>(
-        value.str().toStdString(), ctx, b, ix);
+    const std::string text = value.str().toStdString();
+    glz::to<glz::JSON, std::string>::template op<Opts>(text, ctx, b, ix);
   }
 };
 

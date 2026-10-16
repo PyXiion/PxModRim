@@ -9,20 +9,11 @@
 namespace px::modrim {
 
 inline constexpr QLatin1StringView kRimworldSteamAppId{"294100"};
-
-enum class LaunchStrategy : int {
-  kDirect = 0,
-  kSteam = 1,
-};
-
-enum class AfterLaunch : int {
-  kStay = 0,
-  kMinimize = 1,
-  kClose = 2,
-};
-
 inline constexpr QLatin1StringView kDefaultMissingPackageid{
     "missing.packageid"};
+
+enum class LaunchStrategy : int { kDirect = 0, kSteam = 1 };
+enum class AfterLaunch : int { kStay = 0, kMinimize = 1, kClose = 2 };
 
 struct RimWorldDlc {
   QLatin1StringView appId;
@@ -32,7 +23,6 @@ struct RimWorldDlc {
   QLatin1StringView description;
 };
 
-// Ordered by Steam app id, matching the legacy dict's iteration order.
 inline constexpr std::array<RimWorldDlc, 6> kRimworldDlcMetadata{{
     {QLatin1StringView{"294100"}, QLatin1StringView{"ludeon.rimworld"},
      QLatin1StringView{"RimWorld"},
@@ -57,31 +47,27 @@ inline constexpr std::array<RimWorldDlc, 6> kRimworldDlcMetadata{{
     {QLatin1StringView{"2380740"}, QLatin1StringView{"ludeon.rimworld.anomaly"},
      QLatin1StringView{"RimWorld - Anomaly"},
      QLatin1StringView{
-         "https://store.steampowered.com/app/2380740/RimWorld__Anomaly/"},
+         "https://store.steampowered.com/app/2380740/RimWorld__Anomaly"},
      QLatin1StringView{"DLC #4"}},
     {QLatin1StringView{"3022790"}, QLatin1StringView{"ludeon.rimworld.odyssey"},
      QLatin1StringView{"RimWorld - Odyssey"},
      QLatin1StringView{
-         "https://store.steampowered.com/app/3022790/RimWorld__Odyssey/"},
+         "https://store.steampowered.com/app/3022790/RimWorld__Odyssey"},
      QLatin1StringView{"DLC #5"}},
 }};
 
-// Ordered package ids of RIMWORLD_DLC_METADATA.
 inline const QStringList kRimworldPackageIds = [] {
-  QStringList ids;
-  for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
-    ids.append(QString(dlc.packageId));
+  QStringList result;
+  result.reserve(kRimworldDlcMetadata.size());
+  for (const auto& release : kRimworldDlcMetadata) {
+    result.push_back(QString(release.packageId));
   }
-  return ids;
+  return result;
 }();
 
-// Exact (case-sensitive) lookup; callers pass lowercase ids as produced by
-// CaseInsensitiveStr.
 inline const RimWorldDlc* findRimWorldDlcByPackageId(QStringView packageId) {
-  for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
-    if (packageId == QLatin1StringView(dlc.packageId)) {
-      return &dlc;
-    }
+  for (const auto& release : kRimworldDlcMetadata) {
+    if (packageId == release.packageId) return &release;
   }
   return nullptr;
 }

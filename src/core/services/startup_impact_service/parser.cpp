@@ -1,150 +1,130 @@
 #include "core/services/startup_impact_service/parser.hpp"
 
+#include <QByteArrayView>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QIODevice>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonParseError>
+#include <string_view>
+#include <utility>
 
+#include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
 
 namespace px::modrim::startup_impact {
-
 namespace {
 
-constexpr QLatin1StringView kReportFilename{"StartupImpactData.json"};
-
-// The game writes milliseconds; the rest of the app works in seconds.
-double msToS(double ms) { return ms / 1000.0; }
-
-// Python's bool is an int subclass, so the legacy parser accepts true/false as
-// 1/0 ms.
-bool isNumeric(const QJsonValue& value) {
-  return value.isDouble() || value.isBool();
+const glz::json_t& field(const glz::json_t& object, std::string_view name) {
+  static const glz::json_t kMissing;
+  const auto& members = object.get_object();
+  const auto it = members.find(name);
+  return it == members.end() ? kMissing : it->second;
 }
 
-double numericMs(const QJsonValue& value) {
-  return value.isBool() ? static_cast<double>(value.toBool())
-                        : value.toDouble();
-}
-
-double asSeconds(const QJsonValue& value) {
-  if (isNumeric(value)) {
-    return msToS(numericMs(value));
+double durationSeconds(const glz::json_t& value) {
+  if (value.is_number()) {
+    return value.get_number() / 1000.0;
   }
-  if (value.isString()) {
+  if (value.is_string()) {
     bool ok = false;
-    const double ms = value.toString().toDouble(&ok);
-    return ok ? msToS(ms) : 0.0;
+    const double number =
+        QString::fromStdString(value.get_string()).toDouble(&ok);
+    return ok ? number / 1000.0 : 0.0;
   }
   return 0.0;
 }
 
-// Non-numeric values are skipped, as the legacy parser skips them.
-QMap<QString, double> asSecondsMap(const QJsonValue& value) {
+QMap<QString, double> durationMap(const glz::json_t& value) {
   QMap<QString, double> result;
-  if (!value.isObject()) {
-    return result;
-  }
-  const QJsonObject object = value.toObject();
-  for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
-    if (isNumeric(it.value())) {
-      result.insert(it.key(), msToS(numericMs(it.value())));
+  if (value.is_object()) {
+    for (const auto& [name, duration] : value.get_object()) {
+      if (duration.is_number()) {
+        result.insert(QString::fromStdString(name),
+                      duration.get_number() / 1000.0);
+      }
     }
   }
   return result;
 }
 
-std::optional<StartupImpactMod> parseMod(const QJsonValue& value) {
-  if (!value.isObject()) {
-    return std::nullopt;
-  }
-  const QJsonObject entry = value.toObject();
-  const QJsonValue modName = entry.value(QStringLiteral("modName"));
-  if (!modName.isString() || modName.toString().isEmpty()) {
-    return std::nullopt;
-  }
-
-  const QJsonValue rawPackageId = entry.value(QStringLiteral("modPackageId"));
-  std::optional<QString> packageId;
-  if (rawPackageId.isString() && !rawPackageId.toString().isEmpty()) {
-    packageId = normalizePackageId(rawPackageId.toString());
-  }
-
-  return StartupImpactMod{
-      .modName = modName.toString(),
-      .packageId = packageId,
-      .totalImpactS = asSeconds(entry.value(QStringLiteral("totalImpact"))),
-      .metrics = asSecondsMap(entry.value(QStringLiteral("metrics"))),
-      .offThreadMetrics =
-          asSecondsMap(entry.value(QStringLiteral("offThreadMetrics"))),
-      .offThreadTotalImpactS =
-          asSeconds(entry.value(QStringLiteral("offThreadTotalImpact"))),
-  };
-}
-
 }  // namespace
 
 QString getStartupImpactPath(const QString& configFolder) {
-  // Mirrors Path(config_folder).parent: a trailing separator is ignored and a
-  // bare name has the current directory as its parent.
-  const QString clean = QDir::cleanPath(configFolder);
-  const qsizetype slash = clean.lastIndexOf(u'/');
-  const QString parent = slash < 0    ? QStringLiteral(".")
-                         : slash == 0 ? QStringLiteral("/")
-                                      : clean.left(slash);
-  return QDir::cleanPath(QDir(parent).filePath(kReportFilename.toString()));
+  const QString folder = QDir::cleanPath(configFolder);
+  return QDir(QFileInfo(folder).path())
+      .filePath(QStringLiteral("StartupImpactData.json"));
 }
 
 std::optional<StartupImpactReport> parseStartupImpact(const QString& path) {
-  if (!QFileInfo::exists(path)) {
-    spdlog::debug("Startup impact report not found at {}", path.toStdString());
+  QFile input(path);
+  if (!input.open(QIODevice::ReadOnly)) {
+    if (!input.exists()) {
+      spdlog::debug("Startup impact report missing: {}", path.toStdString());
+    } else {
+      spdlog::warn("Cannot open startup impact report {}: {}",
+                   path.toStdString(), input.errorString().toStdString());
+    }
     return std::nullopt;
   }
-
-  QFile file(path);
-  if (!file.open(QIODevice::ReadOnly)) {
-    spdlog::warn("Failed to parse startup impact report at {}: {}",
-                 path.toStdString(), file.errorString().toStdString());
+  const QByteArray bytes = input.readAll();
+  if (input.error() != QFileDevice::NoError) {
+    spdlog::warn("Cannot read startup impact report {}: {}", path.toStdString(),
+                 input.errorString().toStdString());
     return std::nullopt;
   }
-
-  QJsonParseError error;
-  const QJsonDocument document =
-      QJsonDocument::fromJson(file.readAll(), &error);
-  if (error.error != QJsonParseError::NoError) {
-    spdlog::warn("Failed to parse startup impact report at {}: {}",
-                 path.toStdString(), error.errorString().toStdString());
+  if (!QByteArrayView(bytes).isValidUtf8()) {
+    spdlog::warn("Startup impact report is not UTF-8: {}", path.toStdString());
     return std::nullopt;
   }
-  if (!document.isObject()) {
-    spdlog::warn("Startup impact report is not a JSON object: {}",
+  const std::string_view text(bytes.constData(),
+                              static_cast<std::size_t>(bytes.size()));
+  glz::json_t root;
+  if (auto error = glz::read_json(root, text)) {
+    spdlog::warn("Cannot parse startup impact report {}: {}",
+                 path.toStdString(), glz::format_error(error, text));
+    return std::nullopt;
+  }
+  if (!root.is_object()) {
+    spdlog::warn("Startup impact report must be an object: {}",
                  path.toStdString());
     return std::nullopt;
   }
 
-  const QJsonObject data = document.object();
   StartupImpactReport report;
-  report.path = QDir::cleanPath(path);
-  report.loadingTimeS = asSeconds(data.value(QStringLiteral("loadingTime")));
-  if (const QJsonValue timestamp = data.value(QStringLiteral("timestamp"));
-      timestamp.isString()) {
-    report.timestamp = timestamp.toString();
-  }
-  report.metrics = asSecondsMap(data.value(QStringLiteral("metrics")));
-  report.totalImpact = asSeconds(data.value(QStringLiteral("totalImpact")));
-  report.offThreadMetrics =
-      asSecondsMap(data.value(QStringLiteral("offThreadMetrics")));
+  report.path = path;
+  report.loadingTimeS = durationSeconds(field(root, "loadingTime"));
+  report.metrics = durationMap(field(root, "metrics"));
+  report.totalImpact = durationSeconds(field(root, "totalImpact"));
+  report.offThreadMetrics = durationMap(field(root, "offThreadMetrics"));
   report.offThreadTotalImpact =
-      asSeconds(data.value(QStringLiteral("offThreadTotalImpact")));
-
-  // A non-array "mods" yields no entries, as iterating the legacy value did.
-  for (const QJsonValue& entry : data.value(QStringLiteral("mods")).toArray()) {
-    if (auto mod = parseMod(entry)) {
-      report.mods.append(std::move(*mod));
+      durationSeconds(field(root, "offThreadTotalImpact"));
+  const auto& timestamp = field(root, "timestamp");
+  if (timestamp.is_string()) {
+    report.timestamp = QString::fromStdString(timestamp.get_string());
+  }
+  const auto& entries = field(root, "mods");
+  if (entries.is_array()) {
+    report.mods.reserve(static_cast<qsizetype>(entries.get_array().size()));
+    for (const auto& entry : entries.get_array()) {
+      if (!entry.is_object()) {
+        continue;
+      }
+      const auto& name = field(entry, "modName");
+      if (!name.is_string() || name.get_string().empty()) {
+        continue;
+      }
+      StartupImpactMod mod;
+      mod.modName = QString::fromStdString(name.get_string());
+      const auto& packageId = field(entry, "modPackageId");
+      if (packageId.is_string() && !packageId.get_string().empty()) {
+        mod.packageId =
+            normalizePackageId(QString::fromStdString(packageId.get_string()));
+      }
+      mod.totalImpactS = durationSeconds(field(entry, "totalImpact"));
+      mod.metrics = durationMap(field(entry, "metrics"));
+      mod.offThreadMetrics = durationMap(field(entry, "offThreadMetrics"));
+      mod.offThreadTotalImpactS =
+          durationSeconds(field(entry, "offThreadTotalImpact"));
+      report.mods.append(std::move(mod));
     }
   }
   return report;

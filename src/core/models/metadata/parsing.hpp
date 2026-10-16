@@ -11,21 +11,14 @@
 
 namespace px::modrim {
 
-// Builds a mod for the directory `path`, parsing its About.xml (found
-// automatically, or the explicit `aboutXmlPath`). Returns Err only when `path`
-// is not a directory. A mod whose metadata is unusable is still returned, with
-// `valid == false`.
-//
-// `targetVersion` selects `*ByVersion` entries: "1.5" matches `<v1.5>`. When
-// `preferVersioned` is false those entries are ignored.
+// A missing or unreadable About.xml yields an invalid mod, not an error.
+// Only a path that is not a directory is rejected.
 Result<ListedModPtr> createListedModFromPath(
     const QString& path, const QString& targetVersion,
     bool preferVersioned = true,
     std::optional<QString> aboutXmlPath = std::nullopt);
 
-// Builds an AboutXmlMod from the `<ModMetaData>` root element of an About.xml.
-// The result's `valid` flag reports whether the metadata is usable; no mod path
-// is set.
+// Parses metadata without assigning a directory to the resulting mod.
 std::shared_ptr<AboutXmlMod> createAboutModFromElement(
     pugi::xml_node root, const QString& targetVersion,
     bool preferVersioned = true);
