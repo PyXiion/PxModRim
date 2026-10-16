@@ -1,6 +1,7 @@
 set windows-shell := ["bash", "-cu"]
 
 python := if os() == "windows" { "python" } else { "python3" }
+app_exe := if os() == "macos" { "pxmodrim.app/Contents/MacOS/pxmodrim" } else { "pxmodrim" }
 
 @default:
     just --list
@@ -25,7 +26,7 @@ run-none *args: (_run "NoWorkshop" "none" args)
 _run variant dir *args: build-js
     cmake -S . -B build/{{dir}} -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPX_WORKSHOP_VARIANT={{variant}}
     cmake --build build/{{dir}} --target pxmodrim
-    PX_LOG_LEVEL=debug build/{{dir}}/src/app/pxmodrim {{args}}
+    PX_LOG_LEVEL=debug build/{{dir}}/src/app/{{app_exe}} {{args}}
 
 test: build
     QT_QPA_PLATFORM=offscreen ctest --preset default

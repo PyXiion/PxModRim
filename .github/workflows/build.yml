@@ -57,6 +57,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
             -DUSE_QT_VERSION=6 \
             -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_WITH_QTWEBSOCKETS=OFF \
             -DQCORO_BUILD_EXAMPLES=OFF \
             -DBUILD_TESTING=OFF
           cmake --build "$RUNNER_TEMP/qcoro-build"
@@ -266,6 +267,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
             -DUSE_QT_VERSION=6 \
             -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_WITH_QTWEBSOCKETS=OFF \
             -DQCORO_BUILD_EXAMPLES=OFF \
             -DBUILD_TESTING=OFF
           cmake --build "$RUNNER_TEMP/qcoro-build"
@@ -377,6 +379,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
             -DUSE_QT_VERSION=6 \
             -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_WITH_QTWEBSOCKETS=OFF \
             -DQCORO_BUILD_EXAMPLES=OFF \
             -DBUILD_TESTING=OFF
           cmake --build "$RUNNER_TEMP/qcoro-build"
