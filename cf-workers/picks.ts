@@ -170,8 +170,10 @@ export async function listPicks(
     bindings.push(options.tag);
   }
   if (options.version !== null) {
-    predicates.push('EXISTS (SELECT 1 FROM json_each(p.supported_versions) WHERE value = ?)');
+    const taggedVersion = /^\d+\.\d+(?:\.\d+)?$/.test(options.version);
+    predicates.push(`(EXISTS (SELECT 1 FROM json_each(p.supported_versions) WHERE value = ?)${taggedVersion ? ' OR EXISTS (SELECT 1 FROM json_each(p.tags) WHERE value = ?)' : ''})`);
     bindings.push(options.version);
+    if (taggedVersion) bindings.push(options.version);
   }
   const where = predicates.length ? ` WHERE ${predicates.join(' AND ')}` : '';
   const orders = {

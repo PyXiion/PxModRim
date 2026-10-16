@@ -530,7 +530,6 @@ async function ensureCollectionRootDeps(env: Env, rootId: string): Promise<boole
   if (!rootDetail || rootDetail.result !== 1) return false;
 
   const children = (rootDetail.children || []).map(c => c.publishedfileid).filter(Boolean);
-  if (children.length === 0) return false;
 
   const currentDeps = cached.data.deps || [];
   const depsChanged = children.length !== currentDeps.length ||
@@ -893,11 +892,11 @@ export default {
         } else {
           console.log(`[QUEUE CONTINUE] Root ${rootId}: ${check.missingIds.size} still missing, re-scheduling`);
           if (!env.SCRAPE_QUEUE) throw new Error('SCRAPE_QUEUE not configured');
-          message.ack();
           await env.SCRAPE_QUEUE.send(
             { rootId },
             { delaySeconds: 30 }
           );
+          message.ack();
         }
       } catch (err) {
         console.error(`[QUEUE ERROR] Root ${rootId}:`, err instanceof Error ? err.message : err);
