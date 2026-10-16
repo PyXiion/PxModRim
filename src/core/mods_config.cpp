@@ -313,7 +313,7 @@ Result<void> writeModsConfig(const QString& path, const ModsConfig& data,
       return std::unexpected(kept.error());
     }
   }
-  if (auto written = writeFileAtomically(path, out.str()); !written) {
+  if (auto written = writeFileAtomically(path, out.view()); !written) {
     return std::unexpected(written.error());
   }
   spdlog::info("ModsConfig.xml written to {}", path.toStdString());

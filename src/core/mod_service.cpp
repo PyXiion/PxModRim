@@ -69,10 +69,9 @@ QCoro::Task<Result<void>> ModService::discover(Profiler* timer,
                                                bool forceReparse) {
   // Each provider profiles into its own tree, since their discoveries
   // interleave.
-  std::unique_ptr<Profiler> ownTimer;
+  std::optional<Profiler> ownTimer;
   if (!timer) {
-    ownTimer = std::make_unique<Profiler>();
-    timer = ownTimer.get();
+    timer = &ownTimer.emplace();
   }
   auto scope = (*timer)(QStringLiteral("discover"));
 
@@ -138,7 +137,6 @@ QCoro::Task<Result<void>> ModService::runRefreshPipeline(const QString& label,
 
   Profiler discoverTimer;
   Profiler diagnosticsTimer;
-  Profiler impactTimer;
   auto discovery = discover(&discoverTimer, forceReparse);
   auto diagnostics = m_ctx.diagnosticsService().initialize(&diagnosticsTimer);
   auto impact = m_startupImpact.load();
@@ -148,7 +146,6 @@ QCoro::Task<Result<void>> ModService::runRefreshPipeline(const QString& label,
   const auto loaded = co_await impact;
   timer.adopt(discoverTimer);
   timer.adopt(diagnosticsTimer);
-  timer.adopt(impactTimer);
 
   if (!discovered) {
     co_return std::unexpected(discovered.error());

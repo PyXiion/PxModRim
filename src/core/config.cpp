@@ -351,7 +351,7 @@ JsonObject ConfigService::loadRaw(const QString& filename) const {
   if (glz::read_json(document, *bytes) || !document.is_object()) {
     return {};
   }
-  return document.get_object();
+  return std::move(document.get_object());
 }
 
 Result<std::optional<JsonObject>> ConfigService::loadVersioned(
@@ -375,7 +375,7 @@ Result<std::optional<JsonObject>> ConfigService::loadVersioned(
                  filename.toStdString());
     return std::optional<JsonObject>{};
   }
-  JsonObject raw = document.get_object();
+  JsonObject raw = std::move(document.get_object());
 
   // A missing marker or an explicit null means schema version 0.
   std::int64_t version = 0;

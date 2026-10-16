@@ -73,11 +73,11 @@ void CoreContext::load(QHash<QString, ListedModPtr> mods,
 }
 
 void CoreContext::setActive(QStringList uuids) {
-  const QSet<QString> oldSet(m_activeUuids.cbegin(), m_activeUuids.cend());
-  const QSet<QString> newSet(uuids.cbegin(), uuids.cend());
-  if (oldSet == newSet && m_activeUuids == uuids) {
+  if (m_activeUuids == uuids) {
     return;
   }
+  const QSet<QString> oldSet(m_activeUuids.cbegin(), m_activeUuids.cend());
+  const QSet<QString> newSet(uuids.cbegin(), uuids.cend());
   const bool setChanged = oldSet != newSet;
   m_activeUuids = std::move(uuids);
   if (setChanged) {
