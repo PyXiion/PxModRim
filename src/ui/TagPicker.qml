@@ -8,9 +8,12 @@ PxComboBox {
     property var options: []
     property string selectedTag: ""
     displayText: selectedTag || "All tags"
-    model: options.filter(function (tag) {
-        return tag === "All tags" || tag.toLowerCase().indexOf(tagSearch.text.toLowerCase()) >= 0
-    })
+    model: {
+        const query = tagSearch.text.toLowerCase()
+        return options.filter(function (tag) {
+            return tag === "All tags" || tag.toLowerCase().indexOf(query) >= 0
+        })
+    }
     Accessible.name: "Tag filter"
     onActivated: selectedTag = currentText === "All tags" ? "" : currentText
     delegate: ItemDelegate {

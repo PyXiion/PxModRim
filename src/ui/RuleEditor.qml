@@ -75,27 +75,15 @@ FocusScope {
     }
 
     function findFieldIndex(val) {
-        for (var i = 0; i < fieldOptions.length; ++i) {
-            if (fieldOptions[i].value === val)
-                return i
-        }
-        return 0
+        return Math.max(0, fieldOptions.findIndex(option => option.value === val))
     }
 
     function findOpIndex(val) {
-        for (var i = 0; i < opOptions.length; ++i) {
-            if (opOptions[i].value === val)
-                return i
-        }
-        return 0
+        return Math.max(0, opOptions.findIndex(option => option.value === val))
     }
 
     function findFolderIndex(fid) {
-        for (var i = 0; i < ruleFolders.length; ++i) {
-            if (ruleFolders[i].id === fid)
-                return i
-        }
-        return 0
+        return Math.max(0, ruleFolders.findIndex(folder => folder.id === fid))
     }
 
     ListModel {
@@ -126,9 +114,7 @@ FocusScope {
     }
 
     onRuleRowsChanged: {
-        if (!opened && !draftMatches(ruleRows))
-            loadDraft()
-        else if (opened && draftMatches(loadedRows) && !draftMatches(ruleRows))
+        if ((!opened || draftMatches(loadedRows)) && !draftMatches(ruleRows))
             loadDraft()
         refreshDirty()
         schedulePreview()

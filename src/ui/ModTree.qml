@@ -38,6 +38,7 @@ Rectangle {
 
     function clickRow(index, row, modifiers) {
         var range = []
+        var key = modTreeModel.data(index, Qt.UserRole + 2)
         var anchorRow = tree.rowAtIndex(modTreeModel.indexForKey(root.anchorKey))
         if ((modifiers & Qt.ShiftModifier) && anchorRow >= 0) {
             var from = Math.min(anchorRow, row)
@@ -45,22 +46,22 @@ Rectangle {
             for (var r = from; r <= to; ++r)
                 range.push(tree.index(r, 0))
         } else {
-            root.anchorKey = modTreeModel.data(index, Qt.UserRole + 2)
+            root.anchorKey = key
         }
-        root.focusedKey = modTreeModel.data(index, Qt.UserRole + 2)
+        root.focusedKey = key
         organizerPanel.selectRow(index, modifiers, range)
         tree.forceActiveFocus()
     }
 
     function toggleRow(index, row) {
-        if (tree.isExpanded(row)) {
+        var collapsed = tree.isExpanded(row)
+        if (collapsed)
             tree.collapse(row)
-            organizerPanel.persistCollapsed(index, true)
-        } else {
+        else
             tree.expand(row)
-            organizerPanel.persistCollapsed(index, false)
+        organizerPanel.persistCollapsed(index, collapsed)
+        if (!collapsed)
             root.restoreExpansion()
-        }
     }
 
     function navigateRow(row, modifiers) {
@@ -176,10 +177,9 @@ Rectangle {
             implicitWidth: tree.width
             implicitHeight: item.model.kind === "mod" ? 30 : 32
             radius: Theme.radiusSm
-            color: root.dropRow === item.row
+            color: root.dropRow === item.row || item.model.selected
                 ? Theme.primaryBg
-                : (item.model.selected ? Theme.primaryBg
-                : (rowMouse.containsMouse ? Theme.elevate3 : "transparent"))
+                : rowMouse.containsMouse ? Theme.elevate3 : "transparent"
             border.width: root.dropRow === item.row ? 1 : 0
             border.color: Theme.primary
             Accessible.role: Accessible.TreeItem
