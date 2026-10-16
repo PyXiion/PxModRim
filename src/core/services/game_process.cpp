@@ -50,15 +50,15 @@ const QSet<QString> kProcessNames = {
 };
 
 // Simple POSIX shlex-style tokenizer. Handles single/double quotes and backslash escapes.
-Result<QStringList> split_posix(const QString& text) {
+Result<QStringList> splitPosix(const QString& text) {
     QStringList tokens;
     QString current;
-    enum State { Space, Word, SingleQuote, DoubleQuote } state = Space;
+    enum State { kSpace, kWord, kSingleQuote, kDoubleQuote } state = kSpace;
     bool escaped = false;
 
     for (const QChar ch : text) {
         if (escaped) {
-            if (state == DoubleQuote && ch != u'"' && ch != u'\\' && ch != u'$' && ch != u'`') {
+            if (state == kDoubleQuote && ch != u'"' && ch != u'\\' && ch != u'$' && ch != u'`') {
                 current.append(u'\\');
             }
             current.append(ch);
@@ -67,52 +67,52 @@ Result<QStringList> split_posix(const QString& text) {
         }
 
         switch (state) {
-        case Space:
+        case kSpace:
             if (ch.isSpace()) {
                 continue;
             }
             if (ch == u'\\') {
                 escaped = true;
-                state = Word;
+                state = kWord;
             } else if (ch == u'\'') {
-                state = SingleQuote;
+                state = kSingleQuote;
             } else if (ch == u'"') {
-                state = DoubleQuote;
+                state = kDoubleQuote;
             } else {
                 current.append(ch);
-                state = Word;
+                state = kWord;
             }
             break;
 
-        case Word:
+        case kWord:
             if (ch.isSpace()) {
                 tokens.append(current);
                 current.clear();
-                state = Space;
+                state = kSpace;
             } else if (ch == u'\\') {
                 escaped = true;
             } else if (ch == u'\'') {
-                state = SingleQuote;
+                state = kSingleQuote;
             } else if (ch == u'"') {
-                state = DoubleQuote;
+                state = kDoubleQuote;
             } else {
                 current.append(ch);
             }
             break;
 
-        case SingleQuote:
+        case kSingleQuote:
             if (ch == u'\'') {
-                state = Word;
+                state = kWord;
             } else {
                 current.append(ch);
             }
             break;
 
-        case DoubleQuote:
+        case kDoubleQuote:
             if (ch == u'\\') {
                 escaped = true;
             } else if (ch == u'"') {
-                state = Word;
+                state = kWord;
             } else {
                 current.append(ch);
             }
@@ -120,10 +120,10 @@ Result<QStringList> split_posix(const QString& text) {
         }
     }
 
-    if (escaped || state == SingleQuote || state == DoubleQuote) {
+    if (escaped || state == kSingleQuote || state == kDoubleQuote) {
         return std::unexpected(Error{QStringLiteral("No closing quotation")});
     }
-    if (state == Word || !current.isEmpty()) {
+    if (state == kWord || !current.isEmpty()) {
         tokens.append(current);
     }
     return tokens;
@@ -131,7 +131,7 @@ Result<QStringList> split_posix(const QString& text) {
 
 // Python's shlex.split(posix=False), which the Windows launch path uses: quotes are kept in the
 // token and there are no escapes, so whitespace inside quotes does not split.
-Result<QStringList> split_windows(const QString& text) {
+Result<QStringList> splitWindows(const QString& text) {
     QStringList tokens;
     QString current;
     bool inToken = false;
@@ -168,34 +168,34 @@ Result<QStringList> split_windows(const QString& text) {
     return tokens;
 }
 
-bool is_env_assignment(const QString& token) {
+bool isEnvAssignment(const QString& token) {
     static const QRegularExpression pattern(QStringLiteral("^[A-Za-z_][A-Za-z0-9_]*="));
     return pattern.match(token).hasMatch();
 }
 
 }  // namespace
 
-Platform current_platform() {
+Platform currentPlatform() {
 #if defined(Q_OS_MACOS)
     return Platform::MacOS;
 #elif defined(Q_OS_WIN)
     return Platform::Windows;
 #else
-    return Platform::Linux;
+    return Platform::kLinux;
 #endif
 }
 
-Result<QStringList> split_arguments(const QString& text, Platform platform) {
-    return platform == Platform::Windows ? split_windows(text) : split_posix(text);
+Result<QStringList> splitArguments(const QString& text, Platform platform) {
+    return platform == Platform::kWindows ? splitWindows(text) : splitPosix(text);
 }
 
-Result<DirectCommand> build_direct_command(const QString& exe, const QString& wrapper,
+Result<DirectCommand> buildDirectCommand(const QString& exe, const QString& wrapper,
                                            const QString& args, Platform platform) {
-    auto splitArgs = split_arguments(args, platform);
+    auto splitArgs = splitArguments(args, platform);
     if (!splitArgs) {
         return std::unexpected(splitArgs.error());
     }
-    auto splitWrapper = split_arguments(wrapper, platform);
+    auto splitWrapper = splitArguments(wrapper, platform);
     if (!splitWrapper) {
         return std::unexpected(splitWrapper.error());
     }
@@ -206,7 +206,7 @@ Result<DirectCommand> build_direct_command(const QString& exe, const QString& wr
 
     QStringList tokens = *splitWrapper;
     DirectCommand result;
-    while (!tokens.isEmpty() && is_env_assignment(tokens.front())) {
+    while (!tokens.isEmpty() && isEnvAssignment(tokens.front())) {
         const QString token = tokens.takeFirst();
         const qsizetype eq = token.indexOf(u'=');
         result.env.insert(token.left(eq), token.mid(eq + 1));
@@ -224,9 +224,9 @@ Result<DirectCommand> build_direct_command(const QString& exe, const QString& wr
     return result;
 }
 
-std::optional<QString> find_executable(const QString& game_path, Platform platform) {
-    const QDir dir(game_path);
-    if (platform == Platform::Linux) {
+std::optional<QString> findExecutable(const QString& gamePath, Platform platform) {
+    const QDir dir(gamePath);
+    if (platform == Platform::kLinux) {
         for (const char* name : {"RimWorld", "RimWorldLinux"}) {
             const QString candidate = dir.filePath(QString::fromLatin1(name));
             const QFileInfo info(candidate);
@@ -236,7 +236,7 @@ std::optional<QString> find_executable(const QString& game_path, Platform platfo
         }
         return std::nullopt;
     }
-    if (platform == Platform::MacOS) {
+    if (platform == Platform::kMacOs) {
         const QString primary = dir.filePath(QStringLiteral("RimWorld.app"));
         if (QFileInfo(primary).isDir()) {
             return primary;
@@ -257,33 +257,33 @@ std::optional<QString> find_executable(const QString& game_path, Platform platfo
     return std::nullopt;
 }
 
-void ensure_steam_appid(const QString& game_path, Platform platform) {
+void ensureSteamAppid(const QString& gamePath, Platform platform) {
     const QString targetDir =
-        platform == Platform::MacOS ? QFileInfo(game_path).dir().absolutePath() : game_path;
+        platform == Platform::kMacOs ? QFileInfo(gamePath).dir().absolutePath() : gamePath;
     const QString path = QDir(targetDir).filePath(QStringLiteral("steam_appid.txt"));
     if (QFileInfo::exists(path)) {
         return;
     }
-    const std::string_view appId(RIMWORLD_STEAM_APP_ID.data(), RIMWORLD_STEAM_APP_ID.size());
-    if (auto written = write_file_atomically(path, appId); !written) {
+    const std::string_view appId(kRimworldSteamAppId.data(), kRimworldSteamAppId.size());
+    if (auto written = writeFileAtomically(path, appId); !written) {
         spdlog::warn("Failed to create steam_appid.txt: {}", written.error().message.toStdString());
     } else {
         spdlog::debug("Created {}", path.toStdString());
     }
 }
 
-QString steam_run_url(const QString& launch_args) {
-    const QString trimmed = launch_args.trimmed();
+QString steamRunUrl(const QString& launchArgs) {
+    const QString trimmed = launchArgs.trimmed();
     if (trimmed.isEmpty()) {
-        return QStringLiteral("steam://rungameid/%1").arg(QString(RIMWORLD_STEAM_APP_ID));
+        return QStringLiteral("steam://rungameid/%1").arg(QString(kRimworldSteamAppId));
     }
     const QByteArray encoded = QUrl::toPercentEncoding(trimmed);
     return QStringLiteral("steam://run/%1//%2/")
-        .arg(QString(RIMWORLD_STEAM_APP_ID), QString::fromUtf8(encoded));
+        .arg(QString(kRimworldSteamAppId), QString::fromUtf8(encoded));
 }
 
-Result<void> open_steam_url(const QString& launch_args) {
-    const QString url = steam_run_url(launch_args);
+Result<void> openSteamUrl(const QString& launchArgs) {
+    const QString url = steamRunUrl(launchArgs);
     spdlog::info("Opening Steam URL: {}", url.toStdString());
 #if defined(Q_OS_WIN)
     const bool started = QProcess::startDetached(
@@ -300,7 +300,7 @@ Result<void> open_steam_url(const QString& launch_args) {
     return {};
 }
 
-std::vector<ProcessInfo> host_process_lister() {
+std::vector<ProcessInfo> hostProcessLister() {
     std::vector<ProcessInfo> procs;
 #if defined(Q_OS_LINUX)
     DIR* proc = opendir("/proc");
@@ -367,7 +367,7 @@ std::vector<ProcessInfo> host_process_lister() {
     return procs;
 }
 
-QSet<qint64> live_game_pids(const ProcessLister& lister) {
+QSet<qint64> liveGamePids(const ProcessLister& lister) {
     QSet<qint64> pids;
     for (const ProcessInfo& proc : lister()) {
         if (!proc.zombie && kProcessNames.contains(proc.name)) {
@@ -377,76 +377,76 @@ QSet<qint64> live_game_pids(const ProcessLister& lister) {
     return pids;
 }
 
-bool is_game_running(const ProcessLister& lister) {
-    return !live_game_pids(lister).isEmpty();
+bool isGameRunning(const ProcessLister& lister) {
+    return !liveGamePids(lister).isEmpty();
 }
 
 GameProcessMonitor::GameProcessMonitor(ProcessLister lister, MonitorTiming timing)
-    : lister_(std::move(lister)), timing_(timing) {}
+    : m_lister(std::move(lister)), m_timing(timing) {}
 
 GameProcessMonitor::~GameProcessMonitor() {
-    drop_process();
+    dropProcess();
 }
 
-QCoro::Task<void> GameProcessMonitor::capture_baseline() {
-    baseline_ = co_await providers::runOnPool<QSet<qint64>>(nullptr, [this] {
-        return live_game_pids(lister_);
+QCoro::Task<void> GameProcessMonitor::captureBaseline() {
+    m_baseline = co_await providers::runOnPool<QSet<qint64>>(nullptr, [this] {
+        return liveGamePids(m_lister);
     });
 }
 
-void GameProcessMonitor::attach_process(std::unique_ptr<QProcess> proc) {
-    drop_process();
-    proc_ = std::move(proc);
+void GameProcessMonitor::attachProcess(std::unique_ptr<QProcess> proc) {
+    dropProcess();
+    m_proc = std::move(proc);
 }
 
-bool GameProcessMonitor::launched_alive() const {
-    const QSet<qint64> live = live_game_pids(lister_);
-    return !(live - baseline_).isEmpty();
+bool GameProcessMonitor::launchedAlive() const {
+    const QSet<qint64> live = liveGamePids(m_lister);
+    return !(live - m_baseline).isEmpty();
 }
 
-void GameProcessMonitor::drop_process() {
-    if (proc_ && proc_->state() != QProcess::NotRunning) {
+void GameProcessMonitor::dropProcess() {
+    if (m_proc && m_proc->state() != QProcess::NotRunning) {
         // Intentionally leaked: the child keeps running after the monitor is gone, as it did
         // under Popen, and destroying a running QProcess would kill it.
-        static_cast<void>(proc_.release());
+        static_cast<void>(m_proc.release());
         return;
     }
-    proc_.reset();
+    m_proc.reset();
 }
 
-QCoro::Task<bool> GameProcessMonitor::wait_for_start(std::chrono::milliseconds timeout) {
+QCoro::Task<bool> GameProcessMonitor::waitForStart(std::chrono::milliseconds timeout) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
         const bool alive = co_await providers::runOnPool<bool>(nullptr, [this] {
-            return launched_alive();
+            return launchedAlive();
         });
         if (alive) {
             co_return true;
         }
-        if (proc_ && proc_->state() == QProcess::NotRunning) {
+        if (m_proc && m_proc->state() == QProcess::NotRunning) {
             co_return false;
         }
-        if (timing_.poll_start.count() > 0) {
-            co_await QCoro::sleepFor(timing_.poll_start);
+        if (m_timing.pollStart.count() > 0) {
+            co_await QCoro::sleepFor(m_timing.pollStart);
         }
     }
     co_return false;
 }
 
-QCoro::Task<std::optional<int>> GameProcessMonitor::wait_for_exit() {
-    while (co_await providers::runOnPool<bool>(nullptr, [this] { return launched_alive(); })) {
-        if (timing_.poll_exit.count() > 0) {
-            co_await QCoro::sleepFor(timing_.poll_exit);
+QCoro::Task<std::optional<int>> GameProcessMonitor::waitForExit() {
+    while (co_await providers::runOnPool<bool>(nullptr, [this] { return launchedAlive(); })) {
+        if (m_timing.pollExit.count() > 0) {
+            co_await QCoro::sleepFor(m_timing.pollExit);
         }
     }
-    if (!proc_) {
+    if (!m_proc) {
         co_return std::nullopt;
     }
     std::optional<int> code;
-    if (proc_->state() == QProcess::NotRunning) {
-        code = proc_->exitCode();
+    if (m_proc->state() == QProcess::NotRunning) {
+        code = m_proc->exitCode();
     }
-    drop_process();
+    dropProcess();
     co_return code;
 }
 

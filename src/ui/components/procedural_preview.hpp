@@ -3,5 +3,5 @@
 #include <QString>
 namespace px::modrim {
 QString initials(const QString& title);
-QImage generate_preview(const QString& title, int width, int height);
+QImage generatePreview(const QString& title, int width, int height);
 }

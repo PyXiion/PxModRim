@@ -10,9 +10,9 @@ namespace px::modrim {
 BaseViewPanel::BaseViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
     : RailView(ctx, engine, parent, app) {
     setAutoFillBackground(true);
-    root_ = new QVBoxLayout(this);
-    root_->setContentsMargins(0, 0, 0, 0);
-    root_->setSpacing(0);
+    m_root = new QVBoxLayout(this);
+    m_root->setContentsMargins(0, 0, 0, 0);
+    m_root->setSpacing(0);
     setClearColor(paletteValue(u"ELEVATE_0"));
 }
 

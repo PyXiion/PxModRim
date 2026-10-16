@@ -4,7 +4,7 @@
 #include "core/services/update_service.hpp"
 
 namespace px::modrim {
-inline constexpr int SKIP_RESULT = 2;
+inline constexpr int kSkipResult = 2;
 
 class UpdateDialog : public QDialog {
 public:

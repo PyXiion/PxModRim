@@ -7,7 +7,7 @@
 
 namespace px::modrim {
 
-Result<std::string> read_file_bytes(const QString& path) {
+Result<std::string> readFileBytes(const QString& path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         return std::unexpected(Error{file.errorString()});
@@ -16,7 +16,7 @@ Result<std::string> read_file_bytes(const QString& path) {
     return std::string(bytes.constData(), static_cast<std::size_t>(bytes.size()));
 }
 
-Result<void> write_file_atomically(const QString& path, std::string_view data) {
+Result<void> writeFileAtomically(const QString& path, std::string_view data) {
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
         return std::unexpected(Error{QStringLiteral("Cannot create directory for %1").arg(path)});
     }
@@ -35,7 +35,7 @@ Result<void> write_file_atomically(const QString& path, std::string_view data) {
     return {};
 }
 
-Result<void> copy_file_replacing(const QString& source, const QString& target) {
+Result<void> copyFileReplacing(const QString& source, const QString& target) {
     QFile::remove(target);
     if (!QFile::copy(source, target)) {
         return std::unexpected(Error{QStringLiteral("Cannot copy %1 to %2").arg(source, target)});

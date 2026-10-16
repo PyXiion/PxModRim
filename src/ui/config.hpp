@@ -27,8 +27,8 @@ public:
     Result<void> savePrefs() const;
 
 private:
-    ConfigService& svc_;
-    std::optional<UiPrefs> prefs_;
+    ConfigService& m_svc;
+    std::optional<UiPrefs> m_prefs;
 };
 
 }  // namespace px::modrim

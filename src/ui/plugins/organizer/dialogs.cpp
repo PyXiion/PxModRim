@@ -17,11 +17,11 @@ namespace px::modrim {
 namespace {
 
 using px::modrim::organizer::FolderNode;
-using px::modrim::organizer::ROOT_ID;
+using px::modrim::organizer::kRootId;
 
-QPushButton* makeButton(const QString& text, QWidget* parent, const QString& object_name) {
+QPushButton* makeButton(const QString& text, QWidget* parent, const QString& objectName) {
     auto* button = new QPushButton(text, parent);
-    button->setObjectName(object_name);
+    button->setObjectName(objectName);
     button->setCursor(Qt::PointingHandCursor);
     return button;
 }
@@ -54,12 +54,12 @@ FolderNameDialog::FolderNameDialog(const QString& title, const QString& initial,
     setMinimumWidth(360);
     auto* layout = new QVBoxLayout(this);
     layout->addWidget(new QLabel(QStringLiteral("Folder name"), this));
-    edit_ = new QLineEdit(initial, this);
-    layout->addWidget(edit_);
+    m_edit = new QLineEdit(initial, this);
+    layout->addWidget(m_edit);
 
-    const QString primary_text =
+    const QString primaryText =
         verb.isEmpty() ? title.section(u' ', 0, 0, QString::SectionSkipEmpty) : verb;
-    auto* ok = makeButton(primary_text, this, QStringLiteral("primaryAction"));
+    auto* ok = makeButton(primaryText, this, QStringLiteral("primaryAction"));
     ok->setDefault(true);
     auto* cancel = makeButton(QStringLiteral("Cancel"), this, QStringLiteral("appBtn"));
     connect(ok, &QPushButton::clicked, this, &QDialog::accept);
@@ -67,14 +67,14 @@ FolderNameDialog::FolderNameDialog(const QString& title, const QString& initial,
     addButtonRow(layout, cancel, ok);
 
     auto validate = [ok](const QString& text) { ok->setEnabled(!text.trimmed().isEmpty()); };
-    connect(edit_, &QLineEdit::textChanged, this, validate);
-    connect(edit_, &QLineEdit::returnPressed, ok, &QPushButton::click);
+    connect(m_edit, &QLineEdit::textChanged, this, validate);
+    connect(m_edit, &QLineEdit::returnPressed, ok, &QPushButton::click);
     validate(initial);
-    edit_->selectAll();
+    m_edit->selectAll();
 }
 
 QString FolderNameDialog::textValue() const {
-    return edit_->text().trimmed();
+    return m_edit->text().trimmed();
 }
 
 DeleteFolderDialog::DeleteFolderDialog(const QString& name, QWidget* parent)
@@ -101,42 +101,42 @@ FolderPickerDialog::FolderPickerDialog(const FolderNode& tree, const QString& ti
     resize(380, 450);
     auto* layout = new QVBoxLayout(this);
     layout->addWidget(new QLabel(QStringLiteral("Destination folder"), this));
-    tree_ = new QTreeWidget(this);
-    tree_->setHeaderHidden(true);
-    tree_->setRootIsDecorated(true);
-    layout->addWidget(tree_);
+    m_tree = new QTreeWidget(this);
+    m_tree->setHeaderHidden(true);
+    m_tree->setRootIsDecorated(true);
+    layout->addWidget(m_tree);
 
-    auto* top = new QTreeWidgetItem(tree_, QStringList{QStringLiteral("Ungrouped (top level)")});
-    top->setData(0, Qt::UserRole, ROOT_ID);
-    if (!allowed.contains(ROOT_ID)) {
+    auto* top = new QTreeWidgetItem(m_tree, QStringList{QStringLiteral("Ungrouped (top level)")});
+    top->setData(0, Qt::UserRole, kRootId);
+    if (!allowed.contains(kRootId)) {
         top->setDisabled(true);
     }
     for (const FolderNode& folder : tree.children) {
         addFolder(top, folder, allowed);
     }
-    tree_->expandAll();
+    m_tree->expandAll();
 
     auto* ok = makeButton(verb, this, QStringLiteral("primaryAction"));
     ok->setDefault(true);
     ok->setEnabled(false);
     auto* cancel = makeButton(QStringLiteral("Cancel"), this, QStringLiteral("appBtn"));
 
-    auto accept_valid = [this, ok] {
+    auto acceptValid = [this, ok] {
         if (ok->isEnabled()) {
             accept();
         }
     };
-    connect(tree_, &QTreeWidget::currentItemChanged, this, [ok](QTreeWidgetItem* item) {
+    connect(m_tree, &QTreeWidget::currentItemChanged, this, [ok](QTreeWidgetItem* item) {
         ok->setEnabled(item != nullptr && !item->isDisabled());
     });
-    connect(tree_, &QTreeWidget::itemDoubleClicked, this, accept_valid);
-    connect(ok, &QPushButton::clicked, this, accept_valid);
+    connect(m_tree, &QTreeWidget::itemDoubleClicked, this, acceptValid);
+    connect(ok, &QPushButton::clicked, this, acceptValid);
     connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
     addButtonRow(layout, cancel, ok);
 }
 
-qint64 FolderPickerDialog::folder_id() const {
-    QTreeWidgetItem* item = tree_->currentItem();
+qint64 FolderPickerDialog::folderId() const {
+    QTreeWidgetItem* item = m_tree->currentItem();
     Q_ASSERT(item != nullptr);
     return item->data(0, Qt::UserRole).toLongLong();
 }

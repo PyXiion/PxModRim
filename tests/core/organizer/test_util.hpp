@@ -28,7 +28,7 @@ inline void expect(const px::modrim::Result<void>& result) {
 
 
 template <class T>
-void expect_error(const px::modrim::Result<T>& result, const QString& fragment = {}) {
+void expectError(const px::modrim::Result<T>& result, const QString& fragment = {}) {
     REQUIRE_FALSE(result.has_value());
     if (!fragment.isEmpty()) {
         CHECK(result.error().message.contains(fragment));

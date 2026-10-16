@@ -18,8 +18,8 @@ using namespace px::modrim;
 using namespace px::modrim::providers;
 using namespace px::modrim::services;
 using services_test::EventLoop;
-using services_test::run_async;
-using services_test::write_text;
+using services_test::runAsync;
+using services_test::writeText;
 
 namespace {
 
@@ -81,18 +81,18 @@ constexpr auto kAboutTwo = R"(<?xml version="1.0" encoding="utf-8"?>
 )";
 
 // Writes About/About.xml (and optionally About/PublishedFileId.txt) under `modDir`.
-QString create_mod(const QString& modDir, const char* xml, bool withPublishedFileId = false) {
+QString createMod(const QString& modDir, const char* xml, bool withPublishedFileId = false) {
     REQUIRE(QDir().mkpath(QDir(modDir).filePath(QStringLiteral("About"))));
-    REQUIRE(write_text(QDir(modDir).filePath(QStringLiteral("About/About.xml")), xml));
+    REQUIRE(writeText(QDir(modDir).filePath(QStringLiteral("About/About.xml")), xml));
     if (withPublishedFileId) {
-        REQUIRE(write_text(QDir(modDir).filePath(QStringLiteral("About/PublishedFileId.txt")),
+        REQUIRE(writeText(QDir(modDir).filePath(QStringLiteral("About/PublishedFileId.txt")),
                            "123456"));
     }
     return modDir;
 }
 
 // Stat data the way the providers take it: About.xml mtime in seconds, and its size.
-ModCandidate candidate_for(const QString& modDir) {
+ModCandidate candidateFor(const QString& modDir) {
     const QString about = QDir(modDir).filePath(QStringLiteral("About/About.xml"));
     const QFileInfo info(about);
     return ModCandidate{modDir, about, info.lastModified().toMSecsSinceEpoch() / 1000.0,
@@ -100,7 +100,7 @@ ModCandidate candidate_for(const QString& modDir) {
 }
 
 // Parses the mod exactly as the providers do, so cache entries match real ones.
-std::shared_ptr<AboutXmlMod> parse_about(const QString& modDir) {
+std::shared_ptr<AboutXmlMod> parseAbout(const QString& modDir) {
     auto listed = createListedModFromPath(modDir, QStringLiteral("1.5"), true);
     REQUIRE(listed.has_value());
     auto about = std::dynamic_pointer_cast<AboutXmlMod>(*listed);
@@ -109,7 +109,7 @@ std::shared_ptr<AboutXmlMod> parse_about(const QString& modDir) {
 }
 
 // Moves About.xml's mtime, keeping the file's contents.
-void set_about_mtime(const ModCandidate& candidate, double mtimeSeconds) {
+void setAboutMtime(const ModCandidate& candidate, double mtimeSeconds) {
     QFile file(candidate.aboutXmlPath);
     REQUIRE(file.open(QIODevice::ReadWrite));
     REQUIRE(file.setFileTime(QDateTime::fromMSecsSinceEpoch(std::llround(mtimeSeconds * 1000)),
@@ -117,7 +117,7 @@ void set_about_mtime(const ModCandidate& candidate, double mtimeSeconds) {
 }
 
 // Reads mod_path values with an independent connection, to check what the cache stored.
-QStringList stored_mod_paths(const QString& dbPath) {
+QStringList storedModPaths(const QString& dbPath) {
     const QString name = QStringLiteral("metadata-cache-test-reader");
     QStringList paths;
     {
@@ -140,42 +140,42 @@ TEST_CASE("cache returns the parsed fields of a stored mod") {
     EventLoop loop;
     QTemporaryDir root;
     REQUIRE(root.isValid());
-    const QString modDir = create_mod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
-    const ModCandidate candidate = candidate_for(modDir);
-    const QString dbPath = metadata_cache_path(root.path());
+    const QString modDir = createMod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
+    const ModCandidate candidate = candidateFor(modDir);
+    const QString dbPath = metadataCachePath(root.path());
     MetadataCache cache(dbPath);
 
-    run_async(cache.put_mods({CachedMod{parse_about(modDir), candidate}}, QStringLiteral("1.5")));
-    const CacheLookup lookup = run_async(cache.get_mods({candidate}, QStringLiteral("1.5")));
+    runAsync(cache.putMods({CachedMod{parseAbout(modDir), candidate}}, QStringLiteral("1.5")));
+    const CacheLookup lookup = runAsync(cache.getMods({candidate}, QStringLiteral("1.5")));
 
     REQUIRE(lookup.cached.size() == 1);
     REQUIRE(lookup.missing.isEmpty());
     const auto mod = std::dynamic_pointer_cast<AboutXmlMod>(lookup.cached[0]);
     REQUIRE(mod != nullptr);
     CHECK(mod->name == QStringLiteral("Sample Mod One"));
-    CHECK(mod->package_id.str() == QStringLiteral("author.samplemodone"));
+    CHECK(mod->packageId.str() == QStringLiteral("author.samplemodone"));
     CHECK(mod->authors == QStringList{QStringLiteral("TestAuthor")});
-    CHECK(mod->supported_versions == QSet<QString>{QStringLiteral("1.4"), QStringLiteral("1.5")});
+    CHECK(mod->supportedVersions == QSet<QString>{QStringLiteral("1.4"), QStringLiteral("1.5")});
     CHECK(mod->description == QStringLiteral("Initial description"));
-    CHECK(mod->mod_version == QStringLiteral("1.0.0"));
+    CHECK(mod->modVersion == QStringLiteral("1.0.0"));
     CHECK(mod->url == QStringLiteral("https://example.com/mod"));
-    REQUIRE(mod->mod_icon_path.has_value());
-    CHECK(*mod->mod_icon_path == QStringLiteral("UI/Icon.png"));
+    REQUIRE(mod->modIconPath.has_value());
+    CHECK(*mod->modIconPath == QStringLiteral("UI/Icon.png"));
     CHECK(std::abs(mod->mtime - candidate.mtime) < 1e-3);
-    CHECK(mod->about_rules.dependencies.size() == 1);
-    CHECK(mod->about_rules.has_dependency(CaseInsensitiveStr(QStringLiteral("ludeon.rimworld"))));
-    REQUIRE(mod->mod_path().has_value());
-    CHECK(*mod->mod_path() == modDir);
+    CHECK(mod->aboutRules.dependencies.size() == 1);
+    CHECK(mod->aboutRules.hasDependency(CaseInsensitiveStr(QStringLiteral("ludeon.rimworld"))));
+    REQUIRE(mod->modPath().has_value());
+    CHECK(*mod->modPath() == modDir);
 }
 
 TEST_CASE("cache entries are misses when the file size, mtime or target version changes") {
     EventLoop loop;
     QTemporaryDir root;
     REQUIRE(root.isValid());
-    const QString modDir = create_mod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
-    const ModCandidate candidate = candidate_for(modDir);
-    MetadataCache cache(metadata_cache_path(root.path()));
-    run_async(cache.put_mods({CachedMod{parse_about(modDir), candidate}}, QStringLiteral("1.5")));
+    const QString modDir = createMod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
+    const ModCandidate candidate = candidateFor(modDir);
+    MetadataCache cache(metadataCachePath(root.path()));
+    runAsync(cache.putMods({CachedMod{parseAbout(modDir), candidate}}, QStringLiteral("1.5")));
 
     ModCandidate resized = candidate;
     resized.size += 1;
@@ -183,11 +183,11 @@ TEST_CASE("cache entries are misses when the file size, mtime or target version 
     touched.mtime += 5.0;
 
     for (const ModCandidate& stale : {resized, touched}) {
-        const CacheLookup lookup = run_async(cache.get_mods({stale}, QStringLiteral("1.5")));
+        const CacheLookup lookup = runAsync(cache.getMods({stale}, QStringLiteral("1.5")));
         CHECK(lookup.cached.isEmpty());
         CHECK(lookup.missing.size() == 1);
     }
-    const CacheLookup otherVersion = run_async(cache.get_mods({candidate}, QStringLiteral("1.4")));
+    const CacheLookup otherVersion = runAsync(cache.getMods({candidate}, QStringLiteral("1.4")));
     CHECK(otherVersion.cached.isEmpty());
     CHECK(otherVersion.missing.size() == 1);
 }
@@ -196,21 +196,21 @@ TEST_CASE("pruning removes entries for mods that disappeared") {
     EventLoop loop;
     QTemporaryDir root;
     REQUIRE(root.isValid());
-    const QString modA = create_mod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
-    const QString modB = create_mod(QDir(root.path()).filePath(QStringLiteral("ModB")), kAboutTwo);
-    const QString dbPath = metadata_cache_path(root.path());
+    const QString modA = createMod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
+    const QString modB = createMod(QDir(root.path()).filePath(QStringLiteral("ModB")), kAboutTwo);
+    const QString dbPath = metadataCachePath(root.path());
     MetadataCache cache(dbPath);
-    run_async(cache.put_mods({CachedMod{parse_about(modA), candidate_for(modA)},
-                              CachedMod{parse_about(modB), candidate_for(modB)}},
+    runAsync(cache.putMods({CachedMod{parseAbout(modA), candidateFor(modA)},
+                              CachedMod{parseAbout(modB), candidateFor(modB)}},
                              QStringLiteral("1.5")));
-    QStringList expectedPaths{normalize_path(modA), normalize_path(modB)};
+    QStringList expectedPaths{normalizePath(modA), normalizePath(modB)};
     expectedPaths.sort();
-    REQUIRE(stored_mod_paths(dbPath) == expectedPaths);
+    REQUIRE(storedModPaths(dbPath) == expectedPaths);
 
-    run_async(cache.prune_disappeared(QSet<QString>{normalize_path(modA)}));
+    runAsync(cache.pruneDisappeared(QSet<QString>{normalizePath(modA)}));
 
-    CHECK(stored_mod_paths(dbPath) == QStringList{normalize_path(modA)});
-    const CacheLookup lookup = run_async(cache.get_mods({candidate_for(modB)}, QStringLiteral("1.5")));
+    CHECK(storedModPaths(dbPath) == QStringList{normalizePath(modA)});
+    const CacheLookup lookup = runAsync(cache.getMods({candidateFor(modB)}, QStringLiteral("1.5")));
     CHECK(lookup.cached.isEmpty());
 }
 
@@ -218,27 +218,27 @@ TEST_CASE("corrupt cache database is recovered and keeps working") {
     EventLoop loop;
     QTemporaryDir root;
     REQUIRE(root.isValid());
-    const QString modDir = create_mod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
-    const ModCandidate candidate = candidate_for(modDir);
-    const QString dbPath = metadata_cache_path(root.path());
+    const QString modDir = createMod(QDir(root.path()).filePath(QStringLiteral("ModA")), kAboutV1);
+    const ModCandidate candidate = candidateFor(modDir);
+    const QString dbPath = metadataCachePath(root.path());
     {
         MetadataCache cache(dbPath);
-        run_async(cache.put_mods({CachedMod{parse_about(modDir), candidate}}, QStringLiteral("1.5")));
-        run_async(cache.close());
+        runAsync(cache.putMods({CachedMod{parseAbout(modDir), candidate}}, QStringLiteral("1.5")));
+        runAsync(cache.close());
     }
     QByteArray garbage;
     for (int i = 0; i < 50; ++i) {
         garbage += "corrupt non-sqlite data";
     }
-    REQUIRE(write_text(dbPath, garbage));
+    REQUIRE(writeText(dbPath, garbage));
 
     MetadataCache recovered(dbPath);
-    const CacheLookup empty = run_async(recovered.get_mods({candidate}, QStringLiteral("1.5")));
+    const CacheLookup empty = runAsync(recovered.getMods({candidate}, QStringLiteral("1.5")));
     CHECK(empty.cached.isEmpty());
     REQUIRE(empty.missing.size() == 1);
 
-    run_async(recovered.put_mods({CachedMod{parse_about(modDir), candidate}}, QStringLiteral("1.5")));
-    const CacheLookup warm = run_async(recovered.get_mods({candidate}, QStringLiteral("1.5")));
+    runAsync(recovered.putMods({CachedMod{parseAbout(modDir), candidate}}, QStringLiteral("1.5")));
+    const CacheLookup warm = runAsync(recovered.getMods({candidate}, QStringLiteral("1.5")));
     CHECK(warm.cached.size() == 1);
 }
 
@@ -247,30 +247,30 @@ TEST_CASE("providers reuse cached metadata and reparse when the file changes") {
     QTemporaryDir root;
     REQUIRE(root.isValid());
     const QString modsRoot = QDir(root.path()).filePath(QStringLiteral("mods"));
-    const QString modDir = create_mod(QDir(modsRoot).filePath(QStringLiteral("ModA")), kAboutV1);
+    const QString modDir = createMod(QDir(modsRoot).filePath(QStringLiteral("ModA")), kAboutV1);
     const QString about = QDir(modDir).filePath(QStringLiteral("About/About.xml"));
-    const ModCandidate original = candidate_for(modDir);
-    MetadataCache cache(metadata_cache_path(root.path()));
+    const ModCandidate original = candidateFor(modDir);
+    MetadataCache cache(metadataCachePath(root.path()));
     LocalModProvider provider(modsRoot, nullptr, &cache);
 
-    auto first = run_async(provider.discover(QStringLiteral("1.5")));
+    auto first = runAsync(provider.discover(QStringLiteral("1.5")));
     REQUIRE(first.has_value());
     REQUIRE(first->contains(modDir));
     CHECK((*first)[modDir]->name == QStringLiteral("Sample Mod One"));
 
     // Same size and mtime, different text: the cache still answers, a forced reparse does not.
-    REQUIRE(write_text(about, kAboutSameSize));
-    set_about_mtime(original, original.mtime);
-    auto cached = run_async(provider.discover(QStringLiteral("1.5")));
+    REQUIRE(writeText(about, kAboutSameSize));
+    setAboutMtime(original, original.mtime);
+    auto cached = runAsync(provider.discover(QStringLiteral("1.5")));
     REQUIRE(cached.has_value());
     CHECK((*cached)[modDir]->name == QStringLiteral("Sample Mod One"));
-    auto forced = run_async(provider.discover(QStringLiteral("1.5"), nullptr, nullptr, true));
+    auto forced = runAsync(provider.discover(QStringLiteral("1.5"), nullptr, nullptr, true));
     REQUIRE(forced.has_value());
     CHECK((*forced)[modDir]->name == QStringLiteral("Sample Mod Two"));
 
     // A new mtime invalidates the entry even though the cache is consulted.
-    set_about_mtime(original, original.mtime + 5.0);
-    auto changed = run_async(provider.discover(QStringLiteral("1.5")));
+    setAboutMtime(original, original.mtime + 5.0);
+    auto changed = runAsync(provider.discover(QStringLiteral("1.5")));
     REQUIRE(changed.has_value());
     CHECK((*changed)[modDir]->name == QStringLiteral("Sample Mod Two"));
     // mtime lives on AboutXmlMod; ListedMod has no such field.
@@ -285,21 +285,21 @@ TEST_CASE("providers keep their identity when they share one cache") {
     REQUIRE(root.isValid());
     const QString localRoot = QDir(root.path()).filePath(QStringLiteral("local"));
     const QString downloadedRoot = QDir(root.path()).filePath(QStringLiteral("downloaded"));
-    const QString localMod = create_mod(QDir(localRoot).filePath(QStringLiteral("LocalMod")), kAboutV1);
-    const QString steamMod = create_mod(QDir(downloadedRoot).filePath(QStringLiteral("SteamMod")), kAboutTwo, true);
-    MetadataCache cache(metadata_cache_path(root.path()));
+    const QString localMod = createMod(QDir(localRoot).filePath(QStringLiteral("LocalMod")), kAboutV1);
+    const QString steamMod = createMod(QDir(downloadedRoot).filePath(QStringLiteral("SteamMod")), kAboutTwo, true);
+    MetadataCache cache(metadataCachePath(root.path()));
     LocalModProvider local(localRoot, nullptr, &cache);
     DownloadedModProvider downloaded(downloadedRoot, nullptr, &cache);
 
     for (int pass = 0; pass < 2; ++pass) {
-        auto localMods = run_async(local.discover(QStringLiteral("1.5")));
-        auto steamMods = run_async(downloaded.discover(QStringLiteral("1.5")));
+        auto localMods = runAsync(local.discover(QStringLiteral("1.5")));
+        auto steamMods = runAsync(downloaded.discover(QStringLiteral("1.5")));
         REQUIRE(localMods.has_value());
         REQUIRE(steamMods.has_value());
         REQUIRE(localMods->contains(localMod));
         REQUIRE(steamMods->contains(steamMod));
-        CHECK((*localMods)[localMod]->provider_id == QStringLiteral("local"));
-        CHECK((*steamMods)[steamMod]->provider_id == QStringLiteral("downloaded"));
+        CHECK((*localMods)[localMod]->providerId == QStringLiteral("local"));
+        CHECK((*steamMods)[steamMod]->providerId == QStringLiteral("downloaded"));
     }
 }
 
@@ -325,8 +325,8 @@ TEST_CASE("normalize_paths matches normalize_path, including symlinks") {
 
     QStringList expected;
     for (const QString& path : paths) {
-        expected.append(normalize_path(path));
+        expected.append(normalizePath(path));
     }
-    CHECK(normalize_paths(paths) == expected);
-    CHECK(normalize_path(QDir(linkdir).filePath(QStringLiteral("linkmod"))) == normalize_path(other));
+    CHECK(normalizePaths(paths) == expected);
+    CHECK(normalizePath(QDir(linkdir).filePath(QStringLiteral("linkmod"))) == normalizePath(other));
 }

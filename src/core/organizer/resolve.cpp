@@ -10,35 +10,35 @@ namespace px::modrim::organizer {
 namespace {
 
 struct Matcher {
-    RuleOp op = RuleOp::Equals;
+    RuleOp op = RuleOp::kEquals;
     QString pattern;  // casefolded
 
     bool matches(const QString& value) const {
         switch (op) {
-            case RuleOp::Prefix: return value.startsWith(pattern);
-            case RuleOp::Contains: return value.contains(pattern);
-            case RuleOp::Equals: return value == pattern;
+            case RuleOp::kPrefix: return value.startsWith(pattern);
+            case RuleOp::kContains: return value.contains(pattern);
+            case RuleOp::kEquals: return value == pattern;
         }
         return false;
     }
 };
 
-Matcher make_matcher(RuleOp op, const QString& pattern) {
+Matcher makeMatcher(RuleOp op, const QString& pattern) {
     return Matcher{op, pattern.toCaseFolded()};
 }
 
 struct FieldRule {
-    RuleField field = RuleField::Name;
+    RuleField field = RuleField::kName;
     Matcher matcher;
-    qint64 folder_id = ROOT_ID;
+    qint64 folderId = kRootId;
 };
 
 // The casefolded value a rule field is matched against.
-QString field_value(RuleField field, const QString& pid, const QString& name, const QString& author) {
+QString fieldValue(RuleField field, const QString& pid, const QString& name, const QString& author) {
     switch (field) {
-        case RuleField::PackageId: return pid.toCaseFolded();
-        case RuleField::Name: return name.toCaseFolded();
-        case RuleField::Author: return author.toCaseFolded();
+        case RuleField::kPackageId: return pid.toCaseFolded();
+        case RuleField::kName: return name.toCaseFolded();
+        case RuleField::kAuthor: return author.toCaseFolded();
     }
     return {};
 }
@@ -46,48 +46,48 @@ QString field_value(RuleField field, const QString& pid, const QString& name, co
 // Manual placements win over rules; the first matching rule by position wins.
 class Resolver {
 public:
-    explicit Resolver(const OrganizerState& state) : placements_(state.placements) {
+    explicit Resolver(const OrganizerState& state) : m_placements(state.placements) {
         for (const Rule& rule : state.rules) {
-            if (state.folders.contains(rule.folder_id) && rule.folder_id != ROOT_ID) {
-                rules_.append(FieldRule{rule.field, make_matcher(rule.op, rule.pattern), rule.folder_id});
+            if (state.folders.contains(rule.folderId) && rule.folderId != kRootId) {
+                m_rules.append(FieldRule{rule.field, makeMatcher(rule.op, rule.pattern), rule.folderId});
             }
         }
     }
 
-    Resolution resolve(const std::optional<QString>& package_id, const QString& name,
+    Resolution resolve(const std::optional<QString>& packageId, const QString& name,
                        const QString& author) const {
-        if (!package_id) {
-            return {ROOT_ID, Placement::None};
+        if (!packageId) {
+            return {kRootId, Placement::kNone};
         }
-        const QString pid = package_id->toLower();
-        if (const auto manual = placements_.constFind(pid); manual != placements_.cend()) {
-            return {manual.value(), Placement::Manual};
+        const QString pid = packageId->toLower();
+        if (const auto manual = m_placements.constFind(pid); manual != m_placements.cend()) {
+            return {manual.value(), Placement::kManual};
         }
-        for (const FieldRule& rule : rules_) {
-            if (rule.matcher.matches(field_value(rule.field, pid, name, author))) {
-                return {rule.folder_id, Placement::Rule};
+        for (const FieldRule& rule : m_rules) {
+            if (rule.matcher.matches(fieldValue(rule.field, pid, name, author))) {
+                return {rule.folderId, Placement::kRule};
             }
         }
-        return {ROOT_ID, Placement::None};
+        return {kRootId, Placement::kNone};
     }
 
 private:
-    const QHash<QString, qint64>& placements_;
-    QList<FieldRule> rules_;
+    const QHash<QString, qint64>& m_placements;
+    QList<FieldRule> m_rules;
 };
 
-bool matches_query(const ModLeaf& leaf, const QString& provider_id, const TreeQuery& query) {
-    if (query.status == StatusFilter::Active && !leaf.enabled) {
+bool matchesQuery(const ModLeaf& leaf, const QString& providerId, const TreeQuery& query) {
+    if (query.status == StatusFilter::kActive && !leaf.enabled) {
         return false;
     }
-    if (query.status == StatusFilter::Inactive && leaf.enabled) {
+    if (query.status == StatusFilter::kInactive && leaf.enabled) {
         return false;
     }
-    if (!query.provider_ids.isEmpty() && !query.provider_ids.contains(provider_id)) {
+    if (!query.providerIds.isEmpty() && !query.providerIds.contains(providerId)) {
         return false;
     }
-    for (qint64 tag_id : query.tag_ids) {
-        if (!leaf.tag_ids.contains(tag_id)) {
+    for (qint64 tagId : query.tagIds) {
+        if (!leaf.tagIds.contains(tagId)) {
             return false;
         }
     }
@@ -96,26 +96,26 @@ bool matches_query(const ModLeaf& leaf, const QString& provider_id, const TreeQu
         return true;
     }
     return leaf.name.trimmed().toCaseFolded().contains(text)
-        || (leaf.package_id && leaf.package_id->contains(text))
+        || (leaf.packageId && leaf.packageId->contains(text))
         || leaf.author.toCaseFolded().contains(text);
 }
 
 // A folder with no mods counts as off, not on: "on" needs at least one enabled mod.
-CheckState check_state(int total, int enabled) {
+CheckState checkState(int total, int enabled) {
     if (total != 0 && enabled == total) {
-        return CheckState::On;
+        return CheckState::kOn;
     }
     if (enabled == 0) {
-        return CheckState::Off;
+        return CheckState::kOff;
     }
-    return CheckState::Partial;
+    return CheckState::kPartial;
 }
 
-bool mod_less(const ModLeaf& a, const ModLeaf& b) {
+bool modLess(const ModLeaf& a, const ModLeaf& b) {
     return std::pair(a.name.toCaseFolded(), a.uuid) < std::pair(b.name.toCaseFolded(), b.uuid);
 }
 
-bool folder_less(const Folder& a, const Folder& b) {
+bool folderLess(const Folder& a, const Folder& b) {
     return std::pair(a.name.toCaseFolded(), a.id) < std::pair(b.name.toCaseFolded(), b.id);
 }
 
@@ -123,9 +123,9 @@ bool folder_less(const Folder& a, const Folder& b) {
 // reachable twice is attached once.
 struct TreeBuilder {
     const OrganizerState& state;
-    const QHash<qint64, QList<Folder>>& children_of;
-    const QHash<qint64, QList<ModLeaf>>& all_by_folder;
-    const QHash<qint64, QList<ModLeaf>>& visible_by_folder;
+    const QHash<qint64, QList<Folder>>& childrenOf;
+    const QHash<qint64, QList<ModLeaf>>& allByFolder;
+    const QHash<qint64, QList<ModLeaf>>& visibleByFolder;
     const QSet<qint64>& ruled;
     bool filtering;
     QSet<qint64> visited;
@@ -135,10 +135,10 @@ struct TreeBuilder {
         FolderNode node;
         node.folder = folder;
         node.depth = depth;
-        node.has_rules = ruled.contains(folder.id);
+        node.hasRules = ruled.contains(folder.id);
 
-        QList<Folder> children = children_of.value(folder.id);
-        std::sort(children.begin(), children.end(), folder_less);
+        QList<Folder> children = childrenOf.value(folder.id);
+        std::sort(children.begin(), children.end(), folderLess);
         for (const Folder& child : children) {
             if (visited.contains(child.id)) {
                 continue;
@@ -146,25 +146,25 @@ struct TreeBuilder {
             FolderNode sub = build(child, depth + 1);
             node.total += sub.total;
             node.enabled += sub.enabled;
-            node.visible_total += sub.visible_total;
-            if (!filtering || sub.visible_total != 0) {
+            node.visibleTotal += sub.visibleTotal;
+            if (!filtering || sub.visibleTotal != 0) {
                 node.children.push_back(std::move(sub));
             }
         }
 
-        const QList<ModLeaf> own = all_by_folder.value(folder.id);
-        QList<ModLeaf> visible = visible_by_folder.value(folder.id);
-        std::sort(visible.begin(), visible.end(), mod_less);
-        int own_enabled = 0;
+        const QList<ModLeaf> own = allByFolder.value(folder.id);
+        QList<ModLeaf> visible = visibleByFolder.value(folder.id);
+        std::sort(visible.begin(), visible.end(), modLess);
+        int ownEnabled = 0;
         for (const ModLeaf& leaf : own) {
-            own_enabled += leaf.enabled ? 1 : 0;
+            ownEnabled += leaf.enabled ? 1 : 0;
         }
-        node.own_total = static_cast<int>(own.size());
-        node.own_enabled = own_enabled;
-        node.total += node.own_total;
-        node.enabled += own_enabled;
-        node.visible_total += static_cast<int>(visible.size());
-        node.check = check_state(node.total, node.enabled);
+        node.ownTotal = static_cast<int>(own.size());
+        node.ownEnabled = ownEnabled;
+        node.total += node.ownTotal;
+        node.enabled += ownEnabled;
+        node.visibleTotal += static_cast<int>(visible.size());
+        node.check = checkState(node.total, node.enabled);
         node.mods = std::move(visible);
         return node;
     }
@@ -172,25 +172,25 @@ struct TreeBuilder {
 
 }  // namespace
 
-bool TreeQuery::is_empty() const {
-    return text.trimmed().isEmpty() && tag_ids.isEmpty() && status == StatusFilter::All && provider_ids.isEmpty();
+bool TreeQuery::isEmpty() const {
+    return text.trimmed().isEmpty() && tagIds.isEmpty() && status == StatusFilter::kAll && providerIds.isEmpty();
 }
 
 TreeQuery TreeFilter::query(const QString& text) const {
     TreeQuery query;
     query.text = text;
     query.status = status;
-    if (provider_id) {
-        query.provider_ids.insert(*provider_id);
+    if (providerId) {
+        query.providerIds.insert(*providerId);
     }
-    if (tag_id) {
-        query.tag_ids.insert(*tag_id);
+    if (tagId) {
+        query.tagIds.insert(*tagId);
     }
     return query;
 }
 
-CheckState FolderNode::own_check() const {
-    return check_state(own_total, own_enabled);
+CheckState FolderNode::ownCheck() const {
+    return checkState(ownTotal, ownEnabled);
 }
 
 QList<const FolderNode*> FolderNode::walk() const {
@@ -201,34 +201,34 @@ QList<const FolderNode*> FolderNode::walk() const {
     return nodes;
 }
 
-QList<ModLeaf> FolderNode::all_mods() const {
-    QList<ModLeaf> mods_out;
+QList<ModLeaf> FolderNode::allMods() const {
+    QList<ModLeaf> modsOut;
     for (const FolderNode* node : walk()) {
-        mods_out += node->mods;
+        modsOut += node->mods;
     }
-    return mods_out;
+    return modsOut;
 }
 
-std::optional<QString> mod_package_id(const ListedMod& mod) {
+std::optional<QString> modPackageId(const ListedMod& mod) {
     if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) {
-        return about->package_id.str();
+        return about->packageId.str();
     }
     return std::nullopt;
 }
 
-QString mod_author(const ListedMod& mod) {
+QString modAuthor(const ListedMod& mod) {
     if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) {
         return about->authors.join(QStringLiteral(", "));
     }
     return {};
 }
 
-Resolution folder_for(const OrganizerState& state, const std::optional<QString>& package_id,
+Resolution folderFor(const OrganizerState& state, const std::optional<QString>& packageId,
                       const QString& name, const QString& author) {
-    return Resolver(state).resolve(package_id, name, author);
+    return Resolver(state).resolve(packageId, name, author);
 }
 
-RulePreview preview_rule_matches(const OrganizerState& state, const ModsByUuid& mods,
+RulePreview previewRuleMatches(const OrganizerState& state, const ModsByUuid& mods,
                                  const QList<RuleSpec>& specs) {
     const Resolver current(state);
     // A spec with a blank pattern, an unknown folder or the root matches nothing. The
@@ -236,28 +236,28 @@ RulePreview preview_rule_matches(const OrganizerState& state, const ModsByUuid& 
     std::vector<std::optional<FieldRule>> candidates;
     candidates.reserve(static_cast<std::size_t>(specs.size()));
     for (const RuleSpec& spec : specs) {
-        const bool usable = !spec.pattern.trimmed().isEmpty() && state.folders.contains(spec.folder_id) &&
-                            spec.folder_id != ROOT_ID;
-        candidates.push_back(usable ? std::optional(FieldRule{spec.field, make_matcher(spec.op, spec.pattern),
-                                                              spec.folder_id})
+        const bool usable = !spec.pattern.trimmed().isEmpty() && state.folders.contains(spec.folderId) &&
+                            spec.folderId != kRootId;
+        candidates.push_back(usable ? std::optional(FieldRule{spec.field, makeMatcher(spec.op, spec.pattern),
+                                                              spec.folderId})
                                     : std::nullopt);
     }
 
     RulePreview preview;
     preview.counts.assign(specs.size(), 0);
     for (const ListedModPtr& mod : mods) {
-        const auto pid = mod_package_id(*mod);
+        const auto pid = modPackageId(*mod);
         if (!pid) {
             continue;
         }
-        const QString author = mod_author(*mod);
+        const QString author = modAuthor(*mod);
         for (qsizetype index = 0; index < specs.size(); ++index) {
             const std::optional<FieldRule>& candidate = candidates[static_cast<std::size_t>(index)];
-            if (!candidate || !candidate->matcher.matches(field_value(candidate->field, *pid, mod->name, author))) {
+            if (!candidate || !candidate->matcher.matches(fieldValue(candidate->field, *pid, mod->name, author))) {
                 continue;
             }
             preview.counts[index] += 1;
-            if (!state.placements.contains(*pid) && current.resolve(pid, mod->name, author).folder_id == ROOT_ID) {
+            if (!state.placements.contains(*pid) && current.resolve(pid, mod->name, author).folderId == kRootId) {
                 preview.assignable += 1;
             }
             break;
@@ -266,14 +266,14 @@ RulePreview preview_rule_matches(const OrganizerState& state, const ModsByUuid& 
     return preview;
 }
 
-QList<TreeFilter> tree_filters(const ModsByUuid& mods, const QSet<QString>& active,
+QList<TreeFilter> treeFilters(const ModsByUuid& mods, const QSet<QString>& active,
                                const OrganizerState* state) {
     const int total = static_cast<int>(mods.size());
     int enabled = 0;
-    QHash<QString, int> per_provider;
+    QHash<QString, int> perProvider;
     for (auto it = mods.cbegin(); it != mods.cend(); ++it) {
         enabled += active.contains(it.key()) ? 1 : 0;
-        per_provider[it.value()->provider_id] += 1;
+        perProvider[it.value()->providerId] += 1;
     }
 
     const auto make = [](QString key, QString label, int count) {
@@ -284,101 +284,101 @@ QList<TreeFilter> tree_filters(const ModsByUuid& mods, const QSet<QString>& acti
         return filter;
     };
 
-    TreeFilter status_active = make(QStringLiteral("active"), QStringLiteral("Active"), enabled);
-    status_active.status = StatusFilter::Active;
-    TreeFilter status_inactive = make(QStringLiteral("inactive"), QStringLiteral("Inactive"), total - enabled);
-    status_inactive.status = StatusFilter::Inactive;
-    QList<TreeFilter> filters{make(QStringLiteral("all"), QStringLiteral("All"), total), std::move(status_active),
-                              std::move(status_inactive)};
+    TreeFilter statusActive = make(QStringLiteral("active"), QStringLiteral("Active"), enabled);
+    statusActive.status = StatusFilter::kActive;
+    TreeFilter statusInactive = make(QStringLiteral("inactive"), QStringLiteral("Inactive"), total - enabled);
+    statusInactive.status = StatusFilter::kInactive;
+    QList<TreeFilter> filters{make(QStringLiteral("all"), QStringLiteral("All"), total), std::move(statusActive),
+                              std::move(statusInactive)};
 
     std::vector<std::pair<QString, QString>> labelled;  // (label, provider id)
-    for (auto it = per_provider.cbegin(); it != per_provider.cend(); ++it) {
+    for (auto it = perProvider.cbegin(); it != perProvider.cend(); ++it) {
         labelled.emplace_back(providerLabel(it.key()), it.key());
     }
     std::sort(labelled.begin(), labelled.end());
     for (const auto& [label, pid] : labelled) {
-        TreeFilter provider = make(QStringLiteral("provider:%1").arg(pid), label, per_provider.value(pid));
-        provider.provider_id = pid;
+        TreeFilter provider = make(QStringLiteral("provider:%1").arg(pid), label, perProvider.value(pid));
+        provider.providerId = pid;
         filters.append(std::move(provider));
     }
 
     if (state && !state->tags.isEmpty()) {
-        QHash<qint64, int> tag_counts;
+        QHash<qint64, int> tagCounts;
         for (const auto& [id, tag] : state->tags.asKeyValueRange()) {
-            tag_counts.insert(id, 0);
+            tagCounts.insert(id, 0);
         }
         for (const ListedModPtr& mod : mods) {
-            const auto pid = mod_package_id(*mod);
+            const auto pid = modPackageId(*mod);
             if (!pid) {
                 continue;
             }
-            for (qint64 tag_id : state->mod_tags.value(*pid)) {
-                if (tag_counts.contains(tag_id)) {
-                    tag_counts[tag_id] += 1;
+            for (qint64 tagId : state->modTags.value(*pid)) {
+                if (tagCounts.contains(tagId)) {
+                    tagCounts[tagId] += 1;
                 }
             }
         }
 
-        std::vector<Tag> sorted_tags;
+        std::vector<Tag> sortedTags;
         for (const Tag& tag : state->tags) {
-            sorted_tags.push_back(tag);
+            sortedTags.push_back(tag);
         }
-        std::sort(sorted_tags.begin(), sorted_tags.end(), [](const Tag& a, const Tag& b) {
+        std::sort(sortedTags.begin(), sortedTags.end(), [](const Tag& a, const Tag& b) {
             return std::pair(a.name.toCaseFolded(), a.id) < std::pair(b.name.toCaseFolded(), b.id);
         });
-        for (const Tag& tag : sorted_tags) {
-            TreeFilter tag_filter = make(QStringLiteral("tag:%1").arg(tag.id), tag.name, tag_counts.value(tag.id));
-            tag_filter.tag_id = tag.id;
-            filters.append(std::move(tag_filter));
+        for (const Tag& tag : sortedTags) {
+            TreeFilter tagFilter = make(QStringLiteral("tag:%1").arg(tag.id), tag.name, tagCounts.value(tag.id));
+            tagFilter.tagId = tag.id;
+            filters.append(std::move(tagFilter));
         }
     }
     return filters;
 }
 
-FolderNode build_tree(const OrganizerState& state, const ModsByUuid& mods, const QSet<QString>& active,
+FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods, const QSet<QString>& active,
                       const std::optional<TreeQuery>& query) {
-    const bool filtering = query && !query->is_empty();
+    const bool filtering = query && !query->isEmpty();
     const Resolver resolver(state);
 
-    QHash<qint64, QList<ModLeaf>> all_by_folder;
-    QHash<qint64, QList<ModLeaf>> visible_by_folder;
+    QHash<qint64, QList<ModLeaf>> allByFolder;
+    QHash<qint64, QList<ModLeaf>> visibleByFolder;
     for (auto it = mods.cbegin(); it != mods.cend(); ++it) {
         const ListedMod& mod = *it.value();
         const QString& uuid = it.key();
-        const auto pid = mod_package_id(mod);
-        const QString author = mod_author(mod);
+        const auto pid = modPackageId(mod);
+        const QString author = modAuthor(mod);
         Resolution where = resolver.resolve(pid, mod.name, author);
-        if (!state.folders.contains(where.folder_id)) {
-            where = Resolution{ROOT_ID, Placement::None};
+        if (!state.folders.contains(where.folderId)) {
+            where = Resolution{kRootId, Placement::kNone};
         }
         const ModLeaf leaf{
             .uuid = uuid,
-            .package_id = pid,
+            .packageId = pid,
             .name = mod.name,
             .author = author,
             .enabled = active.contains(uuid),
-            .tag_ids = pid ? state.mod_tags.value(*pid) : QSet<qint64>{},
+            .tagIds = pid ? state.modTags.value(*pid) : QSet<qint64>{},
             .placement = where.placement,
         };
-        all_by_folder[where.folder_id].append(leaf);
-        if (!filtering || matches_query(leaf, mod.provider_id, *query)) {
-            visible_by_folder[where.folder_id].append(leaf);
+        allByFolder[where.folderId].append(leaf);
+        if (!filtering || matchesQuery(leaf, mod.providerId, *query)) {
+            visibleByFolder[where.folderId].append(leaf);
         }
     }
 
-    QHash<qint64, QList<Folder>> children_of;
+    QHash<qint64, QList<Folder>> childrenOf;
     for (const Folder& folder : state.folders) {
-        if (folder.parent_id) {
-            children_of[*folder.parent_id].append(folder);
+        if (folder.parentId) {
+            childrenOf[*folder.parentId].append(folder);
         }
     }
     QSet<qint64> ruled;
     for (const Rule& rule : state.rules) {
-        ruled.insert(rule.folder_id);
+        ruled.insert(rule.folderId);
     }
 
-    TreeBuilder builder{state, children_of, all_by_folder, visible_by_folder, ruled, filtering, {}};
-    return builder.build(state.folders.value(ROOT_ID), 0);
+    TreeBuilder builder{state, childrenOf, allByFolder, visibleByFolder, ruled, filtering, {}};
+    return builder.build(state.folders.value(kRootId), 0);
 }
 
 }  // namespace px::modrim::organizer

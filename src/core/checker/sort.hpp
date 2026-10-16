@@ -16,10 +16,10 @@ namespace px::modrim::checker {
 // Orders active mods by tier, then by dependencies and load-order constraints, breaking ties by
 // the tier config priority and then by package id. Mods caught in a cycle are appended at the
 // end of their tier in the same key order.
-QList<PackageId> topological_sort(const QHash<PackageId, std::shared_ptr<AboutXmlMod>>& active_mods,
+QList<PackageId> topologicalSort(const QHash<PackageId, std::shared_ptr<AboutXmlMod>>& activeMods,
                                   const ConstraintGraph& graph,
                                   const sort::SortSettings& settings,
-                                  const sort::CommunityRules* community_rules = nullptr,
+                                  const sort::CommunityRules* communityRules = nullptr,
                                   Profiler* timer = nullptr);
 
 }  // namespace px::modrim::checker

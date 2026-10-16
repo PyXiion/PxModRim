@@ -63,9 +63,9 @@ struct Fixture {
         core = px::modrim::CoreContext::create(config, &configService);
         core->registerPlugin(std::make_unique<px::modrim::DownloadManager>());
         auto a = std::make_shared<px::modrim::AboutXmlMod>();
-        a->package_id = px::modrim::CaseInsensitiveStr(u"test.a");
+        a->packageId = px::modrim::CaseInsensitiveStr(u"test.a");
         auto b = std::make_shared<px::modrim::AboutXmlMod>();
-        b->package_id = px::modrim::CaseInsensitiveStr(u"test.b");
+        b->packageId = px::modrim::CaseInsensitiveStr(u"test.b");
         core->load({{QStringLiteral("a"), a}, {QStringLiteral("b"), b}}, {QStringLiteral("a"), QStringLiteral("b")});
         app = std::make_unique<px::modrim::AppContext>(*core);
         app->addRailView<FirstView>();
@@ -135,7 +135,7 @@ TEST_CASE("Dirty state tracks active list order and disk reload baseline", "[ui]
     fixture.core->setActive({QStringLiteral("a"), QStringLiteral("b")});
     CHECK_FALSE(window.hasUnsavedChanges());
     fixture.core->setActive({QStringLiteral("a")});
-    fixture.core->modService().mods_changed.notify(std::monostate{});
+    fixture.core->modService().modsChanged.notify(std::monostate{});
     CHECK(window.hasUnsavedChanges());
 }
 

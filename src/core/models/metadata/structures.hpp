@@ -24,17 +24,17 @@ namespace px::modrim {
 class CaseInsensitiveStr {
 public:
     CaseInsensitiveStr() = default;
-    explicit CaseInsensitiveStr(QStringView pid) : value_(pid.toString().toLower()) {}
+    explicit CaseInsensitiveStr(QStringView pid) : m_value(pid.toString().toLower()) {}
 
-    const QString& str() const noexcept { return value_; }
+    const QString& str() const noexcept { return m_value; }
 
     friend bool operator==(const CaseInsensitiveStr&, const CaseInsensitiveStr&) = default;
     friend size_t qHash(const CaseInsensitiveStr& key, size_t seed = 0) noexcept {
-        return qHash(key.value_, seed);
+        return qHash(key.m_value, seed);
     }
 
 private:
-    QString value_;
+    QString m_value;
 };
 
 // Set of CaseInsensitiveStr with string-friendly membership tests.
@@ -51,19 +51,19 @@ public:
     void discard(QStringView value);
     void discard(const CaseInsensitiveStr& value);
 
-    qsizetype size() const noexcept { return data_.size(); }
-    bool empty() const noexcept { return data_.isEmpty(); }
+    qsizetype size() const noexcept { return m_data.size(); }
+    bool empty() const noexcept { return m_data.isEmpty(); }
 
     // Set union; the result keeps the elements of both operands.
     CaseInsensitiveSet operator|(const CaseInsensitiveSet& other) const;
 
-    auto begin() const { return data_.cbegin(); }
-    auto end() const { return data_.cend(); }
+    auto begin() const { return m_data.cbegin(); }
+    auto end() const { return m_data.cend(); }
 
     friend bool operator==(const CaseInsensitiveSet&, const CaseInsensitiveSet&) = default;
 
 private:
-    QSet<CaseInsensitiveStr> data_;
+    QSet<CaseInsensitiveStr> m_data;
 };
 
 // Parsed ModsConfig.xml data with active mods and known expansions.
@@ -72,10 +72,10 @@ struct ModsConfig {
     QList<CaseInsensitiveStr> activeMods;
     QList<CaseInsensitiveStr> knownExpansions;
 
-    bool check_active_duplicates() const;
-    bool check_expansions_duplicates() const;
-    void clear_active_mods() { activeMods.clear(); }
-    void clear_all() {
+    bool checkActiveDuplicates() const;
+    bool checkExpansionsDuplicates() const;
+    void clearActiveMods() { activeMods.clear(); }
+    void clearAll() {
         activeMods.clear();
         knownExpansions.clear();
     }
@@ -93,24 +93,24 @@ struct ReplacementInfo {
 // Dependency declared by a mod's About.xml (or synthesized, e.g. the RimWorld base game for DLC).
 struct DependencyMod {
     QString name;
-    CaseInsensitiveStr package_id{QStringLiteral("invalid.mod")};
-    QString workshop_url;
-    CaseInsensitiveSet alternative_package_ids;
+    CaseInsensitiveStr packageId{QStringLiteral("invalid.mod")};
+    QString workshopUrl;
+    CaseInsensitiveSet alternativePackageIds;
 };
 
 // Load-order rules and dependencies. Dependencies keep declaration order.
 struct BaseRules {
-    CaseInsensitiveSet load_after;
-    CaseInsensitiveSet load_before;
-    CaseInsensitiveSet incompatible_with;
+    CaseInsensitiveSet loadAfter;
+    CaseInsensitiveSet loadBefore;
+    CaseInsensitiveSet incompatibleWith;
     QList<DependencyMod> dependencies;
 
-    const DependencyMod* find_dependency(const CaseInsensitiveStr& package_id) const;
-    bool has_dependency(const CaseInsensitiveStr& package_id) const {
-        return find_dependency(package_id) != nullptr;
+    const DependencyMod* findDependency(const CaseInsensitiveStr& packageId) const;
+    bool hasDependency(const CaseInsensitiveStr& packageId) const {
+        return findDependency(packageId) != nullptr;
     }
     // Inserts, or replaces the dependency with the same package id in place.
-    void set_dependency(DependencyMod dependency);
+    void setDependency(DependencyMod dependency);
 };
 
 // Mod discovered by any provider. Polymorphic so providers can hand out AboutXmlMod (and
@@ -124,42 +124,42 @@ public:
 
     QString name = QStringLiteral("Unknown Mod Name");
     bool valid = true;
-    QSet<QString> supported_versions;
+    QSet<QString> supportedVersions;
     QString description = QStringLiteral(
         "This mod is considered invalid by PxModRim (and the RimWorld game).\n\n"
         "This mod does NOT contain an ./About/About.xml and is likely leftover from previous "
         "usage.");
-    QString provider_id;
+    QString providerId;
     bool obsolete = false;
-    bool db_builder_no_name = false;
+    bool dbBuilderNoName = false;
 
     // Identity: the mod path once it is known, otherwise a random id assigned at construction.
     virtual QString uuid() const;
 
-    const std::optional<QString>& mod_path() const noexcept { return mod_path_; }
+    const std::optional<QString>& modPath() const noexcept { return m_modPath; }
     // Fails if a path was already set; a mod's directory is fixed after discovery.
-    Result<void> set_mod_path(const QString& path);
+    Result<void> setModPath(const QString& path);
 
     // Folder name without its last extension (Python's Path.stem); nullopt without a path.
-    std::optional<QString> mod_folder() const;
+    std::optional<QString> modFolder() const;
     // Modification time of the mod folder in seconds since the epoch, or -1 if unavailable.
-    qint64 internal_time_touched() const;
+    qint64 internalTimeTouched() const;
 
     // Published file id from About/PublishedFileId.txt or a numeric folder name. Cached on first
     // use; this touches the disk, so callers may warm it off the UI thread.
-    std::optional<QString> published_file_id() const;
-    bool c_sharp_mod() const;
-    bool xml_patch_mod() const;
-    std::optional<QString> preview_img_path() const;
+    std::optional<QString> publishedFileId() const;
+    bool cSharpMod() const;
+    bool xmlPatchMod() const;
+    std::optional<QString> previewImgPath() const;
 
 private:
     static QString newUuid();
 
-    QString uuid_ = newUuid();
-    std::optional<QString> mod_path_;
-    mutable std::optional<std::optional<QString>> published_file_id_cache_;
-    mutable std::optional<bool> c_sharp_mod_cache_;
-    mutable std::optional<bool> xml_patch_mod_cache_;
+    QString m_uuid = newUuid();
+    std::optional<QString> m_modPath;
+    mutable std::optional<std::optional<QString>> m_publishedFileIdCache;
+    mutable std::optional<bool> m_cSharpModCache;
+    mutable std::optional<bool> m_xmlPatchModCache;
 };
 
 class ScenarioMod : public ListedMod {
@@ -170,67 +170,80 @@ public:
 // A mod with an About.xml: authors, version, rules, and DLC metadata.
 class AboutXmlMod : public ListedMod {
 public:
-    CaseInsensitiveStr package_id{QStringLiteral("invalid.mod")};
+    CaseInsensitiveStr packageId{QStringLiteral("invalid.mod")};
     QStringList authors;
-    QString mod_version;
-    std::optional<QString> mod_icon_path;
-    qint64 steam_app_id = -1;
+    QString modVersion;
+    std::optional<QString> modIconPath;
+    qint64 steamAppId = -1;
     QString url;
     double mtime = 0.0;
-    BaseRules about_rules;
+    BaseRules aboutRules;
 
     // Display name of the RimWorld DLC this package id belongs to, if any.
-    std::optional<QString> get_dlc_name() const;
+    std::optional<QString> getDlcName() const;
 };
 
 using ListedModPtr = std::shared_ptr<ListedMod>;
 
 // Pre-computed dependency graphs and tier classification for sorting.
 struct CompiledDependencyData {
-    QHash<QString, QSet<QString>> deps_graph;
-    QHash<QString, QSet<QString>> rev_deps_graph;
-    QSet<QString> tier_zero_mods;
-    QSet<QString> tier_one_mods;
-    QSet<QString> tier_three_mods;
+    QHash<QString, QSet<QString>> depsGraph;
+    QHash<QString, QSet<QString>> revDepsGraph;
+    QSet<QString> tierZeroMods;
+    QSet<QString> tierOneMods;
+    QSet<QString> tierThreeMods;
     QHash<QString, QSet<QString>> incompatibilities;
-    QHash<QString, QSet<QString>> declared_incompatibilities;
+    QHash<QString, QSet<QString>> declaredIncompatibilities;
 };
 
 // Glaze schemas for community rules and the Steam Workshop database. Fields the upstream JSON
 // may write either as a single value or as a list use std::variant.
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct SubExternalRule {
     std::variant<std::vector<std::string>, std::string> name = std::string{};
     std::variant<std::vector<std::string>, std::string> comment = std::string{};
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct SubExternalBoolRule {
     bool value = false;
     std::variant<std::vector<std::string>, std::string> comment = std::string{};
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct ExternalRule {
     std::map<std::string, SubExternalRule> loadAfter;
     std::map<std::string, SubExternalRule> loadBefore;
     SubExternalBoolRule loadTop;
     SubExternalBoolRule loadBottom;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct ExternalRulesSchema {
     std::int64_t timestamp = 0;
     std::map<std::string, ExternalRule> rules;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct SteamDbEntryDependency {
     std::string name;
     std::string url;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct SteamDbEntryBlacklist {
     bool value = false;
     std::string comment;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct SteamDbEntry {
     bool unpublished = false;
     std::string url;
@@ -245,24 +258,27 @@ struct SteamDbEntry {
     SteamDbEntryBlacklist blacklist;
     std::vector<std::map<std::string, std::string>> tags;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct SteamDbSchema {
     std::int64_t version = 0;
     std::map<std::string, SteamDbEntry> database;
 };
+// NOLINTEND(readability-identifier-naming)
 
 enum class WorkshopUpdateStatus {
-    Success,
-    NoWorkshopMods,
-    Partial,
-    Failed,
+    kSuccess,
+    kNoWorkshopMods,
+    kPartial,
+    kFailed,
 };
 
 struct WorkshopUpdateResult {
-    WorkshopUpdateStatus status = WorkshopUpdateStatus::Failed;
-    int mods_checked = 0;
-    int mods_updated = 0;
-    QStringList failed_pfids;
+    WorkshopUpdateStatus status = WorkshopUpdateStatus::kFailed;
+    int modsChecked = 0;
+    int modsUpdated = 0;
+    QStringList failedPfids;
     QStringList errors;
 };
 

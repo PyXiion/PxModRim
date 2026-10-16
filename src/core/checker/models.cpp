@@ -2,22 +2,22 @@
 
 namespace px::modrim::checker {
 
-QString ModDiagnostics::error_tooltip() const {
+QString ModDiagnostics::errorTooltip() const {
     if (errors.isEmpty()) {
         return {};
     }
     if (errors.size() == 1) {
-        return errors.front().short_message;
+        return errors.front().shortMessage;
     }
     return QStringLiteral("%1 errors").arg(errors.size());
 }
 
-QString ModDiagnostics::warning_tooltip() const {
+QString ModDiagnostics::warningTooltip() const {
     if (warnings.isEmpty()) {
         return {};
     }
     if (warnings.size() == 1) {
-        return warnings.front().short_message;
+        return warnings.front().shortMessage;
     }
     return QStringLiteral("%1 warnings").arg(warnings.size());
 }

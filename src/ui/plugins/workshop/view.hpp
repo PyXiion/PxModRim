@@ -46,156 +46,156 @@ public:
     ~WorkshopViewPanel() override;
     void openRoute(const QStringList& path) override;
     Q_INVOKABLE void teardown() override;
-    QCoro::Task<void> follow_route(QStringList path);
+    QCoro::Task<void> followRoute(QStringList path);
     QCoro::Task<void> load(bool append = false);
-    QCoro::Task<void> select_tab(QString tab);
-    QCoro::Task<void> open_item(QString item_id, QString kind, bool record = true);
-    QCoro::Task<void> filter_items(QString query, QString version, QString source, QString sort, QString tag);
-    QCoro::Task<void> go_back();
-    QCoro::Task<void> retry_load();
-    QCoro::Task<void> download_item(QString item_id, QString kind);
-    QCoro::Task<void> toggle_activation(QString item_id);
-    QCoro::Task<void> toggle_collection(bool only = false);
-    QCoro::Task<void> update_all();
+    QCoro::Task<void> selectTabAsync(QString tab);
+    QCoro::Task<void> openItemAsync(QString itemId, QString kind, bool record = true);
+    QCoro::Task<void> filterItems(QString query, QString version, QString source, QString sort, QString tag);
+    QCoro::Task<void> goBack();
+    QCoro::Task<void> retryLoad();
+    QCoro::Task<void> downloadItemAsync(QString itemId, QString kind);
+    QCoro::Task<void> toggleActivationAsync(QString itemId);
+    QCoro::Task<void> toggleCollectionAsync(bool only = false);
+    QCoro::Task<void> updateAllAsync();
 
     Q_INVOKABLE QCoro::QmlTask refresh() { return load(); }
     Q_INVOKABLE void selectTab(const QString& tab);
     Q_INVOKABLE QCoro::QmlTask filter(QString query, QString version, QString source, QString sort, QString tag) {
-        return filter_items(std::move(query), std::move(version), std::move(source), std::move(sort), std::move(tag));
+        return filterItems(std::move(query), std::move(version), std::move(source), std::move(sort), std::move(tag));
     }
     Q_INVOKABLE QCoro::QmlTask loadMore() { return load(true); }
-    Q_INVOKABLE QCoro::QmlTask retry() { return retry_load(); }
-    Q_INVOKABLE void openItem(const QString& item_id, const QString& kind);
-    Q_INVOKABLE QCoro::QmlTask back() { return go_back(); }
-    Q_INVOKABLE QCoro::QmlTask downloadItem(QString item_id, QString kind) { return download_item(std::move(item_id), std::move(kind)); }
-    Q_INVOKABLE QCoro::QmlTask toggleActivation(QString item_id) { return toggle_activation(std::move(item_id)); }
-    Q_INVOKABLE QCoro::QmlTask toggleCollection() { return toggle_collection(); }
-    Q_INVOKABLE QCoro::QmlTask activateOnlyCollection() { return toggle_collection(true); }
-    Q_INVOKABLE QCoro::QmlTask updateAll() { return update_all(); }
+    Q_INVOKABLE QCoro::QmlTask retry() { return retryLoad(); }
+    Q_INVOKABLE void openItem(const QString& itemId, const QString& kind);
+    Q_INVOKABLE QCoro::QmlTask back() { return goBack(); }
+    Q_INVOKABLE QCoro::QmlTask downloadItem(QString itemId, QString kind) { return downloadItemAsync(std::move(itemId), std::move(kind)); }
+    Q_INVOKABLE QCoro::QmlTask toggleActivation(QString itemId) { return toggleActivationAsync(std::move(itemId)); }
+    Q_INVOKABLE QCoro::QmlTask toggleCollection() { return toggleCollectionAsync(); }
+    Q_INVOKABLE QCoro::QmlTask activateOnlyCollection() { return toggleCollectionAsync(true); }
+    Q_INVOKABLE QCoro::QmlTask updateAll() { return updateAllAsync(); }
     Q_INVOKABLE void downloadAvailable();
     Q_INVOKABLE void dismissPlan();
     Q_INVOKABLE void openLink(const QString& url);
     Q_INVOKABLE void openSettings();
-    Q_INVOKABLE void toggleFavourite(const QString& item_id);
+    Q_INVOKABLE void toggleFavourite(const QString& itemId);
 
-    QString tab() const { return tab_; }
+    QString tab() const { return m_tab; }
     QString url() const;
     QString backLabel() const;
-    bool configured() const { return catalog_.configured(); }
-    bool busy() const { return busy_; }
-    QString error() const { return error_; }
-    QString notice() const { return notice_; }
-    QVariantMap detail() const { return detail_; }
-    bool hasDetail() const { return !detail_.isEmpty(); }
-    bool pendingPlan() const { return pending_.has_value(); }
-    bool canDownloadAvailable() const { return pending_ && !pending_->to_download.isEmpty(); }
-    QString searchQuery() const { return criteria_.query; }
+    bool configured() const { return m_catalog.configured(); }
+    bool busy() const { return m_busy; }
+    QString error() const { return m_error; }
+    QString notice() const { return m_notice; }
+    QVariantMap detail() const { return m_detail; }
+    bool hasDetail() const { return !m_detail.isEmpty(); }
+    bool pendingPlan() const { return m_pending.has_value(); }
+    bool canDownloadAvailable() const { return m_pending && !m_pending->to_download.isEmpty(); }
+    QString searchQuery() const { return m_criteria.query; }
     QStringList tagOptions() const;
     QString gameVersion() const;
     QStringList versionOptions() const;
-    int updateCount() const { return update_count_; }
-    bool planning() const { return planning_ > 0; }
+    int updateCount() const { return m_updateCount; }
+    bool planning() const { return m_planning > 0; }
 
-    CatalogListModel* mods_model;
-    CatalogListModel* collections_model;
-    CatalogListModel* members_model;
+    CatalogListModel* modsModel;
+    CatalogListModel* collectionsModel;
+    CatalogListModel* membersModel;
 
 signals:
     void changed();
 
 private:
     template<class T>
-    QCoro::Task<void> run_cached(QString key,
+    QCoro::Task<void> runCached(QString key,
         std::function<QCoro::Task<workshop::CatalogResult<T>>()> produce,
         std::function<void(const T&)> apply, bool cached = true);
-    QCoro::Task<void> load_pack();
+    QCoro::Task<void> loadPack();
     QCoro::Task<void> download(QStringList ids, QStringList collections);
-    QCoro::Task<void> installed_changed();
-    QCoro::Task<void> url_changed();
-    void refresh_mod_ids();
+    QCoro::Task<void> installedChanged();
+    QCoro::Task<void> urlChanged();
+    void refreshModIds();
     QVariantMap row(const workshop::CatalogEntry& item, bool detail = false);
-    QVariantMap detail_row(const Detail& detail);
+    QVariantMap detailRow(const Detail& detail);
     template<class T> QList<QVariantMap> rows(const std::vector<T>& items) {
-        refresh_mod_ids();
+        refreshModIds();
         QList<QVariantMap> result;
         result.reserve(static_cast<qsizetype>(items.size()));
         for (const auto& item : items) result.append(row(item));
         return result;
     }
-    void refresh_rows();
-    void clear_detail();
-    std::optional<QStringList> pack_copies() const;
-    void show_favourites();
-    void show_installed();
+    void refreshRows();
+    void clearDetail();
+    std::optional<QStringList> packCopies() const;
+    void showFavourites();
+    void showInstalled();
     void recount();
-    std::optional<QString> installed_cursor() const;
-    void queue_plan(const workshop::DownloadPlan& plan);
+    std::optional<QString> installedCursor() const;
+    void queuePlan(const workshop::DownloadPlan& plan);
     void go(const QStringList& path);
 
-    workshop::WorkshopCatalog& catalog_;
-    DownloadManager& downloads_;
-    workshop::FavouriteCollections& favourites_;
-    QQuickWidget* qml_ = nullptr;
-    QString tab_ = QStringLiteral("Discover");
-    workshop::CatalogQuery criteria_;
-    bool busy_ = false;
-    bool torn_down_ = false;
-    bool installed_dirty_ = false;
-    int generation_ = 0;
-    int planning_ = 0;
-    int update_count_ = 0;
-    QString error_, notice_;
-    std::function<QCoro::Task<void>()> retry_;
-    QVariantMap detail_;
-    std::optional<Detail> detail_data_;
-    InstalledList installed_;
-    std::optional<std::pair<QString, QString>> current_;
-    std::vector<std::tuple<QString, QString, QString>> trail_;
-    std::optional<workshop::DownloadPlan> pending_;
-    QSet<QString> preparing_, pack_ids_, installed_ids_, active_ids_, known_tags_;
-    QHash<QString, QSet<QString>> collection_mods_;
-    QHash<QString, workshop::CatalogEntry> items_;
-    Event<bool>::Id busy_id_ = 0;
-    Event<std::monostate>::Id queue_id_ = 0, installed_id_ = 0;
-    Event<QString>::Id url_id_ = 0;
-    Event<workshop::FavouritesState>::Id favourites_id_ = 0;
-    Event<QStringList>::Id active_id_ = 0;
+    workshop::WorkshopCatalog& m_catalog;
+    DownloadManager& m_downloads;
+    workshop::FavouriteCollections& m_favourites;
+    QQuickWidget* m_qml = nullptr;
+    QString m_tab = QStringLiteral("Discover");
+    workshop::CatalogQuery m_criteria;
+    bool m_busy = false;
+    bool m_tornDown = false;
+    bool m_installedDirty = false;
+    int m_generation = 0;
+    int m_planning = 0;
+    int m_updateCount = 0;
+    QString m_error, m_notice;
+    std::function<QCoro::Task<void>()> m_retry;
+    QVariantMap m_detail;
+    std::optional<Detail> m_detailData;
+    InstalledList m_installed;
+    std::optional<std::pair<QString, QString>> m_current;
+    std::vector<std::tuple<QString, QString, QString>> m_trail;
+    std::optional<workshop::DownloadPlan> m_pending;
+    QSet<QString> m_preparing, m_packIds, m_installedIds, m_activeIds, m_knownTags;
+    QHash<QString, QSet<QString>> m_collectionMods;
+    QHash<QString, workshop::CatalogEntry> m_items;
+    Event<bool>::Id m_busyId = 0;
+    Event<std::monostate>::Id m_queueId = 0, m_installedId = 0;
+    Event<QString>::Id m_urlId = 0;
+    Event<workshop::FavouritesState>::Id m_favouritesId = 0;
+    Event<QStringList>::Id m_activeId = 0;
 };
 
 template<class T>
-QCoro::Task<void> WorkshopViewPanel::run_cached(QString key,
+QCoro::Task<void> WorkshopViewPanel::runCached(QString key,
     std::function<QCoro::Task<workshop::CatalogResult<T>>()> produce,
     std::function<void(const T&)> apply, bool cached) {
-    if (torn_down_) co_return;
+    if (m_tornDown) co_return;
     QPointer<WorkshopViewPanel> self(this);
-    const int generation = ++generation_;
-    busy_ = true;
-    error_.clear();
-    retry_ = [self, key, produce, apply, cached] {
-        return self->run_cached<T>(key, produce, apply, cached);
+    const int generation = ++m_generation;
+    m_busy = true;
+    m_error.clear();
+    m_retry = [self, key, produce, apply, cached] {
+        return self->runCached<T>(key, produce, apply, cached);
     };
     emit changed();
     bool shown = false;
     auto show = [self, generation, apply, &shown](const T& value) {
-        if (!self || self->torn_down_ || generation != self->generation_) return;
+        if (!self || self->m_tornDown || generation != self->m_generation) return;
         apply(value);
         shown = true;
-        self->busy_ = false;
+        self->m_busy = false;
         emit self->changed();
     };
     workshop::CatalogResult<void> result;
-    if (cached) result = co_await catalog_.cached<T>(key, std::move(produce), show, workshop::kFreshSeconds, true);
+    if (cached) result = co_await m_catalog.cached<T>(key, std::move(produce), show, workshop::kFreshSeconds, true);
     else {
         auto fetched = co_await produce();
         if (fetched) show(*fetched);
         else result = std::unexpected(fetched.error());
     }
-    if (!self || self->torn_down_ || generation != self->generation_) co_return;
+    if (!self || self->m_tornDown || generation != self->m_generation) co_return;
     if (!result && shown) spdlog::warn("[workshop] background refresh failed: {}", result.error().message.toStdString());
-    else if (!result) self->error_ = result.error().message;
-    self->busy_ = false;
+    else if (!result) self->m_error = result.error().message;
+    self->m_busy = false;
     emit self->changed();
-    if (self->installed_dirty_ && self->tab_ == QStringLiteral("Installed") && !self->detail_data_)
+    if (self->m_installedDirty && self->m_tab == QStringLiteral("Installed") && !self->m_detailData)
         co_await self->load();
 }
 

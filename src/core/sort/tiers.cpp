@@ -28,7 +28,7 @@ QSet<PackageId> reachable(const PackageId& start, const PackageGraph& graph) {
 }
 
 // Adds `ids` to `tiers` as `tier`, skipping ids that are not canonical (keys of `tiers`).
-void assign_present(QHash<PackageId, Tier>& tiers, const QSet<PackageId>& ids, Tier tier) {
+void assignPresent(QHash<PackageId, Tier>& tiers, const QSet<PackageId>& ids, Tier tier) {
     for (const auto& pid : ids) {
         if (auto it = tiers.find(pid); it != tiers.end()) {
             *it = tier;
@@ -38,72 +38,72 @@ void assign_present(QHash<PackageId, Tier>& tiers, const QSet<PackageId>& ids, T
 
 }  // namespace
 
-QHash<PackageId, Tier> assign_tiers(const QSet<PackageId>& canonical_ids,
+QHash<PackageId, Tier> assignTiers(const QSet<PackageId>& canonicalIds,
                                     const PackageGraph& deps,
-                                    const PackageGraph& rev_deps,
-                                    const QSet<PackageId>& load_first,
-                                    const QSet<PackageId>& load_last,
-                                    const TierConfig& tier_config) {
+                                    const PackageGraph& revDeps,
+                                    const QSet<PackageId>& loadFirst,
+                                    const QSet<PackageId>& loadLast,
+                                    const TierConfig& tierConfig) {
     QHash<PackageId, Tier> tiers;
-    for (const auto& pid : canonical_ids) {
-        tiers.insert(pid, Tier::Tier2);
+    for (const auto& pid : canonicalIds) {
+        tiers.insert(pid, Tier::kTier2);
     }
 
     // Tier 3 is the bottom of the load order, so dependents of late mods also sink there.
-    QSet<PackageId> tier3_set = load_last;
-    for (const auto& pid : load_last) {
-        tier3_set |= reachable(pid, rev_deps);
+    QSet<PackageId> tier3Set = loadLast;
+    for (const auto& pid : loadLast) {
+        tier3Set |= reachable(pid, revDeps);
     }
-    for (const auto& pid : tier_config.tier_3) {
-        if (canonical_ids.contains(pid)) {
-            tier3_set.insert(pid);
-            tier3_set |= reachable(pid, rev_deps);
+    for (const auto& pid : tierConfig.tier_3) {
+        if (canonicalIds.contains(pid)) {
+            tier3Set.insert(pid);
+            tier3Set |= reachable(pid, revDeps);
         }
     }
-    assign_present(tiers, tier3_set, Tier::Tier3);
+    assignPresent(tiers, tier3Set, Tier::kTier3);
 
     // Tier 0 is assigned after tier 3, so a configured tier-0 mod wins over a tier-3 mark.
-    QSet<PackageId> tier0_set;
-    for (const auto& pid : tier_config.tier_0) {
-        if (canonical_ids.contains(pid)) {
-            tier0_set.insert(pid);
-            tier0_set |= reachable(pid, deps);
+    QSet<PackageId> tier0Set;
+    for (const auto& pid : tierConfig.tier_0) {
+        if (canonicalIds.contains(pid)) {
+            tier0Set.insert(pid);
+            tier0Set |= reachable(pid, deps);
         }
     }
-    assign_present(tiers, tier0_set, Tier::Tier0);
+    assignPresent(tiers, tier0Set, Tier::kTier0);
 
     // Only tier-2 mods move up: a tier-0 or tier-3 mark is never overridden here.
-    QSet<PackageId> tier1_set;
-    for (const auto& pid : tier_config.tier_1) {
-        if (canonical_ids.contains(pid)) {
-            tier1_set.insert(pid);
-            tier1_set |= reachable(pid, deps);
+    QSet<PackageId> tier1Set;
+    for (const auto& pid : tierConfig.tier_1) {
+        if (canonicalIds.contains(pid)) {
+            tier1Set.insert(pid);
+            tier1Set |= reachable(pid, deps);
         }
     }
-    for (const auto& pid : load_first) {
-        if (canonical_ids.contains(pid)) {
-            tier1_set.insert(pid);
-            tier1_set |= reachable(pid, deps);
+    for (const auto& pid : loadFirst) {
+        if (canonicalIds.contains(pid)) {
+            tier1Set.insert(pid);
+            tier1Set |= reachable(pid, deps);
         }
     }
-    for (const auto& pid : tier1_set) {
-        if (auto it = tiers.find(pid); it != tiers.end() && *it == Tier::Tier2) {
-            *it = Tier::Tier1;
+    for (const auto& pid : tier1Set) {
+        if (auto it = tiers.find(pid); it != tiers.end() && *it == Tier::kTier2) {
+            *it = Tier::kTier1;
         }
     }
 
     return tiers;
 }
 
-QSet<PackageId> get_deps_recursive(const PackageId& start, const PackageGraph& deps) {
+QSet<PackageId> getDepsRecursive(const PackageId& start, const PackageGraph& deps) {
     return reachable(start, deps);
 }
 
-QSet<PackageId> get_reverse_deps_recursive(const PackageId& start, const PackageGraph& rev_deps) {
-    return reachable(start, rev_deps);
+QSet<PackageId> getReverseDepsRecursive(const PackageId& start, const PackageGraph& revDeps) {
+    return reachable(start, revDeps);
 }
 
-std::optional<QList<PackageId>> find_cycle(const QSet<PackageId>& nodes, const PackageGraph& deps) {
+std::optional<QList<PackageId>> findCycle(const QSet<PackageId>& nodes, const PackageGraph& deps) {
     // One frame per node on the DFS stack; `next` indexes the node's outgoing edges.
     struct Frame {
         PackageId pid;
@@ -112,7 +112,7 @@ std::optional<QList<PackageId>> find_cycle(const QSet<PackageId>& nodes, const P
     };
 
     QSet<PackageId> visited;
-    QSet<PackageId> rec_stack;
+    QSet<PackageId> recStack;
     QHash<PackageId, PackageId> parent;
 
     for (const auto& root : nodes) {
@@ -122,12 +122,12 @@ std::optional<QList<PackageId>> find_cycle(const QSet<PackageId>& nodes, const P
 
         parent.insert(root, root);
         visited.insert(root);
-        rec_stack.insert(root);
+        recStack.insert(root);
         std::vector<Frame> stack{Frame{root, deps.value(root).values()}};
         while (!stack.empty()) {
             Frame& top = stack.back();
             if (top.next == top.edges.size()) {
-                rec_stack.remove(top.pid);
+                recStack.remove(top.pid);
                 stack.pop_back();
                 continue;
             }
@@ -140,10 +140,10 @@ std::optional<QList<PackageId>> find_cycle(const QSet<PackageId>& nodes, const P
             if (!visited.contains(dep)) {
                 parent.insert(dep, pid);
                 visited.insert(dep);
-                rec_stack.insert(dep);
+                recStack.insert(dep);
                 // `top` is invalid after this push.
                 stack.push_back(Frame{dep, deps.value(dep).values()});
-            } else if (rec_stack.contains(dep)) {
+            } else if (recStack.contains(dep)) {
                 // Walk parents from the current node back to `dep`, which is on the DFS path.
                 QList<PackageId> cycle{dep};
                 PackageId current = pid;

@@ -12,7 +12,7 @@
 
 namespace px::modrim {
 
-inline const QString UNGROUPED_KEY = QStringLiteral("ungrouped");
+inline const QString kUngroupedKey = QStringLiteral("ungrouped");
 
 struct TreeNode {
     QString kind;
@@ -20,34 +20,34 @@ struct TreeNode {
     TreeNode* parent = nullptr;
     const organizer::FolderNode* folder = nullptr;
     const organizer::ModLeaf* leaf = nullptr;
-    QString provider_id;
-    QString provider_label;
-    QString mod_version;
+    QString providerId;
+    QString providerLabel;
+    QString modVersion;
     int row = 0;
     std::vector<std::unique_ptr<TreeNode>> children;
 
     void add(std::unique_ptr<TreeNode> child);
     QList<TreeNode*> walk() const;
-    qint64 folder_id() const;
+    qint64 folderId() const;
     TreeNode(QString kind = QStringLiteral("root"), QString key = {}, TreeNode* parent = nullptr,
              const organizer::FolderNode* folder = nullptr,
-             const organizer::ModLeaf* leaf = nullptr, QString provider_id = {});
-    bool is_container() const;
+             const organizer::ModLeaf* leaf = nullptr, QString providerId = {});
+    bool isContainer() const;
 };
 
 class ModTreeModel : public QAbstractItemModel {
     Q_OBJECT
 public:
     enum Role {
-        KindRole = Qt::UserRole + 1, KeyRole, UuidRole, PackageIdRole,
-        CheckStateRole, EnabledCountRole, TotalCountRole, VisibleCountRole,
-        FilteringRole, HasRuleRole, ProviderIconRole, ProviderColorRole,
-        HasErrorRole, ErrorTooltipRole, CanPlaceRole, SelectedRole,
-        HasWarningRole, WarningTooltipRole, TagsRole, ProviderLabelRole, ModVersionRole
+        kKindRole = Qt::UserRole + 1, kKeyRole, kUuidRole, kPackageIdRole,
+        kCheckStateRole, kEnabledCountRole, kTotalCountRole, kVisibleCountRole,
+        kFilteringRole, kHasRuleRole, kProviderIconRole, kProviderColorRole,
+        kHasErrorRole, kErrorTooltipRole, kCanPlaceRole, kSelectedRole,
+        kHasWarningRole, kWarningTooltipRole, kTagsRole, kProviderLabelRole, kModVersionRole
     };
     Q_ENUM(Role)
     using SummaryFor = std::function<std::optional<view::ModDiagnosticsView>(const QString&)>;
-    explicit ModTreeModel(SummaryFor summary_for, QObject* parent = nullptr);
+    explicit ModTreeModel(SummaryFor summaryFor, QObject* parent = nullptr);
     QModelIndex index(int row, int column, const QModelIndex& parent = {}) const override;
     QModelIndex parent(const QModelIndex& child) const override;
     int rowCount(const QModelIndex& parent = {}) const override;
@@ -56,32 +56,32 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     bool filtering() const;
-    void set_tree(const organizer::FolderNode& root,
+    void setTree(const organizer::FolderNode& root,
                   const organizer::ModsByUuid& mods,
-                  const QHash<QString, QString>& provider_colors, bool filtering,
+                  const QHash<QString, QString>& providerColors, bool filtering,
                   const QHash<qint64, organizer::Tag>& tags = {});
-    void refresh_diagnostics();
-    TreeNode* node_at(const QModelIndex& index) const;
-    QModelIndex index_for_key(const QString& key) const;
-    QModelIndex index_for_uuid(const QString& uuid) const;
-    QList<QModelIndex> expanded_indexes(const QModelIndex& parent = {}) const;
-    QList<TreeNode*> selected_nodes() const;
-    bool is_selected(const QModelIndex& index) const;
+    void refreshDiagnostics();
+    TreeNode* nodeAt(const QModelIndex& index) const;
+    QModelIndex indexForKey(const QString& key) const;
+    QModelIndex indexForUuid(const QString& uuid) const;
+    QList<QModelIndex> expandedIndexes(const QModelIndex& parent = {}) const;
+    QList<TreeNode*> selectedNodes() const;
+    bool isSelected(const QModelIndex& index) const;
     void select(const QList<QModelIndex>& indexes, const QString& mode = QStringLiteral("replace"));
-    void clear_selection();
+    void clearSelection();
 
 private:
     TreeNode* node(const QModelIndex& index) const;
-    QModelIndex index_of(const TreeNode* node) const;
-    void emit_all_changed(TreeNode* node, const QList<int>& roles = {});
-    void notify_selection(const QSet<QString>& changed);
-    SummaryFor summary_for_;
-    std::unique_ptr<TreeNode> root_;
-    std::unique_ptr<organizer::FolderNode> payload_;
-    bool filtering_ = false;
-    QHash<QString, QString> provider_colors_;
-    QHash<QString, QVariantList> tag_rows_;
-    QSet<QString> selected_;
+    QModelIndex indexOf(const TreeNode* node) const;
+    void emitAllChanged(TreeNode* node, const QList<int>& roles = {});
+    void notifySelection(const QSet<QString>& changed);
+    SummaryFor m_summaryFor;
+    std::unique_ptr<TreeNode> m_root;
+    std::unique_ptr<organizer::FolderNode> m_payload;
+    bool m_filtering = false;
+    QHash<QString, QString> m_providerColors;
+    QHash<QString, QVariantList> m_tagRows;
+    QSet<QString> m_selected;
 };
 
 }  // namespace px::modrim

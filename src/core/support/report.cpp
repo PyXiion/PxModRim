@@ -31,29 +31,29 @@ namespace px::modrim::support {
 
 namespace {
 
-constexpr qint64 MIB = 1024 * 1024;
-constexpr qint64 KIB = 1024;
-constexpr qint64 MIN_READ_WINDOW = 10 * MIB;
+constexpr qint64 kMib = 1024 * 1024;
+constexpr qint64 kKib = 1024;
+constexpr qint64 kMinReadWindow = 10 * kMib;
 // Upload responses are shown back to the user, so only a short prefix is echoed.
-constexpr qsizetype MAX_ECHOED_BODY = 100;
+constexpr qsizetype kMaxEchoedBody = 100;
 
 // A path component may not run into adjacent name characters, so "ludeon.rimworld" is never
 // mistaken for a path that contains the username "rimworld".
-constexpr QLatin1StringView COMPONENT_START{R"re((?<![\w.-]))re"};
-constexpr QLatin1StringView COMPONENT_END{R"re((?![\w.-]))re"};
+constexpr QLatin1StringView kComponentStart{R"re((?<![\w.-]))re"};
+constexpr QLatin1StringView kComponentEnd{R"re((?![\w.-]))re"};
 
 // Roots that hold user folders. Backslashes may be doubled because repr() of a Windows path
 // doubles them.
-constexpr QLatin1StringView USER_DIR_PREFIX{R"re((?:/home|/Users|/run/media|/media|\\{1,2}Users)(?:\\{1,2}|/))re"};
+constexpr QLatin1StringView kUserDirPrefix{R"re((?:/home|/Users|/run/media|/media|\\{1,2}Users)(?:\\{1,2}|/))re"};
 
-QRegularExpression unicode_regex(const QString& pattern,
+QRegularExpression unicodeRegex(const QString& pattern,
                                  QRegularExpression::PatternOptions options = {}) {
     return QRegularExpression(pattern,
                               QRegularExpression::UseUnicodePropertiesOption | options);
 }
 
 // Mirrors getpass.getuser(): the usual environment variables first, then the account database.
-QString current_username() {
+QString currentUsername() {
     for (const char* name : {"LOGNAME", "USER", "LNAME", "USERNAME"}) {
         if (const QString value = qEnvironmentVariable(name); !value.isEmpty()) {
             return value;
@@ -67,13 +67,13 @@ QString current_username() {
     return QString();
 }
 
-QString format_size(qint64 bytes) {
-    if (bytes >= MIB) {
-        return QString::number(static_cast<double>(bytes) / static_cast<double>(MIB), 'f', 1) +
+QString formatSize(qint64 bytes) {
+    if (bytes >= kMib) {
+        return QString::number(static_cast<double>(bytes) / static_cast<double>(kMib), 'f', 1) +
                QStringLiteral(" MiB");
     }
-    if (bytes >= KIB) {
-        return QString::number(static_cast<double>(bytes) / static_cast<double>(KIB), 'f', 1) +
+    if (bytes >= kKib) {
+        return QString::number(static_cast<double>(bytes) / static_cast<double>(kKib), 'f', 1) +
                QStringLiteral(" KiB");
     }
     return QString::number(bytes) + QStringLiteral(" B");
@@ -81,7 +81,7 @@ QString format_size(qint64 bytes) {
 
 // Splits the way Python's str.splitlines() does: several characters end a line, and a trailing
 // terminator does not start an empty line.
-QStringList split_lines(const QString& text) {
+QStringList splitLines(const QString& text) {
     QStringList lines;
     qsizetype start = 0;
     for (qsizetype i = 0; i < text.size(); ++i) {
@@ -106,7 +106,7 @@ QStringList split_lines(const QString& text) {
 
 // loguru writes each record as a JSON object whose "text" holds the formatted line. Lines
 // that are not such records pass through unchanged.
-QString log_line_text(const QString& line) {
+QString logLineText(const QString& line) {
     const QString trimmed = line.trimmed();
     if (!trimmed.startsWith(u'{') || !trimmed.endsWith(u'}')) {
         return line;
@@ -127,25 +127,25 @@ QString log_line_text(const QString& line) {
     return result;
 }
 
-QString parse_log_text(const QString& raw_text) {
-    QStringList lines = split_lines(raw_text);
+QString parseLogText(const QString& rawText) {
+    QStringList lines = splitLines(rawText);
     for (QString& line : lines) {
-        line = log_line_text(line);
+        line = logLineText(line);
     }
     QString result = lines.join(QLatin1Char('\n'));
-    if (raw_text.endsWith(u'\n') && !result.isEmpty()) {
+    if (rawText.endsWith(u'\n') && !result.isEmpty()) {
         result += u'\n';
     }
     return result;
 }
 
 // Drops the partial line at the start of a tail slice.
-QByteArray after_first_newline(const QByteArray& data) {
+QByteArray afterFirstNewline(const QByteArray& data) {
     const qsizetype newline = data.indexOf('\n');
     return newline < 0 ? data : data.mid(newline + 1);
 }
 
-Result<QByteArray> read_raw_tail(QFile& file, qint64 size, qint64 window) {
+Result<QByteArray> readRawTail(QFile& file, qint64 size, qint64 window) {
     if (!file.open(QIODevice::ReadOnly)) {
         return std::unexpected(Error{file.errorString()});
     }
@@ -153,11 +153,11 @@ Result<QByteArray> read_raw_tail(QFile& file, qint64 size, qint64 window) {
         return file.readAll();
     }
     file.seek(size - window);
-    return after_first_newline(file.read(window));
+    return afterFirstNewline(file.read(window));
 }
 
 // Python's repr() of a string, for quoting part of a server response in an error message.
-QString py_repr(const QString& text) {
+QString pyRepr(const QString& text) {
     const QChar quote = text.contains(u'\'') && !text.contains(u'"') ? QChar(u'"') : QChar(u'\'');
     QString out(quote);
     for (const QChar c : text) {
@@ -187,11 +187,11 @@ QString py_repr(const QString& text) {
 
 }  // namespace
 
-QString redact(const QString& text, const std::optional<QString>& home_dir,
+QString redact(const QString& text, const std::optional<QString>& homeDir,
                const std::optional<QString>& username) {
     QString result = text;
 
-    QString home = home_dir ? *home_dir : QDir::homePath();
+    QString home = homeDir ? *homeDir : QDir::homePath();
     while (home.endsWith(u'/') || home.endsWith(u'\\')) {
         home.chop(1);
     }
@@ -210,27 +210,27 @@ QString redact(const QString& text, const std::optional<QString>& home_dir,
         for (const QString& variant : ordered) {
             alternatives.append(QRegularExpression::escape(variant));
         }
-        const QRegularExpression home_pattern = unicode_regex(
-            QString(COMPONENT_START) + QStringLiteral("(?:") + alternatives.join(u'|') +
-            QStringLiteral(")") + QString(COMPONENT_END));
-        result.replace(home_pattern, QStringLiteral("~"));
+        const QRegularExpression homePattern = unicodeRegex(
+            QString(kComponentStart) + QStringLiteral("(?:") + alternatives.join(u'|') +
+            QStringLiteral(")") + QString(kComponentEnd));
+        result.replace(homePattern, QStringLiteral("~"));
     }
 
     // Only in path contexts: a bare word match would corrupt ids such as ludeon.rimworld.
-    const QString user = username ? *username : current_username();
+    const QString user = username ? *username : currentUsername();
     if (!user.isEmpty()) {
-        const QRegularExpression user_pattern = unicode_regex(
-            QStringLiteral("(") + QString(USER_DIR_PREFIX) + QStringLiteral(")") +
-                QRegularExpression::escape(user) + QString(COMPONENT_END),
+        const QRegularExpression userPattern = unicodeRegex(
+            QStringLiteral("(") + QString(kUserDirPrefix) + QStringLiteral(")") +
+                QRegularExpression::escape(user) + QString(kComponentEnd),
             QRegularExpression::CaseInsensitiveOption);
-        result.replace(user_pattern, QStringLiteral("\\1<user>"));
+        result.replace(userPattern, QStringLiteral("\\1<user>"));
     }
     return result;
 }
 
-QString read_log_tail(const std::optional<QString>& log_path, qint64 max_bytes) {
-    const QString path = log_path ? *log_path
-                                  : QDir(config_dir()).filePath(QStringLiteral("logs/pxmodrim.log"));
+QString readLogTail(const std::optional<QString>& logPath, qint64 maxBytes) {
+    const QString path = logPath ? *logPath
+                                  : QDir(configDir()).filePath(QStringLiteral("logs/pxmodrim.log"));
     const QFileInfo info(path);
     if (!info.isFile()) {
         return QStringLiteral("<no log file found>");
@@ -241,28 +241,28 @@ QString read_log_tail(const std::optional<QString>& log_path, qint64 max_bytes) 
     }
 
     // JSON records shrink once unpacked, so read a wider raw window than the byte budget.
-    const qint64 read_window = std::max(max_bytes * 5, MIN_READ_WINDOW);
+    const qint64 readWindow = std::max(maxBytes * 5, kMinReadWindow);
     QFile file(path);
-    auto raw = read_raw_tail(file, size, read_window);
+    auto raw = readRawTail(file, size, readWindow);
     if (!raw) {
         return QStringLiteral("<error reading log file: %1>").arg(raw.error().message);
     }
 
-    const QString plain = parse_log_text(QString::fromUtf8(*raw));
+    const QString plain = parseLogText(QString::fromUtf8(*raw));
     const QByteArray encoded = plain.toUtf8();
-    if (encoded.size() <= max_bytes) {
+    if (encoded.size() <= maxBytes) {
         return plain;
     }
 
-    const QByteArray tail = after_first_newline(encoded.right(max_bytes));
+    const QByteArray tail = afterFirstNewline(encoded.right(maxBytes));
     return QStringLiteral("[... truncated, showing last %1 of %2 ...]\n")
-               .arg(format_size(tail.size()), format_size(encoded.size())) +
+               .arg(formatSize(tail.size()), formatSize(encoded.size())) +
            QString::fromUtf8(tail);
 }
 
-QString build_report(const ReportSource& source, const std::optional<QString>& log_path,
-                     const std::optional<QString>& home_dir, const std::optional<QString>& username,
-                     qint64 max_log_bytes) {
+QString buildReport(const ReportSource& source, const std::optional<QString>& logPath,
+                     const std::optional<QString>& homeDir, const std::optional<QString>& username,
+                     qint64 maxLogBytes) {
     QStringList lines;
 
     lines << QStringLiteral("=== PxModRim System Report ===");
@@ -275,67 +275,67 @@ QString build_report(const ReportSource& source, const std::optional<QString>& l
 
     const PathConfig& paths = source.paths;
     lines << QStringLiteral("=== RimWorld Configuration ===");
-    lines << QStringLiteral("Game Version: ") + source.game_version;
-    const auto or_none = [](const std::string& value) {
+    lines << QStringLiteral("Game Version: ") + source.gameVersion;
+    const auto orNone = [](const std::string& value) {
         return value.empty() ? QStringLiteral("<none>") : QString::fromStdString(value);
     };
-    lines << QStringLiteral("Game Path: ") + or_none(paths.game);
-    lines << QStringLiteral("Config Folder: ") + or_none(paths.config_folder);
-    lines << QStringLiteral("Local Mods Path: ") + or_none(paths.local);
-    lines << QStringLiteral("Workshop Mods Path: ") + or_none(paths.workshop);
+    lines << QStringLiteral("Game Path: ") + orNone(paths.game);
+    lines << QStringLiteral("Config Folder: ") + orNone(paths.config_folder);
+    lines << QStringLiteral("Local Mods Path: ") + orNone(paths.local);
+    lines << QStringLiteral("Workshop Mods Path: ") + orNone(paths.workshop);
     lines << QString();
 
     lines << QStringLiteral("=== Mod Collection ===");
-    lines << QStringLiteral("Total Mods: %1").arg(source.all_mods.size());
-    lines << QStringLiteral("Active Mods: %1").arg(source.active_uuids.size());
+    lines << QStringLiteral("Total Mods: %1").arg(source.allMods.size());
+    lines << QStringLiteral("Active Mods: %1").arg(source.activeUuids.size());
     lines << QString();
 
     lines << QStringLiteral("=== Active Mods (Load Order) ===");
-    if (source.active_uuids.isEmpty()) {
+    if (source.activeUuids.isEmpty()) {
         lines << QStringLiteral("  <no active mods>");
     }
-    for (qsizetype i = 0; i < source.active_uuids.size(); ++i) {
-        const QString& uuid = source.active_uuids[i];
-        QString mod_name = QStringLiteral("Unknown Mod");
+    for (qsizetype i = 0; i < source.activeUuids.size(); ++i) {
+        const QString& uuid = source.activeUuids[i];
+        QString modName = QStringLiteral("Unknown Mod");
         QString pid = uuid;
-        if (const auto found = source.all_mods.constFind(uuid); found != source.all_mods.cend()) {
-            mod_name = (*found)->name;
+        if (const auto found = source.allMods.constFind(uuid); found != source.allMods.cend()) {
+            modName = (*found)->name;
             const auto* about = dynamic_cast<const AboutXmlMod*>(found->get());
-            pid = about ? about->package_id.str() : QStringLiteral("Unknown");
+            pid = about ? about->packageId.str() : QStringLiteral("Unknown");
         }
         lines << QStringLiteral("%1. %2 (%3)")
-                     .arg(QString::number(i + 1).rightJustified(3), mod_name, pid);
+                     .arg(QString::number(i + 1).rightJustified(3), modName, pid);
     }
     lines << QString();
 
     lines << QStringLiteral("=== Application Log ===");
-    lines << read_log_tail(log_path, max_log_bytes);
+    lines << readLogTail(logPath, maxLogBytes);
 
-    return redact(lines.join(QLatin1Char('\n')), home_dir, username);
+    return redact(lines.join(QLatin1Char('\n')), homeDir, username);
 }
 
 PasteUploader::PasteUploader(QNetworkAccessManager& network, QString endpoint,
                              std::chrono::milliseconds timeout)
-    : network_(network), endpoint_(std::move(endpoint)), timeout_(timeout) {}
+    : m_network(network), m_endpoint(std::move(endpoint)), m_timeout(timeout) {}
 
 QCoro::Task<Result<QString>> PasteUploader::upload(QString text) {
     if (text.trimmed().isEmpty()) {
         co_return std::unexpected(Error{QStringLiteral("Report text is empty")});
     }
 
-    QNetworkRequest request{QUrl(endpoint_)};
+    QNetworkRequest request{QUrl(m_endpoint)};
     request.setRawHeader("User-Agent", (QStringLiteral("PxModRim/") + appVersion()).toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader,
                       QStringLiteral("text/plain; charset=utf-8"));
-    request.setTransferTimeout(static_cast<int>(timeout_.count()));
+    request.setTransferTimeout(static_cast<int>(m_timeout.count()));
 
-    QNetworkReply* reply = network_.post(request, text.toUtf8());
-    const auto release_reply = qScopeGuard([reply] { reply->deleteLater(); });
+    QNetworkReply* reply = m_network.post(request, text.toUtf8());
+    const auto releaseReply = qScopeGuard([reply] { reply->deleteLater(); });
     co_await qCoro(reply).waitForFinished();
 
     if (reply->error() == QNetworkReply::TimeoutError) {
         co_return std::unexpected(Error{QStringLiteral("Upload failed: request timed out after %1s")
-                                            .arg(QString::number(timeout_.count() / 1000.0))});
+                                            .arg(QString::number(m_timeout.count() / 1000.0))});
     }
     // No HTTP status means the request never got a response.
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -360,7 +360,7 @@ QCoro::Task<Result<QString>> PasteUploader::upload(QString text) {
         !body.startsWith(QLatin1StringView("https://"))) {
         co_return std::unexpected(Error{
             QStringLiteral("Upload failed: server did not return a valid URL: %1")
-                .arg(py_repr(body.left(MAX_ECHOED_BODY)))});
+                .arg(pyRepr(body.left(kMaxEchoedBody)))});
     }
     co_return body;
 }

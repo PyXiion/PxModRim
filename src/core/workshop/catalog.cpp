@@ -20,7 +20,7 @@ namespace {
 constexpr qsizetype kCacheLimit = 200;
 constexpr qsizetype kDiskLimit = 300;
 
-QStringList to_qstrings(const std::vector<std::string>& values) {
+QStringList toQstrings(const std::vector<std::string>& values) {
     QStringList out;
     out.reserve(static_cast<qsizetype>(values.size()));
     for (const std::string& value : values) {
@@ -29,7 +29,7 @@ QStringList to_qstrings(const std::vector<std::string>& values) {
     return out;
 }
 
-const std::string& title_of(const CatalogEntry& entry) {
+const std::string& titleOf(const CatalogEntry& entry) {
     return std::visit([](const auto& item) -> const std::string& { return item.title; }, entry);
 }
 
@@ -37,8 +37,8 @@ const std::string& title_of(const CatalogEntry& entry) {
 
 namespace detail {
 
-Result<void> write_cached(const QString& directory, const QString& path, const std::string& text) {
-    if (auto saved = write_file_atomically(path, text); !saved) {
+Result<void> writeCached(const QString& directory, const QString& path, const std::string& text) {
+    if (auto saved = writeFileAtomically(path, text); !saved) {
         return saved;
     }
     QFileInfoList files = QDir(directory).entryInfoList({QStringLiteral("*.json")}, QDir::Files);
@@ -53,119 +53,119 @@ Result<void> write_cached(const QString& directory, const QString& path, const s
 
 WorkshopCatalog::WorkshopCatalog()
     : Plugin(QStringLiteral("workshop_catalog"), {QStringLiteral("downloads")}),
-      settings_(nullptr, QStringLiteral("workshop_catalog")),
-      base_url_(normalize_base_url(QString::fromStdString(settings_.value().url))), favourites_(nullptr) {
-    settings_.changed.connect([this](const CatalogSettings& value) { change_url(QString::fromStdString(value.url)); });
+      m_settings(nullptr, QStringLiteral("workshop_catalog")),
+      m_baseUrl(normalizeBaseUrl(QString::fromStdString(m_settings.value().url))), m_favourites(nullptr) {
+    m_settings.changed.connect([this](const CatalogSettings& value) { changeUrl(QString::fromStdString(value.url)); });
 }
 
 void WorkshopCatalog::setup(CoreContext& ctx) {
-    context_ = &ctx;
-    installed_mods_ = [&ctx] { return ctx.allMods().values(); };
+    m_context = &ctx;
+    m_installedMods = [&ctx] { return ctx.allMods().values(); };
     if (ctx.hasConfigService()) {
-        settings_ = PluginConfig<CatalogSettings>(&ctx.configService(), QStringLiteral("workshop_catalog"),
+        m_settings = PluginConfig<CatalogSettings>(&ctx.configService(), QStringLiteral("workshop_catalog"),
             {{QStringLiteral("workshop_catalog_url"), QStringLiteral("url")}});
-        settings_.changed.connect([this](const CatalogSettings& value) { change_url(QString::fromStdString(value.url)); });
-        change_url(QString::fromStdString(settings_.value().url));
-        cache_dir_ = ctx.configService().directory() + QStringLiteral("/workshop-cache");
-        favourites_ = FavouriteCollections(&ctx.configService());
+        m_settings.changed.connect([this](const CatalogSettings& value) { changeUrl(QString::fromStdString(value.url)); });
+        changeUrl(QString::fromStdString(m_settings.value().url));
+        m_cacheDir = ctx.configService().directory() + QStringLiteral("/workshop-cache");
+        m_favourites = FavouriteCollections(&ctx.configService());
     }
-    bind_downloads(ctx.downloads());
-    mods_changed_id_ = ctx.modService().mods_changed.connect([this](const std::monostate&) { invalidate_installed(); });
-    config_changed_id_ = ctx.configChanged().connect([this](const AppConfig&) { invalidate_installed(); });
+    bindDownloads(ctx.downloads());
+    m_modsChangedId = ctx.modService().modsChanged.connect([this](const std::monostate&) { invalidateInstalled(); });
+    m_configChangedId = ctx.configChanged().connect([this](const AppConfig&) { invalidateInstalled(); });
 }
 
 WorkshopCatalog::WorkshopCatalog(ConfigService* config, DownloadManager& downloads,
-                                 InstalledModsProvider installed_mods)
+                                 InstalledModsProvider installedMods)
     : Plugin(QStringLiteral("workshop_catalog"), {QStringLiteral("downloads")}),
-      settings_(config, QStringLiteral("workshop_catalog"),
+      m_settings(config, QStringLiteral("workshop_catalog"),
                 {{QStringLiteral("workshop_catalog_url"), QStringLiteral("url")}}),
-      base_url_(normalize_base_url(QString::fromStdString(settings_.value().url))),
-      favourites_(config),
-      downloads_(&downloads),
-      installed_mods_(std::move(installed_mods)) {
+      m_baseUrl(normalizeBaseUrl(QString::fromStdString(m_settings.value().url))),
+      m_favourites(config),
+      m_downloads(&downloads),
+      m_installedMods(std::move(installedMods)) {
     if (config) {
-        cache_dir_ = config->directory() + QStringLiteral("/workshop-cache");
+        m_cacheDir = config->directory() + QStringLiteral("/workshop-cache");
     }
-    settings_.changed.connect(
-        [this](const CatalogSettings& settings) { change_url(QString::fromStdString(settings.url)); });
-    bind_downloads(downloads);
+    m_settings.changed.connect(
+        [this](const CatalogSettings& settings) { changeUrl(QString::fromStdString(settings.url)); });
+    bindDownloads(downloads);
 }
 
-void WorkshopCatalog::bind_downloads(DownloadManager& downloads) {
-    downloads_ = &downloads;
-    download_finished_id_ = downloads_->download_finished.connect([this](const DownloadResult&) { invalidate_installed(); });
-    busy_changed_id_ = downloads_->busy_changed.connect([this](bool busy) { on_busy_changed(busy); });
+void WorkshopCatalog::bindDownloads(DownloadManager& downloads) {
+    m_downloads = &downloads;
+    m_downloadFinishedId = m_downloads->downloadFinished.connect([this](const DownloadResult&) { invalidateInstalled(); });
+    m_busyChangedId = m_downloads->busyChanged.connect([this](bool busy) { onBusyChanged(busy); });
 }
 
-void WorkshopCatalog::disconnect_events() {
-    if (downloads_) {
-        downloads_->download_finished.disconnect(download_finished_id_);
-        downloads_->busy_changed.disconnect(busy_changed_id_);
-        download_finished_id_ = 0;
-        busy_changed_id_ = 0;
+void WorkshopCatalog::disconnectEvents() {
+    if (m_downloads) {
+        m_downloads->downloadFinished.disconnect(m_downloadFinishedId);
+        m_downloads->busyChanged.disconnect(m_busyChangedId);
+        m_downloadFinishedId = 0;
+        m_busyChangedId = 0;
     }
-    if (context_) {
-        context_->modService().mods_changed.disconnect(mods_changed_id_);
-        context_->configChanged().disconnect(config_changed_id_);
-        context_ = nullptr;
+    if (m_context) {
+        m_context->modService().modsChanged.disconnect(m_modsChangedId);
+        m_context->configChanged().disconnect(m_configChangedId);
+        m_context = nullptr;
     }
 }
 
 WorkshopCatalog::~WorkshopCatalog() {
-    disconnect_events();
+    disconnectEvents();
     // Destroying the queue's coroutine must not leave the downloads holding its handle.
-    idle_waiters_.clear();
-    runner_.reset();
+    m_idleWaiters.clear();
+    m_runner.reset();
 }
 
 QCoro::Task<void> WorkshopCatalog::shutdown() {
-    disconnect_events();
-    cancel_queue();
-    idle_waiters_.clear();
-    runner_.reset();
-    draining_ = false;
-    for (const auto& client : clients_) {
+    disconnectEvents();
+    cancelQueue();
+    m_idleWaiters.clear();
+    m_runner.reset();
+    m_draining = false;
+    for (const auto& client : m_clients) {
         client->shutdown();
     }
     co_return;
 }
 
-void WorkshopCatalog::set_base_url(const QString& url) {
-    settings_.update(CatalogSettings{.url = normalize_base_url(url).toStdString()});
+void WorkshopCatalog::setBaseUrl(const QString& url) {
+    m_settings.update(CatalogSettings{.url = normalizeBaseUrl(url).toStdString()});
 }
 
-void WorkshopCatalog::change_url(const QString& url) {
-    const QString normalized = normalize_base_url(url);
-    if (normalized == base_url_) {
+void WorkshopCatalog::changeUrl(const QString& url) {
+    const QString normalized = normalizeBaseUrl(url);
+    if (normalized == m_baseUrl) {
         return;
     }
-    base_url_ = normalized;
-    client_ = nullptr;
-    catalog_url_changed.notify(base_url_);
+    m_baseUrl = normalized;
+    m_client = nullptr;
+    catalogUrlChanged.notify(m_baseUrl);
 }
 
 CatalogClient& WorkshopCatalog::client() {
-    if (!client_) {
-        clients_.push_back(std::make_unique<CatalogClient>(base_url_));
-        client_ = clients_.back().get();
+    if (!m_client) {
+        m_clients.push_back(std::make_unique<CatalogClient>(m_baseUrl));
+        m_client = m_clients.back().get();
     }
-    return *client_;
+    return *m_client;
 }
 
-QString WorkshopCatalog::cache_file(const QString& key) const {
+QString WorkshopCatalog::cacheFile(const QString& key) const {
     const QByteArray digest = QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256).toHex();
-    return *cache_dir_ + QLatin1Char('/') + QString::fromLatin1(digest.left(32)) + QStringLiteral(".json");
+    return *m_cacheDir + QLatin1Char('/') + QString::fromLatin1(digest.left(32)) + QStringLiteral(".json");
 }
 
-void WorkshopCatalog::remember(const QString& key, std::any value, bool move_to_end) {
-    if (move_to_end || !responses_.contains(key)) {
-        response_order_.removeAll(key);
-        response_order_.append(key);
+void WorkshopCatalog::remember(const QString& key, std::any value, bool moveToEnd) {
+    if (moveToEnd || !m_responses.contains(key)) {
+        m_responseOrder.removeAll(key);
+        m_responseOrder.append(key);
     }
-    responses_.insert(key, std::move(value));
-    while (response_order_.size() > kCacheLimit) {
-        responses_.remove(response_order_.first());
-        response_order_.removeFirst();
+    m_responses.insert(key, std::move(value));
+    while (m_responseOrder.size() > kCacheLimit) {
+        m_responses.remove(m_responseOrder.first());
+        m_responseOrder.removeFirst();
     }
 }
 
@@ -190,58 +190,58 @@ QCoro::Task<CatalogResult<std::optional<CollectionDetail>>> WorkshopCatalog::col
 }
 
 const WorkshopCatalog::InstalledIndex& WorkshopCatalog::installed() {
-    if (!installed_index_) {
+    if (!m_installedIndex) {
         InstalledIndex index;
-        for (const ListedModPtr& mod : installed_mods_()) {
-            if (auto id = mod->published_file_id()) {
+        for (const ListedModPtr& mod : m_installedMods()) {
+            if (auto id = mod->publishedFileId()) {
                 index[*id].append(mod);
             }
         }
-        installed_index_ = std::move(index);
+        m_installedIndex = std::move(index);
     }
-    return *installed_index_;
+    return *m_installedIndex;
 }
 
-InstallState WorkshopCatalog::install_state_of(const CatalogMod& mod, const InstalledIndex& index) const {
+InstallState WorkshopCatalog::installStateOf(const CatalogMod& mod, const InstalledIndex& index) const {
     const QList<ListedModPtr> local = index.value(QString::fromStdString(mod.id));
     if (local.isEmpty()) {
-        return InstallState::missing;
+        return InstallState::kMissing;
     }
     // Only copies downloaded through the manager have a sync time; a copy without one is never outdated.
-    std::optional<double> newest_sync;
+    std::optional<double> newestSync;
     for (const ListedModPtr& item : local) {
-        if (auto synced = downloads_->last_synced(*item)) {
-            newest_sync = newest_sync ? std::max(*newest_sync, *synced) : *synced;
+        if (auto synced = m_downloads->lastSynced(*item)) {
+            newestSync = newestSync ? std::max(*newestSync, *synced) : *synced;
         }
     }
-    if (newest_sync && mod.updated_at && *newest_sync < static_cast<double>(*mod.updated_at)) {
-        return InstallState::outdated;
+    if (newestSync && mod.updated_at && *newestSync < static_cast<double>(*mod.updated_at)) {
+        return InstallState::kOutdated;
     }
-    return InstallState::installed;
+    return InstallState::kInstalled;
 }
 
-InstallState WorkshopCatalog::install_state(const CatalogMod& mod) {
-    return install_state_of(mod, installed());
+InstallState WorkshopCatalog::installState(const CatalogMod& mod) {
+    return installStateOf(mod, installed());
 }
 
-void WorkshopCatalog::invalidate_installed() {
-    installed_index_.reset();
-    installed_changed.notify(std::monostate{});
+void WorkshopCatalog::invalidateInstalled() {
+    m_installedIndex.reset();
+    installedChanged.notify(std::monostate{});
 }
 
-QCoro::Task<CatalogResult<std::vector<CatalogMod>>> WorkshopCatalog::installed_with_updates() {
+QCoro::Task<CatalogResult<std::vector<CatalogMod>>> WorkshopCatalog::installedWithUpdates() {
     QStringList ids = installed().keys();
     // The index is a hash, so sort the ids to request them in a stable order.
     ids.sort();
-    auto batch = co_await client().mods_batch(std::move(ids));
+    auto batch = co_await client().modsBatch(std::move(ids));
     if (!batch) {
         co_return std::unexpected(batch.error());
     }
     co_return std::move(batch->items);
 }
 
-QCoro::Task<CatalogResult<DownloadPlan>> WorkshopCatalog::plan(QStringList mod_ids, QStringList collection_ids) {
-    auto resolved = co_await client().resolve(std::move(mod_ids), std::move(collection_ids));
+QCoro::Task<CatalogResult<DownloadPlan>> WorkshopCatalog::plan(QStringList modIds, QStringList collectionIds) {
+    auto resolved = co_await client().resolve(std::move(modIds), std::move(collectionIds));
     if (!resolved) {
         co_return std::unexpected(resolved.error());
     }
@@ -255,84 +255,84 @@ QCoro::Task<CatalogResult<DownloadPlan>> WorkshopCatalog::plan(QStringList mod_i
                 QStringLiteral("The Workshop catalog returned an invalid download plan."), std::nullopt});
         }
         const QString qid = QString::fromStdString(id);
-        if (install_state_of(*mod, index) == InstallState::installed) {
+        if (installStateOf(*mod, index) == InstallState::kInstalled) {
             result.already_current.append(qid);
         } else {
             result.to_download.append(qid);
         }
     }
     for (const auto& [id, entry] : resolved->items) {
-        result.titles.insert(QString::fromStdString(id), QString::fromStdString(title_of(entry)));
+        result.titles.insert(QString::fromStdString(id), QString::fromStdString(titleOf(entry)));
     }
-    result.unavailable_ids = to_qstrings(resolved->unavailable_ids);
-    result.incomplete_collection_ids = to_qstrings(resolved->incomplete_collection_ids);
+    result.unavailable_ids = toQstrings(resolved->unavailable_ids);
+    result.incomplete_collection_ids = toQstrings(resolved->incomplete_collection_ids);
     result.is_complete = resolved->is_complete;
     co_return result;
 }
 
-QCoro::Task<Result<DownloadResult>> WorkshopCatalog::download(DownloadPlan download_plan) {
-    co_return co_await downloads_->download_mods(std::move(download_plan.to_download));
+QCoro::Task<Result<DownloadResult>> WorkshopCatalog::download(DownloadPlan downloadPlan) {
+    co_return co_await m_downloads->downloadMods(std::move(downloadPlan.to_download));
 }
 
-void WorkshopCatalog::enqueue(const DownloadPlan& download_plan) {
-    const QSet<QString> active = downloads_->active_ids();
+void WorkshopCatalog::enqueue(const DownloadPlan& downloadPlan) {
+    const QSet<QString> active = m_downloads->activeIds();
     QStringList ids;
-    for (const QString& id : download_plan.to_download) {
-        if (!queued_.contains(id) && !active.contains(id)) {
+    for (const QString& id : downloadPlan.to_download) {
+        if (!m_queued.contains(id) && !active.contains(id)) {
             ids.append(id);
         }
     }
     if (ids.isEmpty()) {
         return;
     }
-    queue_.append(ids);
-    queued_.unite(QSet<QString>(ids.begin(), ids.end()));
-    queue_changed.notify(std::monostate{});
-    if (!draining_) {
-        draining_ = true;
-        runner_.emplace(drain());
+    m_queue.append(ids);
+    m_queued.unite(QSet<QString>(ids.begin(), ids.end()));
+    queueChanged.notify(std::monostate{});
+    if (!m_draining) {
+        m_draining = true;
+        m_runner.emplace(drain());
     }
 }
 
-void WorkshopCatalog::cancel_queue() {
-    queue_.clear();
-    queued_.clear();
-    queue_changed.notify(std::monostate{});
+void WorkshopCatalog::cancelQueue() {
+    m_queue.clear();
+    m_queued.clear();
+    queueChanged.notify(std::monostate{});
 }
 
 QCoro::Task<void> WorkshopCatalog::drain() {
-    while (!queue_.isEmpty()) {
-        const QStringList ids = queue_.takeFirst();
+    while (!m_queue.isEmpty()) {
+        const QStringList ids = m_queue.takeFirst();
         // A batch that waited for the running download stops the queue if that download was cancelled.
-        const bool waited = downloads_->is_downloading();
-        while (downloads_->is_downloading()) {
+        const bool waited = m_downloads->isDownloading();
+        while (m_downloads->isDownloading()) {
             co_await IdleWait{*this};
         }
-        if (waited && downloads_->cancelled()) {
-            cancel_queue();
+        if (waited && m_downloads->cancelled()) {
+            cancelQueue();
             break;
         }
 
-        auto result = co_await downloads_->download_mods(ids);
+        auto result = co_await m_downloads->downloadMods(ids);
         if (!result) {
             spdlog::warn("[workshop] queued download failed: {}", result.error().message.toStdString());
         }
-        queued_.subtract(QSet<QString>(ids.begin(), ids.end()));
-        queue_changed.notify(std::monostate{});
-        if (downloads_->cancelled()) {
-            cancel_queue();
+        m_queued.subtract(QSet<QString>(ids.begin(), ids.end()));
+        queueChanged.notify(std::monostate{});
+        if (m_downloads->cancelled()) {
+            cancelQueue();
             break;
         }
     }
-    draining_ = false;
+    m_draining = false;
 }
 
-void WorkshopCatalog::on_busy_changed(bool busy) {
+void WorkshopCatalog::onBusyChanged(bool busy) {
     if (busy) {
         return;
     }
-    auto waiters = std::move(idle_waiters_);
-    idle_waiters_.clear();
+    auto waiters = std::move(m_idleWaiters);
+    m_idleWaiters.clear();
     for (std::coroutine_handle<> waiter : waiters) {
         waiter.resume();
     }

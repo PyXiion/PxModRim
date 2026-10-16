@@ -25,7 +25,7 @@ public:
     ProgressDialog(LoadingState& loading, QWidget* parent);
     ~ProgressDialog() override;
 
-    LoadingState& loading() const noexcept { return loading_; }
+    LoadingState& loading() const noexcept { return m_loading; }
 
 private:
     void onChanged(int pct);
@@ -35,16 +35,16 @@ private:
     void fadeTo(qreal end, int durationMs);
     void onFadeFinished();
 
-    LoadingState& loading_;
-    bool shown_ = false;
+    LoadingState& m_loading;
+    bool m_shown = false;
 
-    QWidget* crumbs_ = nullptr;
-    QHBoxLayout* crumbs_layout_ = nullptr;
-    QProgressBar* progress_ = nullptr;
-    QTimer* hide_timer_ = nullptr;
-    QPropertyAnimation* fade_ = nullptr;
+    QWidget* m_crumbs = nullptr;
+    QHBoxLayout* m_crumbsLayout = nullptr;
+    QProgressBar* m_progress = nullptr;
+    QTimer* m_hideTimer = nullptr;
+    QPropertyAnimation* m_fade = nullptr;
 
-    std::vector<QMetaObject::Connection> connections_;
+    std::vector<QMetaObject::Connection> m_connections;
 };
 
 }  // namespace px::modrim

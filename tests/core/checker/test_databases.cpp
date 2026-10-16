@@ -20,7 +20,7 @@ using namespace px::modrim::checker;
 
 namespace {
 
-std::string gzip_compress(std::string_view data) {
+std::string gzipCompress(std::string_view data) {
     z_stream stream{};
     deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 16 + MAX_WBITS, 8, Z_DEFAULT_STRATEGY);
     stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
@@ -39,7 +39,7 @@ std::string gzip_compress(std::string_view data) {
     return out;
 }
 
-void write_file(const QString& path, std::string_view content) {
+void writeFile(const QString& path, std::string_view content) {
     QFile file(path);
     REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
     file.write(content.data(), static_cast<qint64>(content.size()));
@@ -53,14 +53,14 @@ TEST_CASE("NoVersionWarningService load_if_exists on missing file returns empty"
     QNetworkAccessManager network;
     NoVersionWarningService service(config, network);
 
-    CHECK(!service.cache_age_s().has_value());
-    CHECK(service.load_if_exists().isEmpty());
+    CHECK(!service.cacheAgeS().has_value());
+    CHECK(service.loadIfExists().isEmpty());
 }
 
 TEST_CASE("NoVersionWarningService parses ModIdsToFix.xml") {
     QTemporaryDir dir;
-    const QString xml_path = QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
-    write_file(xml_path,
+    const QString xmlPath = QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
+    writeFile(xmlPath,
                "<ModIdsToFix>"
                "  <li>brrainz.harmony</li>"
                "  <li>unlimitedhugs.hugslib</li>"
@@ -70,10 +70,10 @@ TEST_CASE("NoVersionWarningService parses ModIdsToFix.xml") {
     QNetworkAccessManager network;
     NoVersionWarningService service(config, network);
 
-    CHECK(service.cache_age_s().has_value());
-    CHECK(*service.cache_age_s() >= 0.0);
+    CHECK(service.cacheAgeS().has_value());
+    CHECK(*service.cacheAgeS() >= 0.0);
 
-    const auto pids = service.load_if_exists();
+    const auto pids = service.loadIfExists();
     CHECK(pids.size() == 2);
     CHECK(pids.contains(PackageId(QStringLiteral("brrainz.harmony"))));
     CHECK(pids.contains(PackageId(QStringLiteral("unlimitedhugs.hugslib"))));
@@ -81,28 +81,28 @@ TEST_CASE("NoVersionWarningService parses ModIdsToFix.xml") {
 
 TEST_CASE("NoVersionWarningService parses single-item li") {
     QTemporaryDir dir;
-    const QString xml_path = QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
-    write_file(xml_path, "<ModIdsToFix><li>lone.mod</li></ModIdsToFix>");
+    const QString xmlPath = QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
+    writeFile(xmlPath, "<ModIdsToFix><li>lone.mod</li></ModIdsToFix>");
 
     ConfigService config(dir.path());
     QNetworkAccessManager network;
     NoVersionWarningService service(config, network);
 
-    const auto pids = service.load_if_exists();
+    const auto pids = service.loadIfExists();
     CHECK(pids.size() == 1);
     CHECK(pids.contains(PackageId(QStringLiteral("lone.mod"))));
 }
 
 TEST_CASE("NoVersionWarningService handles malformed XML gracefully") {
     QTemporaryDir dir;
-    const QString xml_path = QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
-    write_file(xml_path, "not xml at all");
+    const QString xmlPath = QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
+    writeFile(xmlPath, "not xml at all");
 
     ConfigService config(dir.path());
     QNetworkAccessManager network;
     NoVersionWarningService service(config, network);
 
-    CHECK(service.load_if_exists().isEmpty());
+    CHECK(service.loadIfExists().isEmpty());
 }
 
 TEST_CASE("UseThisInsteadService load_if_exists on missing file returns empty") {
@@ -111,13 +111,13 @@ TEST_CASE("UseThisInsteadService load_if_exists on missing file returns empty") 
     QNetworkAccessManager network;
     UseThisInsteadService service(config, network);
 
-    CHECK(!service.cache_age_s().has_value());
-    CHECK(service.load_if_exists().isEmpty());
+    CHECK(!service.cacheAgeS().has_value());
+    CHECK(service.loadIfExists().isEmpty());
 }
 
 TEST_CASE("UseThisInsteadService parses gzipped replacements JSON") {
     QTemporaryDir dir;
-    const QString gz_path = QDir(dir.path()).filePath(QStringLiteral("replacements.json.gz"));
+    const QString gzPath = QDir(dir.path()).filePath(QStringLiteral("replacements.json.gz"));
     const std::string json = R"({
       "rules": [
         {
@@ -130,14 +130,14 @@ TEST_CASE("UseThisInsteadService parses gzipped replacements JSON") {
         }
       ]
     })";
-    write_file(gz_path, gzip_compress(json));
+    writeFile(gzPath, gzipCompress(json));
 
     ConfigService config(dir.path());
     QNetworkAccessManager network;
     UseThisInsteadService service(config, network);
 
-    CHECK(service.cache_age_s().has_value());
-    const auto entries = service.load_if_exists();
+    CHECK(service.cacheAgeS().has_value());
+    const auto entries = service.loadIfExists();
     REQUIRE(entries.size() == 1);
     REQUIRE(entries.contains(QStringLiteral("123456")));
 
@@ -152,12 +152,12 @@ TEST_CASE("UseThisInsteadService parses gzipped replacements JSON") {
 
 TEST_CASE("UseThisInsteadService handles corrupt gzip gracefully") {
     QTemporaryDir dir;
-    const QString gz_path = QDir(dir.path()).filePath(QStringLiteral("replacements.json.gz"));
-    write_file(gz_path, "not gzip data");
+    const QString gzPath = QDir(dir.path()).filePath(QStringLiteral("replacements.json.gz"));
+    writeFile(gzPath, "not gzip data");
 
     ConfigService config(dir.path());
     QNetworkAccessManager network;
     UseThisInsteadService service(config, network);
 
-    CHECK(service.load_if_exists().isEmpty());
+    CHECK(service.loadIfExists().isEmpty());
 }

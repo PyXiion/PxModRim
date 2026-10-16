@@ -28,22 +28,22 @@ public:
     // nullopt when no config folder is set or no report can be read.
     QCoro::Task<Result<std::optional<StartupImpactReport>>> load();
 
-    QCoro::Task<Result<std::optional<StartupImpactReport>>> get_latest_report();
-    QCoro::Task<Result<double>> estimated_impact_for(QString package_id);
+    QCoro::Task<Result<std::optional<StartupImpactReport>>> getLatestReport();
+    QCoro::Task<Result<double>> estimatedImpactFor(QString packageId);
     // Base-game average plus the on-thread and off-thread averages of each active mod.
-    QCoro::Task<Result<double>> estimated_total(QStringList active_pids);
-    QCoro::Task<Result<QHash<QString, double>>> get_all_averages();
-    QCoro::Task<Result<double>> base_game_average();
-    QCoro::Task<Result<LatestWithAverages>> snapshot(QStringList active_pids,
-                                                     std::optional<QString> selected_pid = {});
+    QCoro::Task<Result<double>> estimatedTotal(QStringList activePids);
+    QCoro::Task<Result<QHash<QString, double>>> getAllAverages();
+    QCoro::Task<Result<double>> baseGameAverage();
+    QCoro::Task<Result<LatestWithAverages>> snapshot(QStringList activePids,
+                                                     std::optional<QString> selectedPid = {});
     QCoro::Task<Result<void>> clear();
 
-    QCoro::Task<void> close_connection();
-    void close_connection_sync();
+    QCoro::Task<void> closeConnection();
+    void closeConnectionSync();
 
 private:
-    CoreContext& ctx_;
-    StartupImpactDb db_;
+    CoreContext& m_ctx;
+    StartupImpactDb m_db;
 };
 
 }  // namespace px::modrim::startup_impact

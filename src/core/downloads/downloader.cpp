@@ -8,18 +8,18 @@ namespace px::modrim {
 
 Downloader::Downloader(QString name, QString label, DownloadManager& manager)
     : Plugin(std::move(name), QStringList{kDownloadsManagerName}),
-      label_(std::move(label)),
-      manager_(manager) {}
+      m_label(std::move(label)),
+      m_manager(manager) {}
 
-const QString& Downloader::label() const noexcept { return label_; }
+const QString& Downloader::label() const noexcept { return m_label; }
 
-void Downloader::setup(CoreContext&) { manager_.register_downloader(*this); }
+void Downloader::setup(CoreContext&) { m_manager.registerDownloader(*this); }
 
-QStringList Downloader::updatable_ids(const QList<ListedModPtr>& mods) const {
+QStringList Downloader::updatableIds(const QList<ListedModPtr>& mods) const {
     QStringList ids;
     QSet<QString> seen;
     for (const auto& mod : mods) {
-        auto id = updatable_id(*mod);
+        auto id = updatableId(*mod);
         if (id && !seen.contains(*id)) {
             seen.insert(*id);
             ids.append(std::move(*id));

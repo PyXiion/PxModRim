@@ -18,32 +18,32 @@ public:
     // Pops its frame on destruction.
     class TaskScope {
     public:
-        explicit TaskScope(LoadingState& state) noexcept : state_(&state) {}
-        TaskScope(TaskScope&& other) noexcept : state_(std::exchange(other.state_, nullptr)) {}
+        explicit TaskScope(LoadingState& state) noexcept : m_state(&state) {}
+        TaskScope(TaskScope&& other) noexcept : m_state(std::exchange(other.m_state, nullptr)) {}
         TaskScope(const TaskScope&) = delete;
         TaskScope& operator=(const TaskScope&) = delete;
         TaskScope& operator=(TaskScope&&) = delete;
         ~TaskScope() {
-            if (state_) {
-                state_->pop();
+            if (m_state) {
+                m_state->pop();
             }
         }
 
     private:
-        LoadingState* state_;
+        LoadingState* m_state;
     };
 
     explicit LoadingState(QObject* parent = nullptr);
 
     QStringList statuses() const;
 
-    void push(const QString& status, int total_steps = 100);
+    void push(const QString& status, int totalSteps = 100);
     void pop();
     void step(int amount = 1);
-    void set_total(int total);
-    void set_progress(int value);
+    void setTotal(int total);
+    void setProgress(int value);
 
-    [[nodiscard]] TaskScope task(const QString& status, int total_steps = 100);
+    [[nodiscard]] TaskScope task(const QString& status, int totalSteps = 100);
 
 Q_SIGNALS:
     void changed(const QString& status, int pct, int current, int total);
@@ -52,13 +52,13 @@ Q_SIGNALS:
 private:
     struct Frame {
         QString status;
-        int current_step = 0;
-        int total_steps = 100;
+        int currentStep = 0;
+        int totalSteps = 100;
     };
 
-    void emit_changed();
+    void emitChanged();
 
-    std::vector<Frame> stack_;
+    std::vector<Frame> m_stack;
 };
 
 }  // namespace px::modrim

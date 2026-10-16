@@ -18,7 +18,7 @@ namespace px::modrim {
 // dependencies all sit in earlier levels. Names within a level are ascending,
 // so the result is deterministic. Self-dependencies and dependencies that are
 // not keys of `graph` are ignored.
-inline Result<std::vector<QStringList>> toposort_levels(
+inline Result<std::vector<QStringList>> toposortLevels(
     const std::map<QString, QSet<QString>>& graph) {
     std::map<QString, QSet<QString>> pending;
     for (const auto& [node, deps] : graph) {

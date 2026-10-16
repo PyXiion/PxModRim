@@ -24,14 +24,15 @@ inline constexpr glz::opts kWireOpts{
 };
 
 // Literal-typed wire fields are enums so that a value outside the catalog's contract fails to decode.
-enum class PreviewType { image, video };
-enum class ModSource { steam };
-enum class ModDescriptionFormat { bbcode };
-enum class ModKind { mod };
-enum class CollectionSource { steam, picked };
-enum class CollectionDescriptionFormat { bbcode, text };
-enum class CollectionKind { collection };
+enum class PreviewType { kImage, kVideo };
+enum class ModSource { kSteam };
+enum class ModDescriptionFormat { kBbcode };
+enum class ModKind { kMod };
+enum class CollectionSource { kSteam, kPicked };
+enum class CollectionDescriptionFormat { kBbcode, kText };
+enum class CollectionKind { kCollection };
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct Author {
     std::optional<std::string> id;
     std::optional<std::string> name;
@@ -39,14 +40,18 @@ struct Author {
 
     bool operator==(const Author&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct Preview {
-    PreviewType type = PreviewType::image;
+    PreviewType type = PreviewType::kImage;
     std::string url;
 
     bool operator==(const Preview&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct Votes {
     std::int64_t up = 0;
     std::int64_t down = 0;
@@ -54,14 +59,16 @@ struct Votes {
 
     bool operator==(const Votes&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct CatalogMod {
     std::string id;
-    ModSource source = ModSource::steam;
+    ModSource source = ModSource::kSteam;
     std::string title;
     Author author;
     std::string description;
-    ModDescriptionFormat description_format = ModDescriptionFormat::bbcode;
+    ModDescriptionFormat description_format = ModDescriptionFormat::kBbcode;
     std::optional<std::string> preview_url;
     std::vector<Preview> previews;
     std::string workshop_url;
@@ -76,19 +83,21 @@ struct CatalogMod {
     std::optional<std::string> package_id;
     bool incompatible = false;
     // The wire tag: decoding a collection payload as a mod fails here.
-    ModKind kind = ModKind::mod;
+    ModKind kind = ModKind::kMod;
 
     bool operator==(const CatalogMod&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct CatalogCollection {
     std::string id;
-    CollectionSource source = CollectionSource::steam;
+    CollectionSource source = CollectionSource::kSteam;
     std::optional<std::string> steam_id;
     std::string title;
     Author author;
     std::string description;
-    CollectionDescriptionFormat description_format = CollectionDescriptionFormat::text;
+    CollectionDescriptionFormat description_format = CollectionDescriptionFormat::kText;
     std::optional<std::string> preview_url;
     std::vector<Preview> previews;
     std::optional<std::string> workshop_url;
@@ -102,14 +111,16 @@ struct CatalogCollection {
     std::optional<std::string> total_size;
     bool no_common_version = false;
     // The wire tag: decoding a mod payload as a collection fails here.
-    CollectionKind kind = CollectionKind::collection;
+    CollectionKind kind = CollectionKind::kCollection;
 
     bool operator==(const CatalogCollection&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
 // A mod or a collection, told apart by the wire `kind` tag.
 using CatalogEntry = std::variant<CatalogMod, CatalogCollection>;
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 template <class T>
 struct CatalogPage {
     std::vector<T> items;
@@ -118,7 +129,9 @@ struct CatalogPage {
 
     bool operator==(const CatalogPage&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct CollectionDetail {
     CatalogCollection collection;
     std::vector<CatalogEntry> members;
@@ -127,14 +140,18 @@ struct CollectionDetail {
 
     bool operator==(const CollectionDetail&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct Discover {
     CatalogPage<CatalogMod> mods;
     CatalogPage<CatalogCollection> collections;
 
     bool operator==(const Discover&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct ResolvedDownload {
     std::vector<std::string> roots;
     std::map<std::string, CatalogEntry> items;
@@ -145,7 +162,9 @@ struct ResolvedDownload {
 
     bool operator==(const ResolvedDownload&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct CatalogQuery {
     QString query;
     std::optional<QString> tag;
@@ -155,10 +174,12 @@ struct CatalogQuery {
     std::optional<QString> cursor;
     QString source = QStringLiteral("all");
 };
+// NOLINTEND(readability-identifier-naming)
 
-enum class InstallState { missing, installed, outdated };
+enum class InstallState { kMissing, kInstalled, kOutdated };
 
 // What a download would fetch, in dependency order. Built on the client side, so it uses Qt types.
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct DownloadPlan {
     QStringList to_download{};
     QStringList already_current{};
@@ -167,57 +188,64 @@ struct DownloadPlan {
     QHash<QString, QString> titles{};
     bool is_complete = false;
 };
+// NOLINTEND(readability-identifier-naming)
 
 // Failure of a catalog request. `status` is the HTTP status when the server answered, empty when the
 // request never got a response (disabled catalog, unreachable host, undecodable payload).
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct CatalogError {
     QString message;
     std::optional<int> status;
 };
+// NOLINTEND(readability-identifier-naming)
 
 template <class T>
 using CatalogResult = std::expected<T, CatalogError>;
 
 }  // namespace px::modrim::workshop
 
+// The JSON strings are part of the catalog API, so they are spelled out instead of derived from
+// the enumerator names.
+// NOLINTBEGIN(readability-identifier-naming): glaze looks the member up by this exact name
 template <>
 struct glz::meta<px::modrim::workshop::PreviewType> {
     using enum px::modrim::workshop::PreviewType;
-    static constexpr auto value = glz::enumerate(image, video);
+    static constexpr auto value = glz::enumerate("image", kImage, "video", kVideo);
 };
 
 template <>
 struct glz::meta<px::modrim::workshop::ModSource> {
     using enum px::modrim::workshop::ModSource;
-    static constexpr auto value = glz::enumerate(steam);
+    static constexpr auto value = glz::enumerate("steam", kSteam);
 };
 
 template <>
 struct glz::meta<px::modrim::workshop::ModDescriptionFormat> {
     using enum px::modrim::workshop::ModDescriptionFormat;
-    static constexpr auto value = glz::enumerate(bbcode);
+    static constexpr auto value = glz::enumerate("bbcode", kBbcode);
 };
 
 template <>
 struct glz::meta<px::modrim::workshop::ModKind> {
     using enum px::modrim::workshop::ModKind;
-    static constexpr auto value = glz::enumerate(mod);
+    static constexpr auto value = glz::enumerate("mod", kMod);
 };
 
 template <>
 struct glz::meta<px::modrim::workshop::CollectionSource> {
     using enum px::modrim::workshop::CollectionSource;
-    static constexpr auto value = glz::enumerate(steam, picked);
+    static constexpr auto value = glz::enumerate("steam", kSteam, "picked", kPicked);
 };
 
 template <>
 struct glz::meta<px::modrim::workshop::CollectionDescriptionFormat> {
     using enum px::modrim::workshop::CollectionDescriptionFormat;
-    static constexpr auto value = glz::enumerate(bbcode, text);
+    static constexpr auto value = glz::enumerate("bbcode", kBbcode, "text", kText);
 };
 
 template <>
 struct glz::meta<px::modrim::workshop::CollectionKind> {
     using enum px::modrim::workshop::CollectionKind;
-    static constexpr auto value = glz::enumerate(collection);
+    static constexpr auto value = glz::enumerate("collection", kCollection);
 };
+// NOLINTEND(readability-identifier-naming)

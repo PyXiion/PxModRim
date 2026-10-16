@@ -34,10 +34,10 @@ public:
     // `network` is not owned and must outlive the service.
     DiagnosticsService(CoreContext& ctx, QNetworkAccessManager& network);
 
-    Event<QHash<QString, view::ModDiagnosticsView>> diagnostics_summary_changed;
-    Event<QString> status_message_changed;
-    Event<QString> background_task_changed;
-    Event<QList<view::SidebarEntry>> sidebar_entries_changed;
+    Event<QHash<QString, view::ModDiagnosticsView>> diagnosticsSummaryChanged;
+    Event<QString> statusMessageChanged;
+    Event<QString> backgroundTaskChanged;
+    Event<QList<view::SidebarEntry>> sidebarEntriesChanged;
 
     // ── Lifecycle ─────────────────────────────────────────────
 
@@ -49,55 +49,55 @@ public:
 
     // Rebuilds the checker for the context's active mods, or for `active_uuids`.
     void rebuild(Profiler* timer = nullptr);
-    void rebuild(const QStringList& active_uuids, Profiler* timer = nullptr);
+    void rebuild(const QStringList& activeUuids, Profiler* timer = nullptr);
 
     // Notifies the checker of a new active mod order.
-    void reorder(const QStringList& active_uuids);
+    void reorder(const QStringList& activeUuids);
 
     // ── Queries ───────────────────────────────────────────────
 
-    QHash<checker::PackageId, checker::AboutXmlModPtr> active_mods_by_pid() const;
-    const checker::ConstraintGraph& constraint_graph() const;
-    QList<checker::PackageId> active_ordered_pids() const;
-    const sort::CommunityRules& community_rules() const;
+    QHash<checker::PackageId, checker::AboutXmlModPtr> activeModsByPid() const;
+    const checker::ConstraintGraph& constraintGraph() const;
+    QList<checker::PackageId> activeOrderedPids() const;
+    const sort::CommunityRules& communityRules() const;
 
     // Views of every issue on a mod; empty when the mod is not active.
-    QList<view::ModIssueView> issues_for(const QString& uuid) const;
-    std::optional<view::ModDiagnosticsView> summary_for(const QString& uuid) const;
-    int active_error_count() const;
+    QList<view::ModIssueView> issuesFor(const QString& uuid) const;
+    std::optional<view::ModDiagnosticsView> summaryFor(const QString& uuid) const;
+    int activeErrorCount() const;
 
 private:
     // Partitions that do not depend on diagnostics; reused until the mod list changes.
     struct SidebarBase {
         QHash<QString, ListedModPtr> mods;
-        QSet<QString> all_uuids;
+        QSet<QString> allUuids;
         QSet<QString> invalid;
-        QMap<QString, QSet<QString>> by_provider;
+        QMap<QString, QSet<QString>> byProvider;
 
         explicit SidebarBase(const QHash<QString, ListedModPtr>& current);
         bool matches(const QHash<QString, ListedModPtr>& current) const;
     };
 
-    QCoro::Task<void> ensure_databases();
-    QCoro::Task<void> download_databases(bool nvw, bool uti);
+    QCoro::Task<void> ensureDatabases();
+    QCoro::Task<void> downloadDatabases(bool nvw, bool uti);
     // The community rules file to load, or nullopt when rules are disabled or no file exists.
-    std::optional<QString> community_rules_path() const;
+    std::optional<QString> communityRulesPath() const;
 
-    static QList<view::ModIssueView> to_issue_views(const checker::ModDiagnostics& diag);
-    static view::ModDiagnosticsView to_view(const checker::ModDiagnostics& diag);
+    static QList<view::ModIssueView> toIssueViews(const checker::ModDiagnostics& diag);
+    static view::ModDiagnosticsView toView(const checker::ModDiagnostics& diag);
 
-    void on_checker_diagnostics_changed(const checker::DiagnosticsByUuid& diagnostics);
-    QString format_status() const;
-    QList<view::SidebarEntry> build_sidebar_entries();
+    void onCheckerDiagnosticsChanged(const checker::DiagnosticsByUuid& diagnostics);
+    QString formatStatus() const;
+    QList<view::SidebarEntry> buildSidebarEntries();
 
-    CoreContext& ctx_;
-    checker::NoVersionWarningService no_version_warning_service_;
-    checker::UseThisInsteadService use_this_instead_service_;
-    checker::ModChecker checker_;
-    std::optional<QCoro::Task<void>> db_task_;
-    QStringList last_active_uuids_;
-    QHash<QString, view::ModDiagnosticsView> last_summary_;
-    std::optional<SidebarBase> sidebar_base_;
+    CoreContext& m_ctx;
+    checker::NoVersionWarningService m_noVersionWarningService;
+    checker::UseThisInsteadService m_useThisInsteadService;
+    checker::ModChecker m_checker;
+    std::optional<QCoro::Task<void>> m_dbTask;
+    QStringList m_lastActiveUuids;
+    QHash<QString, view::ModDiagnosticsView> m_lastSummary;
+    std::optional<SidebarBase> m_sidebarBase;
 };
 
 }  // namespace px::modrim

@@ -12,80 +12,80 @@ namespace px::modrim::startup_impact {
 
 namespace {
 
-const QHash<QString, Phase>& exact_phases() {
+const QHash<QString, Phase>& exactPhases() {
     static const QHash<QString, Phase> phases{
-        {QStringLiteral("GlobalTextureAtlasManagerBakeStaticAtlases"), Phase::Content},
-        {QStringLiteral("ModConstructor"), Phase::ModConstructors},
-        {QStringLiteral("StaticConstructorOnStartupUtilityCallAll"), Phase::StaticConstructors},
-        {QStringLiteral("ExecuteToExecuteWhenFinished"), Phase::Deferred},
-        {QStringLiteral("LoadDefs"), Phase::Defs},
-        {QStringLiteral("LoadModXml"), Phase::Defs},
-        {QStringLiteral("CombineXml"), Phase::Defs},
-        {QStringLiteral("LoadedModManagerParseAndProcessXML"), Phase::Defs},
-        {QStringLiteral("RegisterXmlInheritance"), Phase::Defs},
-        {QStringLiteral("ResolveXmlInheritance"), Phase::Defs},
-        {QStringLiteral("ClearCachedXmlInheritance"), Phase::Defs},
-        {QStringLiteral("DefDatabaseAddAllInMods"), Phase::Defs},
-        {QStringLiteral("ResolveReferences"), Phase::Defs},
-        {QStringLiteral("ErrorCheckAllDefs"), Phase::Defs},
-        {QStringLiteral("ShortHashGiverGiveAllShortHashes"), Phase::Defs},
+        {QStringLiteral("GlobalTextureAtlasManagerBakeStaticAtlases"), Phase::kContent},
+        {QStringLiteral("ModConstructor"), Phase::kModConstructors},
+        {QStringLiteral("StaticConstructorOnStartupUtilityCallAll"), Phase::kStaticConstructors},
+        {QStringLiteral("ExecuteToExecuteWhenFinished"), Phase::kDeferred},
+        {QStringLiteral("LoadDefs"), Phase::kDefs},
+        {QStringLiteral("LoadModXml"), Phase::kDefs},
+        {QStringLiteral("CombineXml"), Phase::kDefs},
+        {QStringLiteral("LoadedModManagerParseAndProcessXML"), Phase::kDefs},
+        {QStringLiteral("RegisterXmlInheritance"), Phase::kDefs},
+        {QStringLiteral("ResolveXmlInheritance"), Phase::kDefs},
+        {QStringLiteral("ClearCachedXmlInheritance"), Phase::kDefs},
+        {QStringLiteral("DefDatabaseAddAllInMods"), Phase::kDefs},
+        {QStringLiteral("ResolveReferences"), Phase::kDefs},
+        {QStringLiteral("ErrorCheckAllDefs"), Phase::kDefs},
+        {QStringLiteral("ShortHashGiverGiveAllShortHashes"), Phase::kDefs},
     };
     return phases;
 }
 
 // Checked in order after the exact names; the first matching prefix wins.
 constexpr std::array<std::pair<QLatin1StringView, Phase>, 4> kPrefixPhases{{
-    {QLatin1StringView{"ModContentPackReloadContentInt"}, Phase::Content},
-    {QLatin1StringView{"ResolveAllWantedCrossReferences"}, Phase::Defs},
-    {QLatin1StringView{"DefGeneratorGenerateImpliedDefs"}, Phase::Defs},
-    {QLatin1StringView{"DefOfHelperRebindAllDefOfs"}, Phase::Defs},
+    {QLatin1StringView{"ModContentPackReloadContentInt"}, Phase::kContent},
+    {QLatin1StringView{"ResolveAllWantedCrossReferences"}, Phase::kDefs},
+    {QLatin1StringView{"DefGeneratorGenerateImpliedDefs"}, Phase::kDefs},
+    {QLatin1StringView{"DefOfHelperRebindAllDefOfs"}, Phase::kDefs},
 }};
 
 }  // namespace
 
-QString phase_label(Phase phase) {
+QString phaseLabel(Phase phase) {
     switch (phase) {
-        case Phase::Content:
+        case Phase::kContent:
             return QStringLiteral("Textures & audio");
-        case Phase::ModConstructors:
+        case Phase::kModConstructors:
             return QStringLiteral("Mod constructors");
-        case Phase::StaticConstructors:
+        case Phase::kStaticConstructors:
             return QStringLiteral("Static constructors");
-        case Phase::Patches:
+        case Phase::kPatches:
             return QStringLiteral("Patches");
-        case Phase::Defs:
+        case Phase::kDefs:
             return QStringLiteral("Defs & XML");
-        case Phase::Deferred:
+        case Phase::kDeferred:
             return QStringLiteral("Deferred init");
-        case Phase::Other:
+        case Phase::kOther:
             return QStringLiteral("Other");
     }
     return QString();
 }
 
-Phase metric_phase(const QString& key) {
-    const QString stripped = strip_metric_prefix(key);
+Phase metricPhase(const QString& key) {
+    const QString stripped = stripMetricPrefix(key);
     const qsizetype bar = stripped.indexOf(u'|');
     const QString name = bar < 0 ? stripped : stripped.left(bar);
 
-    if (const auto found = exact_phases().constFind(name); found != exact_phases().cend()) {
+    if (const auto found = exactPhases().constFind(name); found != exactPhases().cend()) {
         return *found;
     }
     if (name.endsWith(QLatin1StringView{"Patches"})) {
-        return Phase::Patches;
+        return Phase::kPatches;
     }
     for (const auto& [prefix, phase] : kPrefixPhases) {
         if (name.startsWith(prefix)) {
             return phase;
         }
     }
-    return Phase::Other;
+    return Phase::kOther;
 }
 
-PhaseTotals phase_totals(const QMap<QString, double>& metrics) {
+PhaseTotals phaseTotals(const QMap<QString, double>& metrics) {
     PhaseTotals totals{};
     for (auto it = metrics.cbegin(); it != metrics.cend(); ++it) {
-        totals[phase_index(metric_phase(it.key()))] += it.value();
+        totals[phaseIndex(metricPhase(it.key()))] += it.value();
     }
     return totals;
 }

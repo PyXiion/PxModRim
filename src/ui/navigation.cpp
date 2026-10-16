@@ -5,7 +5,7 @@
 
 namespace px::modrim {
 
-QString Route::url() const { return buildRoute(view_id, path); }
+QString Route::url() const { return buildRoute(viewId, path); }
 
 QString buildRoute(const QString& viewId, const QStringList& path) {
     QString url = QStringLiteral("%1://%2").arg(QString(kRouteScheme), viewId);

@@ -115,8 +115,8 @@ public:
     QString logoFileDataUri() const;
 
 private:
-    QStringList logo_variants_;
-    QString logo_data_uri_;
+    QStringList m_logoVariants;
+    QString m_logoDataUri;
 };
 
 }  // namespace px::modrim

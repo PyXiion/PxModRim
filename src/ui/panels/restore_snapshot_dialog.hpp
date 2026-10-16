@@ -41,11 +41,11 @@ private:
 
     void populateList();
 
-    std::vector<Snapshot> snapshots_;
-    std::optional<QString> selected_;
-    QListWidget* list_ = nullptr;
-    QLabel* details_ = nullptr;
-    QPushButton* restore_ = nullptr;
+    std::vector<Snapshot> m_snapshots;
+    std::optional<QString> m_selected;
+    QListWidget* m_list = nullptr;
+    QLabel* m_details = nullptr;
+    QPushButton* m_restore = nullptr;
 };
 
 // Asks before the current mod list is replaced by a snapshot.

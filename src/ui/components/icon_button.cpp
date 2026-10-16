@@ -22,7 +22,7 @@ QIcon requireIcon(QStringView name, int size, QStringView color) {
 
 IconButton::IconButton(const QString& iconName, const QString& tooltip, bool primary, int size,
                        QWidget* parent)
-    : QPushButton(parent), icon_name_(iconName), icon_px_(std::max(16, size / 2)) {
+    : QPushButton(parent), m_iconName(iconName), m_iconPx(std::max(16, size / 2)) {
     setIconColor(paletteValue(u"TEXT_MUTED"));
     setFixedSize(size, size);
     setObjectName(QStringLiteral("iconBtn"));
@@ -40,7 +40,7 @@ IconButton::IconButton(const QString& iconName, const QString& tooltip, bool pri
 }
 
 void IconButton::setIconColor(const QString& color) {
-    setIcon(requireIcon(icon_name_, icon_px_, color));
+    setIcon(requireIcon(m_iconName, m_iconPx, color));
 }
 
 }  // namespace px::modrim

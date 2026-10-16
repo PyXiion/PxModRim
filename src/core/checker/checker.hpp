@@ -30,75 +30,75 @@ class ModChecker {
 public:
     ModChecker(std::vector<std::unique_ptr<ModIssueChecker>> checkers,
                sort::SortSettings settings,
-               QString target_version = QStringLiteral("1.5"),
-               DiagnosticsCallback on_diagnostics_changed = {});
+               QString targetVersion = QStringLiteral("1.5"),
+               DiagnosticsCallback onDiagnosticsChanged = {});
 
     // ── Database config ───────────────────────────────────────
 
-    void set_no_version_warning(QSet<PackageId> pids);
-    void set_use_this_instead(QHash<QString, ReplacementInfo> db);
-    void set_community_rules(sort::CommunityRules rules);
+    void setNoVersionWarning(QSet<PackageId> pids);
+    void setUseThisInstead(QHash<QString, ReplacementInfo> db);
+    void setCommunityRules(sort::CommunityRules rules);
 
     // ── Rebuild ───────────────────────────────────────────────
 
     // Re-scans all mods and regenerates diagnostics from scratch.
     void rebuild(const QHash<QString, ListedModPtr>& mods,
-                 const QStringList& ordered_uuids,
+                 const QStringList& orderedUuids,
                  Profiler* timer = nullptr);
 
     // ── Incremental updates ───────────────────────────────────
 
     // Rebuilds constraints and diagnostics after toggling `mod`. Non-About.xml mods only emit.
-    void toggle_mod(const ListedMod& mod, const QStringList& ordered_uuids);
+    void toggleMod(const ListedMod& mod, const QStringList& orderedUuids);
 
     // Moves a mod to a new position and rechecks it and its graph neighbours.
-    void move_mod(const QString& uuid, int old_index, int new_index);
+    void moveMod(const QString& uuid, int oldIndex, int newIndex);
 
     // Reapplies the full active-mod order and regenerates the affected diagnostics.
-    void reorder(const QStringList& ordered_uuids);
+    void reorder(const QStringList& orderedUuids);
 
     // ── Query ─────────────────────────────────────────────────
 
-    QHash<PackageId, AboutXmlModPtr> active_mods() const { return active_mods_; }
-    const ConstraintGraph& graph() const noexcept { return graph_; }
-    QList<PackageId> ordered_pids() const { return ordered_pids_; }
-    const sort::CommunityRules& community_rules() const noexcept { return community_rules_; }
+    QHash<PackageId, AboutXmlModPtr> activeMods() const { return m_activeMods; }
+    const ConstraintGraph& graph() const noexcept { return m_graph; }
+    QList<PackageId> orderedPids() const { return m_orderedPids; }
+    const sort::CommunityRules& communityRules() const noexcept { return m_communityRules; }
 
     // Null when `uuid` is not an active mod. The pointer is valid until the next mutation.
-    const ModDiagnostics* diagnostics_for(const QString& uuid) const;
-    DiagnosticsByUuid active_mod_diagnostics() const;
+    const ModDiagnostics* diagnosticsFor(const QString& uuid) const;
+    DiagnosticsByUuid activeModDiagnostics() const;
 
 private:
     using CheckerResults = QHash<PackageId, std::vector<QList<ModIssue>>>;
 
-    void collect_active(const QHash<QString, ListedModPtr>& mods, const QStringList& ordered_uuids);
-    CheckContext build_context(const QList<QList<PackageId>>& cycles) const;
-    void check_all(const CheckContext& ctx);
-    ModDiagnostics check_mod(const AboutXmlMod& mod, const CheckContext& ctx) const;
-    QList<ModIssue> run_checker(const ModIssueChecker& checker,
+    void collectActive(const QHash<QString, ListedModPtr>& mods, const QStringList& orderedUuids);
+    CheckContext buildContext(const QList<QList<PackageId>>& cycles) const;
+    void checkAll(const CheckContext& ctx);
+    ModDiagnostics checkMod(const AboutXmlMod& mod, const CheckContext& ctx) const;
+    QList<ModIssue> runChecker(const ModIssueChecker& checker,
                                 const AboutXmlMod& mod,
                                 const CheckContext& ctx) const;
-    void emit_diagnostics() const;
+    void emitDiagnostics() const;
 
-    std::vector<std::unique_ptr<ModIssueChecker>> checkers_;
-    sort::SortSettings settings_;
-    QString target_version_;
-    DiagnosticsCallback on_diagnostics_changed_;
+    std::vector<std::unique_ptr<ModIssueChecker>> m_checkers;
+    sort::SortSettings m_settings;
+    QString m_targetVersion;
+    DiagnosticsCallback m_onDiagnosticsChanged;
 
-    ConstraintGraph graph_;
-    QHash<QString, ListedModPtr> all_mods_;
-    QHash<PackageId, ModDiagnostics> diagnostics_;
-    QHash<PackageId, AboutXmlModPtr> active_mods_;
-    QHash<QString, PackageId> uuid_to_pid_;
-    QList<PackageId> ordered_pids_;
+    ConstraintGraph m_graph;
+    QHash<QString, ListedModPtr> m_allMods;
+    QHash<PackageId, ModDiagnostics> m_diagnostics;
+    QHash<PackageId, AboutXmlModPtr> m_activeMods;
+    QHash<QString, PackageId> m_uuidToPid;
+    QList<PackageId> m_orderedPids;
 
-    QSet<PackageId> no_version_warning_;
-    QHash<QString, ReplacementInfo> use_this_instead_;
-    sort::CommunityRules community_rules_;
-    QList<QList<PackageId>> cached_cycles_;
+    QSet<PackageId> m_noVersionWarning;
+    QHash<QString, ReplacementInfo> m_useThisInstead;
+    sort::CommunityRules m_communityRules;
+    QList<QList<PackageId>> m_cachedCycles;
     // Per-mod issues from each checker (checker order), reused by reorder() for
     // order-independent checkers; nullopt when stale.
-    std::optional<CheckerResults> checker_results_;
+    std::optional<CheckerResults> m_checkerResults;
 };
 
 }  // namespace px::modrim::checker

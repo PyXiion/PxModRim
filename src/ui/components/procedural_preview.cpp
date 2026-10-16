@@ -20,9 +20,9 @@ QString initials(const QString& title) {
     static const QSet<QString> stop{"a", "an", "and", "for", "of", "the", "to", "in", "on"};
     QString stripped = title;
     stripped.replace(tags, " ");
-    const bool use_stripped = words.match(stripped).hasMatch();
+    const bool useStripped = words.match(stripped).hasMatch();
     QStringList all, meaningful;
-    auto chunks = words.globalMatch(use_stripped ? stripped : title);
+    auto chunks = words.globalMatch(useStripped ? stripped : title);
     while (chunks.hasNext()) {
         const QString chunk = chunks.next().captured();
         auto parts = camel.globalMatch(chunk);
@@ -33,11 +33,11 @@ QString initials(const QString& title) {
     if (meaningful.isEmpty()) meaningful = all;
     if (meaningful.isEmpty()) return title.trimmed().isEmpty() ? QStringLiteral("?") : title.trimmed().left(2).toUpper();
     if (meaningful.size() == 1) {
-        auto tag_matches = tags.globalMatch(title);
-        QString tag_text;
-        while (tag_matches.hasNext()) tag_text += tag_matches.next().captured() + " ";
-        const auto tag_word = words.match(tag_text);
-        if (use_stripped && tag_word.hasMatch()) return (tag_word.captured().left(1) + meaningful.front().left(1)).toUpper();
+        auto tagMatches = tags.globalMatch(title);
+        QString tagText;
+        while (tagMatches.hasNext()) tagText += tagMatches.next().captured() + " ";
+        const auto tagWord = words.match(tagText);
+        if (useStripped && tagWord.hasMatch()) return (tagWord.captured().left(1) + meaningful.front().left(1)).toUpper();
         return meaningful.front().left(2).toUpper();
     }
     return (meaningful[0].left(1) + meaningful[1].left(1)).toUpper();
@@ -62,7 +62,7 @@ void blob(QPainter& painter, double x, double y, double radius, const QColor& co
     painter.drawEllipse(QPointF(x, y), radius, radius);
 }
 }
-QImage generate_preview(const QString& title, int width, int height) {
+QImage generatePreview(const QString& title, int width, int height) {
     static QMutex mutex;
     static QCache<QString, QImage> cache(16);
     const QString key = QString::number(width) + ":" + QString::number(height) + ":" + title;
@@ -88,7 +88,7 @@ QImage generate_preview(const QString& title, int width, int height) {
     font.setLetterSpacing(QFont::PercentageSpacing, 96);
     painter.setFont(font);
     painter.setPen(QColor(255, 255, 255, 210));
-    const int visible = std::max(height - BANNER_OVERLAY_HEIGHT, height / 2);
+    const int visible = std::max(height - kBannerOverlayHeight, height / 2);
     painter.drawText(QRectF(0, 0, width, visible), Qt::AlignCenter, initials(title));
     painter.end();
     QMutexLocker lock(&mutex);

@@ -7,50 +7,50 @@
 namespace px::modrim {
 
 ModSelectionPresenter::ModSelectionPresenter(CoreContext& ctx, ModInfoSink& sink)
-    : ctx_(ctx), sink_(sink) {}
+    : m_ctx(ctx), m_sink(sink) {}
 
 QCoro::Task<void> ModSelectionPresenter::show(QString uuid) {
-    const std::uint64_t generation = ++generation_;
+    const std::uint64_t generation = ++m_generation;
 
     if (uuid.isEmpty()) {
-        sink_.clear();
+        m_sink.clear();
         co_return;
     }
 
-    const auto& mods = ctx_.allMods();
+    const auto& mods = m_ctx.allMods();
     const auto found = mods.constFind(uuid);
     if (found == mods.cend()) {
-        sink_.clear();
+        m_sink.clear();
         co_return;
     }
 
     const ListedMod& mod = *found.value();
-    sink_.showMod(mod, ctx_.diagnosticsService().issues_for(uuid));
+    m_sink.showMod(mod, m_ctx.diagnosticsService().issuesFor(uuid));
 
     std::optional<QString> packageId;
     if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) {
-        packageId = about->package_id.str();
+        packageId = about->packageId.str();
     }
     const QStringList activePackageIds = resolveActivePackageIds();
 
-    if (generation != generation_) {
+    if (generation != m_generation) {
         co_return;
     }
-    co_await sink_.setTimeAnalytics(packageId, activePackageIds);
+    co_await m_sink.setTimeAnalytics(packageId, activePackageIds);
 }
 
 void ModSelectionPresenter::clear() {
-    ++generation_;
-    sink_.clear();
+    ++m_generation;
+    m_sink.clear();
 }
 
 QStringList ModSelectionPresenter::resolveActivePackageIds() const {
-    const QSet<QString> active(ctx_.activeUuids().cbegin(), ctx_.activeUuids().cend());
+    const QSet<QString> active(m_ctx.activeUuids().cbegin(), m_ctx.activeUuids().cend());
     QStringList packageIds;
-    for (const ListedModPtr& mod : ctx_.allMods()) {
+    for (const ListedModPtr& mod : m_ctx.allMods()) {
         const auto* about = dynamic_cast<const AboutXmlMod*>(mod.get());
         if (about && active.contains(about->uuid())) {
-            packageIds.append(about->package_id.str());
+            packageIds.append(about->packageId.str());
         }
     }
     return packageIds;

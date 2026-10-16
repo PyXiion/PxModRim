@@ -17,7 +17,7 @@ using px::modrim::AboutXmlMod;
 using px::modrim::CaseInsensitiveSet;
 using px::modrim::CaseInsensitiveStr;
 using px::modrim::checker::ConstraintGraph;
-using px::modrim::checker::topological_sort;
+using px::modrim::checker::topologicalSort;
 using px::modrim::sort::PackageId;
 using px::modrim::sort::SortSettings;
 using px::modrim::sort::Tier;
@@ -32,60 +32,60 @@ PackageId pid(const QString& value) {
     return PackageId(value);
 }
 
-ModPtr make_mod(const QString& package_id) {
+ModPtr makeMod(const QString& packageId) {
     auto mod = std::make_shared<AboutXmlMod>();
-    mod->package_id = CaseInsensitiveStr(package_id);
-    mod->name = package_id;
+    mod->packageId = CaseInsensitiveStr(packageId);
+    mod->name = packageId;
     return mod;
 }
 
-ModMap active_dict(std::initializer_list<ModPtr> mods) {
+ModMap activeDict(std::initializer_list<ModPtr> mods) {
     ModMap result;
     for (const auto& mod : mods) {
-        result.insert(mod->package_id, mod);
+        result.insert(mod->packageId, mod);
     }
     return result;
 }
 
 // Community rules are off and alternative ids are ignored, so only the tier config and explicit
 // load-order rules shape the result.
-QList<PackageId> sort_mods(const ModMap& mods, const TierConfig& tier_config = TierConfig::defaults()) {
+QList<PackageId> sortMods(const ModMap& mods, const TierConfig& tierConfig = TierConfig::defaults()) {
     SortSettings settings;
     settings.use_community_rules = false;
     settings.use_alternative_package_ids = false;
-    settings.tier_config = tier_config;
+    settings.tier_config = tierConfig;
 
     ConstraintGraph graph;
     graph.build(mods, mods.keys(), settings);
-    return topological_sort(mods, graph, settings);
+    return topologicalSort(mods, graph, settings);
 }
 
 // Checks only the entries of `result` that belong to `expected`, in their order.
-void assert_order(const QList<PackageId>& result, const QStringList& expected) {
-    QStringList in_tier;
+void assertOrder(const QList<PackageId>& result, const QStringList& expected) {
+    QStringList inTier;
     for (const auto& entry : result) {
         if (expected.contains(entry.str())) {
-            in_tier.append(entry.str());
+            inTier.append(entry.str());
         }
     }
-    CHECK(in_tier == expected);
+    CHECK(inTier == expected);
 }
 
 }  // namespace
 
 TEST_CASE("tier 0 mods follow the config order") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("brrainz.harmony")),
-        make_mod(QStringLiteral("zetrith.prepatcher")),
-        make_mod(QStringLiteral("ludeon.rimworld")),
-        make_mod(QStringLiteral("ludeon.rimworld.royalty")),
-        make_mod(QStringLiteral("ludeon.rimworld.ideology")),
-        make_mod(QStringLiteral("ludeon.rimworld.biotech")),
-        make_mod(QStringLiteral("ludeon.rimworld.anomaly")),
-        make_mod(QStringLiteral("ludeon.rimworld.odyssey")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("brrainz.harmony")),
+        makeMod(QStringLiteral("zetrith.prepatcher")),
+        makeMod(QStringLiteral("ludeon.rimworld")),
+        makeMod(QStringLiteral("ludeon.rimworld.royalty")),
+        makeMod(QStringLiteral("ludeon.rimworld.ideology")),
+        makeMod(QStringLiteral("ludeon.rimworld.biotech")),
+        makeMod(QStringLiteral("ludeon.rimworld.anomaly")),
+        makeMod(QStringLiteral("ludeon.rimworld.odyssey")),
     });
 
-    assert_order(sort_mods(mods),
+    assertOrder(sortMods(mods),
                  {QStringLiteral("zetrith.prepatcher"), QStringLiteral("brrainz.harmony"),
                   QStringLiteral("ludeon.rimworld"), QStringLiteral("ludeon.rimworld.royalty"),
                   QStringLiteral("ludeon.rimworld.ideology"), QStringLiteral("ludeon.rimworld.biotech"),
@@ -93,79 +93,79 @@ TEST_CASE("tier 0 mods follow the config order") {
 }
 
 TEST_CASE("tier 0 partial active set keeps config order") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("ludeon.rimworld.biotech")),
-        make_mod(QStringLiteral("zetrith.prepatcher")),
-        make_mod(QStringLiteral("ludeon.rimworld.royalty")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("ludeon.rimworld.biotech")),
+        makeMod(QStringLiteral("zetrith.prepatcher")),
+        makeMod(QStringLiteral("ludeon.rimworld.royalty")),
     });
 
-    assert_order(sort_mods(mods),
+    assertOrder(sortMods(mods),
                  {QStringLiteral("zetrith.prepatcher"), QStringLiteral("ludeon.rimworld.royalty"),
                   QStringLiteral("ludeon.rimworld.biotech")});
 }
 
 TEST_CASE("tier 0 load-after rule orders mods within the tier") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("brrainz.harmony")),
-        make_mod(QStringLiteral("zetrith.prepatcher")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("brrainz.harmony")),
+        makeMod(QStringLiteral("zetrith.prepatcher")),
     });
-    mods.value(pid(QStringLiteral("brrainz.harmony")))->about_rules.load_after =
+    mods.value(pid(QStringLiteral("brrainz.harmony")))->aboutRules.loadAfter =
         CaseInsensitiveSet(QStringList{QStringLiteral("zetrith.prepatcher")});
 
-    assert_order(sort_mods(mods), {QStringLiteral("zetrith.prepatcher"), QStringLiteral("brrainz.harmony")});
+    assertOrder(sortMods(mods), {QStringLiteral("zetrith.prepatcher"), QStringLiteral("brrainz.harmony")});
 }
 
 TEST_CASE("tier 1 mods follow the config order") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("unlimitedhugs.hugslib")),
-        make_mod(QStringLiteral("adaptive.storage.framework")),
-        make_mod(QStringLiteral("aoba.framework")),
-        make_mod(QStringLiteral("smashphil.vehicleframework")),
-        make_mod(QStringLiteral("vanillaexpanded.backgrounds")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("unlimitedhugs.hugslib")),
+        makeMod(QStringLiteral("adaptive.storage.framework")),
+        makeMod(QStringLiteral("aoba.framework")),
+        makeMod(QStringLiteral("smashphil.vehicleframework")),
+        makeMod(QStringLiteral("vanillaexpanded.backgrounds")),
     });
 
-    assert_order(sort_mods(mods),
+    assertOrder(sortMods(mods),
                  {QStringLiteral("adaptive.storage.framework"), QStringLiteral("aoba.framework"),
                   QStringLiteral("smashphil.vehicleframework"), QStringLiteral("unlimitedhugs.hugslib"),
                   QStringLiteral("vanillaexpanded.backgrounds")});
 }
 
 TEST_CASE("tier 1 partial active set keeps config order") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("smashphil.vehicleframework")),
-        make_mod(QStringLiteral("adaptive.storage.framework")),
-        make_mod(QStringLiteral("vanillaexpanded.backgrounds")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("smashphil.vehicleframework")),
+        makeMod(QStringLiteral("adaptive.storage.framework")),
+        makeMod(QStringLiteral("vanillaexpanded.backgrounds")),
     });
 
-    assert_order(sort_mods(mods),
+    assertOrder(sortMods(mods),
                  {QStringLiteral("adaptive.storage.framework"), QStringLiteral("smashphil.vehicleframework"),
                   QStringLiteral("vanillaexpanded.backgrounds")});
 }
 
 TEST_CASE("tier 1 load-after rule orders mods within the tier") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("aoba.exosuit.framework")),
-        make_mod(QStringLiteral("aoba.framework")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("aoba.exosuit.framework")),
+        makeMod(QStringLiteral("aoba.framework")),
     });
-    mods.value(pid(QStringLiteral("aoba.exosuit.framework")))->about_rules.load_after =
+    mods.value(pid(QStringLiteral("aoba.exosuit.framework")))->aboutRules.loadAfter =
         CaseInsensitiveSet(QStringList{QStringLiteral("aoba.framework")});
 
-    assert_order(sort_mods(mods), {QStringLiteral("aoba.framework"), QStringLiteral("aoba.exosuit.framework")});
+    assertOrder(sortMods(mods), {QStringLiteral("aoba.framework"), QStringLiteral("aoba.exosuit.framework")});
 }
 
 TEST_CASE("tiers are ordered: 0 before 1 before 2 before 3") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("some.two.mod")),
-        make_mod(QStringLiteral("brrainz.harmony")),
-        make_mod(QStringLiteral("adaptive.storage.framework")),
-        make_mod(QStringLiteral("some.three.mod")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("some.two.mod")),
+        makeMod(QStringLiteral("brrainz.harmony")),
+        makeMod(QStringLiteral("adaptive.storage.framework")),
+        makeMod(QStringLiteral("some.three.mod")),
     });
-    TierConfig tier_config;
-    tier_config.tier_0 = {pid(QStringLiteral("brrainz.harmony"))};
-    tier_config.tier_1 = {pid(QStringLiteral("adaptive.storage.framework"))};
-    tier_config.tier_3 = {pid(QStringLiteral("some.three.mod"))};
+    TierConfig tierConfig;
+    tierConfig.tier_0 = {pid(QStringLiteral("brrainz.harmony"))};
+    tierConfig.tier_1 = {pid(QStringLiteral("adaptive.storage.framework"))};
+    tierConfig.tier_3 = {pid(QStringLiteral("some.three.mod"))};
 
-    const auto result = sort_mods(mods, tier_config);
+    const auto result = sortMods(mods, tierConfig);
 
     CHECK(result.indexOf(pid(QStringLiteral("brrainz.harmony"))) <
           result.indexOf(pid(QStringLiteral("adaptive.storage.framework"))));
@@ -176,15 +176,15 @@ TEST_CASE("tiers are ordered: 0 before 1 before 2 before 3") {
 }
 
 TEST_CASE("mods outside every configured tier come after configured mods") {
-    const auto mods = active_dict({
-        make_mod(QStringLiteral("unknown.first")),
-        make_mod(QStringLiteral("zetrith.prepatcher")),
-        make_mod(QStringLiteral("unknown.second")),
-        make_mod(QStringLiteral("brrainz.harmony")),
+    const auto mods = activeDict({
+        makeMod(QStringLiteral("unknown.first")),
+        makeMod(QStringLiteral("zetrith.prepatcher")),
+        makeMod(QStringLiteral("unknown.second")),
+        makeMod(QStringLiteral("brrainz.harmony")),
     });
-    TierConfig tier_config;
-    tier_config.tier_0 = {pid(QStringLiteral("zetrith.prepatcher")), pid(QStringLiteral("brrainz.harmony"))};
+    TierConfig tierConfig;
+    tierConfig.tier_0 = {pid(QStringLiteral("zetrith.prepatcher")), pid(QStringLiteral("brrainz.harmony"))};
 
-    assert_order(sort_mods(mods, tier_config),
+    assertOrder(sortMods(mods, tierConfig),
                  {QStringLiteral("zetrith.prepatcher"), QStringLiteral("brrainz.harmony")});
 }

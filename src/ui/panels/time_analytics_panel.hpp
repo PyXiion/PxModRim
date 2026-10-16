@@ -15,9 +15,9 @@ public:
     QCoro::Task<void> setData(std::optional<QString> pid, QStringList activePids);
     void clear();
 private:
-    startup_impact::StartupImpactService* service_;
-    QQuickWidget* qml_;
-    quint64 requestToken_ = 0;
+    startup_impact::StartupImpactService* m_service;
+    QQuickWidget* m_qml;
+    quint64 m_requestToken = 0;
 };
 class StartupImpactDialog : public QDialog {
     Q_OBJECT

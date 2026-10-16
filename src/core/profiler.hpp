@@ -31,10 +31,10 @@ public:
         Scope& operator=(Scope&&) = delete;
 
     private:
-        Profiler& owner_;
-        Node* node_;
-        Node* parent_;
-        std::chrono::steady_clock::time_point start_;
+        Profiler& m_owner;
+        Node* m_node;
+        Node* m_parent;
+        std::chrono::steady_clock::time_point m_start;
     };
 
     Profiler() = default;
@@ -48,8 +48,8 @@ public:
     [[nodiscard]] QString render() const;
 
 private:
-    Node root_{QStringLiteral("<root>")};
-    Node* current_ = &root_;
+    Node m_root{QStringLiteral("<root>")};
+    Node* m_current = &m_root;
 };
 
 // Logs the hierarchical report of a block at debug level when it ends.
@@ -60,11 +60,11 @@ public:
     ProfileSession(const ProfileSession&) = delete;
     ProfileSession& operator=(const ProfileSession&) = delete;
 
-    [[nodiscard]] Profiler& timer() { return timer_; }
+    [[nodiscard]] Profiler& timer() { return m_timer; }
 
 private:
-    Profiler timer_;
-    std::unique_ptr<Profiler::Scope> scope_;
+    Profiler m_timer;
+    std::unique_ptr<Profiler::Scope> m_scope;
 };
 
 }  // namespace px::modrim

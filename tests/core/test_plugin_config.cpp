@@ -14,30 +14,32 @@
 namespace {
 
 using namespace px::modrim;
-using test_support::read_bytes;
-using test_support::write_bytes;
+using test_support::readBytes;
+using test_support::writeBytes;
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct DemoSettings {
     bool show_badges = false;
     int level = 0;
 
     bool operator==(const DemoSettings&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
 }  // namespace
 
 TEST_CASE("plugin config seeds from legacy config.json keys and persists changes") {
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
-    REQUIRE(write_bytes(dir.filePath(QStringLiteral("config.json")), R"({"old_badges":true,"paths":{}})"));
-    const QString settings_path = dir.filePath(QStringLiteral("plugins/demo.json"));
+    REQUIRE(writeBytes(dir.filePath(QStringLiteral("config.json")), R"({"old_badges":true,"paths":{}})"));
+    const QString settingsPath = dir.filePath(QStringLiteral("plugins/demo.json"));
 
     ConfigService service(dir.path());
     PluginConfig<DemoSettings> settings(&service, QStringLiteral("demo"),
                                         QHash<QString, QString>{{QStringLiteral("old_badges"),
                                                                  QStringLiteral("show_badges")}});
     REQUIRE(settings.value().show_badges);
-    REQUIRE(QFileInfo::exists(settings_path));
+    REQUIRE(QFileInfo::exists(settingsPath));
 
     int emitted = 0;
     DemoSettings last;

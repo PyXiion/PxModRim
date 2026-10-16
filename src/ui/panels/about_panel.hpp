@@ -17,8 +17,8 @@ public:
 
 private:
     QCoro::Task<void> uploadReport();
-    CoreContext& ctx_;
-    Notifier& toast_;
-    QPushButton* upload_;
+    CoreContext& m_ctx;
+    Notifier& m_toast;
+    QPushButton* m_upload;
 };
 }  // namespace px::modrim

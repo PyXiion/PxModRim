@@ -15,7 +15,7 @@ namespace {
 QList<StandardRule> exact(const QString& folder, std::initializer_list<const char*> ids) {
     QList<StandardRule> rules;
     for (const char* id : ids) {
-        rules.append({folder, RuleField::PackageId, RuleOp::Equals, QString::fromLatin1(id)});
+        rules.append({folder, RuleField::kPackageId, RuleOp::kEquals, QString::fromLatin1(id)});
     }
     return rules;
 }
@@ -23,12 +23,12 @@ QList<StandardRule> exact(const QString& folder, std::initializer_list<const cha
 QList<StandardRule> prefixes(const QString& folder, std::initializer_list<const char*> prefixes) {
     QList<StandardRule> rules;
     for (const char* prefix : prefixes) {
-        rules.append({folder, RuleField::PackageId, RuleOp::Prefix, QString::fromLatin1(prefix)});
+        rules.append({folder, RuleField::kPackageId, RuleOp::kPrefix, QString::fromLatin1(prefix)});
     }
     return rules;
 }
 
-QList<StandardRule> build_standard_rules() {
+QList<StandardRule> buildStandardRules() {
     QList<StandardRule> rules;
     const auto append = [&rules](const QList<StandardRule>& more) { rules.append(more); };
     const auto add = [&rules](StandardRule rule) { rules.append(std::move(rule)); };
@@ -68,18 +68,18 @@ QList<StandardRule> build_standard_rules() {
         "vanillaquestsexpanded.",
         "vanillastorytellersexpanded.",
     }));
-    add({"Vanilla Expanded", RuleField::Author, RuleOp::Contains, "oskar potocki"});
+    add({"Vanilla Expanded", RuleField::kAuthor, RuleOp::kContains, "oskar potocki"});
     append(prefixes("Alpha Mods", {"sarg."}));
     append(prefixes("Combat Extended", {"ceteam."}));
-    add({"Combat Extended", RuleField::Name, RuleOp::Contains, "combat extended"});
+    add({"Combat Extended", RuleField::kName, RuleOp::kContains, "combat extended"});
     append(prefixes("Dubs Mods", {"dubwise."}));
     return rules;
 }
 
 }  // namespace
 
-const QList<StandardRule>& standard_rules() {
-    static const QList<StandardRule> rules = build_standard_rules();
+const QList<StandardRule>& standardRules() {
+    static const QList<StandardRule> rules = buildStandardRules();
     return rules;
 }
 

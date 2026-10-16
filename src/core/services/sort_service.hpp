@@ -21,26 +21,26 @@ public:
 
     // Orders the active mods by tier, dependencies and load-order rules. Resolves to their uuids
     // in that order.
-    QCoro::Task<QStringList> sort_active_mods();
+    QCoro::Task<QStringList> sortActiveMods();
 
     // Uuids of inactive mods that the active mods need and that are not already covered.
-    QStringList resolve_missing_dependencies(const QSet<QString>& active_uuids) const;
+    QStringList resolveMissingDependencies(const QSet<QString>& activeUuids) const;
 
     // Maps topologically sorted package ids back to the uuids of the active mods that declare them.
     // Only the active uuid of a package id is considered, so an inactive duplicate never stands in
     // for an active mod.
-    static QStringList order_uuids(const QList<sort::PackageId>& sorted_pids,
-                                   const QHash<QString, ListedModPtr>& all_mods,
-                                   const QStringList& active_uuids);
+    static QStringList orderUuids(const QList<sort::PackageId>& sortedPids,
+                                   const QHash<QString, ListedModPtr>& allMods,
+                                   const QStringList& activeUuids);
 
     // Uuids of inactive mods that satisfy a dependency of an active mod which no active mod (or
     // alternative package id) already covers. Duplicates are removed, keeping first occurrence.
-    static QStringList missing_dependency_uuids(const QHash<QString, ListedModPtr>& all_mods,
-                                                const QSet<QString>& active_uuids);
+    static QStringList missingDependencyUuids(const QHash<QString, ListedModPtr>& allMods,
+                                                const QSet<QString>& activeUuids);
 
 private:
-    CoreContext& ctx_;
-    DiagnosticsService& diagnostics_;
+    CoreContext& m_ctx;
+    DiagnosticsService& m_diagnostics;
 };
 
 }  // namespace px::modrim

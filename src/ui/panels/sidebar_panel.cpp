@@ -4,30 +4,30 @@
 #include <QQuickItem>
 namespace px::modrim {
 SidebarPanel::SidebarPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent)
-    : FilterSidebar(engine, nullptr, parent), ctx_(ctx), model_(new SidebarModel(this)) {
-    if (rootObject()) rootObject()->setProperty("model", QVariant::fromValue(model_));
-    connect(this, &FilterSidebar::activated, this, &SidebarPanel::on_activated);
-    sidebar_connection_ = ctx_.diagnosticsService().sidebar_entries_changed.connect([this](const auto& entries) { set_entries(entries); });
+    : FilterSidebar(engine, nullptr, parent), m_ctx(ctx), m_model(new SidebarModel(this)) {
+    if (rootObject()) rootObject()->setProperty("model", QVariant::fromValue(m_model));
+    connect(this, &FilterSidebar::activated, this, &SidebarPanel::onActivated);
+    m_sidebarConnection = m_ctx.diagnosticsService().sidebarEntriesChanged.connect([this](const auto& entries) { setEntries(entries); });
 }
-SidebarPanel::~SidebarPanel() { ctx_.diagnosticsService().sidebar_entries_changed.disconnect(sidebar_connection_); }
-void SidebarPanel::set_entries(const QList<view::SidebarEntry>& entries) {
-    const bool reset = entries.size() != entries_.size();
-    entries_ = entries;
-    model_->update_entries(entries);
-    if (reset) if (const auto current = current_entry()) emit entry_selected(*current);
+SidebarPanel::~SidebarPanel() { m_ctx.diagnosticsService().sidebarEntriesChanged.disconnect(m_sidebarConnection); }
+void SidebarPanel::setEntries(const QList<view::SidebarEntry>& entries) {
+    const bool reset = entries.size() != m_entries.size();
+    m_entries = entries;
+    m_model->updateEntries(entries);
+    if (reset) if (const auto current = currentEntry()) emit entrySelected(*current);
 }
-std::optional<view::SidebarEntry> SidebarPanel::current_entry() const {
-    const int selected = current_index();
-    if (selected >= 0 && selected < entries_.size()) return entries_[selected];
+std::optional<view::SidebarEntry> SidebarPanel::currentEntry() const {
+    const int selected = currentIndex();
+    if (selected >= 0 && selected < m_entries.size()) return m_entries[selected];
     return std::nullopt;
 }
-void SidebarPanel::select_all_entry() {
+void SidebarPanel::selectAllEntry() {
     auto* root = rootObject();
     auto* view = root ? root->findChild<QObject*>(QStringLiteral("listView")) : nullptr;
     if (!view) return;
-    for (int row = 0; row < entries_.size(); ++row) if (entries_[row].kind == view::SidebarEntry::Kind::All) {
-        view->setProperty("currentIndex", row); on_activated(row); return;
+    for (int row = 0; row < m_entries.size(); ++row) if (m_entries[row].kind == view::SidebarEntry::Kind::kAll) {
+        view->setProperty("currentIndex", row); onActivated(row); return;
     }
 }
-void SidebarPanel::on_activated(int row) { if (row >= 0 && row < entries_.size()) emit entry_selected(entries_[row]); }
+void SidebarPanel::onActivated(int row) { if (row >= 0 && row < m_entries.size()) emit entrySelected(m_entries[row]); }
 }

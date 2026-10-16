@@ -22,10 +22,10 @@ using namespace px::modrim::checker;
 
 namespace {
 
-std::shared_ptr<AboutXmlMod> make_mod(const QString& package_id, const QString& name = {}) {
+std::shared_ptr<AboutXmlMod> makeMod(const QString& packageId, const QString& name = {}) {
     auto m = std::make_shared<AboutXmlMod>();
-    m->package_id = CaseInsensitiveStr(package_id);
-    m->name = name.isEmpty() ? package_id : name;
+    m->packageId = CaseInsensitiveStr(packageId);
+    m->name = name.isEmpty() ? packageId : name;
     return m;
 }
 
@@ -37,7 +37,7 @@ sort::SortSettings settings() {
     return s;
 }
 
-QHash<QString, ListedModPtr> as_listed(const std::vector<std::shared_ptr<AboutXmlMod>>& mods) {
+QHash<QString, ListedModPtr> asListed(const std::vector<std::shared_ptr<AboutXmlMod>>& mods) {
     QHash<QString, ListedModPtr> result;
     for (std::size_t i = 0; i < mods.size(); ++i) {
         result.insert(QString::number(i), mods[i]);
@@ -45,7 +45,7 @@ QHash<QString, ListedModPtr> as_listed(const std::vector<std::shared_ptr<AboutXm
     return result;
 }
 
-QString uuid_for(const QHash<QString, ListedModPtr>& mods, const QString& name) {
+QString uuidFor(const QHash<QString, ListedModPtr>& mods, const QString& name) {
     for (auto it = mods.cbegin(); it != mods.cend(); ++it) {
         if (it.value()->name == name) {
             return it.key();
@@ -54,7 +54,7 @@ QString uuid_for(const QHash<QString, ListedModPtr>& mods, const QString& name) 
     return {};
 }
 
-std::vector<std::unique_ptr<ModIssueChecker>> default_checkers() {
+std::vector<std::unique_ptr<ModIssueChecker>> defaultCheckers() {
     std::vector<std::unique_ptr<ModIssueChecker>> checkers;
     checkers.push_back(std::make_unique<DependencyIssueChecker>());
     checkers.push_back(std::make_unique<IncompatibilityIssueChecker>());
@@ -66,40 +66,40 @@ std::vector<std::unique_ptr<ModIssueChecker>> default_checkers() {
 }  // namespace
 
 TEST_CASE("ModChecker basic rebuild") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
     DependencyMod dep;
-    dep.package_id = CaseInsensitiveStr(QStringLiteral("mod.c"));
-    a->about_rules.dependencies.append(dep);
+    dep.packageId = CaseInsensitiveStr(QStringLiteral("mod.c"));
+    a->aboutRules.dependencies.append(dep);
 
-    const auto mods = as_listed({a, b});
-    const QStringList active_uuids{
-        uuid_for(mods, QStringLiteral("mod.a")),
-        uuid_for(mods, QStringLiteral("mod.b")),
+    const auto mods = asListed({a, b});
+    const QStringList activeUuids{
+        uuidFor(mods, QStringLiteral("mod.a")),
+        uuidFor(mods, QStringLiteral("mod.b")),
     };
 
     DiagnosticsByUuid collected;
-    auto on_change = [&](const DiagnosticsByUuid& diags) {
+    auto onChange = [&](const DiagnosticsByUuid& diags) {
         for (auto it = diags.cbegin(); it != diags.cend(); ++it) {
             collected.insert(it.key(), it.value());
         }
     };
 
-    ModChecker checker(default_checkers(), settings(), QStringLiteral("1.5"), on_change);
-    checker.rebuild(mods, active_uuids);
+    ModChecker checker(defaultCheckers(), settings(), QStringLiteral("1.5"), onChange);
+    checker.rebuild(mods, activeUuids);
 
-    const QString a_uuid = uuid_for(mods, QStringLiteral("mod.a"));
-    const auto* diag_a = checker.diagnostics_for(a_uuid);
-    REQUIRE(diag_a != nullptr);
-    CHECK(diag_a->has_errors());
-    REQUIRE(diag_a->errors.size() == 1);
-    CHECK(diag_a->errors[0].category == QStringLiteral("missing_dependency"));
+    const QString aUuid = uuidFor(mods, QStringLiteral("mod.a"));
+    const auto* diagA = checker.diagnosticsFor(aUuid);
+    REQUIRE(diagA != nullptr);
+    CHECK(diagA->hasErrors());
+    REQUIRE(diagA->errors.size() == 1);
+    CHECK(diagA->errors[0].category == QStringLiteral("missing_dependency"));
 
-    const QString b_uuid = uuid_for(mods, QStringLiteral("mod.b"));
-    const auto* diag_b = checker.diagnostics_for(b_uuid);
-    REQUIRE(diag_b != nullptr);
-    CHECK(!diag_b->has_errors());
-    CHECK(!diag_b->has_warnings());
+    const QString bUuid = uuidFor(mods, QStringLiteral("mod.b"));
+    const auto* diagB = checker.diagnosticsFor(bUuid);
+    REQUIRE(diagB != nullptr);
+    CHECK(!diagB->hasErrors());
+    CHECK(!diagB->hasWarnings());
 }
 
 TEST_CASE("ModChecker toggle mod rebuilds diagnostics and constraints") {
@@ -107,81 +107,81 @@ TEST_CASE("ModChecker toggle mod rebuilds diagnostics and constraints") {
     checkers.push_back(std::make_unique<DependencyIssueChecker>());
     checkers.push_back(std::make_unique<IncompatibilityIssueChecker>());
 
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
     DependencyMod dep;
-    dep.package_id = CaseInsensitiveStr(QStringLiteral("mod.b"));
-    a->about_rules.dependencies.append(dep);
-    b->about_rules.load_after.add(QStringLiteral("mod.a"));
+    dep.packageId = CaseInsensitiveStr(QStringLiteral("mod.b"));
+    a->aboutRules.dependencies.append(dep);
+    b->aboutRules.loadAfter.add(QStringLiteral("mod.a"));
 
-    const auto mods = as_listed({a, b});
-    const QString a_uuid = uuid_for(mods, QStringLiteral("mod.a"));
-    const QString b_uuid = uuid_for(mods, QStringLiteral("mod.b"));
+    const auto mods = asListed({a, b});
+    const QString aUuid = uuidFor(mods, QStringLiteral("mod.a"));
+    const QString bUuid = uuidFor(mods, QStringLiteral("mod.b"));
 
     ModChecker checker(std::move(checkers), settings());
-    checker.rebuild(mods, {a_uuid, b_uuid});
+    checker.rebuild(mods, {aUuid, bUuid});
 
-    checker.toggle_mod(*mods[b_uuid], {a_uuid});
-    const auto* diag_disabled = checker.diagnostics_for(a_uuid);
-    REQUIRE(diag_disabled != nullptr);
-    CHECK(diag_disabled->has_errors());
-    CHECK(diag_disabled->errors[0].category == QStringLiteral("missing_dependency"));
+    checker.toggleMod(*mods[bUuid], {aUuid});
+    const auto* diagDisabled = checker.diagnosticsFor(aUuid);
+    REQUIRE(diagDisabled != nullptr);
+    CHECK(diagDisabled->hasErrors());
+    CHECK(diagDisabled->errors[0].category == QStringLiteral("missing_dependency"));
 
-    checker.toggle_mod(*mods[b_uuid], {a_uuid, b_uuid});
-    const auto* diag_enabled = checker.diagnostics_for(a_uuid);
-    REQUIRE(diag_enabled != nullptr);
-    CHECK(!diag_enabled->has_errors());
+    checker.toggleMod(*mods[bUuid], {aUuid, bUuid});
+    const auto* diagEnabled = checker.diagnosticsFor(aUuid);
+    REQUIRE(diagEnabled != nullptr);
+    CHECK(!diagEnabled->hasErrors());
 
-    QSet<PackageId> dependency_sources;
+    QSet<PackageId> dependencySources;
     for (const auto& edge :
-         checker.graph().incoming_of_type(PackageId(QStringLiteral("mod.b")), EdgeType::Dependency)) {
-        dependency_sources.insert(edge.source);
+         checker.graph().incomingOfType(PackageId(QStringLiteral("mod.b")), EdgeType::kDependency)) {
+        dependencySources.insert(edge.source);
     }
-    CHECK(dependency_sources == QSet<PackageId>{PackageId(QStringLiteral("mod.a"))});
+    CHECK(dependencySources == QSet<PackageId>{PackageId(QStringLiteral("mod.a"))});
 
-    QSet<PackageId> load_after_targets;
+    QSet<PackageId> loadAfterTargets;
     for (const auto& edge :
-         checker.graph().edges_of_type(PackageId(QStringLiteral("mod.b")), EdgeType::LoadAfter)) {
-        load_after_targets.insert(edge.target);
+         checker.graph().edgesOfType(PackageId(QStringLiteral("mod.b")), EdgeType::kLoadAfter)) {
+        loadAfterTargets.insert(edge.target);
     }
-    CHECK(load_after_targets == QSet<PackageId>{PackageId(QStringLiteral("mod.a"))});
+    CHECK(loadAfterTargets == QSet<PackageId>{PackageId(QStringLiteral("mod.a"))});
 }
 
 TEST_CASE("ModChecker move mod updates load order") {
     std::vector<std::unique_ptr<ModIssueChecker>> checkers;
     checkers.push_back(std::make_unique<LoadOrderIssueChecker>());
 
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    a->about_rules.load_after.add(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    a->aboutRules.loadAfter.add(QStringLiteral("mod.b"));
 
     // b first, then a -> satisfies load_after
-    const auto mods = as_listed({b, a});
-    const QString a_uuid = uuid_for(mods, QStringLiteral("mod.a"));
-    const QString b_uuid = uuid_for(mods, QStringLiteral("mod.b"));
+    const auto mods = asListed({b, a});
+    const QString aUuid = uuidFor(mods, QStringLiteral("mod.a"));
+    const QString bUuid = uuidFor(mods, QStringLiteral("mod.b"));
 
     ModChecker checker(std::move(checkers), settings());
-    checker.rebuild(mods, {b_uuid, a_uuid});
+    checker.rebuild(mods, {bUuid, aUuid});
 
-    const auto* initial = checker.diagnostics_for(a_uuid);
-    CHECK((initial == nullptr || !initial->has_warnings()));
+    const auto* initial = checker.diagnosticsFor(aUuid);
+    CHECK((initial == nullptr || !initial->hasWarnings()));
 
     // Move a before b (old_index 1 -> new_index 0)
-    checker.move_mod(a_uuid, 1, 0);
+    checker.moveMod(aUuid, 1, 0);
 
-    const auto* after_move = checker.diagnostics_for(a_uuid);
-    REQUIRE(after_move != nullptr);
-    CHECK(after_move->has_warnings());
-    CHECK(after_move->warnings[0].category == QStringLiteral("load_order"));
+    const auto* afterMove = checker.diagnosticsFor(aUuid);
+    REQUIRE(afterMove != nullptr);
+    CHECK(afterMove->hasWarnings());
+    CHECK(afterMove->warnings[0].category == QStringLiteral("load_order"));
 }
 
 TEST_CASE("ModChecker reorder matches full rebuild") {
     std::mt19937 rng(0);
     constexpr int kModCount = 12;
-    std::vector<std::shared_ptr<AboutXmlMod>> mods_list;
-    mods_list.reserve(kModCount);
+    std::vector<std::shared_ptr<AboutXmlMod>> modsList;
+    modsList.reserve(kModCount);
     for (int i = 0; i < kModCount; ++i) {
-        mods_list.push_back(make_mod(QStringLiteral("mod.%1").arg(i)));
+        modsList.push_back(makeMod(QStringLiteral("mod.%1").arg(i)));
     }
 
     for (int i = 0; i < kModCount; ++i) {
@@ -192,18 +192,18 @@ TEST_CASE("ModChecker reorder matches full rebuild") {
             }
         }
         std::ranges::shuffle(others, rng);
-        mods_list[i]->about_rules.load_after.add(QStringLiteral("mod.%1").arg(others[0]));
-        mods_list[i]->about_rules.load_after.add(QStringLiteral("mod.%1").arg(others[1]));
-        mods_list[i]->about_rules.load_before.add(QStringLiteral("mod.%1").arg(others[2]));
+        modsList[i]->aboutRules.loadAfter.add(QStringLiteral("mod.%1").arg(others[0]));
+        modsList[i]->aboutRules.loadAfter.add(QStringLiteral("mod.%1").arg(others[1]));
+        modsList[i]->aboutRules.loadBefore.add(QStringLiteral("mod.%1").arg(others[2]));
     }
 
-    const auto mods = as_listed(mods_list);
+    const auto mods = asListed(modsList);
     QStringList order;
     for (int i = 0; i < kModCount; ++i) {
         order.append(QString::number(i));
     }
 
-    ModChecker incremental(default_checkers(), settings());
+    ModChecker incremental(defaultCheckers(), settings());
     incremental.rebuild(mods, order);
 
     for (int step = 0; step < 30; ++step) {
@@ -220,12 +220,12 @@ TEST_CASE("ModChecker reorder matches full rebuild") {
         }
         incremental.reorder(order);
 
-        ModChecker full(default_checkers(), settings());
+        ModChecker full(defaultCheckers(), settings());
         full.rebuild(mods, order);
 
         for (const QString& uuid : order) {
-            const auto* got = incremental.diagnostics_for(uuid);
-            const auto* want = full.diagnostics_for(uuid);
+            const auto* got = incremental.diagnosticsFor(uuid);
+            const auto* want = full.diagnosticsFor(uuid);
             REQUIRE(got != nullptr);
             REQUIRE(want != nullptr);
 

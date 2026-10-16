@@ -29,23 +29,23 @@ using ModMap = QHash<PackageId, checker::AboutXmlModPtr>;
 using Edge = std::pair<PackageId, PackageId>;
 
 // The About.xml mod behind `uuid`, or null when it is unknown or has no About.xml.
-checker::AboutXmlModPtr about_mod(const QHash<QString, ListedModPtr>& all_mods, const QString& uuid) {
-    const auto it = all_mods.constFind(uuid);
-    return it == all_mods.cend() ? nullptr : std::dynamic_pointer_cast<AboutXmlMod>(it.value());
+checker::AboutXmlModPtr aboutMod(const QHash<QString, ListedModPtr>& allMods, const QString& uuid) {
+    const auto it = allMods.constFind(uuid);
+    return it == allMods.cend() ? nullptr : std::dynamic_pointer_cast<AboutXmlMod>(it.value());
 }
 
-QStringList enable_candidates(const QHash<QString, ListedModPtr>& all_mods,
+QStringList enableCandidates(const QHash<QString, ListedModPtr>& allMods,
                               const QStringList& enable,
-                              const QSet<QString>& disable_set,
-                              const QSet<QString>& active_set) {
+                              const QSet<QString>& disableSet,
+                              const QSet<QString>& activeSet) {
     QStringList candidates;
     QSet<QString> seen;
     for (const QString& uuid : enable) {
-        if (seen.contains(uuid) || disable_set.contains(uuid)) {
+        if (seen.contains(uuid) || disableSet.contains(uuid)) {
             continue;
         }
         seen.insert(uuid);
-        if (all_mods.contains(uuid) && !active_set.contains(uuid)) {
+        if (allMods.contains(uuid) && !activeSet.contains(uuid)) {
             candidates.append(uuid);
         }
     }
@@ -54,13 +54,13 @@ QStringList enable_candidates(const QHash<QString, ListedModPtr>& all_mods,
 
 // (before, after) pairs between mods touching any of `candidates`. Edges through ids outside
 // `mods` (uninstalled optional mods) are dropped so they cannot chain unrelated mods together.
-QList<Edge> build_edges(const ModMap& mods,
+QList<Edge> buildEdges(const ModMap& mods,
                         const QList<PackageId>& order,
                         const QList<PackageId>& candidates,
                         const sort::SortSettings& settings,
-                        const sort::CommunityRules& community_rules) {
+                        const sort::CommunityRules& communityRules) {
     ConstraintGraph graph;
-    graph.build(mods, order, settings, &community_rules);
+    graph.build(mods, order, settings, &communityRules);
     // Placement ignores active-to-active edges, so only edges incident to a candidate matter;
     // the graph still resolves the full alternative map.
     QSet<ConstraintEdge> incident;
@@ -74,12 +74,12 @@ QList<Edge> build_edges(const ModMap& mods,
         PackageId before;
         PackageId after;
         switch (edge.type) {
-        case EdgeType::LoadBefore:
+        case EdgeType::kLoadBefore:
             before = edge.source;
             after = edge.target;
             break;
-        case EdgeType::Dependency:
-        case EdgeType::LoadAfter:
+        case EdgeType::kDependency:
+        case EdgeType::kLoadAfter:
             before = edge.target;
             after = edge.source;
             break;
@@ -94,7 +94,7 @@ QList<Edge> build_edges(const ModMap& mods,
 }
 
 // Iterative Tarjan SCC. Each component lists its members in `nodes` order.
-QList<QStringList> strongly_connected(const QStringList& nodes,
+QList<QStringList> stronglyConnected(const QStringList& nodes,
                                       const QHash<QString, QSet<QString>>& adjacent) {
     struct Frame {
         QString node;
@@ -102,25 +102,25 @@ QList<QStringList> strongly_connected(const QStringList& nodes,
         qsizetype next = 0;
     };
 
-    QHash<QString, int> index_of;
+    QHash<QString, int> indexOf;
     QHash<QString, int> lowlink;
     QStringList stack;
-    QSet<QString> on_stack;
+    QSet<QString> onStack;
     QList<QStringList> components;
     QList<Frame> work;
 
     const auto visit = [&](const QString& node) {
-        const int index = static_cast<int>(index_of.size());
-        index_of.insert(node, index);
+        const int index = static_cast<int>(indexOf.size());
+        indexOf.insert(node, index);
         lowlink.insert(node, index);
         stack.append(node);
-        on_stack.insert(node);
+        onStack.insert(node);
         const QSet<QString> successors = adjacent.value(node);
         work.append(Frame{node, QStringList(successors.cbegin(), successors.cend()), 0});
     };
 
     for (const QString& root : nodes) {
-        if (index_of.contains(root)) {
+        if (indexOf.contains(root)) {
             continue;
         }
         visit(root);
@@ -128,11 +128,11 @@ QList<QStringList> strongly_connected(const QStringList& nodes,
             Frame& frame = work.last();
             if (frame.next < frame.children.size()) {
                 const QString child = frame.children[frame.next++];
-                if (!index_of.contains(child)) {
+                if (!indexOf.contains(child)) {
                     // Invalidates `frame`; the loop re-reads work.last().
                     visit(child);
-                } else if (on_stack.contains(child)) {
-                    lowlink[frame.node] = std::min(lowlink.value(frame.node), index_of.value(child));
+                } else if (onStack.contains(child)) {
+                    lowlink[frame.node] = std::min(lowlink.value(frame.node), indexOf.value(child));
                 }
                 continue;
             }
@@ -144,12 +144,12 @@ QList<QStringList> strongly_connected(const QStringList& nodes,
                 const QString parent = work.last().node;
                 lowlink[parent] = std::min(lowlink.value(parent), lowlink.value(node));
             }
-            if (lowlink.value(node) == index_of.value(node)) {
+            if (lowlink.value(node) == indexOf.value(node)) {
                 QStringList component;
                 QString member;
                 do {
                     member = stack.takeLast();
-                    on_stack.remove(member);
+                    onStack.remove(member);
                     component.append(member);
                 } while (member != node);
                 components.append(component);
@@ -166,146 +166,146 @@ QList<QStringList> strongly_connected(const QStringList& nodes,
 // itself may already violate constraints and must not be re-derived transitively.
 class Placement {
 public:
-    Placement(QStringList new_active,
+    Placement(QStringList newActive,
               QStringList candidates,
-              const QHash<QString, ListedModPtr>& all_mods,
+              const QHash<QString, ListedModPtr>& allMods,
               const sort::SortSettings& settings,
-              const sort::CommunityRules& community_rules);
+              const sort::CommunityRules& communityRules);
 
     QStringList assemble() const;
 
 private:
-    void add_edge(const PackageId& before, const PackageId& after);
-    std::pair<QStringList, QSet<QString>> order_batch() const;
-    QHash<QString, int> propagated_ceilings(const QStringList& ordered,
+    void addEdge(const PackageId& before, const PackageId& after);
+    std::pair<QStringList, QSet<QString>> orderBatch() const;
+    QHash<QString, int> propagatedCeilings(const QStringList& ordered,
                                             const QSet<QString>& cyclic) const;
-    int gap_for(const QString& uuid,
+    int gapFor(const QString& uuid,
                 const QSet<QString>& cyclic,
                 const QHash<QString, int>& ceilings,
                 const QHash<QString, int>& gaps) const;
 
-    QStringList new_active_;
-    QStringList candidates_;
-    int end_;
+    QStringList m_newActive;
+    QStringList m_candidates;
+    int m_end;
 
-    QHash<PackageId, int> first_pos_;
-    QHash<PackageId, int> last_pos_;
-    QHash<PackageId, QStringList> uuids_by_pid_;
+    QHash<PackageId, int> m_firstPos;
+    QHash<PackageId, int> m_lastPos;
+    QHash<PackageId, QStringList> m_uuidsByPid;
 
     // Batch-internal adjacency plus direct bounds against active mods.
-    QHash<QString, QSet<QString>> after_;
-    QHash<QString, QSet<QString>> before_;
-    QHash<QString, int> floor_;
-    QHash<QString, int> ceiling_;
+    QHash<QString, QSet<QString>> m_after;
+    QHash<QString, QSet<QString>> m_before;
+    QHash<QString, int> m_floor;
+    QHash<QString, int> m_ceiling;
 };
 
-Placement::Placement(QStringList new_active,
+Placement::Placement(QStringList newActive,
                      QStringList candidates,
-                     const QHash<QString, ListedModPtr>& all_mods,
+                     const QHash<QString, ListedModPtr>& allMods,
                      const sort::SortSettings& settings,
-                     const sort::CommunityRules& community_rules)
-    : new_active_(std::move(new_active)),
-      candidates_(std::move(candidates)),
-      end_(static_cast<int>(new_active_.size())) {
+                     const sort::CommunityRules& communityRules)
+    : m_newActive(std::move(newActive)),
+      m_candidates(std::move(candidates)),
+      m_end(static_cast<int>(m_newActive.size())) {
     ModMap mods;
     QList<PackageId> order;
-    for (qsizetype index = 0; index < new_active_.size(); ++index) {
-        const checker::AboutXmlModPtr mod = about_mod(all_mods, new_active_[index]);
+    for (qsizetype index = 0; index < m_newActive.size(); ++index) {
+        const checker::AboutXmlModPtr mod = aboutMod(allMods, m_newActive[index]);
         if (!mod) {
             continue;
         }
-        const PackageId& pid = mod->package_id;
-        if (!first_pos_.contains(pid)) {
-            first_pos_.insert(pid, static_cast<int>(index));
+        const PackageId& pid = mod->packageId;
+        if (!m_firstPos.contains(pid)) {
+            m_firstPos.insert(pid, static_cast<int>(index));
         }
-        last_pos_.insert(pid, static_cast<int>(index));
+        m_lastPos.insert(pid, static_cast<int>(index));
         if (!mods.contains(pid)) {
             mods.insert(pid, mod);
             order.append(pid);
         }
     }
 
-    for (const QString& uuid : candidates_) {
-        after_.insert(uuid, {});
-        before_.insert(uuid, {});
-        const checker::AboutXmlModPtr mod = about_mod(all_mods, uuid);
+    for (const QString& uuid : m_candidates) {
+        m_after.insert(uuid, {});
+        m_before.insert(uuid, {});
+        const checker::AboutXmlModPtr mod = aboutMod(allMods, uuid);
         if (!mod) {
             continue;
         }
-        const PackageId& pid = mod->package_id;
-        uuids_by_pid_[pid].append(uuid);
+        const PackageId& pid = mod->packageId;
+        m_uuidsByPid[pid].append(uuid);
         if (!mods.contains(pid)) {
             mods.insert(pid, mod);
             order.append(pid);
         }
     }
 
-    if (!uuids_by_pid_.isEmpty()) {
+    if (!m_uuidsByPid.isEmpty()) {
         for (const Edge& edge :
-             build_edges(mods, order, uuids_by_pid_.keys(), settings, community_rules)) {
-            add_edge(edge.first, edge.second);
+             buildEdges(mods, order, m_uuidsByPid.keys(), settings, communityRules)) {
+            addEdge(edge.first, edge.second);
         }
     }
 }
 
-void Placement::add_edge(const PackageId& before, const PackageId& after) {
-    const QStringList before_uuids = uuids_by_pid_.value(before);
-    const QStringList after_uuids = uuids_by_pid_.value(after);
-    for (const QString& b : before_uuids) {
-        for (const QString& a : after_uuids) {
+void Placement::addEdge(const PackageId& before, const PackageId& after) {
+    const QStringList beforeUuids = m_uuidsByPid.value(before);
+    const QStringList afterUuids = m_uuidsByPid.value(after);
+    for (const QString& b : beforeUuids) {
+        for (const QString& a : afterUuids) {
             if (a != b) {
-                after_[b].insert(a);
-                before_[a].insert(b);
+                m_after[b].insert(a);
+                m_before[a].insert(b);
             }
         }
-        if (const auto first = first_pos_.constFind(after); first != first_pos_.cend()) {
-            ceiling_[b] = std::min(ceiling_.value(b, first.value()), first.value());
+        if (const auto first = m_firstPos.constFind(after); first != m_firstPos.cend()) {
+            m_ceiling[b] = std::min(m_ceiling.value(b, first.value()), first.value());
         }
     }
-    if (const auto last = last_pos_.constFind(before); last != last_pos_.cend()) {
-        for (const QString& a : after_uuids) {
-            floor_[a] = std::max(floor_.value(a, last.value() + 1), last.value() + 1);
+    if (const auto last = m_lastPos.constFind(before); last != m_lastPos.cend()) {
+        for (const QString& a : afterUuids) {
+            m_floor[a] = std::max(m_floor.value(a, last.value() + 1), last.value() + 1);
         }
     }
 }
 
 QStringList Placement::assemble() const {
-    const auto [ordered, cyclic] = order_batch();
-    const QHash<QString, int> ceilings = propagated_ceilings(ordered, cyclic);
-    QList<QStringList> buckets(end_ + 1);
+    const auto [ordered, cyclic] = orderBatch();
+    const QHash<QString, int> ceilings = propagatedCeilings(ordered, cyclic);
+    QList<QStringList> buckets(m_end + 1);
     QHash<QString, int> gaps;
     for (const QString& uuid : ordered) {
-        const int gap = gap_for(uuid, cyclic, ceilings, gaps);
+        const int gap = gapFor(uuid, cyclic, ceilings, gaps);
         gaps.insert(uuid, gap);
         buckets[gap].append(uuid);
     }
 
     QStringList result;
-    for (qsizetype index = 0; index < new_active_.size(); ++index) {
+    for (qsizetype index = 0; index < m_newActive.size(); ++index) {
         result.append(buckets[index]);
-        result.append(new_active_[index]);
+        result.append(m_newActive[index]);
     }
-    result.append(buckets[end_]);
+    result.append(buckets[m_end]);
     return result;
 }
 
-int Placement::gap_for(const QString& uuid,
+int Placement::gapFor(const QString& uuid,
                        const QSet<QString>& cyclic,
                        const QHash<QString, int>& ceilings,
                        const QHash<QString, int>& gaps) const {
     if (cyclic.contains(uuid)) {
-        return end_;
+        return m_end;
     }
     // Befores of an acyclic candidate sit in earlier components, so their gaps are final.
     std::optional<int> earliest;
-    const auto raise_floor = [&earliest](int floor) {
+    const auto raiseFloor = [&earliest](int floor) {
         earliest = earliest ? std::max(*earliest, floor) : floor;
     };
-    for (const QString& b : before_.value(uuid)) {
-        raise_floor(gaps.value(b));
+    for (const QString& b : m_before.value(uuid)) {
+        raiseFloor(gaps.value(b));
     }
-    if (const auto floor = floor_.constFind(uuid); floor != floor_.cend()) {
-        raise_floor(floor.value());
+    if (const auto floor = m_floor.constFind(uuid); floor != m_floor.cend()) {
+        raiseFloor(floor.value());
     }
 
     std::optional<int> ceiling;
@@ -314,14 +314,14 @@ int Placement::gap_for(const QString& uuid,
     }
     if (earliest) {
         if (ceiling && *earliest > *ceiling) {
-            return end_;
+            return m_end;
         }
         return *earliest;
     }
-    return ceiling ? *ceiling : end_;
+    return ceiling ? *ceiling : m_end;
 }
 
-QHash<QString, int> Placement::propagated_ceilings(const QStringList& ordered,
+QHash<QString, int> Placement::propagatedCeilings(const QStringList& ordered,
                                                    const QSet<QString>& cyclic) const {
     // Earliest active position each candidate must precede, via batch chains.
     QHash<QString, int> ceilings;
@@ -333,12 +333,12 @@ QHash<QString, int> Placement::propagated_ceilings(const QStringList& ordered,
         const auto tighten = [&bound](int value) {
             bound = bound ? std::min(*bound, value) : value;
         };
-        for (const QString& a : after_.value(*it)) {
+        for (const QString& a : m_after.value(*it)) {
             if (const auto found = ceilings.constFind(a); found != ceilings.cend()) {
                 tighten(found.value());
             }
         }
-        if (const auto own = ceiling_.constFind(*it); own != ceiling_.cend()) {
+        if (const auto own = m_ceiling.constFind(*it); own != m_ceiling.cend()) {
             tighten(own.value());
         }
         if (bound) {
@@ -349,23 +349,23 @@ QHash<QString, int> Placement::propagated_ceilings(const QStringList& ordered,
 }
 
 // Topologically orders candidates by input order; cycle members are placed as a unit.
-std::pair<QStringList, QSet<QString>> Placement::order_batch() const {
-    auto components = strongly_connected(candidates_, after_);
+std::pair<QStringList, QSet<QString>> Placement::orderBatch() const {
+    auto components = stronglyConnected(m_candidates, m_after);
 
-    QHash<QString, int> input_index;
-    for (qsizetype index = 0; index < candidates_.size(); ++index) {
-        input_index.insert(candidates_[index], static_cast<int>(index));
+    QHash<QString, int> inputIndex;
+    for (qsizetype index = 0; index < m_candidates.size(); ++index) {
+        inputIndex.insert(m_candidates[index], static_cast<int>(index));
     }
 
-    QHash<QString, int> component_of;
+    QHash<QString, int> componentOf;
     QSet<QString> cyclic;
     for (int index = 0; index < components.size(); ++index) {
         QStringList& members = components[index];
-        std::sort(members.begin(), members.end(), [&input_index](const QString& a, const QString& b) {
-            return input_index.value(a) < input_index.value(b);
+        std::sort(members.begin(), members.end(), [&inputIndex](const QString& a, const QString& b) {
+            return inputIndex.value(a) < inputIndex.value(b);
         });
         for (const QString& member : members) {
-            component_of.insert(member, index);
+            componentOf.insert(member, index);
         }
         if (members.size() > 1) {
             cyclic.unite(QSet<QString>(members.cbegin(), members.cend()));
@@ -374,10 +374,10 @@ std::pair<QStringList, QSet<QString>> Placement::order_batch() const {
 
     QList<QSet<int>> successors(components.size());
     QList<int> indegree(components.size(), 0);
-    for (auto it = after_.cbegin(); it != after_.cend(); ++it) {
-        const int source = component_of.value(it.key());
+    for (auto it = m_after.cbegin(); it != m_after.cend(); ++it) {
+        const int source = componentOf.value(it.key());
         for (const QString& successor : it.value()) {
-            const int target = component_of.value(successor);
+            const int target = componentOf.value(successor);
             if (target != source && !successors[source].contains(target)) {
                 successors[source].insert(target);
                 ++indegree[target];
@@ -390,7 +390,7 @@ std::pair<QStringList, QSet<QString>> Placement::order_batch() const {
     std::priority_queue<Ready, std::vector<Ready>, std::greater<>> ready;
     for (int index = 0; index < components.size(); ++index) {
         if (indegree[index] == 0) {
-            ready.emplace(input_index.value(components[index].front()), index);
+            ready.emplace(inputIndex.value(components[index].front()), index);
         }
     }
     QStringList ordered;
@@ -400,7 +400,7 @@ std::pair<QStringList, QSet<QString>> Placement::order_batch() const {
         ordered.append(components[index]);
         for (const int target : successors[index]) {
             if (--indegree[target] == 0) {
-                ready.emplace(input_index.value(components[target].front()), target);
+                ready.emplace(inputIndex.value(components[target].front()), target);
             }
         }
     }
@@ -409,21 +409,21 @@ std::pair<QStringList, QSet<QString>> Placement::order_batch() const {
 
 }  // namespace
 
-ActivationService::ActivationService(CoreContext& ctx) : ctx_(ctx) {}
+ActivationService::ActivationService(CoreContext& ctx) : m_ctx(ctx) {}
 
-QStringList ActivationService::dependents_of(const QStringList& uuids,
+QStringList ActivationService::dependentsOf(const QStringList& uuids,
                                              const QStringList& enable) const {
     const QSet<QString> excluded(uuids.cbegin(), uuids.cend());
-    const QHash<QString, ListedModPtr>& all_mods = ctx_.allMods();
-    const QStringList& active = ctx_.activeUuids();
+    const QHash<QString, ListedModPtr>& allMods = m_ctx.allMods();
+    const QStringList& active = m_ctx.activeUuids();
 
     QSet<PackageId> remaining;
     const auto keep = [&](const QString& uuid) {
         if (excluded.contains(uuid)) {
             return;
         }
-        if (const checker::AboutXmlModPtr mod = about_mod(all_mods, uuid)) {
-            remaining.insert(mod->package_id);
+        if (const checker::AboutXmlModPtr mod = aboutMod(allMods, uuid)) {
+            remaining.insert(mod->packageId);
         }
     };
     for (const QString& uuid : active) {
@@ -435,21 +435,21 @@ QStringList ActivationService::dependents_of(const QStringList& uuids,
 
     QSet<PackageId> roots;
     for (const QString& uuid : excluded) {
-        const checker::AboutXmlModPtr mod = about_mod(all_mods, uuid);
-        if (mod && !remaining.contains(mod->package_id)) {
-            roots.insert(mod->package_id);
+        const checker::AboutXmlModPtr mod = aboutMod(allMods, uuid);
+        if (mod && !remaining.contains(mod->packageId)) {
+            roots.insert(mod->packageId);
         }
     }
     if (roots.isEmpty()) {
         return {};
     }
 
-    const ConstraintGraph& graph = ctx_.diagnosticsService().constraint_graph();
+    const ConstraintGraph& graph = m_ctx.diagnosticsService().constraintGraph();
     QSet<PackageId> dependents;
     QList<PackageId> pending(roots.cbegin(), roots.cend());
     while (!pending.isEmpty()) {
         const PackageId target = pending.takeLast();
-        const auto edges = graph.incoming_of_type(target, EdgeType::Dependency);
+        const auto edges = graph.incomingOfType(target, EdgeType::kDependency);
         for (const ConstraintEdge& edge : edges) {
             if (!roots.contains(edge.source) && !dependents.contains(edge.source)) {
                 dependents.insert(edge.source);
@@ -463,8 +463,8 @@ QStringList ActivationService::dependents_of(const QStringList& uuids,
         if (excluded.contains(uuid)) {
             continue;
         }
-        const checker::AboutXmlModPtr mod = about_mod(all_mods, uuid);
-        if (mod && dependents.contains(mod->package_id)) {
+        const checker::AboutXmlModPtr mod = aboutMod(allMods, uuid);
+        if (mod && dependents.contains(mod->packageId)) {
             result.append(uuid);
         }
     }
@@ -472,29 +472,29 @@ QStringList ActivationService::dependents_of(const QStringList& uuids,
 }
 
 bool ActivationService::apply(const QStringList& enable, const QStringList& disable) {
-    const QStringList& active = ctx_.activeUuids();
-    const QSet<QString> disable_set(disable.cbegin(), disable.cend());
-    QStringList new_active;
+    const QStringList& active = m_ctx.activeUuids();
+    const QSet<QString> disableSet(disable.cbegin(), disable.cend());
+    QStringList newActive;
     for (const QString& uuid : active) {
-        if (!disable_set.contains(uuid)) {
-            new_active.append(uuid);
+        if (!disableSet.contains(uuid)) {
+            newActive.append(uuid);
         }
     }
-    const QSet<QString> active_set(active.cbegin(), active.cend());
+    const QSet<QString> activeSet(active.cbegin(), active.cend());
     QStringList candidates =
-        enable_candidates(ctx_.allMods(), enable, disable_set, active_set);
+        enableCandidates(m_ctx.allMods(), enable, disableSet, activeSet);
 
-    const Placement placement(std::move(new_active),
+    const Placement placement(std::move(newActive),
                               std::move(candidates),
-                              ctx_.allMods(),
-                              ctx_.config().sort,
-                              ctx_.diagnosticsService().community_rules());
+                              m_ctx.allMods(),
+                              m_ctx.config().sort,
+                              m_ctx.diagnosticsService().communityRules());
     const QStringList result = placement.assemble();
     if (result == active) {
         return false;
     }
 
-    ctx_.setActive(result);
+    m_ctx.setActive(result);
     return true;
 }
 

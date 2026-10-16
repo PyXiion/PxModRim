@@ -19,21 +19,21 @@ namespace px::modrim::sort {
 class CommunityRulesService {
 public:
     // `network` is not owned and must outlive the service.
-    CommunityRulesService(const ConfigService& config_service, QNetworkAccessManager& network);
+    CommunityRulesService(const ConfigService& configService, QNetworkAccessManager& network);
 
     // Returns the rules file path, downloading first when it is missing or `force` is set.
     // nullopt when the download or extraction failed, or the archive has no rules file; the
     // failure is logged, not returned.
-    QCoro::Task<std::optional<QString>> ensure_rules(LoadingState& loading, bool force = false);
+    QCoro::Task<std::optional<QString>> ensureRules(LoadingState& loading, bool force = false);
 
-    Result<CommunityRules> load_rules() const;
+    Result<CommunityRules> loadRules() const;
 
 private:
-    QCoro::Task<Result<std::optional<QString>>> download_rules(LoadingState& loading);
+    QCoro::Task<Result<std::optional<QString>>> downloadRules(LoadingState& loading);
 
-    QString cache_dir_;
-    QString json_path_;
-    QNetworkAccessManager& network_;
+    QString m_cacheDir;
+    QString m_jsonPath;
+    QNetworkAccessManager& m_network;
 };
 
 }  // namespace px::modrim::sort

@@ -42,7 +42,7 @@ const QString kReplacementsGz = QStringLiteral("replacements.json.gz");
 
 constexpr int kDownloadTimeoutMs = 30000;
 
-std::optional<FileStamp> file_stamp(const QString& path) {
+std::optional<FileStamp> fileStamp(const QString& path) {
     const QFileInfo info(path);
     if (!info.exists()) {
         return std::nullopt;
@@ -50,17 +50,17 @@ std::optional<FileStamp> file_stamp(const QString& path) {
     return FileStamp{info.lastModified().toMSecsSinceEpoch(), info.size()};
 }
 
-std::optional<double> file_age_s(const QString& path) {
+std::optional<double> fileAgeS(const QString& path) {
     const QFileInfo info(path);
     if (!info.exists()) {
         return std::nullopt;
     }
-    const qint64 age_ms = info.lastModified().msecsTo(QDateTime::currentDateTime());
-    return std::max(0.0, static_cast<double>(age_ms) / 1000.0);
+    const qint64 ageMs = info.lastModified().msecsTo(QDateTime::currentDateTime());
+    return std::max(0.0, static_cast<double>(ageMs) / 1000.0);
 }
 
 // Downloads `url`, following redirects. Any transport or HTTP error fails the download.
-QCoro::Task<Result<QByteArray>> fetch_archive(QNetworkAccessManager& network, const QString& url) {
+QCoro::Task<Result<QByteArray>> fetchArchive(QNetworkAccessManager& network, const QString& url) {
     QNetworkRequest request{QUrl(url)};
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -79,14 +79,14 @@ QCoro::Task<Result<QByteArray>> fetch_archive(QNetworkAccessManager& network, co
     co_return reply->readAll();
 }
 
-Error zip_failure(const char* message) {
+Error zipFailure(const char* message) {
     return Error{QString::fromUtf8(message)};
 }
 
 // Reads the first archive entry whose file name is `entry_name`, at any depth. Yields nullopt
 // when no entry has that name.
-Result<std::optional<QByteArray>> read_zip_entry(const QByteArray& archive,
-                                                 const QString& entry_name) {
+Result<std::optional<QByteArray>> readZipEntry(const QByteArray& archive,
+                                                 const QString& entryName) {
     zip_error_t error;
     zip_error_init(&error);
     zip_source_t* source = zip_source_buffer_create(archive.constData(),
@@ -111,13 +111,13 @@ Result<std::optional<QByteArray>> read_zip_entry(const QByteArray& archive,
         const auto position = static_cast<zip_uint64_t>(index);
         const char* name = zip_get_name(zip, position, 0);
         if (name == nullptr ||
-            QString::fromUtf8(name).section(QLatin1Char('/'), -1) != entry_name) {
+            QString::fromUtf8(name).section(QLatin1Char('/'), -1) != entryName) {
             continue;
         }
 
         zip_file_t* file = zip_fopen_index(zip, position, 0);
         if (file == nullptr) {
-            return std::unexpected(zip_failure(zip_strerror(zip)));
+            return std::unexpected(zipFailure(zip_strerror(zip)));
         }
         QByteArray bytes;
         QByteArray chunk(64 * 1024, Qt::Uninitialized);
@@ -128,7 +128,7 @@ Result<std::optional<QByteArray>> read_zip_entry(const QByteArray& archive,
         const bool failed = read < 0;
         zip_fclose(file);
         if (failed) {
-            return std::unexpected(zip_failure(zip_strerror(zip)));
+            return std::unexpected(zipFailure(zip_strerror(zip)));
         }
         return std::optional<QByteArray>(std::move(bytes));
     }
@@ -137,10 +137,10 @@ Result<std::optional<QByteArray>> read_zip_entry(const QByteArray& archive,
 
 // Blocking: writes the archive entry `entry_name` to `target`. Yields false when the archive has
 // no such entry, leaving `target` untouched.
-Result<bool> store_archive_entry(const QByteArray& archive,
-                                 const QString& entry_name,
+Result<bool> storeArchiveEntry(const QByteArray& archive,
+                                 const QString& entryName,
                                  const QString& target) {
-    auto entry = read_zip_entry(archive, entry_name);
+    auto entry = readZipEntry(archive, entryName);
     if (!entry) {
         return std::unexpected(entry.error());
     }
@@ -148,7 +148,7 @@ Result<bool> store_archive_entry(const QByteArray& archive,
         return false;
     }
     const QByteArray& bytes = **entry;
-    auto written = write_file_atomically(
+    auto written = writeFileAtomically(
         target, std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
     if (!written) {
         return std::unexpected(written.error());
@@ -187,7 +187,7 @@ Result<std::string> gunzip(const std::string& data) {
 
 // The ids under ModIdsToFix/li: a lone <li> is a string, several are an array. Nullopt when the
 // document has another shape.
-std::optional<QSet<PackageId>> no_version_warning_ids(const glz::json_t& root) {
+std::optional<QSet<PackageId>> noVersionWarningIds(const glz::json_t& root) {
     QSet<PackageId> ids;
     if (!root.contains("ModIdsToFix")) {
         return ids;
@@ -217,13 +217,13 @@ std::optional<QSet<PackageId>> no_version_warning_ids(const glz::json_t& root) {
 }
 
 // Blocking: parses the cached NoVersionWarning XML. A broken file yields an empty set.
-QSet<PackageId> parse_no_version_warning(const QString& xml_path) {
-    const auto data = xmlFileToJson(xml_path);
+QSet<PackageId> parseNoVersionWarning(const QString& xmlPath) {
+    const auto data = xmlFileToJson(xmlPath);
     if (!data) {
         spdlog::error("Failed to load No Version Warning DB: {}", data.error().message.toStdString());
         return {};
     }
-    const auto ids = no_version_warning_ids(*data);
+    const auto ids = noVersionWarningIds(*data);
     if (!ids) {
         spdlog::error("Failed to load No Version Warning DB: unexpected ModIdsToFix layout");
         return {};
@@ -233,7 +233,7 @@ QSet<PackageId> parse_no_version_warning(const QString& xml_path) {
 }
 
 // Text of a JSON scalar as Python's str() would show it. Other kinds yield an empty string.
-QString json_text(const glz::json_t& object, const char* key) {
+QString jsonText(const glz::json_t& object, const char* key) {
     if (!object.contains(key)) {
         return {};
     }
@@ -251,7 +251,7 @@ QString json_text(const glz::json_t& object, const char* key) {
     return {};
 }
 
-QStringList json_string_list(const glz::json_t& object, const char* key) {
+QStringList jsonStringList(const glz::json_t& object, const char* key) {
     QStringList values;
     if (!object.contains(key) || !object[key].is_array()) {
         return values;
@@ -265,8 +265,8 @@ QStringList json_string_list(const glz::json_t& object, const char* key) {
 }
 
 // Blocking: parses the cached gzipped UseThisInstead JSON. A broken file yields no entries.
-QHash<QString, ReplacementInfo> parse_replacements(const QString& json_path) {
-    const auto bytes = read_file_bytes(json_path);
+QHash<QString, ReplacementInfo> parseReplacements(const QString& jsonPath) {
+    const auto bytes = readFileBytes(jsonPath);
     if (!bytes) {
         spdlog::error("Failed to load Use This Instead DB: {}", bytes.error().message.toStdString());
         return {};
@@ -295,12 +295,12 @@ QHash<QString, ReplacementInfo> parse_replacements(const QString& json_path) {
                 continue;
             }
             ReplacementInfo info;
-            info.name = json_text(rule, "newName");
-            info.author = json_text(rule, "newAuthor");
-            info.packageid = json_text(rule, "newPackageId");
-            info.pfid = json_text(rule, "newWorkshopId");
-            info.supportedversions = json_string_list(rule, "newVersions");
-            entries.insert(json_text(rule, "oldWorkshopId"), std::move(info));
+            info.name = jsonText(rule, "newName");
+            info.author = jsonText(rule, "newAuthor");
+            info.packageid = jsonText(rule, "newPackageId");
+            info.pfid = jsonText(rule, "newWorkshopId");
+            info.supportedversions = jsonStringList(rule, "newVersions");
+            entries.insert(jsonText(rule, "oldWorkshopId"), std::move(info));
         }
     }
     spdlog::info("Loaded {} Use This Instead entries", entries.size());
@@ -309,49 +309,49 @@ QHash<QString, ReplacementInfo> parse_replacements(const QString& json_path) {
 
 }  // namespace
 
-NoVersionWarningService::NoVersionWarningService(const ConfigService& config_service,
+NoVersionWarningService::NoVersionWarningService(const ConfigService& configService,
                                                  QNetworkAccessManager& network)
-    : network_(network),
-      cache_dir_(config_service.directory()),
-      xml_path_(QDir(cache_dir_).filePath(kNoVersionWarningXml)) {}
+    : m_network(network),
+      m_cacheDir(configService.directory()),
+      m_xmlPath(QDir(m_cacheDir).filePath(kNoVersionWarningXml)) {}
 
 QCoro::Task<QSet<PackageId>> NoVersionWarningService::ensure(bool force) {
     if (!force) {
-        if (const auto stamp = file_stamp(xml_path_)) {
-            if (stamp != loaded_stamp_) {
-                pids_ = co_await QtConcurrent::run(parse_no_version_warning, xml_path_);
-                loaded_stamp_ = stamp;
+        if (const auto stamp = fileStamp(m_xmlPath)) {
+            if (stamp != m_loadedStamp) {
+                m_pids = co_await QtConcurrent::run(parseNoVersionWarning, m_xmlPath);
+                m_loadedStamp = stamp;
             }
-            co_return pids_;
+            co_return m_pids;
         }
     }
     co_return co_await download();
 }
 
-std::optional<double> NoVersionWarningService::cache_age_s() const {
-    return file_age_s(xml_path_);
+std::optional<double> NoVersionWarningService::cacheAgeS() const {
+    return fileAgeS(m_xmlPath);
 }
 
-QSet<PackageId> NoVersionWarningService::load_if_exists() {
-    if (QFileInfo::exists(xml_path_)) {
-        pids_ = parse_no_version_warning(xml_path_);
+QSet<PackageId> NoVersionWarningService::loadIfExists() {
+    if (QFileInfo::exists(m_xmlPath)) {
+        m_pids = parseNoVersionWarning(m_xmlPath);
     }
-    return pids_;
+    return m_pids;
 }
 
 QCoro::Task<QSet<PackageId>> NoVersionWarningService::download() {
-    QDir().mkpath(cache_dir_);
+    QDir().mkpath(m_cacheDir);
 
-    auto archive = co_await fetch_archive(network_, kNoVersionWarningUrl);
+    auto archive = co_await fetchArchive(m_network, kNoVersionWarningUrl);
     if (!archive) {
         spdlog::warn("Failed to download No Version Warning DB: {}",
                      archive.error().message.toStdString());
         co_return QSet<PackageId>{};
     }
-    auto stored = co_await QtConcurrent::run(store_archive_entry,
+    auto stored = co_await QtConcurrent::run(storeArchiveEntry,
                                              std::move(*archive),
                                              kNoVersionWarningXml,
-                                             xml_path_);
+                                             m_xmlPath);
     if (!stored) {
         spdlog::warn("Failed to download No Version Warning DB: {}",
                      stored.error().message.toStdString());
@@ -361,53 +361,53 @@ QCoro::Task<QSet<PackageId>> NoVersionWarningService::download() {
         co_return QSet<PackageId>{};
     }
 
-    pids_ = co_await QtConcurrent::run(parse_no_version_warning, xml_path_);
-    co_return pids_;
+    m_pids = co_await QtConcurrent::run(parseNoVersionWarning, m_xmlPath);
+    co_return m_pids;
 }
 
-UseThisInsteadService::UseThisInsteadService(const ConfigService& config_service,
+UseThisInsteadService::UseThisInsteadService(const ConfigService& configService,
                                              QNetworkAccessManager& network)
-    : network_(network),
-      cache_dir_(config_service.directory()),
-      json_path_(QDir(cache_dir_).filePath(kReplacementsGz)) {}
+    : m_network(network),
+      m_cacheDir(configService.directory()),
+      m_jsonPath(QDir(m_cacheDir).filePath(kReplacementsGz)) {}
 
 QCoro::Task<QHash<QString, ReplacementInfo>> UseThisInsteadService::ensure(bool force) {
     if (!force) {
-        if (const auto stamp = file_stamp(json_path_)) {
-            if (stamp != loaded_stamp_) {
-                entries_ = co_await QtConcurrent::run(parse_replacements, json_path_);
-                loaded_stamp_ = stamp;
+        if (const auto stamp = fileStamp(m_jsonPath)) {
+            if (stamp != m_loadedStamp) {
+                m_entries = co_await QtConcurrent::run(parseReplacements, m_jsonPath);
+                m_loadedStamp = stamp;
             }
-            co_return entries_;
+            co_return m_entries;
         }
     }
     co_return co_await download();
 }
 
-std::optional<double> UseThisInsteadService::cache_age_s() const {
-    return file_age_s(json_path_);
+std::optional<double> UseThisInsteadService::cacheAgeS() const {
+    return fileAgeS(m_jsonPath);
 }
 
-QHash<QString, ReplacementInfo> UseThisInsteadService::load_if_exists() {
-    if (QFileInfo::exists(json_path_)) {
-        entries_ = parse_replacements(json_path_);
+QHash<QString, ReplacementInfo> UseThisInsteadService::loadIfExists() {
+    if (QFileInfo::exists(m_jsonPath)) {
+        m_entries = parseReplacements(m_jsonPath);
     }
-    return entries_;
+    return m_entries;
 }
 
 QCoro::Task<QHash<QString, ReplacementInfo>> UseThisInsteadService::download() {
-    QDir().mkpath(cache_dir_);
+    QDir().mkpath(m_cacheDir);
 
-    auto archive = co_await fetch_archive(network_, kUseThisInsteadUrl);
+    auto archive = co_await fetchArchive(m_network, kUseThisInsteadUrl);
     if (!archive) {
         spdlog::warn("Failed to download Use This Instead DB: {}",
                      archive.error().message.toStdString());
         co_return QHash<QString, ReplacementInfo>{};
     }
-    auto stored = co_await QtConcurrent::run(store_archive_entry,
+    auto stored = co_await QtConcurrent::run(storeArchiveEntry,
                                              std::move(*archive),
                                              kReplacementsGz,
-                                             json_path_);
+                                             m_jsonPath);
     if (!stored) {
         spdlog::warn("Failed to download Use This Instead DB: {}",
                      stored.error().message.toStdString());
@@ -417,8 +417,8 @@ QCoro::Task<QHash<QString, ReplacementInfo>> UseThisInsteadService::download() {
         co_return QHash<QString, ReplacementInfo>{};
     }
 
-    entries_ = co_await QtConcurrent::run(parse_replacements, json_path_);
-    co_return entries_;
+    m_entries = co_await QtConcurrent::run(parseReplacements, m_jsonPath);
+    co_return m_entries;
 }
 
 }  // namespace px::modrim::checker

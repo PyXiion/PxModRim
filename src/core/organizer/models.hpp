@@ -12,48 +12,48 @@
 
 namespace px::modrim::organizer {
 
-inline constexpr qint64 ROOT_ID = 1;
-inline constexpr int MAX_DEPTH = 3;
+inline constexpr qint64 kRootId = 1;
+inline constexpr int kMaxDepth = 3;
 
 // Names match the SQL values stored in the rules table's CHECK constraints.
-enum class RuleField { PackageId, Name, Author };
-enum class RuleOp { Prefix, Contains, Equals };
+enum class RuleField { kPackageId, kName, kAuthor };
+enum class RuleOp { kPrefix, kContains, kEquals };
 
-inline QLatin1StringView rule_field_name(RuleField field) {
+inline QLatin1StringView ruleFieldName(RuleField field) {
     switch (field) {
-        case RuleField::PackageId: return QLatin1StringView("package_id");
-        case RuleField::Name: return QLatin1StringView("name");
-        case RuleField::Author: return QLatin1StringView("author");
+        case RuleField::kPackageId: return QLatin1StringView("package_id");
+        case RuleField::kName: return QLatin1StringView("name");
+        case RuleField::kAuthor: return QLatin1StringView("author");
     }
     return {};
 }
 
-inline QLatin1StringView rule_op_name(RuleOp op) {
+inline QLatin1StringView ruleOpName(RuleOp op) {
     switch (op) {
-        case RuleOp::Prefix: return QLatin1StringView("prefix");
-        case RuleOp::Contains: return QLatin1StringView("contains");
-        case RuleOp::Equals: return QLatin1StringView("equals");
+        case RuleOp::kPrefix: return QLatin1StringView("prefix");
+        case RuleOp::kContains: return QLatin1StringView("contains");
+        case RuleOp::kEquals: return QLatin1StringView("equals");
     }
     return {};
 }
 
-inline std::optional<RuleField> parse_rule_field(const QString& name) {
-    if (name == QLatin1StringView("package_id")) return RuleField::PackageId;
-    if (name == QLatin1StringView("name")) return RuleField::Name;
-    if (name == QLatin1StringView("author")) return RuleField::Author;
+inline std::optional<RuleField> parseRuleField(const QString& name) {
+    if (name == QLatin1StringView("package_id")) return RuleField::kPackageId;
+    if (name == QLatin1StringView("name")) return RuleField::kName;
+    if (name == QLatin1StringView("author")) return RuleField::kAuthor;
     return std::nullopt;
 }
 
-inline std::optional<RuleOp> parse_rule_op(const QString& name) {
-    if (name == QLatin1StringView("prefix")) return RuleOp::Prefix;
-    if (name == QLatin1StringView("contains")) return RuleOp::Contains;
-    if (name == QLatin1StringView("equals")) return RuleOp::Equals;
+inline std::optional<RuleOp> parseRuleOp(const QString& name) {
+    if (name == QLatin1StringView("prefix")) return RuleOp::kPrefix;
+    if (name == QLatin1StringView("contains")) return RuleOp::kContains;
+    if (name == QLatin1StringView("equals")) return RuleOp::kEquals;
     return std::nullopt;
 }
 
 struct Folder {
     qint64 id = 0;
-    std::optional<qint64> parent_id;  // empty only for ROOT_ID
+    std::optional<qint64> parentId;  // empty only for ROOT_ID
     QString name;
     bool collapsed = false;
 
@@ -69,10 +69,10 @@ struct Tag {
 };
 
 struct RuleSpec {
-    RuleField field = RuleField::Name;
-    RuleOp op = RuleOp::Equals;
+    RuleField field = RuleField::kName;
+    RuleOp op = RuleOp::kEquals;
     QString pattern;
-    qint64 folder_id = 0;
+    qint64 folderId = 0;
 
     friend bool operator==(const RuleSpec&, const RuleSpec&) = default;
 };
@@ -80,10 +80,10 @@ struct RuleSpec {
 struct Rule {
     qint64 id = 0;
     qint64 position = 0;
-    RuleField field = RuleField::Name;
-    RuleOp op = RuleOp::Equals;
+    RuleField field = RuleField::kName;
+    RuleOp op = RuleOp::kEquals;
     QString pattern;
-    qint64 folder_id = 0;
+    qint64 folderId = 0;
 
     friend bool operator==(const Rule&, const Rule&) = default;
 };
@@ -94,17 +94,17 @@ struct OrganizerState {
     QHash<qint64, Folder> folders;
     QHash<QString, qint64> placements;
     QHash<qint64, Tag> tags;
-    QHash<QString, QSet<qint64>> mod_tags;
+    QHash<QString, QSet<qint64>> modTags;
     QList<Rule> rules;
 
     friend bool operator==(const OrganizerState&, const OrganizerState&) = default;
 };
 
 // Lowercased, trimmed, de-duplicated package ids in first-seen order; blanks are dropped.
-inline QStringList clean_package_ids(const QStringList& package_ids) {
+inline QStringList cleanPackageIds(const QStringList& packageIds) {
     QStringList cleaned;
     QSet<QString> seen;
-    for (const QString& raw : package_ids) {
+    for (const QString& raw : packageIds) {
         const QString pid = raw.trimmed().toLower();
         if (!pid.isEmpty() && !seen.contains(pid)) {
             seen.insert(pid);

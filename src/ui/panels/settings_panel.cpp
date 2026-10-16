@@ -25,30 +25,30 @@ public:
 };
 }
 SettingsBackend::SettingsBackend(CoreContext& ctx, QDialog* dialog, const std::vector<SettingsSection*>& sections)
-    : QObject(dialog), ctx_(ctx), dialog_(dialog) {
+    : QObject(dialog), m_ctx(ctx), m_dialog(dialog) {
     for (auto* section : sections)
-        sections_.append(QVariantMap{{"title", section->title()}, {"source", section->source().toString()},
+        m_sections.append(QVariantMap{{"title", section->title()}, {"source", section->source().toString()},
                                      {"section", QVariant::fromValue(static_cast<QObject*>(section))}});
     const auto& cfg = ctx.config();
     const auto text = [](const std::string& value) { return QString::fromStdString(value); };
-    initial_ = {{"game", text(cfg.paths.game)}, {"local", text(cfg.paths.local)},
+    m_initial = {{"game", text(cfg.paths.game)}, {"local", text(cfg.paths.local)},
         {"workshop", text(cfg.paths.workshop)}, {"config", text(cfg.paths.config_folder)},
         {"compact", cfg.compact_mod_list}, {"launchArgs", text(cfg.launch_args)}, {"launchWrapper", text(cfg.launch_wrapper)},
         {"afterLaunch", static_cast<int>(cfg.after_launch)}, {"confirmErrors", cfg.launch_confirm_errors},
         {"confirmUnsaved", cfg.launch_confirm_unsaved}, {"confirmRunning", cfg.launch_confirm_running},
         {"useAltIds", cfg.sort.use_alternative_package_ids}, {"checkMissing", cfg.sort.check_missing_dependencies},
         {"useCommunity", cfg.sort.use_community_rules}};
-    const auto path = community_rules_file();
-    communityStatus_ = QFileInfo::exists(path) ? "Found: " + path : QStringLiteral("Not downloaded");
-    cacheAvailable_ = !cfg.paths.config_folder.empty();
-    cacheStatus_ = cacheAvailable_ ? QStringLiteral("Cache ready") : QStringLiteral("No config folder — not available");
+    const auto path = communityRulesFile();
+    m_communityStatus = QFileInfo::exists(path) ? "Found: " + path : QStringLiteral("Not downloaded");
+    m_cacheAvailable = !cfg.paths.config_folder.empty();
+    m_cacheStatus = m_cacheAvailable ? QStringLiteral("Cache ready") : QStringLiteral("No config folder — not available");
 }
 QCoro::Task<void> SettingsBackend::browse(QString key) {
     static const QMap<QString, QString> titles{{"game", "Select RimWorld Game Folder"}, {"local", "Select Local Mods Folder"},
         {"workshop", "Select Workshop Mods Folder"}, {"config", "Select RimWorld Config Folder"}};
     if (!titles.contains(key)) co_return;
     QPointer<SettingsBackend> guard(this);
-    const auto [result, picker] = co_await awaitDialog<FolderDialog>(dialog_, titles.value(key));
+    const auto [result, picker] = co_await awaitDialog<FolderDialog>(m_dialog, titles.value(key));
     const auto files = picker->selectedFiles();
     if (guard && result == QDialog::Accepted && !files.isEmpty()) emit guard->pathPicked(key, files.front());
 }
@@ -57,83 +57,83 @@ QString SettingsBackend::localCandidate(const QString& gamePath) const {
     return QFileInfo(path).isDir() ? path : QString{};
 }
 void SettingsBackend::autoDetect() {
-    const auto paths = detect_game_paths();
+    const auto paths = detectGamePaths();
     const std::pair<const char*, const std::string*> values[]{{"game", &paths.game}, {"local", &paths.local},
         {"workshop", &paths.workshop}, {"config", &paths.config_folder}};
     for (const auto& [key, value] : values)
         if (!value->empty()) emit pathPicked(QString::fromLatin1(key), QString::fromStdString(*value));
 }
 QCoro::Task<void> SettingsBackend::downloadCommunityRules() {
-    communityStatus_ = QStringLiteral("Downloading…");
-    communityBusy_ = true;
+    m_communityStatus = QStringLiteral("Downloading…");
+    m_communityBusy = true;
     emit communityChanged();
-    if (!ctx_.hasConfigService()) {
-        communityStatus_ = QStringLiteral("Download failed");
-        communityBusy_ = false;
+    if (!m_ctx.hasConfigService()) {
+        m_communityStatus = QStringLiteral("Download failed");
+        m_communityBusy = false;
         emit communityChanged();
         co_return;
     }
     LoadingState loading;
-    auto* progress = new QProgressDialog(QStringLiteral("Downloading community rules…"), QString{}, 0, 100, dialog_);
+    auto* progress = new QProgressDialog(QStringLiteral("Downloading community rules…"), QString{}, 0, 100, m_dialog);
     progress->setWindowModality(Qt::WindowModal);
     progress->setCancelButton(nullptr);
     progress->setMinimumDuration(0);
     connect(&loading, &LoadingState::changed, progress,
         [progress](const QString& status, int percent, int, int) { progress->setLabelText(status); progress->setValue(percent); });
     progress->show();
-    sort::CommunityRulesService service(ctx_.configService(), ctx_.network());
+    sort::CommunityRulesService service(m_ctx.configService(), m_ctx.network());
     QPointer<SettingsBackend> guard(this);
     QPointer<QProgressDialog> progressGuard(progress);
-    const auto path = co_await service.ensure_rules(loading, true);
+    const auto path = co_await service.ensureRules(loading, true);
     if (progressGuard) { progressGuard->close(); progressGuard->deleteLater(); }
     if (!guard) co_return;
-    guard->communityStatus_ = path ? "Downloaded: " + *path : QStringLiteral("Download failed");
-    guard->communityBusy_ = false;
+    guard->m_communityStatus = path ? "Downloaded: " + *path : QStringLiteral("Download failed");
+    guard->m_communityBusy = false;
     emit guard->communityChanged();
 }
 QCoro::Task<void> SettingsBackend::clearCache() {
-    cacheStatus_ = QStringLiteral("Clearing…");
-    cacheBusy_ = true;
+    m_cacheStatus = QStringLiteral("Clearing…");
+    m_cacheBusy = true;
     emit cacheChanged();
     QPointer<SettingsBackend> guard(this);
-    const auto result = co_await ctx_.modService().startup_impact().clear();
+    const auto result = co_await m_ctx.modService().startupImpact().clear();
     if (!guard) co_return;
-    guard->cacheStatus_ = result ? QStringLiteral("Cache cleared") : "Error: " + result.error().message;
-    guard->cacheBusy_ = false;
+    guard->m_cacheStatus = result ? QStringLiteral("Cache cleared") : "Error: " + result.error().message;
+    guard->m_cacheBusy = false;
     emit guard->cacheChanged();
 }
 void SettingsBackend::reportSaveError(const QString& message) {
-    auto* box = new QMessageBox(QMessageBox::Warning, QStringLiteral("Settings"), message, QMessageBox::Ok, dialog_);
+    auto* box = new QMessageBox(QMessageBox::Warning, QStringLiteral("Settings"), message, QMessageBox::Ok, m_dialog);
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->open();
 }
 SettingsPanel::SettingsPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
                              const std::vector<SettingsSectionFactory>& factories)
-    : QDialog(parent), config_(ctx.config()), backend_(nullptr), qml_(new QQuickWidget(engine, this)) {
+    : QDialog(parent), m_config(ctx.config()), m_backend(nullptr), m_qml(new QQuickWidget(engine, this)) {
     setObjectName(QStringLiteral("settingsPanel"));
     setWindowTitle(QStringLiteral("Settings"));
     setModal(true);
     resize(700, 560);
-    for (const auto& factory : factories) sections_.push_back(factory(this));
-    backend_ = new SettingsBackend(ctx, this, sections_);
-    connect(backend_, &SettingsBackend::saveRequested, this, &SettingsPanel::save);
-    connect(backend_, &SettingsBackend::cancelRequested, this, &QDialog::reject);
+    for (const auto& factory : factories) m_sections.push_back(factory(this));
+    m_backend = new SettingsBackend(ctx, this, m_sections);
+    connect(m_backend, &SettingsBackend::saveRequested, this, &SettingsPanel::save);
+    connect(m_backend, &SettingsBackend::cancelRequested, this, &QDialog::reject);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    qml_->setAttribute(Qt::WA_AlwaysStackOnTop, false);
-    qml_->setClearColor(paletteColor(u"ELEVATE_2"));
-    qml_->rootContext()->setContextProperty(QStringLiteral("settings"), backend_);
-    qml_->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/Settings.qml")));
-    layout->addWidget(qml_);
+    m_qml->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    m_qml->setAttribute(Qt::WA_AlwaysStackOnTop, false);
+    m_qml->setClearColor(paletteColor(u"ELEVATE_2"));
+    m_qml->rootContext()->setContextProperty(QStringLiteral("settings"), m_backend);
+    m_qml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/Settings.qml")));
+    layout->addWidget(m_qml);
     // A QML click handler must finish before its root object is destroyed.
-    connect(this, &QDialog::finished, this, [this] { qml_->setSource(QUrl{}); }, Qt::QueuedConnection);
+    connect(this, &QDialog::finished, this, [this] { m_qml->setSource(QUrl{}); }, Qt::QueuedConnection);
 }
 SettingsPanel::SettingsPanel(AppContext& app, QQmlEngine* engine, QWidget* parent)
     : SettingsPanel(app.coreContext(), engine, parent, app.settingsSections()) {}
-SettingsPanel::~SettingsPanel() { qml_->setSource(QUrl{}); }
+SettingsPanel::~SettingsPanel() { m_qml->setSource(QUrl{}); }
 void SettingsPanel::save(const QVariantMap& values) {
-    auto updated = config_;
+    auto updated = m_config;
     const auto text = [&](const char* key) { return values.value(QLatin1String(key)).toString().trimmed().toStdString(); };
     updated.paths.game = text("game");
     updated.paths.local = text("local");
@@ -149,11 +149,11 @@ void SettingsPanel::save(const QVariantMap& values) {
     updated.launch_confirm_errors = values.value("confirmErrors").toBool();
     updated.launch_confirm_unsaved = values.value("confirmUnsaved").toBool();
     updated.launch_confirm_running = values.value("confirmRunning").toBool();
-    for (auto* section : sections_) {
+    for (auto* section : m_sections) {
         const auto result = section->apply();
-        if (!result) { backend_->reportSaveError(result.error().message); return; }
+        if (!result) { m_backend->reportSaveError(result.error().message); return; }
     }
-    config_ = std::move(updated);
+    m_config = std::move(updated);
     accept();
 }
 } // namespace px::modrim

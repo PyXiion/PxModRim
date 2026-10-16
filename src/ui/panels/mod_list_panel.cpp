@@ -20,132 +20,132 @@
 #include <utility>
 namespace px::modrim {
 ModListPanel::ModListPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent)
-    : QWidget(parent), ctx_(ctx), model_(new ModListModel({}, &ctx.diagnosticsService(), this)),
-      proxy_(new ModListProxyModel(model_, this)), qml_(new QQuickWidget(engine, this)),
-      compact_mode_(ctx.config().compact_mod_list), highlight_timer_(new QTimer(this)) {
+    : QWidget(parent), m_ctx(ctx), m_model(new ModListModel({}, &ctx.diagnosticsService(), this)),
+      m_proxy(new ModListProxyModel(m_model, this)), m_qml(new QQuickWidget(engine, this)),
+      m_compactMode(ctx.config().compact_mod_list), m_highlightTimer(new QTimer(this)) {
     auto* layout = new QVBoxLayout(this); layout->setContentsMargins(0,0,0,0); layout->setSpacing(0);
     auto* search = new QWidget(this); search->setObjectName(QStringLiteral("searchBox")); search->setFixedHeight(56);
-    auto* search_layout = new QHBoxLayout(search); search_layout->setContentsMargins(16,8,16,8);
-    search_input = new QLineEdit(search);
-    search_input->setObjectName(QStringLiteral("searchInput"));
-    search_input->setPlaceholderText(QStringLiteral("Search mods, package ID, author…"));
-    search_input->setClearButtonEnabled(true);
-    connect(search_input, &QLineEdit::textChanged, this, &ModListPanel::set_search_filter);
-    if (const auto search_icon = icon(u"search",16,paletteValue(u"TEXT_DIM"))) search_input->addAction(*search_icon,QLineEdit::LeadingPosition);
-    search_layout->addWidget(search_input); layout->addWidget(search);
-    connect(model_, &ModListModel::active_mods_changed, this, &ModListPanel::active_mods_changed);
-    qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    qml_->setAttribute(Qt::WA_AlwaysStackOnTop,false);
-    qml_->setClearColor(paletteColor(u"ELEVATE_1")); qml_->setAcceptDrops(true);
-    qml_->rootContext()->setContextProperty(QStringLiteral("modListPanel"),this);
-    qml_->rootContext()->setContextProperty(QStringLiteral("modListModel"),proxy_);
-    qml_->rootContext()->setContextProperty(QStringLiteral("modListHasFocus"),false);
-    qml_->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/ModList.qml")));
-    layout->addWidget(qml_);
-    qml_->setFocusPolicy(Qt::StrongFocus); qml_->installEventFilter(this);
-    highlight_timer_->setSingleShot(true); highlight_timer_->setInterval(1200);
-    connect(highlight_timer_, &QTimer::timeout, this, [this] { set_highlighted({}); });
-    active_connection_ = ctx_.activeStateChanged().connect([this](const auto& active) { core_state_changed(active); });
-    config_connection_ = ctx_.configChanged().connect([this](const auto& cfg) { setCompactMode(cfg.compact_mod_list); });
-    mods_connection_ = ctx_.modService().mods_changed.connect([this](const auto&) { refresh(); });
+    auto* searchLayout = new QHBoxLayout(search); searchLayout->setContentsMargins(16,8,16,8);
+    searchInput = new QLineEdit(search);
+    searchInput->setObjectName(QStringLiteral("searchInput"));
+    searchInput->setPlaceholderText(QStringLiteral("Search mods, package ID, author…"));
+    searchInput->setClearButtonEnabled(true);
+    connect(searchInput, &QLineEdit::textChanged, this, &ModListPanel::setSearchFilter);
+    if (const auto searchIcon = icon(u"search",16,paletteValue(u"TEXT_DIM"))) searchInput->addAction(*searchIcon,QLineEdit::LeadingPosition);
+    searchLayout->addWidget(searchInput); layout->addWidget(search);
+    connect(m_model, &ModListModel::activeModsChanged, this, &ModListPanel::activeModsChanged);
+    m_qml->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    m_qml->setAttribute(Qt::WA_AlwaysStackOnTop,false);
+    m_qml->setClearColor(paletteColor(u"ELEVATE_1")); m_qml->setAcceptDrops(true);
+    m_qml->rootContext()->setContextProperty(QStringLiteral("modListPanel"),this);
+    m_qml->rootContext()->setContextProperty(QStringLiteral("modListModel"),m_proxy);
+    m_qml->rootContext()->setContextProperty(QStringLiteral("modListHasFocus"),false);
+    m_qml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/ModList.qml")));
+    layout->addWidget(m_qml);
+    m_qml->setFocusPolicy(Qt::StrongFocus); m_qml->installEventFilter(this);
+    m_highlightTimer->setSingleShot(true); m_highlightTimer->setInterval(1200);
+    connect(m_highlightTimer, &QTimer::timeout, this, [this] { setHighlighted({}); });
+    m_activeConnection = m_ctx.activeStateChanged().connect([this](const auto& active) { coreStateChanged(active); });
+    m_configConnection = m_ctx.configChanged().connect([this](const auto& cfg) { setCompactMode(cfg.compact_mod_list); });
+    m_modsConnection = m_ctx.modService().modsChanged.connect([this](const auto&) { refresh(); });
 }
 ModListPanel::~ModListPanel() {
-    ctx_.activeStateChanged().disconnect(active_connection_);
-    ctx_.configChanged().disconnect(config_connection_);
-    ctx_.modService().mods_changed.disconnect(mods_connection_);
+    m_ctx.activeStateChanged().disconnect(m_activeConnection);
+    m_ctx.configChanged().disconnect(m_configConnection);
+    m_ctx.modService().modsChanged.disconnect(m_modsConnection);
     // QML bindings refer to the models and panel during destruction.
-    delete qml_;
+    delete m_qml;
 }
-void ModListPanel::load_mods(const QHash<QString, ListedModPtr>& mods, const QStringList& active) { model_->load_mods(mods,active); }
-QStringList ModListPanel::active_uuids() const { return model_->active_uuids(); }
-void ModListPanel::set_sidebar_filter(std::optional<QSet<QString>> uuids) { proxy_->set_sidebar_filter(std::move(uuids)); }
-void ModListPanel::set_search_filter(const QString& text) { proxy_->set_search_filter(text); }
+void ModListPanel::loadMods(const QHash<QString, ListedModPtr>& mods, const QStringList& active) { m_model->loadMods(mods,active); }
+QStringList ModListPanel::activeUuids() const { return m_model->activeUuids(); }
+void ModListPanel::setSidebarFilter(std::optional<QSet<QString>> uuids) { m_proxy->setSidebarFilter(std::move(uuids)); }
+void ModListPanel::setSearchFilter(const QString& text) { m_proxy->setSearchFilter(text); }
 void ModListPanel::setCompactMode(bool enabled) {
-    if (compact_mode_ == enabled) return;
-    compact_mode_ = enabled; emit compact_mode_changed(enabled);
+    if (m_compactMode == enabled) return;
+    m_compactMode = enabled; emit compactModeChanged(enabled);
 }
-bool ModListPanel::isHighlighted(const QString& uuid) const { return highlighted_.contains(uuid); }
-void ModListPanel::modSelected(const QString& uuid) { emit mod_selected(uuid); }
-int ModListPanel::proxy_to_source_row(int row) const { return proxy_->mapToSource(proxy_->index(row)).row(); }
-QString ModListPanel::uuidAt(int row) const { const auto* item = model_->get_item(proxy_to_source_row(row)); return item ? item->uuid : QString{}; }
-int ModListPanel::rowForUuid(const QString& uuid) const { return proxy_->proxy_row_for_uuid(uuid); }
-bool ModListPanel::isChecked(int row) const { const auto* item = model_->get_item(proxy_to_source_row(row)); return item && item->checked; }
-bool ModListPanel::select_uuid(const QString& uuid) {
+bool ModListPanel::isHighlighted(const QString& uuid) const { return m_highlighted.contains(uuid); }
+void ModListPanel::modSelected(const QString& uuid) { emit modPicked(uuid); }
+int ModListPanel::proxyToSourceRow(int row) const { return m_proxy->mapToSource(m_proxy->index(row)).row(); }
+QString ModListPanel::uuidAt(int row) const { const auto* item = m_model->getItem(proxyToSourceRow(row)); return item ? item->uuid : QString{}; }
+int ModListPanel::rowForUuid(const QString& uuid) const { return m_proxy->proxyRowForUuid(uuid); }
+bool ModListPanel::isChecked(int row) const { const auto* item = m_model->getItem(proxyToSourceRow(row)); return item && item->checked; }
+bool ModListPanel::selectUuid(const QString& uuid) {
     const int row = rowForUuid(uuid);
-    auto* root = qml_->rootObject();
+    auto* root = m_qml->rootObject();
     if (row < 0 || !root) return false;
     return QMetaObject::invokeMethod(root,"revealRow",Qt::DirectConnection,Q_ARG(QVariant,QVariant(row)),Q_ARG(QVariant,QVariant(uuid)));
 }
 void ModListPanel::clearSelection() {
-    auto* root = qml_->rootObject();
+    auto* root = m_qml->rootObject();
     auto* view = root ? root->findChild<QObject*>(QStringLiteral("listView")) : nullptr;
     if (view) {
         view->setProperty("currentIndex",-1); view->setProperty("anchorIndex",-1);
         view->setProperty("selectedIndices",QVariantList{}); view->setProperty("selectedUuids",QVariantList{});
         view->setProperty("currentUuid",QString{}); view->setProperty("anchorUuid",QString{});
     }
-    emit selection_changed({}); emit mod_selected({});
+    emit selectionUpdated({}); emit modPicked({});
 }
 QCoro::Task<void> ModListPanel::refresh() {
-    model_->update_provider_colors(ctx_.modService().provider_colors());
-    model_->load_mods(ctx_.allMods(),ctx_.activeUuids());
+    m_model->updateProviderColors(m_ctx.modService().providerColors());
+    m_model->loadMods(m_ctx.allMods(),m_ctx.activeUuids());
     QPointer<ModListPanel> self(this);
-    const auto impacts = co_await ctx_.modService().startup_impact().get_all_averages();
-    if (self && impacts) self->model_->set_startup_impact(*impacts);
+    const auto impacts = co_await m_ctx.modService().startupImpact().getAllAverages();
+    if (self && impacts) self->m_model->setStartupImpact(*impacts);
 }
 QCoro::QmlTask ModListPanel::toggleChecked(const QVariantList& rows) {
     QList<int> selected; selected.reserve(rows.size());
     for (const auto& row : rows) selected.append(row.toInt());
-    return toggle_rows(std::move(selected));
+    return toggleRows(std::move(selected));
 }
-QCoro::Task<void> ModListPanel::toggle_rows(QList<int> rows) {
+QCoro::Task<void> ModListPanel::toggleRows(QList<int> rows) {
     QStringList selected;
     for (const int row : rows) { const auto uuid = uuidAt(row); if (!uuid.isEmpty()) selected.append(uuid); }
     if (selected.isEmpty()) co_return;
-    const QSet<QString> previous(ctx_.activeUuids().begin(),ctx_.activeUuids().end());
+    const QSet<QString> previous(m_ctx.activeUuids().begin(),m_ctx.activeUuids().end());
     QPointer<ModListPanel> self(this);
-    co_await toggle_mods(ctx_,this,selected);
+    co_await toggleMods(m_ctx,this,selected);
     if (!self) co_return;
-    QStringList newly_enabled;
-    for (const auto& uuid : selected) if (!previous.contains(uuid) && ctx_.activeUuids().contains(uuid)) newly_enabled.append(uuid);
-    if (!newly_enabled.isEmpty()) highlight_rows(newly_enabled);
+    QStringList newlyEnabled;
+    for (const auto& uuid : selected) if (!previous.contains(uuid) && m_ctx.activeUuids().contains(uuid)) newlyEnabled.append(uuid);
+    if (!newlyEnabled.isEmpty()) highlightRows(newlyEnabled);
 }
-void ModListPanel::set_highlighted(const QStringList& uuids) {
-    highlighted_ = QSet<QString>(uuids.begin(),uuids.end()); ++highlight_revision_; emit highlighted_changed();
+void ModListPanel::setHighlighted(const QStringList& uuids) {
+    m_highlighted = QSet<QString>(uuids.begin(),uuids.end()); ++m_highlightRevision; emit highlightedChanged();
 }
-void ModListPanel::highlight_rows(const QStringList& uuids) {
+void ModListPanel::highlightRows(const QStringList& uuids) {
     int last = -1;
     for (const auto& uuid : uuids) if (const int row = rowForUuid(uuid); row >= 0) last = row;
-    auto* root = qml_->rootObject();
+    auto* root = m_qml->rootObject();
     if (last < 0 || !root) return;
     if (auto* view = root->findChild<QObject*>(QStringLiteral("listView")))
         QMetaObject::invokeMethod(view,"positionViewAtIndex",Qt::DirectConnection,Q_ARG(int,last),Q_ARG(int,4));
-    set_highlighted(uuids); highlight_timer_->start();
+    setHighlighted(uuids); m_highlightTimer->start();
 }
 void ModListPanel::showContextMenu(const QVariantList& values) {
-    if (!ctx_.downloads().available()) return;
+    if (!m_ctx.downloads().available()) return;
     QStringList uuids; uuids.reserve(values.size());
     for (const auto& value : values) uuids.append(value.toString());
     auto* menu = new QMenu(this); menu->setAttribute(Qt::WA_DeleteOnClose); menu->setToolTipsVisible(true);
-    add_update_action(menu,ctx_,uuids,[this,uuids] { update_mods(ctx_,uuids,this); });
+    addUpdateAction(menu,m_ctx,uuids,[this,uuids] { updateMods(m_ctx,uuids,this); });
     menu->popup(QCursor::pos());
 }
-void ModListPanel::core_state_changed(const QStringList& uuids) {
-    const auto current_list = model_->active_uuids();
-    const QSet<QString> current(current_list.begin(),current_list.end()), next(uuids.begin(),uuids.end());
-    model_->set_checkable(next - current,true); model_->set_checkable(current - next,false); model_->commitOrder(uuids);
+void ModListPanel::coreStateChanged(const QStringList& uuids) {
+    const auto currentList = m_model->activeUuids();
+    const QSet<QString> current(currentList.begin(),currentList.end()), next(uuids.begin(),uuids.end());
+    m_model->setCheckable(next - current,true); m_model->setCheckable(current - next,false); m_model->commitOrder(uuids);
 }
-void ModListPanel::commitOrder(const QStringList& uuids) { model_->commitOrder(uuids); ctx_.setActive(model_->active_uuids()); emit order_changed(); }
-void ModListPanel::moveRow(int source, int target) { proxy_->move_row(source,target,true); }
-void ModListPanel::dragEnded() { ctx_.setActive(model_->active_uuids()); emit order_changed(); }
+void ModListPanel::commitOrder(const QStringList& uuids) { m_model->commitOrder(uuids); m_ctx.setActive(m_model->activeUuids()); emit orderChanged(); }
+void ModListPanel::moveRow(int source, int target) { m_proxy->moveRow(source,target,true); }
+void ModListPanel::dragEnded() { m_ctx.setActive(m_model->activeUuids()); emit orderChanged(); }
 void ModListPanel::selectionChanged(const QVariantList& values) {
     QStringList uuids;
     for (const auto& value : values) if (!value.toString().isEmpty()) uuids.append(value.toString());
-    emit selection_changed(uuids);
+    emit selectionUpdated(uuids);
 }
 bool ModListPanel::eventFilter(QObject* object, QEvent* event) {
-    if (object == qml_ && (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut))
-        qml_->rootContext()->setContextProperty(QStringLiteral("modListHasFocus"),event->type() == QEvent::FocusIn);
+    if (object == m_qml && (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut))
+        m_qml->rootContext()->setContextProperty(QStringLiteral("modListHasFocus"),event->type() == QEvent::FocusIn);
     return QWidget::eventFilter(object,event);
 }
 }

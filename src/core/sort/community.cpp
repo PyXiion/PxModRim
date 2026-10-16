@@ -11,7 +11,7 @@ namespace px::modrim::sort {
 
 namespace {
 
-CaseInsensitiveSet to_package_set(const std::map<std::string, SubExternalRule>& rules) {
+CaseInsensitiveSet toPackageSet(const std::map<std::string, SubExternalRule>& rules) {
     CaseInsensitiveSet result;
     for (const auto& [pid, _] : rules) {
         result.add(QString::fromStdString(pid));
@@ -21,26 +21,26 @@ CaseInsensitiveSet to_package_set(const std::map<std::string, SubExternalRule>& 
 
 }  // namespace
 
-CommunityRules to_community_rules(const ExternalRulesSchema& schema) {
+CommunityRules toCommunityRules(const ExternalRulesSchema& schema) {
     CommunityRules result;
     for (const auto& [pid_str, rule] : schema.rules) {
         CommunityRule community;
-        community.package_id = PackageId(QString::fromStdString(pid_str));
-        community.load_after = to_package_set(rule.loadAfter);
-        community.load_before = to_package_set(rule.loadBefore);
-        community.load_first = rule.loadTop.value;
-        community.load_last = rule.loadBottom.value;
-        result.insert(community.package_id, std::move(community));
+        community.packageId = PackageId(QString::fromStdString(pid_str));
+        community.loadAfter = toPackageSet(rule.loadAfter);
+        community.loadBefore = toPackageSet(rule.loadBefore);
+        community.loadFirst = rule.loadTop.value;
+        community.loadLast = rule.loadBottom.value;
+        result.insert(community.packageId, std::move(community));
     }
     return result;
 }
 
-Result<CommunityRules> load_community_rules(const QString& json_path) {
-    if (!QFileInfo::exists(json_path)) {
+Result<CommunityRules> loadCommunityRules(const QString& jsonPath) {
+    if (!QFileInfo::exists(jsonPath)) {
         return CommunityRules{};
     }
 
-    auto bytes = read_file_bytes(json_path);
+    auto bytes = readFileBytes(jsonPath);
     if (!bytes) {
         return std::unexpected(bytes.error());
     }
@@ -48,10 +48,10 @@ Result<CommunityRules> load_community_rules(const QString& json_path) {
     ExternalRulesSchema schema;
     if (auto error = glz::read<kJsonReadOpts>(schema, *bytes)) {
         return std::unexpected(Error{QStringLiteral("Failed to parse community rules %1: %2")
-                                         .arg(json_path, QString::fromStdString(
+                                         .arg(jsonPath, QString::fromStdString(
                                                              glz::format_error(error, *bytes)))});
     }
-    return to_community_rules(schema);
+    return toCommunityRules(schema);
 }
 
 }  // namespace px::modrim::sort

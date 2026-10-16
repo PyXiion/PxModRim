@@ -13,13 +13,13 @@ using CheckedDownloads = QList<QPair<QString, QString>>;
 class DownloadQueueModel final : public QAbstractListModel {
     Q_OBJECT
 public:
-    enum Role { IdRole = Qt::UserRole + 1, TitleRole, DisplayRole, StatusRole, ProgressRole };
+    enum Role { kIdRole = Qt::UserRole + 1, kTitleRole, kDisplayRole, kStatusRole, kProgressRole };
     explicit DownloadQueueModel(QObject* parent = nullptr);
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
-    void sync_from(const CheckedDownloads& checked, const QHash<QString, QString>& statuses = {});
-    void update_status(const QString& id, const QString& status, qint64 done = 0, qint64 total = 0);
+    void syncFrom(const CheckedDownloads& checked, const QHash<QString, QString>& statuses = {});
+    void updateStatus(const QString& id, const QString& status, qint64 done = 0, qint64 total = 0);
 
 private:
     struct Item {
@@ -29,7 +29,7 @@ private:
         QString status;
         double progress = 0;
     };
-    QList<Item> items_;
+    QList<Item> m_items;
 };
 
 }  // namespace px::modrim

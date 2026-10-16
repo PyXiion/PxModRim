@@ -10,9 +10,9 @@ CoreModProvider::CoreModProvider(QString gamePath, MetadataCacheStore* metadataC
     : BaseModProvider(QStringLiteral("core"), QStringLiteral("#e67e22"), std::move(gamePath),
                       nullptr, metadataCache) {}
 
-QCoro::Task<Result<ModMap>> CoreModProvider::discover(QString target_version, Profiler* timer,
-                                                      MetadataCacheStore* metadata_cache,
-                                                      bool force_reparse) {
+QCoro::Task<Result<ModMap>> CoreModProvider::discover(QString targetVersion, Profiler* timer,
+                                                      MetadataCacheStore* metadataCache,
+                                                      bool forceReparse) {
     Profiler ownTimer;
     Profiler& tm = timer ? *timer : ownTimer;
 
@@ -29,8 +29,8 @@ QCoro::Task<Result<ModMap>> CoreModProvider::discover(QString target_version, Pr
             nullptr, [dataDir] { return scanModDirectory(dataDir); });
     }
 
-    auto discovered = co_await load_mods(std::move(dirs), std::move(target_version), tm,
-                                         metadata_cache, force_reparse);
+    auto discovered = co_await loadMods(std::move(dirs), std::move(targetVersion), tm,
+                                         metadataCache, forceReparse);
     if (discovered) {
         spdlog::info("CoreModProvider discovered {} mods", discovered->size());
     }

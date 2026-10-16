@@ -67,9 +67,9 @@ public:
     virtual void teardown();
 
 protected:
-    CoreContext& ctx_;
-    QQmlEngine* engine_;
-    AppContext& app_;
+    CoreContext& m_ctx;
+    QQmlEngine* m_engine;
+    AppContext& m_app;
 };
 
 using RailViewFactory = std::function<RailView*(CoreContext&, QQmlEngine*, QWidget*, AppContext&)>;
@@ -98,23 +98,23 @@ public:
 
     // ── Plugin system (UI layer) ──────────────────────
     void registerPlugin(std::unique_ptr<UiPlugin> plugin);
-    UiPluginRegistry& plugins() noexcept { return plugins_; }
+    UiPluginRegistry& plugins() noexcept { return m_plugins; }
 
     // ── Rail views ────────────────────────────────────
     // Appends, or inserts at `position` when given.
     template <RailViewType V>
     void addRailView(std::optional<std::size_t> position = std::nullopt);
-    const std::vector<RailViewSpec>& railViews() const noexcept { return rail_views_; }
+    const std::vector<RailViewSpec>& railViews() const noexcept { return m_railViews; }
 
     // ── Settings sections ─────────────────────────────
     // Each section is built per dialog, parented to that dialog.
     void addSettingsSection(SettingsSectionFactory factory);
-    const std::vector<SettingsSectionFactory>& settingsSections() const noexcept { return settings_sections_; }
+    const std::vector<SettingsSectionFactory>& settingsSections() const noexcept { return m_settingsSections; }
 
     // ── Toasts ────────────────────────────────────────
     // Not owned; nullptr when no toast surface is shown.
-    Notifier* toasts() const noexcept { return toasts_; }
-    void setToasts(Notifier* notifier) noexcept { toasts_ = notifier; }
+    Notifier* toasts() const noexcept { return m_toasts; }
+    void setToasts(Notifier* notifier) noexcept { m_toasts = notifier; }
 
     // ── Navigation ────────────────────────────────────
     // Opens a `modrim://<viewId>[/…]` link; a no-op until a navigator is set.
@@ -122,11 +122,11 @@ public:
     void setNavigator(std::function<void(const QString&)> navigate);
 
     // ── UI prefs ──────────────────────────────────────
-    UiPrefs& uiPrefs() noexcept { return ui_prefs_; }
-    const UiPrefs& uiPrefs() const noexcept { return ui_prefs_; }
+    UiPrefs& uiPrefs() noexcept { return m_uiPrefs; }
+    const UiPrefs& uiPrefs() const noexcept { return m_uiPrefs; }
 
     // ── Core access ───────────────────────────────────
-    CoreContext& coreContext() const noexcept { return core_; }
+    CoreContext& coreContext() const noexcept { return m_core; }
 
     // ── Lifecycle ─────────────────────────────────────
     // Core plugins first, then UI plugins; UI plugins may depend on core plugin names.
@@ -138,13 +138,13 @@ public:
     QCoro::Task<Result<void>> shutdownAll();
 
 private:
-    CoreContext& core_;
-    UiPluginRegistry plugins_;
-    std::vector<RailViewSpec> rail_views_;
-    std::vector<SettingsSectionFactory> settings_sections_;
-    Notifier* toasts_ = nullptr;
-    std::function<void(const QString&)> navigate_;
-    UiPrefs ui_prefs_;
+    CoreContext& m_core;
+    UiPluginRegistry m_plugins;
+    std::vector<RailViewSpec> m_railViews;
+    std::vector<SettingsSectionFactory> m_settingsSections;
+    Notifier* m_toasts = nullptr;
+    std::function<void(const QString&)> m_navigate;
+    UiPrefs m_uiPrefs;
 };
 
 template <RailViewType V>
@@ -156,9 +156,9 @@ void AppContext::addRailView(std::optional<std::size_t> position) {
         },
     };
     if (position) {
-        rail_views_.insert(rail_views_.begin() + static_cast<std::ptrdiff_t>(*position), std::move(spec));
+        m_railViews.insert(m_railViews.begin() + static_cast<std::ptrdiff_t>(*position), std::move(spec));
     } else {
-        rail_views_.push_back(std::move(spec));
+        m_railViews.push_back(std::move(spec));
     }
 }
 

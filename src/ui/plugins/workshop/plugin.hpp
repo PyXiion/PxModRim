@@ -16,7 +16,7 @@ protected:
     Result<void> commit(const QJsonObject& merged) override;
 
 private:
-    workshop::WorkshopCatalog& catalog_;
+    workshop::WorkshopCatalog& m_catalog;
 };
 
 class WorkshopUiPlugin : public UiPlugin {

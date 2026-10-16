@@ -18,75 +18,75 @@ namespace px::modrim {
 
 namespace {
 
-QString config_folder_of(const CoreContext& ctx) {
+QString configFolderOf(const CoreContext& ctx) {
     return QString::fromStdString(ctx.config().paths.config_folder);
 }
 
 }  // namespace
 
 ModService::ModService(CoreContext& ctx, providers::ProviderList providers,
-                       std::unique_ptr<services::MetadataCache> metadata_cache)
-    : ctx_(ctx),
-      providers_(std::move(providers)),
-      metadata_cache_(std::move(metadata_cache)),
-      startup_impact_(ctx) {
-    if (!metadata_cache_ && ctx.hasConfigService()) {
-        metadata_cache_ = std::make_unique<services::MetadataCache>(
-            services::metadata_cache_path(ctx.configService().directory()));
+                       std::unique_ptr<services::MetadataCache> metadataCache)
+    : m_ctx(ctx),
+      m_providers(std::move(providers)),
+      m_metadataCache(std::move(metadataCache)),
+      m_startupImpact(ctx) {
+    if (!m_metadataCache && ctx.hasConfigService()) {
+        m_metadataCache = std::make_unique<services::MetadataCache>(
+            services::metadataCachePath(ctx.configService().directory()));
     }
 }
 
-void ModService::reset_providers(providers::ProviderList providers) {
-    providers_ = std::move(providers);
+void ModService::resetProviders(providers::ProviderList providers) {
+    m_providers = std::move(providers);
 }
 
-providers::BaseModProvider* ModService::get_provider(const QString& provider_id) const {
-    for (const auto& provider : providers_) {
-        if (provider->provider_id() == provider_id) {
+providers::BaseModProvider* ModService::getProvider(const QString& providerId) const {
+    for (const auto& provider : m_providers) {
+        if (provider->providerId() == providerId) {
             return provider.get();
         }
     }
     return nullptr;
 }
 
-QHash<QString, QString> ModService::provider_colors() const {
+QHash<QString, QString> ModService::providerColors() const {
     QHash<QString, QString> colors;
-    for (const auto& provider : providers_) {
-        colors.insert(provider->provider_id(), provider->color());
+    for (const auto& provider : m_providers) {
+        colors.insert(provider->providerId(), provider->color());
     }
     return colors;
 }
 
-QCoro::Task<Result<providers::ModMap>> ModService::discover_one(providers::BaseModProvider& provider,
-                                                                Profiler& timer, bool force_reparse) {
-    auto scope = timer(QStringLiteral("provider.%1").arg(provider.provider_id()));
-    co_return co_await provider.discover(ctx_.targetVersion(), &timer, metadata_cache_.get(),
-                                         force_reparse);
+QCoro::Task<Result<providers::ModMap>> ModService::discoverOne(providers::BaseModProvider& provider,
+                                                                Profiler& timer, bool forceReparse) {
+    auto scope = timer(QStringLiteral("provider.%1").arg(provider.providerId()));
+    co_return co_await provider.discover(m_ctx.targetVersion(), &timer, m_metadataCache.get(),
+                                         forceReparse);
 }
 
-QCoro::Task<Result<void>> ModService::discover(Profiler* timer, bool force_reparse) {
+QCoro::Task<Result<void>> ModService::discover(Profiler* timer, bool forceReparse) {
     // Each provider profiles into its own tree, since their discoveries interleave.
-    std::unique_ptr<Profiler> own_timer;
+    std::unique_ptr<Profiler> ownTimer;
     if (!timer) {
-        own_timer = std::make_unique<Profiler>();
-        timer = own_timer.get();
+        ownTimer = std::make_unique<Profiler>();
+        timer = ownTimer.get();
     }
     auto scope = (*timer)(QStringLiteral("discover"));
 
-    std::vector<std::unique_ptr<Profiler>> child_timers;
+    std::vector<std::unique_ptr<Profiler>> childTimers;
     std::vector<QCoro::Task<Result<providers::ModMap>>> tasks;
-    child_timers.reserve(providers_.size());
-    tasks.reserve(providers_.size());
-    for (const auto& provider : providers_) {
-        child_timers.push_back(std::make_unique<Profiler>());
-        tasks.push_back(discover_one(*provider, *child_timers.back(), force_reparse));
+    childTimers.reserve(m_providers.size());
+    tasks.reserve(m_providers.size());
+    for (const auto& provider : m_providers) {
+        childTimers.push_back(std::make_unique<Profiler>());
+        tasks.push_back(discoverOne(*provider, *childTimers.back(), forceReparse));
     }
 
-    providers::ModMap all_mods;
+    providers::ModMap allMods;
     std::optional<Error> failure;
     for (std::size_t i = 0; i < tasks.size(); ++i) {
         auto result = co_await tasks[i];
-        timer->adopt(*child_timers[i]);
+        timer->adopt(*childTimers[i]);
         if (!result) {
             if (!failure) {
                 failure = result.error();
@@ -94,55 +94,55 @@ QCoro::Task<Result<void>> ModService::discover(Profiler* timer, bool force_repar
             continue;
         }
         for (auto it = result->cbegin(); it != result->cend(); ++it) {
-            all_mods.insert(it.key(), it.value());
+            allMods.insert(it.key(), it.value());
         }
     }
     if (failure) {
         co_return std::unexpected(*failure);
     }
 
-    if (metadata_cache_) {
+    if (m_metadataCache) {
         auto prune = (*timer)(QStringLiteral("cache_prune"));
-        QStringList mod_paths;
-        for (const auto& mod : all_mods) {
-            if (mod->mod_path()) {
-                mod_paths.append(*mod->mod_path());
+        QStringList modPaths;
+        for (const auto& mod : allMods) {
+            if (mod->modPath()) {
+                modPaths.append(*mod->modPath());
             }
         }
-        const QStringList live_paths = co_await providers::runOnPool<QStringList>(
-            nullptr, [mod_paths] { return services::normalize_paths(mod_paths); });
-        co_await metadata_cache_->prune_disappeared(QSet<QString>(live_paths.cbegin(), live_paths.cend()));
+        const QStringList livePaths = co_await providers::runOnPool<QStringList>(
+            nullptr, [modPaths] { return services::normalizePaths(modPaths); });
+        co_await m_metadataCache->pruneDisappeared(QSet<QString>(livePaths.cbegin(), livePaths.cend()));
     }
 
     {
         auto resolve = (*timer)(QStringLiteral("resolve_active"));
-        const QStringList active = services::resolve_active_uuids(all_mods, config_folder_of(ctx_));
-        ctx_.load(std::move(all_mods), active);
+        const QStringList active = services::resolveActiveUuids(allMods, configFolderOf(m_ctx));
+        m_ctx.load(std::move(allMods), active);
     }
 
-    if (own_timer) {
-        spdlog::debug("Profile report:\n{}", own_timer->render().toStdString());
+    if (ownTimer) {
+        spdlog::debug("Profile report:\n{}", ownTimer->render().toStdString());
     }
     co_return {};
 }
 
-QCoro::Task<Result<void>> ModService::run_refresh_pipeline(const QString& label, bool force_reparse) {
+QCoro::Task<Result<void>> ModService::runRefreshPipeline(const QString& label, bool forceReparse) {
     Profiler timer;
     auto scope = timer(QStringLiteral("mod_service.%1").arg(label));
 
-    Profiler discover_timer;
-    Profiler diagnostics_timer;
-    Profiler impact_timer;
-    auto discovery = discover(&discover_timer, force_reparse);
-    auto diagnostics = ctx_.diagnosticsService().initialize(&diagnostics_timer);
-    auto impact = startup_impact_.load();
+    Profiler discoverTimer;
+    Profiler diagnosticsTimer;
+    Profiler impactTimer;
+    auto discovery = discover(&discoverTimer, forceReparse);
+    auto diagnostics = m_ctx.diagnosticsService().initialize(&diagnosticsTimer);
+    auto impact = m_startupImpact.load();
 
     const auto discovered = co_await discovery;
     const auto initialized = co_await diagnostics;
     const auto loaded = co_await impact;
-    timer.adopt(discover_timer);
-    timer.adopt(diagnostics_timer);
-    timer.adopt(impact_timer);
+    timer.adopt(discoverTimer);
+    timer.adopt(diagnosticsTimer);
+    timer.adopt(impactTimer);
 
     if (!discovered) {
         co_return std::unexpected(discovered.error());
@@ -153,59 +153,59 @@ QCoro::Task<Result<void>> ModService::run_refresh_pipeline(const QString& label,
     if (!loaded) {
         co_return std::unexpected(loaded.error());
     }
-    ctx_.diagnosticsService().rebuild(ctx_.activeUuids(), &timer);
+    m_ctx.diagnosticsService().rebuild(m_ctx.activeUuids(), &timer);
     spdlog::debug("Profile report:\n{}", timer.render().toStdString());
-    mods_changed.notify(std::monostate{});
+    modsChanged.notify(std::monostate{});
     co_return {};
 }
 
-std::optional<QString> ModService::snapshots_dir() const {
-    if (!ctx_.hasConfigService()) {
+std::optional<QString> ModService::snapshotsDir() const {
+    if (!m_ctx.hasConfigService()) {
         return std::nullopt;
     }
-    return QDir(ctx_.configService().directory()).filePath(QStringLiteral("snapshots"));
+    return QDir(m_ctx.configService().directory()).filePath(QStringLiteral("snapshots"));
 }
 
-void ModService::snapshot_current_config() {
-    const QString config_folder = config_folder_of(ctx_);
-    const auto snapshots = snapshots_dir();
-    if (config_folder.isEmpty() || !snapshots) {
+void ModService::snapshotCurrentConfig() {
+    const QString configFolder = configFolderOf(m_ctx);
+    const auto snapshots = snapshotsDir();
+    if (configFolder.isEmpty() || !snapshots) {
         return;
     }
-    const QString config_path = QDir(config_folder).filePath(QStringLiteral("ModsConfig.xml"));
-    if (!QFileInfo(config_path).isFile()) {
+    const QString configPath = QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+    if (!QFileInfo(configPath).isFile()) {
         return;
     }
-    if (auto created = create_snapshot(config_path, *snapshots, ctx_.config().max_snapshots); !created) {
+    if (auto created = createSnapshot(configPath, *snapshots, m_ctx.config().max_snapshots); !created) {
         spdlog::warn("Failed to snapshot ModsConfig.xml: {}", created.error().message.toStdString());
     }
 }
 
 QCoro::Task<Result<void>> ModService::initialize() {
-    snapshot_current_config();
-    co_return co_await run_refresh_pipeline(QStringLiteral("initialize"), false);
+    snapshotCurrentConfig();
+    co_return co_await runRefreshPipeline(QStringLiteral("initialize"), false);
 }
 
 QCoro::Task<Result<void>> ModService::reload(bool full) {
-    co_return co_await run_refresh_pipeline(QStringLiteral("reload"), full);
+    co_return co_await runRefreshPipeline(QStringLiteral("reload"), full);
 }
 
-QStringList ModService::get_snapshots() const {
-    const auto snapshots = snapshots_dir();
-    return snapshots ? px::modrim::get_snapshots(*snapshots) : QStringList{};
+QStringList ModService::getSnapshots() const {
+    const auto snapshots = snapshotsDir();
+    return snapshots ? px::modrim::getSnapshots(*snapshots) : QStringList{};
 }
 
-QCoro::Task<bool> ModService::restore_snapshot(QString snapshot_path) {
-    const QString config_folder = config_folder_of(ctx_);
-    const auto snapshots = snapshots_dir();
-    if (config_folder.isEmpty() || !snapshots) {
+QCoro::Task<bool> ModService::restoreSnapshot(QString snapshotPath) {
+    const QString configFolder = configFolderOf(m_ctx);
+    const auto snapshots = snapshotsDir();
+    if (configFolder.isEmpty() || !snapshots) {
         spdlog::warn("Cannot restore snapshot: configuration is incomplete");
         co_return false;
     }
 
-    const QString config_path = QDir(config_folder).filePath(QStringLiteral("ModsConfig.xml"));
-    auto restored = px::modrim::restore_snapshot(snapshot_path, config_path, *snapshots,
-                                               ctx_.config().max_snapshots);
+    const QString configPath = QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+    auto restored = px::modrim::restoreSnapshot(snapshotPath, configPath, *snapshots,
+                                               m_ctx.config().max_snapshots);
     if (!restored) {
         spdlog::warn("Failed to restore snapshot: {}", restored.error().message.toStdString());
         co_return false;
@@ -219,35 +219,35 @@ QCoro::Task<bool> ModService::restore_snapshot(QString snapshot_path) {
     co_return true;
 }
 
-QCoro::Task<bool> ModService::save_active_layout(QStringList active_ids) {
-    const QString config_folder = config_folder_of(ctx_);
-    const auto snapshots = snapshots_dir();
-    if (config_folder.isEmpty() || !snapshots) {
+QCoro::Task<bool> ModService::saveActiveLayout(QStringList activeIds) {
+    const QString configFolder = configFolderOf(m_ctx);
+    const auto snapshots = snapshotsDir();
+    if (configFolder.isEmpty() || !snapshots) {
         co_return false;
     }
 
-    const auto& mods = ctx_.allMods();
-    QList<CaseInsensitiveStr> package_ids;
-    for (const QString& uuid : active_ids) {
+    const auto& mods = m_ctx.allMods();
+    QList<CaseInsensitiveStr> packageIds;
+    for (const QString& uuid : activeIds) {
         if (auto about = std::dynamic_pointer_cast<AboutXmlMod>(mods.value(uuid))) {
-            package_ids.append(about->package_id);
+            packageIds.append(about->packageId);
         }
     }
-    const QString config_path = QDir(config_folder).filePath(QStringLiteral("ModsConfig.xml"));
-    const QString target_version = ctx_.targetVersion();
-    const int max_snapshots = ctx_.config().max_snapshots;
-    const QString snapshots_path = *snapshots;
+    const QString configPath = QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+    const QString targetVersion = m_ctx.targetVersion();
+    const int maxSnapshots = m_ctx.config().max_snapshots;
+    const QString snapshotsPath = *snapshots;
 
     auto written = co_await providers::runOnPool<Result<void>>(
-        nullptr, [this, config_path, snapshots_path, target_version, max_snapshots,
-                  package_ids = std::move(package_ids)] {
-            QMutexLocker lock(&save_mutex_);
-            const auto existing = parse_mods_config(config_path);
+        nullptr, [this, configPath, snapshotsPath, targetVersion, maxSnapshots,
+                  packageIds = std::move(packageIds)] {
+            QMutexLocker lock(&m_saveMutex);
+            const auto existing = parseModsConfig(configPath);
             ModsConfig data;
-            data.version = target_version;
-            data.activeMods = package_ids;
+            data.version = targetVersion;
+            data.activeMods = packageIds;
             data.knownExpansions = existing ? existing->knownExpansions : QList<CaseInsensitiveStr>{};
-            return write_mods_config(config_path, data, snapshots_path, max_snapshots);
+            return writeModsConfig(configPath, data, snapshotsPath, maxSnapshots);
         });
     if (!written) {
         spdlog::warn("Failed to save ModsConfig.xml: {}", written.error().message.toStdString());
@@ -257,14 +257,14 @@ QCoro::Task<bool> ModService::save_active_layout(QStringList active_ids) {
 }
 
 QCoro::Task<void> ModService::close() {
-    if (metadata_cache_) {
-        co_await metadata_cache_->close();
+    if (m_metadataCache) {
+        co_await m_metadataCache->close();
     }
 }
 
-void ModService::close_sync() {
+void ModService::closeSync() {
     // Destroying the cache closes its connection and joins its worker thread.
-    metadata_cache_.reset();
+    m_metadataCache.reset();
 }
 
 }  // namespace px::modrim

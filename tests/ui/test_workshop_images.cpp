@@ -39,19 +39,19 @@ public:
         const QString pragma = QStringLiteral(".pragma library");
         if (script.startsWith(pragma))
             script.remove(0, pragma.size());
-        const QJSValue result = engine_.evaluate(script, path);
+        const QJSValue result = m_engine.evaluate(script, path);
         REQUIRE(!result.isError());
-        sized_ = engine_.globalObject().property(QStringLiteral("sized"));
-        REQUIRE(sized_.isCallable());
+        m_sized = m_engine.globalObject().property(QStringLiteral("sized"));
+        REQUIRE(m_sized.isCallable());
     }
 
     QString sized(const QString& url, int width, int height) {
-        return sized_.call(QJSValueList{QJSValue(url), QJSValue(width), QJSValue(height)}).toString();
+        return m_sized.call(QJSValueList{QJSValue(url), QJSValue(width), QJSValue(height)}).toString();
     }
 
 private:
-    QJSEngine engine_;
-    QJSValue sized_;
+    QJSEngine m_engine;
+    QJSValue m_sized;
 };
 
 // Spins the event loop until `predicate` holds or kWaitMs elapses.

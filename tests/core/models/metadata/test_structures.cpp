@@ -57,14 +57,14 @@ TEST_CASE("ListedMod has the invalid-mod defaults") {
     const ListedMod mod;
     CHECK(mod.name == QStringLiteral("Unknown Mod Name"));
     CHECK(mod.valid);
-    CHECK(mod.provider_id.isEmpty());
-    CHECK_FALSE(mod.mod_path().has_value());
+    CHECK(mod.providerId.isEmpty());
+    CHECK_FALSE(mod.modPath().has_value());
 }
 
 TEST_CASE("ListedMod provider_id is assignable") {
     ListedMod mod;
-    mod.provider_id = QStringLiteral("local");
-    CHECK(mod.provider_id == QStringLiteral("local"));
+    mod.providerId = QStringLiteral("local");
+    CHECK(mod.providerId == QStringLiteral("local"));
 }
 
 TEST_CASE("pathless ListedMod uuids are unique") {
@@ -75,28 +75,28 @@ TEST_CASE("pathless ListedMod uuids are unique") {
 
 TEST_CASE("ListedMod mod_path can be set only once") {
     ListedMod mod;
-    REQUIRE(mod.set_mod_path(QStringLiteral("/mods/a")));
+    REQUIRE(mod.setModPath(QStringLiteral("/mods/a")));
     CHECK(mod.uuid() == QStringLiteral("/mods/a"));
 
-    const auto second = mod.set_mod_path(QStringLiteral("/mods/b"));
+    const auto second = mod.setModPath(QStringLiteral("/mods/b"));
     REQUIRE_FALSE(second);
     CHECK(second.error().message == QStringLiteral("Mod path already set. Cannot override."));
-    CHECK(mod.mod_path() == QStringLiteral("/mods/a"));
+    CHECK(mod.modPath() == QStringLiteral("/mods/a"));
 }
 
 TEST_CASE("AboutXmlMod has the About.xml defaults") {
     const AboutXmlMod mod;
     CHECK(mod.name == QStringLiteral("Unknown Mod Name"));
     CHECK(mod.authors.isEmpty());
-    CHECK(mod.mod_version.isEmpty());
-    CHECK(mod.package_id == CaseInsensitiveStr(QStringLiteral("invalid.mod")));
+    CHECK(mod.modVersion.isEmpty());
+    CHECK(mod.packageId == CaseInsensitiveStr(QStringLiteral("invalid.mod")));
 }
 
 TEST_CASE("AboutXmlMod reports the DLC name for DLC package ids") {
     AboutXmlMod mod;
-    mod.package_id = CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.royalty"));
-    REQUIRE(mod.get_dlc_name().has_value());
-    CHECK(*mod.get_dlc_name() == QStringLiteral("RimWorld - Royalty"));
+    mod.packageId = CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.royalty"));
+    REQUIRE(mod.getDlcName().has_value());
+    CHECK(*mod.getDlcName() == QStringLiteral("RimWorld - Royalty"));
 }
 
 TEST_CASE("ModsConfig normalizes package ids to lowercase") {
@@ -114,7 +114,7 @@ TEST_CASE("ModsConfig clear_active_mods keeps expansions") {
         .activeMods = {CaseInsensitiveStr(QStringLiteral("ludeon.rimworld"))},
         .knownExpansions = {CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.royalty"))},
     };
-    config.clear_active_mods();
+    config.clearActiveMods();
     CHECK(config.activeMods.isEmpty());
     CHECK(config.knownExpansions.size() == 1);
 }
@@ -125,7 +125,7 @@ TEST_CASE("ModsConfig clear_all empties both lists") {
         .activeMods = {CaseInsensitiveStr(QStringLiteral("ludeon.rimworld"))},
         .knownExpansions = {CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.royalty"))},
     };
-    config.clear_all();
+    config.clearAll();
     CHECK(config.activeMods.isEmpty());
     CHECK(config.knownExpansions.isEmpty());
 }
@@ -137,7 +137,7 @@ TEST_CASE("ModsConfig detects duplicate active mods ignoring case") {
                        CaseInsensitiveStr(QStringLiteral("Mod.A"))},
         .knownExpansions = {},
     };
-    CHECK(duplicated.check_active_duplicates());
+    CHECK(duplicated.checkActiveDuplicates());
 
     const ModsConfig distinct{
         .version = QStringLiteral("1.5"),
@@ -145,7 +145,7 @@ TEST_CASE("ModsConfig detects duplicate active mods ignoring case") {
                        CaseInsensitiveStr(QStringLiteral("mod.b"))},
         .knownExpansions = {},
     };
-    CHECK_FALSE(distinct.check_active_duplicates());
+    CHECK_FALSE(distinct.checkActiveDuplicates());
 }
 
 TEST_CASE("ModsConfig detects duplicate expansions ignoring case") {
@@ -155,7 +155,7 @@ TEST_CASE("ModsConfig detects duplicate expansions ignoring case") {
         .knownExpansions = {CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.royalty")),
                             CaseInsensitiveStr(QStringLiteral("Ludeon.RimWorld.Royalty"))},
     };
-    CHECK(duplicated.check_expansions_duplicates());
+    CHECK(duplicated.checkExpansionsDuplicates());
 
     const ModsConfig distinct{
         .version = QStringLiteral("1.5"),
@@ -163,5 +163,5 @@ TEST_CASE("ModsConfig detects duplicate expansions ignoring case") {
         .knownExpansions = {CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.royalty")),
                             CaseInsensitiveStr(QStringLiteral("ludeon.rimworld.ideology"))},
     };
-    CHECK_FALSE(distinct.check_expansions_duplicates());
+    CHECK_FALSE(distinct.checkExpansionsDuplicates());
 }

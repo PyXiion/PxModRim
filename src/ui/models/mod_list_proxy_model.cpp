@@ -2,136 +2,136 @@
 #include <algorithm>
 #include <utility>
 namespace px::modrim {
-ModListProxyModel::ModListProxyModel(ModListModel* source, QObject* parent) : QAbstractListModel(parent), source_(source) {
-    connect(source_, &QAbstractItemModel::dataChanged, this, &ModListProxyModel::source_data_changed);
-    connect(source_, &QAbstractItemModel::layoutChanged, this, [this] { if (!in_proxy_move_) layout_rebuild(); });
-    connect(source_, &QAbstractItemModel::modelReset, this, [this] { beginResetModel(); rebuild(); endResetModel(); });
-    connect(source_, &QAbstractItemModel::rowsMoved, this, [this] { if (!in_proxy_move_) layout_rebuild(); });
-    connect(source_, &QAbstractItemModel::rowsInserted, this, [this] { if (!in_proxy_move_) layout_rebuild(); });
-    connect(source_, &QAbstractItemModel::rowsRemoved, this, [this] { if (!in_proxy_move_) layout_rebuild(); });
+ModListProxyModel::ModListProxyModel(ModListModel* source, QObject* parent) : QAbstractListModel(parent), m_source(source) {
+    connect(m_source, &QAbstractItemModel::dataChanged, this, &ModListProxyModel::sourceDataChanged);
+    connect(m_source, &QAbstractItemModel::layoutChanged, this, [this] { if (!m_inProxyMove) layoutRebuild(); });
+    connect(m_source, &QAbstractItemModel::modelReset, this, [this] { beginResetModel(); rebuild(); endResetModel(); });
+    connect(m_source, &QAbstractItemModel::rowsMoved, this, [this] { if (!m_inProxyMove) layoutRebuild(); });
+    connect(m_source, &QAbstractItemModel::rowsInserted, this, [this] { if (!m_inProxyMove) layoutRebuild(); });
+    connect(m_source, &QAbstractItemModel::rowsRemoved, this, [this] { if (!m_inProxyMove) layoutRebuild(); });
     rebuild();
 }
-int ModListProxyModel::rowCount(const QModelIndex& parent) const { return parent.isValid() ? 0 : static_cast<int>(visible_uuids_.size()); }
-void ModListProxyModel::rebuild_source_mapping() {
-    source_rows_.clear();
-    for (int row = 0; row < source_->rowCount(); ++row) source_rows_.insert(source_->get_item(row)->uuid, row);
+int ModListProxyModel::rowCount(const QModelIndex& parent) const { return parent.isValid() ? 0 : static_cast<int>(m_visibleUuids.size()); }
+void ModListProxyModel::rebuildSourceMapping() {
+    m_sourceRows.clear();
+    for (int row = 0; row < m_source->rowCount(); ++row) m_sourceRows.insert(m_source->getItem(row)->uuid, row);
 }
-bool ModListProxyModel::accept_item(const ModItem& item) const {
-    if (sidebar_uuids_ && !sidebar_uuids_->contains(item.uuid)) return false;
-    if (search_text_.isEmpty() || item.mod->name.trimmed().toCaseFolded().contains(search_text_)) return true;
+bool ModListProxyModel::acceptItem(const ModItem& item) const {
+    if (m_sidebarUuids && !m_sidebarUuids->contains(item.uuid)) return false;
+    if (m_searchText.isEmpty() || item.mod->name.trimmed().toCaseFolded().contains(m_searchText)) return true;
     const auto* about = dynamic_cast<const AboutXmlMod*>(item.mod.get());
-    return about && about->package_id.str().trimmed().toCaseFolded().contains(search_text_);
+    return about && about->packageId.str().trimmed().toCaseFolded().contains(m_searchText);
 }
 void ModListProxyModel::rebuild() {
-    rebuild_source_mapping();
-    visible_uuids_.clear(); proxy_rows_.clear();
-    for (int row = 0; row < source_->rowCount(); ++row) {
-        const auto& item = *source_->get_item(row);
-        if (accept_item(item)) { proxy_rows_.insert(item.uuid, static_cast<int>(visible_uuids_.size())); visible_uuids_.append(item.uuid); }
+    rebuildSourceMapping();
+    m_visibleUuids.clear(); m_proxyRows.clear();
+    for (int row = 0; row < m_source->rowCount(); ++row) {
+        const auto& item = *m_source->getItem(row);
+        if (acceptItem(item)) { m_proxyRows.insert(item.uuid, static_cast<int>(m_visibleUuids.size())); m_visibleUuids.append(item.uuid); }
     }
-    update_visible_counts();
+    updateVisibleCounts();
 }
-void ModListProxyModel::update_visible_counts() {
+void ModListProxyModel::updateVisibleCounts() {
     int active = 0;
-    for (const auto& uuid : visible_uuids_) {
-        const auto* item = source_->get_item(source_rows_.value(uuid, -1));
+    for (const auto& uuid : m_visibleUuids) {
+        const auto* item = m_source->getItem(m_sourceRows.value(uuid, -1));
         if (item && item->checked) ++active;
     }
-    const bool changed = active != visible_active_count_;
-    visible_active_count_ = active;
-    visible_inactive_count_ = static_cast<int>(visible_uuids_.size()) - active;
-    if (changed) emit active_count_changed();
+    const bool changed = active != m_visibleActiveCount;
+    m_visibleActiveCount = active;
+    m_visibleInactiveCount = static_cast<int>(m_visibleUuids.size()) - active;
+    if (changed) emit activeCountChanged();
 }
-int ModListProxyModel::proxy_row_for_uuid(const QString& uuid) const { return proxy_rows_.value(uuid, -1); }
+int ModListProxyModel::proxyRowForUuid(const QString& uuid) const { return m_proxyRows.value(uuid, -1); }
 QModelIndex ModListProxyModel::mapToSource(const QModelIndex& index) const {
-    if (!index.isValid() || index.row() < 0 || index.row() >= visible_uuids_.size()) return {};
-    return source_->index(source_rows_.value(visible_uuids_[index.row()], -1));
+    if (!index.isValid() || index.row() < 0 || index.row() >= m_visibleUuids.size()) return {};
+    return m_source->index(m_sourceRows.value(m_visibleUuids[index.row()], -1));
 }
-QModelIndex ModListProxyModel::mapFromSource(const QModelIndex& source_index) const {
-    const auto* item = source_index.isValid() ? source_->get_item(source_index.row()) : nullptr;
-    return item ? index(proxy_row_for_uuid(item->uuid)) : QModelIndex{};
+QModelIndex ModListProxyModel::mapFromSource(const QModelIndex& sourceIndex) const {
+    const auto* item = sourceIndex.isValid() ? m_source->getItem(sourceIndex.row()) : nullptr;
+    return item ? index(proxyRowForUuid(item->uuid)) : QModelIndex{};
 }
-QVariant ModListProxyModel::data(const QModelIndex& proxy_index, int role) const {
-    const auto source_index = mapToSource(proxy_index);
-    if (!source_index.isValid()) return {};
-    if (role == ModListModel::SectionNameRole) {
-        return section_name(source_->get_item(source_index.row())->checked, visible_active_count_, visible_inactive_count_);
+QVariant ModListProxyModel::data(const QModelIndex& proxyIndex, int role) const {
+    const auto sourceIndex = mapToSource(proxyIndex);
+    if (!sourceIndex.isValid()) return {};
+    if (role == ModListModel::kSectionNameRole) {
+        return sectionName(m_source->getItem(sourceIndex.row())->checked, m_visibleActiveCount, m_visibleInactiveCount);
     }
-    return source_->data(source_index, role);
+    return m_source->data(sourceIndex, role);
 }
 bool ModListProxyModel::setData(const QModelIndex& index, const QVariant& value, int role) {
-    const auto source_index = mapToSource(index);
-    return source_index.isValid() && source_->setData(source_index, value, role);
+    const auto sourceIndex = mapToSource(index);
+    return sourceIndex.isValid() && m_source->setData(sourceIndex, value, role);
 }
 Qt::ItemFlags ModListProxyModel::flags(const QModelIndex& index) const {
     if (!index.isValid()) return Qt::ItemIsDropEnabled;
-    const auto source_index = mapToSource(index);
-    return source_index.isValid() ? source_->flags(source_index) : Qt::NoItemFlags;
+    const auto sourceIndex = mapToSource(index);
+    return sourceIndex.isValid() ? m_source->flags(sourceIndex) : Qt::NoItemFlags;
 }
-QHash<int,QByteArray> ModListProxyModel::roleNames() const { return source_->roleNames(); }
-void ModListProxyModel::layout_rebuild() {
+QHash<int,QByteArray> ModListProxyModel::roleNames() const { return m_source->roleNames(); }
+void ModListProxyModel::layoutRebuild() {
     const auto persistent = persistentIndexList();
     QStringList uuids;
     uuids.reserve(persistent.size());
-    for (const auto& index : persistent) uuids.append(index.isValid() && index.row() < visible_uuids_.size() ? visible_uuids_[index.row()] : QString{});
+    for (const auto& index : persistent) uuids.append(index.isValid() && index.row() < m_visibleUuids.size() ? m_visibleUuids[index.row()] : QString{});
     emit layoutAboutToBeChanged();
     rebuild();
     QModelIndexList replacements;
     replacements.reserve(uuids.size());
-    for (const auto& uuid : uuids) replacements.append(index(proxy_row_for_uuid(uuid)));
+    for (const auto& uuid : uuids) replacements.append(index(proxyRowForUuid(uuid)));
     changePersistentIndexList(persistent, replacements);
     emit layoutChanged();
 }
-void ModListProxyModel::set_search_filter(const QString& text) {
+void ModListProxyModel::setSearchFilter(const QString& text) {
     const auto normalized = text.trimmed().toCaseFolded();
-    if (normalized == search_text_) return;
-    const bool was_filtered = is_filtered();
-    search_text_ = normalized;
-    layout_rebuild();
-    if (was_filtered != is_filtered()) emit is_filtered_changed();
+    if (normalized == m_searchText) return;
+    const bool wasFiltered = isFiltered();
+    m_searchText = normalized;
+    layoutRebuild();
+    if (wasFiltered != isFiltered()) emit isFilteredChanged();
 }
-void ModListProxyModel::set_sidebar_filter(std::optional<QSet<QString>> uuids) {
-    if (sidebar_uuids_ == uuids) return;
-    const bool was_filtered = is_filtered();
-    sidebar_uuids_ = std::move(uuids);
-    layout_rebuild();
-    if (was_filtered != is_filtered()) emit is_filtered_changed();
+void ModListProxyModel::setSidebarFilter(std::optional<QSet<QString>> uuids) {
+    if (m_sidebarUuids == uuids) return;
+    const bool wasFiltered = isFiltered();
+    m_sidebarUuids = std::move(uuids);
+    layoutRebuild();
+    if (wasFiltered != isFiltered()) emit isFilteredChanged();
 }
-bool ModListProxyModel::move_row(int source, int target, bool clamp_to_active) {
-    if (source < 0 || source >= visible_uuids_.size()) return false;
-    const auto uuid = visible_uuids_[source];
-    const int source_row = source_rows_.value(uuid, -1);
-    if (clamp_to_active) {
-        const auto* item = source_->get_item(source_row);
-        if (is_filtered() || !item || !item->checked) return false;
-        target = std::max(0, std::min(target, visible_active_count_ - 1));
+bool ModListProxyModel::moveRow(int source, int target, bool clampToActive) {
+    if (source < 0 || source >= m_visibleUuids.size()) return false;
+    const auto uuid = m_visibleUuids[source];
+    const int sourceRow = m_sourceRows.value(uuid, -1);
+    if (clampToActive) {
+        const auto* item = m_source->getItem(sourceRow);
+        if (isFiltered() || !item || !item->checked) return false;
+        target = std::max(0, std::min(target, m_visibleActiveCount - 1));
     }
-    if (source == target || target < 0 || target >= visible_uuids_.size()) return false;
-    const int target_row = source_rows_.value(visible_uuids_[target], -1);
-    if (source_row < 0 || target_row < 0) return false;
+    if (source == target || target < 0 || target >= m_visibleUuids.size()) return false;
+    const int targetRow = m_sourceRows.value(m_visibleUuids[target], -1);
+    if (sourceRow < 0 || targetRow < 0) return false;
     // Source data signals refer to post-move rows, while the proxy is still moving.
-    in_proxy_move_ = true;
+    m_inProxyMove = true;
     beginMoveRows({}, source, source, {}, source < target ? target + 1 : target);
-    visible_uuids_.move(source, target);
-    proxy_rows_.clear();
-    for (int row = 0; row < visible_uuids_.size(); ++row) proxy_rows_.insert(visible_uuids_[row], row);
-    source_->move_row(source_row, target_row);
-    rebuild_source_mapping();
+    m_visibleUuids.move(source, target);
+    m_proxyRows.clear();
+    for (int row = 0; row < m_visibleUuids.size(); ++row) m_proxyRows.insert(m_visibleUuids[row], row);
+    m_source->moveRow(sourceRow, targetRow);
+    rebuildSourceMapping();
     endMoveRows();
-    in_proxy_move_ = false;
-    emit dataChanged(index(std::min(source,target)), index(std::max(source,target)), {ModListModel::LoadIndexRole,ModListModel::SectionNameRole});
+    m_inProxyMove = false;
+    emit dataChanged(index(std::min(source,target)), index(std::max(source,target)), {ModListModel::kLoadIndexRole,ModListModel::kSectionNameRole});
     return true;
 }
-void ModListProxyModel::source_data_changed(const QModelIndex& top, const QModelIndex& bottom, const QList<int>& roles) {
-    if (in_proxy_move_) return;
-    if (roles.isEmpty() || roles.contains(ModListModel::CheckStateRole) || roles.contains(ModListModel::IsActiveRole)) update_visible_counts();
+void ModListProxyModel::sourceDataChanged(const QModelIndex& top, const QModelIndex& bottom, const QList<int>& roles) {
+    if (m_inProxyMove) return;
+    if (roles.isEmpty() || roles.contains(ModListModel::kCheckStateRole) || roles.contains(ModListModel::kIsActiveRole)) updateVisibleCounts();
     int first = rowCount(), last = -1;
     for (int row = top.row(); row <= bottom.row(); ++row) {
-        const auto* item = source_->get_item(row);
+        const auto* item = m_source->getItem(row);
         if (!item) continue;
-        const int proxy_row = proxy_row_for_uuid(item->uuid);
-        if (proxy_row < 0) continue;
-        first = std::min(first, proxy_row); last = std::max(last, proxy_row);
+        const int proxyRow = proxyRowForUuid(item->uuid);
+        if (proxyRow < 0) continue;
+        first = std::min(first, proxyRow); last = std::max(last, proxyRow);
     }
     if (last >= 0) emit dataChanged(index(first), index(last), roles);
 }

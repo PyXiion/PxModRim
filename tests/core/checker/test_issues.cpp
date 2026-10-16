@@ -19,14 +19,14 @@ using namespace px::modrim::checker;
 
 namespace {
 
-std::shared_ptr<AboutXmlMod> make_mod(const QString& package_id) {
+std::shared_ptr<AboutXmlMod> makeMod(const QString& packageId) {
     auto m = std::make_shared<AboutXmlMod>();
-    m->package_id = CaseInsensitiveStr(package_id);
-    m->name = package_id;
+    m->packageId = CaseInsensitiveStr(packageId);
+    m->name = packageId;
     return m;
 }
 
-sort::SortSettings default_settings() {
+sort::SortSettings defaultSettings() {
     sort::SortSettings s;
     s.use_community_rules = false;
     s.use_alternative_package_ids = true;
@@ -36,126 +36,126 @@ sort::SortSettings default_settings() {
 
 // Holds the storage referenced by a CheckContext so tests can construct one simply.
 struct ContextStorage {
-    QHash<PackageId, std::shared_ptr<AboutXmlMod>> active_mods;
-    QList<PackageId> ordered_pids;
-    QHash<PackageId, int> pid_to_index;
+    QHash<PackageId, std::shared_ptr<AboutXmlMod>> activeMods;
+    QList<PackageId> orderedPids;
+    QHash<PackageId, int> pidToIndex;
     ConstraintGraph graph;
-    sort::SortSettings settings = default_settings();
-    QString target_version = QStringLiteral("1.5");
-    QSet<PackageId> no_version_warning;
-    QHash<QString, ReplacementInfo> use_this_instead;
+    sort::SortSettings settings = defaultSettings();
+    QString targetVersion = QStringLiteral("1.5");
+    QSet<PackageId> noVersionWarning;
+    QHash<QString, ReplacementInfo> useThisInstead;
     QList<QList<PackageId>> cycles;
 
     CheckContext ctx() const {
         return CheckContext{
-            .active_mods = active_mods,
-            .ordered_pids = ordered_pids,
-            .pid_to_index = pid_to_index,
+            .activeMods = activeMods,
+            .orderedPids = orderedPids,
+            .pidToIndex = pidToIndex,
             .graph = graph,
             .settings = settings,
-            .target_version = target_version,
-            .no_version_warning = no_version_warning,
-            .use_this_instead = use_this_instead,
+            .targetVersion = targetVersion,
+            .noVersionWarning = noVersionWarning,
+            .useThisInstead = useThisInstead,
             .cycles = cycles,
         };
     }
 };
 
-ContextStorage make_storage(QHash<PackageId, std::shared_ptr<AboutXmlMod>> mods,
+ContextStorage makeStorage(QHash<PackageId, std::shared_ptr<AboutXmlMod>> mods,
                             std::optional<QList<PackageId>> ordered = std::nullopt,
                             const sort::SortSettings* settings = nullptr,
-                            const sort::CommunityRules* community_rules = nullptr) {
+                            const sort::CommunityRules* communityRules = nullptr) {
     ContextStorage storage;
-    storage.active_mods = std::move(mods);
-    storage.ordered_pids = ordered ? *ordered : storage.active_mods.keys();
+    storage.activeMods = std::move(mods);
+    storage.orderedPids = ordered ? *ordered : storage.activeMods.keys();
     if (settings != nullptr) {
         storage.settings = *settings;
     }
-    for (qsizetype i = 0; i < storage.ordered_pids.size(); ++i) {
-        storage.pid_to_index.insert(storage.ordered_pids[i], static_cast<int>(i));
+    for (qsizetype i = 0; i < storage.orderedPids.size(); ++i) {
+        storage.pidToIndex.insert(storage.orderedPids[i], static_cast<int>(i));
     }
-    storage.graph.build(storage.active_mods, storage.ordered_pids, storage.settings, community_rules);
+    storage.graph.build(storage.activeMods, storage.orderedPids, storage.settings, communityRules);
     return storage;
 }
 
 }  // namespace
 
 TEST_CASE("DependencyIssueChecker no issues when mod has no dependencies") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}});
     DependencyIssueChecker checker;
-    CHECK(!checker.should_check(*a, storage.ctx()));
+    CHECK(!checker.shouldCheck(*a, storage.ctx()));
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("DependencyIssueChecker reports missing dependency") {
-    auto a = make_mod(QStringLiteral("mod.a"));
+    auto a = makeMod(QStringLiteral("mod.a"));
     DependencyMod dep;
-    dep.package_id = CaseInsensitiveStr(QStringLiteral("mod.b"));
-    a->about_rules.dependencies.append(dep);
-    auto storage = make_storage({{a->package_id, a}});
+    dep.packageId = CaseInsensitiveStr(QStringLiteral("mod.b"));
+    a->aboutRules.dependencies.append(dep);
+    auto storage = makeStorage({{a->packageId, a}});
 
     DependencyIssueChecker checker;
-    CHECK(checker.should_check(*a, storage.ctx()));
+    CHECK(checker.shouldCheck(*a, storage.ctx()));
     auto issues = checker.check(*a, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("missing_dependency"));
-    CHECK(issues[0].severity == IssueSeverity::Error);
+    CHECK(issues[0].severity == IssueSeverity::kError);
 }
 
 TEST_CASE("DependencyIssueChecker satisfied dependency yields no issues") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
     DependencyMod dep;
-    dep.package_id = CaseInsensitiveStr(QStringLiteral("mod.b"));
-    a->about_rules.dependencies.append(dep);
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}});
+    dep.packageId = CaseInsensitiveStr(QStringLiteral("mod.b"));
+    a->aboutRules.dependencies.append(dep);
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}});
 
     DependencyIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("IncompatibilityIssueChecker no incompatibilities") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}});
     IncompatibilityIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("IncompatibilityIssueChecker self-declared incompatibility") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    a->about_rules.incompatible_with.add(QStringLiteral("mod.b"));
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    a->aboutRules.incompatibleWith.add(QStringLiteral("mod.b"));
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}});
 
     IncompatibilityIssueChecker checker;
     auto issues = checker.check(*a, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("incompatibility"));
-    CHECK(issues[0].severity == IssueSeverity::Error);
+    CHECK(issues[0].severity == IssueSeverity::kError);
 }
 
 TEST_CASE("IncompatibilityIssueChecker reverse-declared incompatibility") {
-    auto declarer = make_mod(QStringLiteral("mod.declarer"));
-    auto target = make_mod(QStringLiteral("mod.target"));
-    declarer->about_rules.incompatible_with.add(QStringLiteral("mod.target"));
-    auto storage = make_storage({{declarer->package_id, declarer}, {target->package_id, target}});
+    auto declarer = makeMod(QStringLiteral("mod.declarer"));
+    auto target = makeMod(QStringLiteral("mod.target"));
+    declarer->aboutRules.incompatibleWith.add(QStringLiteral("mod.target"));
+    auto storage = makeStorage({{declarer->packageId, declarer}, {target->packageId, target}});
 
     IncompatibilityIssueChecker checker;
     auto issues = checker.check(*target, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("incompatibility"));
-    CHECK(issues[0].related_package_ids == QList<PackageId>{PackageId(QStringLiteral("mod.declarer"))});
+    CHECK(issues[0].relatedPackageIds == QList<PackageId>{PackageId(QStringLiteral("mod.declarer"))});
 }
 
 TEST_CASE("IncompatibilityIssueChecker reverse-declared deduplicated across origins") {
-    auto declarer = make_mod(QStringLiteral("mod.declarer"));
-    auto target = make_mod(QStringLiteral("mod.target"));
-    const PackageId declarer_pid(QStringLiteral("mod.declarer"));
-    const PackageId target_pid(QStringLiteral("mod.target"));
-    declarer->about_rules.incompatible_with.add(target_pid.str());
+    auto declarer = makeMod(QStringLiteral("mod.declarer"));
+    auto target = makeMod(QStringLiteral("mod.target"));
+    const PackageId declarerPid(QStringLiteral("mod.declarer"));
+    const PackageId targetPid(QStringLiteral("mod.target"));
+    declarer->aboutRules.incompatibleWith.add(targetPid.str());
 
     sort::SortSettings settings;
     settings.use_community_rules = true;
@@ -163,92 +163,92 @@ TEST_CASE("IncompatibilityIssueChecker reverse-declared deduplicated across orig
     settings.check_missing_dependencies = true;
 
     sort::CommunityRule rule;
-    rule.package_id = declarer_pid;
-    rule.incompatible_with.add(target_pid.str());
-    sort::CommunityRules cr{{declarer_pid, rule}};
+    rule.packageId = declarerPid;
+    rule.incompatibleWith.add(targetPid.str());
+    sort::CommunityRules cr{{declarerPid, rule}};
 
-    auto storage = make_storage({{declarer_pid, declarer}, {target_pid, target}},
+    auto storage = makeStorage({{declarerPid, declarer}, {targetPid, target}},
                                 std::nullopt,
                                 &settings,
                                 &cr);
 
-    auto incoming_edges = storage.graph.incoming_of_type(target_pid, EdgeType::Incompatibility);
+    auto incomingEdges = storage.graph.incomingOfType(targetPid, EdgeType::kIncompatibility);
     QSet<EdgeOrigin> origins;
-    for (const auto& edge : incoming_edges) {
+    for (const auto& edge : incomingEdges) {
         origins.insert(edge.origin);
     }
-    CHECK(origins == QSet<EdgeOrigin>{EdgeOrigin::AboutXml, EdgeOrigin::CommunityRules});
+    CHECK(origins == QSet<EdgeOrigin>{EdgeOrigin::kAboutXml, EdgeOrigin::kCommunityRules});
 
     auto issues = IncompatibilityIssueChecker().check(*target, storage.ctx());
     REQUIRE(issues.size() == 1);
-    CHECK(issues[0].related_package_ids == QList<PackageId>{declarer_pid});
+    CHECK(issues[0].relatedPackageIds == QList<PackageId>{declarerPid});
 }
 
 TEST_CASE("LoadOrderIssueChecker no violations when order satisfies rules") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    a->about_rules.load_after.add(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    a->aboutRules.loadAfter.add(QStringLiteral("mod.b"));
     const QList<PackageId> ordered{PackageId(QStringLiteral("mod.b")), PackageId(QStringLiteral("mod.a"))};
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}}, ordered);
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}}, ordered);
 
     LoadOrderIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("LoadOrderIssueChecker load-after violation reported") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    a->about_rules.load_after.add(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    a->aboutRules.loadAfter.add(QStringLiteral("mod.b"));
     const QList<PackageId> ordered{PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))};
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}}, ordered);
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}}, ordered);
 
     LoadOrderIssueChecker checker;
     auto issues = checker.check(*a, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("load_order"));
-    CHECK(issues[0].severity == IssueSeverity::Warning);
+    CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
 TEST_CASE("LoadOrderIssueChecker load-before violation reported") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    a->about_rules.load_before.add(QStringLiteral("mod.b"));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    a->aboutRules.loadBefore.add(QStringLiteral("mod.b"));
     // A should load before B, but appears after
     const QList<PackageId> ordered{PackageId(QStringLiteral("mod.b")), PackageId(QStringLiteral("mod.a"))};
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}}, ordered);
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}}, ordered);
 
     LoadOrderIssueChecker checker;
     auto issues = checker.check(*a, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("load_order"));
-    CHECK(issues[0].severity == IssueSeverity::Warning);
+    CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
 TEST_CASE("CycleIssueChecker no cycles") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto storage = make_storage({{a->package_id, a}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto storage = makeStorage({{a->packageId, a}});
     CycleIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("CycleIssueChecker reports cycle membership") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}});
     storage.cycles = {{PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))}};
 
     CycleIssueChecker checker;
     auto issues = checker.check(*a, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("cycle"));
-    CHECK(issues[0].severity == IssueSeverity::Warning);
+    CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
 TEST_CASE("CycleIssueChecker non-member gets no issue") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto b = make_mod(QStringLiteral("mod.b"));
-    auto c = make_mod(QStringLiteral("mod.c"));
-    auto storage = make_storage({{a->package_id, a}, {b->package_id, b}, {c->package_id, c}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto b = makeMod(QStringLiteral("mod.b"));
+    auto c = makeMod(QStringLiteral("mod.c"));
+    auto storage = makeStorage({{a->packageId, a}, {b->packageId, b}, {c->packageId, c}});
     storage.cycles = {{PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))}};
 
     CycleIssueChecker checker;
@@ -256,52 +256,52 @@ TEST_CASE("CycleIssueChecker non-member gets no issue") {
 }
 
 TEST_CASE("GameVersionIssueChecker no versions declared is not checked") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    a->supported_versions.clear();
-    auto storage = make_storage({{a->package_id, a}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    a->supportedVersions.clear();
+    auto storage = makeStorage({{a->packageId, a}});
 
     GameVersionIssueChecker checker;
-    CHECK(!checker.should_check(*a, storage.ctx()));
+    CHECK(!checker.shouldCheck(*a, storage.ctx()));
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("GameVersionIssueChecker matching version yields no issues") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    a->supported_versions = {QStringLiteral("1.5")};
-    auto storage = make_storage({{a->package_id, a}});
-    storage.target_version = QStringLiteral("1.5");
+    auto a = makeMod(QStringLiteral("mod.a"));
+    a->supportedVersions = {QStringLiteral("1.5")};
+    auto storage = makeStorage({{a->packageId, a}});
+    storage.targetVersion = QStringLiteral("1.5");
 
     GameVersionIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("GameVersionIssueChecker mismatch reported as warning") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    a->supported_versions = {QStringLiteral("1.4")};
-    auto storage = make_storage({{a->package_id, a}});
-    storage.target_version = QStringLiteral("1.5");
+    auto a = makeMod(QStringLiteral("mod.a"));
+    a->supportedVersions = {QStringLiteral("1.4")};
+    auto storage = makeStorage({{a->packageId, a}});
+    storage.targetVersion = QStringLiteral("1.5");
 
     GameVersionIssueChecker checker;
     auto issues = checker.check(*a, storage.ctx());
     REQUIRE(issues.size() == 1);
     CHECK(issues[0].category == QStringLiteral("version_mismatch"));
-    CHECK(issues[0].severity == IssueSeverity::Warning);
+    CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
 TEST_CASE("GameVersionIssueChecker suppressed by no_version_warning") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    a->supported_versions = {QStringLiteral("1.4")};
-    auto storage = make_storage({{a->package_id, a}});
-    storage.target_version = QStringLiteral("1.5");
-    storage.no_version_warning.insert(PackageId(QStringLiteral("mod.a")));
+    auto a = makeMod(QStringLiteral("mod.a"));
+    a->supportedVersions = {QStringLiteral("1.4")};
+    auto storage = makeStorage({{a->packageId, a}});
+    storage.targetVersion = QStringLiteral("1.5");
+    storage.noVersionWarning.insert(PackageId(QStringLiteral("mod.a")));
 
     GameVersionIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }
 
 TEST_CASE("ReplacementIssueChecker no replacement without published file id") {
-    auto a = make_mod(QStringLiteral("mod.a"));
-    auto storage = make_storage({{a->package_id, a}});
+    auto a = makeMod(QStringLiteral("mod.a"));
+    auto storage = makeStorage({{a->packageId, a}});
     ReplacementIssueChecker checker;
     CHECK(checker.check(*a, storage.ctx()).isEmpty());
 }

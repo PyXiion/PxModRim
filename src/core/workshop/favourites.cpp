@@ -6,14 +6,14 @@
 namespace px::modrim::workshop {
 
 FavouriteCollections::FavouriteCollections(ConfigService* service)
-    : config_(service, QStringLiteral("workshop_favourites")) {
-    for (const CatalogCollection& collection : config_.value().collections) {
-        ids_.insert(collection.id);
+    : m_config(service, QStringLiteral("workshop_favourites")) {
+    for (const CatalogCollection& collection : m_config.value().collections) {
+        m_ids.insert(collection.id);
     }
 }
 
-bool FavouriteCollections::contains(const std::string& collection_id) const {
-    return ids_.contains(collection_id);
+bool FavouriteCollections::contains(const std::string& collectionId) const {
+    return m_ids.contains(collectionId);
 }
 
 void FavouriteCollections::set(const CatalogCollection& collection, bool favourite) {
@@ -21,7 +21,7 @@ void FavouriteCollections::set(const CatalogCollection& collection, bool favouri
         return;
     }
     std::vector<CatalogCollection> rest;
-    for (const CatalogCollection& stored : config_.value().collections) {
+    for (const CatalogCollection& stored : m_config.value().collections) {
         if (stored.id != collection.id) {
             rest.push_back(stored);
         }
@@ -36,7 +36,7 @@ void FavouriteCollections::remember(const CatalogCollection& collection) {
     if (!contains(collection.id)) {
         return;
     }
-    const auto& stored = config_.value().collections;
+    const auto& stored = m_config.value().collections;
     if (std::ranges::find(stored, collection) != stored.end()) {
         return;
     }
@@ -50,11 +50,11 @@ void FavouriteCollections::remember(const CatalogCollection& collection) {
 }
 
 void FavouriteCollections::save(std::vector<CatalogCollection> collections) {
-    ids_.clear();
+    m_ids.clear();
     for (const CatalogCollection& collection : collections) {
-        ids_.insert(collection.id);
+        m_ids.insert(collection.id);
     }
-    config_.update(FavouritesState{std::move(collections)});
+    m_config.update(FavouritesState{std::move(collections)});
 }
 
 }  // namespace px::modrim::workshop

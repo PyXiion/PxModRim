@@ -6,8 +6,8 @@
 
 namespace px::modrim::checker {
 
-bool DependencyIssueChecker::should_check(const AboutXmlMod& mod, const CheckContext&) const {
-    return !mod.about_rules.dependencies.isEmpty();
+bool DependencyIssueChecker::shouldCheck(const AboutXmlMod& mod, const CheckContext&) const {
+    return !mod.aboutRules.dependencies.isEmpty();
 }
 
 QList<ModIssue> DependencyIssueChecker::check(const AboutXmlMod& mod,
@@ -17,109 +17,109 @@ QList<ModIssue> DependencyIssueChecker::check(const AboutXmlMod& mod,
     }
 
     QList<ModIssue> issues;
-    const bool consider_alternatives = ctx.settings.use_alternative_package_ids;
+    const bool considerAlternatives = ctx.settings.use_alternative_package_ids;
 
-    for (const DependencyMod& dep : mod.about_rules.dependencies) {
-        bool satisfied = ctx.active_mods.contains(dep.package_id);
-        if (!satisfied && consider_alternatives) {
-            satisfied = std::ranges::any_of(dep.alternative_package_ids, [&](const PackageId& alt) {
-                return ctx.active_mods.contains(alt);
+    for (const DependencyMod& dep : mod.aboutRules.dependencies) {
+        bool satisfied = ctx.activeMods.contains(dep.packageId);
+        if (!satisfied && considerAlternatives) {
+            satisfied = std::ranges::any_of(dep.alternativePackageIds, [&](const PackageId& alt) {
+                return ctx.activeMods.contains(alt);
             });
         }
         if (satisfied) {
             continue;
         }
 
-        QString alt_note;
-        if (consider_alternatives && !dep.alternative_package_ids.empty()) {
+        QString altNote;
+        if (considerAlternatives && !dep.alternativePackageIds.empty()) {
             QStringList candidates;
-            for (const PackageId& alt : dep.alternative_package_ids) {
+            for (const PackageId& alt : dep.alternativePackageIds) {
                 candidates.append(alt.str());
             }
-            alt_note = QStringLiteral(" (alternatives: %1)").arg(candidates.join(QStringLiteral(", ")));
+            altNote = QStringLiteral(" (alternatives: %1)").arg(candidates.join(QStringLiteral(", ")));
         }
 
         issues.append(ModIssue{
             .category = QStringLiteral("missing_dependency"),
-            .severity = IssueSeverity::Error,
-            .short_message = QStringLiteral("Missing dependencies"),
-            .category_display_name = category_display_name(),
-            .detail_message =
-                QStringLiteral("Dependency not satisfied: %1%2").arg(dep.package_id.str(), alt_note),
-            .related_package_ids = {dep.package_id},
+            .severity = IssueSeverity::kError,
+            .shortMessage = QStringLiteral("Missing dependencies"),
+            .categoryDisplayName = categoryDisplayName(),
+            .detailMessage =
+                QStringLiteral("Dependency not satisfied: %1%2").arg(dep.packageId.str(), altNote),
+            .relatedPackageIds = {dep.packageId},
         });
     }
 
     return issues;
 }
 
-bool IncompatibilityIssueChecker::should_check(const AboutXmlMod& mod,
+bool IncompatibilityIssueChecker::shouldCheck(const AboutXmlMod& mod,
                                                const CheckContext& ctx) const {
-    const PackageId& pid = mod.package_id;
-    return !mod.about_rules.incompatible_with.empty() ||
-           !ctx.graph.edges_of_type(pid, EdgeType::Incompatibility).isEmpty() ||
-           !ctx.graph.incoming_of_type(pid, EdgeType::Incompatibility).isEmpty();
+    const PackageId& pid = mod.packageId;
+    return !mod.aboutRules.incompatibleWith.empty() ||
+           !ctx.graph.edgesOfType(pid, EdgeType::kIncompatibility).isEmpty() ||
+           !ctx.graph.incomingOfType(pid, EdgeType::kIncompatibility).isEmpty();
 }
 
 QList<ModIssue> IncompatibilityIssueChecker::check(const AboutXmlMod& mod,
                                                    const CheckContext& ctx) const {
     QList<ModIssue> issues;
-    const PackageId& pid = mod.package_id;
+    const PackageId& pid = mod.packageId;
 
-    for (const PackageId& incomp : mod.about_rules.incompatible_with) {
-        if (!ctx.active_mods.contains(incomp)) {
+    for (const PackageId& incomp : mod.aboutRules.incompatibleWith) {
+        if (!ctx.activeMods.contains(incomp)) {
             continue;
         }
-        const AboutXmlModPtr other = ctx.active_mods.value(incomp);
+        const AboutXmlModPtr other = ctx.activeMods.value(incomp);
         issues.append(ModIssue{
             .category = QStringLiteral("incompatibility"),
-            .severity = IssueSeverity::Error,
-            .short_message = QStringLiteral("Incompatibilities detected"),
-            .category_display_name = category_display_name(),
-            .detail_message = QStringLiteral("Mod declares incompatibility with: %1 (%2)")
+            .severity = IssueSeverity::kError,
+            .shortMessage = QStringLiteral("Incompatibilities detected"),
+            .categoryDisplayName = categoryDisplayName(),
+            .detailMessage = QStringLiteral("Mod declares incompatibility with: %1 (%2)")
                                   .arg(other->name, incomp.str()),
-            .related_package_ids = {incomp},
+            .relatedPackageIds = {incomp},
         });
     }
 
     // Each declaring mod is reported once, even when it is seen both in our own list and as an
     // incoming graph edge (about.xml and community rules can both declare the same pair).
-    QSet<PackageId> reported_sources(mod.about_rules.incompatible_with.begin(),
-                                     mod.about_rules.incompatible_with.end());
-    for (const ConstraintEdge& edge : ctx.graph.incoming_of_type(pid, EdgeType::Incompatibility)) {
-        if (!ctx.active_mods.contains(edge.source) || edge.source == pid ||
-            reported_sources.contains(edge.source)) {
+    QSet<PackageId> reportedSources(mod.aboutRules.incompatibleWith.begin(),
+                                     mod.aboutRules.incompatibleWith.end());
+    for (const ConstraintEdge& edge : ctx.graph.incomingOfType(pid, EdgeType::kIncompatibility)) {
+        if (!ctx.activeMods.contains(edge.source) || edge.source == pid ||
+            reportedSources.contains(edge.source)) {
             continue;
         }
-        reported_sources.insert(edge.source);
-        const AboutXmlModPtr other = ctx.active_mods.value(edge.source);
+        reportedSources.insert(edge.source);
+        const AboutXmlModPtr other = ctx.activeMods.value(edge.source);
         issues.append(ModIssue{
             .category = QStringLiteral("incompatibility"),
-            .severity = IssueSeverity::Error,
-            .short_message = QStringLiteral("Incompatibilities detected"),
-            .category_display_name = category_display_name(),
-            .detail_message = QStringLiteral("Declared incompatible by: %1 (%2)")
+            .severity = IssueSeverity::kError,
+            .shortMessage = QStringLiteral("Incompatibilities detected"),
+            .categoryDisplayName = categoryDisplayName(),
+            .detailMessage = QStringLiteral("Declared incompatible by: %1 (%2)")
                                   .arg(other->name, edge.source.str()),
-            .related_package_ids = {edge.source},
+            .relatedPackageIds = {edge.source},
         });
     }
 
     return issues;
 }
 
-bool LoadOrderIssueChecker::should_check(const AboutXmlMod& mod, const CheckContext& ctx) const {
-    const PackageId& pid = mod.package_id;
-    return !ctx.graph.edges_of_type(pid, EdgeType::LoadBefore).isEmpty() ||
-           !ctx.graph.edges_of_type(pid, EdgeType::LoadAfter).isEmpty();
+bool LoadOrderIssueChecker::shouldCheck(const AboutXmlMod& mod, const CheckContext& ctx) const {
+    const PackageId& pid = mod.packageId;
+    return !ctx.graph.edgesOfType(pid, EdgeType::kLoadBefore).isEmpty() ||
+           !ctx.graph.edgesOfType(pid, EdgeType::kLoadAfter).isEmpty();
 }
 
-std::optional<QSet<PackageId>> LoadOrderIssueChecker::affected_by_moves(
+std::optional<QSet<PackageId>> LoadOrderIssueChecker::affectedByMoves(
     const CheckContext& ctx, const QSet<PackageId>& moved) const {
     // Results only read the indices of the mod itself and its edge targets.
     QSet<PackageId> affected = moved;
     for (const PackageId& pid : moved) {
-        for (const EdgeType type : {EdgeType::LoadBefore, EdgeType::LoadAfter}) {
-            for (const ConstraintEdge& edge : ctx.graph.incoming_of_type(pid, type)) {
+        for (const EdgeType type : {EdgeType::kLoadBefore, EdgeType::kLoadAfter}) {
+            for (const ConstraintEdge& edge : ctx.graph.incomingOfType(pid, type)) {
                 affected.insert(edge.source);
             }
         }
@@ -130,48 +130,48 @@ std::optional<QSet<PackageId>> LoadOrderIssueChecker::affected_by_moves(
 QList<ModIssue> LoadOrderIssueChecker::check(const AboutXmlMod& mod,
                                              const CheckContext& ctx) const {
     QList<ModIssue> issues;
-    const PackageId& pid = mod.package_id;
-    const int idx = ctx.pid_to_index.value(pid, -1);
+    const PackageId& pid = mod.packageId;
+    const int idx = ctx.pidToIndex.value(pid, -1);
     if (idx < 0) {
         return issues;
     }
 
-    for (const ConstraintEdge& edge : ctx.graph.edges_of_type(pid, EdgeType::LoadBefore)) {
-        const int other_idx = ctx.pid_to_index.value(edge.target, -1);
-        if (other_idx >= 0 && idx >= other_idx) {
-            const AboutXmlModPtr other = ctx.active_mods.value(edge.target);
+    for (const ConstraintEdge& edge : ctx.graph.edgesOfType(pid, EdgeType::kLoadBefore)) {
+        const int otherIdx = ctx.pidToIndex.value(edge.target, -1);
+        if (otherIdx >= 0 && idx >= otherIdx) {
+            const AboutXmlModPtr other = ctx.activeMods.value(edge.target);
             const QString name = other ? other->name : edge.target.str();
             issues.append(ModIssue{
                 .category = QStringLiteral("load_order"),
-                .severity = IssueSeverity::Warning,
-                .short_message = QStringLiteral("Load order violated"),
-                .category_display_name = category_display_name(),
-                .detail_message = QStringLiteral("Should load before: %1 (%2), but appears after "
+                .severity = IssueSeverity::kWarning,
+                .shortMessage = QStringLiteral("Load order violated"),
+                .categoryDisplayName = categoryDisplayName(),
+                .detailMessage = QStringLiteral("Should load before: %1 (%2), but appears after "
                                                  "(index %3 vs %4)")
                                       .arg(name, edge.target.str())
                                       .arg(idx)
-                                      .arg(other_idx),
-                .related_package_ids = {edge.target},
+                                      .arg(otherIdx),
+                .relatedPackageIds = {edge.target},
             });
         }
     }
 
-    for (const ConstraintEdge& edge : ctx.graph.edges_of_type(pid, EdgeType::LoadAfter)) {
-        const int other_idx = ctx.pid_to_index.value(edge.target, -1);
-        if (other_idx >= 0 && idx <= other_idx) {
-            const AboutXmlModPtr other = ctx.active_mods.value(edge.target);
+    for (const ConstraintEdge& edge : ctx.graph.edgesOfType(pid, EdgeType::kLoadAfter)) {
+        const int otherIdx = ctx.pidToIndex.value(edge.target, -1);
+        if (otherIdx >= 0 && idx <= otherIdx) {
+            const AboutXmlModPtr other = ctx.activeMods.value(edge.target);
             const QString name = other ? other->name : edge.target.str();
             issues.append(ModIssue{
                 .category = QStringLiteral("load_order"),
-                .severity = IssueSeverity::Warning,
-                .short_message = QStringLiteral("Load order violated"),
-                .category_display_name = category_display_name(),
-                .detail_message = QStringLiteral("Should load after: %1 (%2), but appears before "
+                .severity = IssueSeverity::kWarning,
+                .shortMessage = QStringLiteral("Load order violated"),
+                .categoryDisplayName = categoryDisplayName(),
+                .detailMessage = QStringLiteral("Should load after: %1 (%2), but appears before "
                                                  "(index %3 vs %4)")
                                       .arg(name, edge.target.str())
                                       .arg(idx)
-                                      .arg(other_idx),
-                .related_package_ids = {edge.target},
+                                      .arg(otherIdx),
+                .relatedPackageIds = {edge.target},
             });
         }
     }
@@ -180,7 +180,7 @@ QList<ModIssue> LoadOrderIssueChecker::check(const AboutXmlMod& mod,
 }
 
 QList<ModIssue> CycleIssueChecker::check(const AboutXmlMod& mod, const CheckContext& ctx) const {
-    const PackageId& pid = mod.package_id;
+    const PackageId& pid = mod.packageId;
     QList<ModIssue> issues;
 
     for (const QList<PackageId>& cycle : ctx.cycles) {
@@ -197,72 +197,72 @@ QList<ModIssue> CycleIssueChecker::check(const AboutXmlMod& mod, const CheckCont
         }
         issues.append(ModIssue{
             .category = QStringLiteral("cycle"),
-            .severity = IssueSeverity::Warning,
-            .short_message = QStringLiteral("Dependency cycle detected"),
-            .category_display_name = category_display_name(),
-            .detail_message = QStringLiteral("Participates in a dependency cycle involving: ") +
+            .severity = IssueSeverity::kWarning,
+            .shortMessage = QStringLiteral("Dependency cycle detected"),
+            .categoryDisplayName = categoryDisplayName(),
+            .detailMessage = QStringLiteral("Participates in a dependency cycle involving: ") +
                               members.join(QStringLiteral(", ")),
-            .related_package_ids = std::move(related),
+            .relatedPackageIds = std::move(related),
         });
     }
 
     return issues;
 }
 
-bool GameVersionIssueChecker::should_check(const AboutXmlMod& mod, const CheckContext&) const {
-    return !mod.supported_versions.isEmpty();
+bool GameVersionIssueChecker::shouldCheck(const AboutXmlMod& mod, const CheckContext&) const {
+    return !mod.supportedVersions.isEmpty();
 }
 
 QList<ModIssue> GameVersionIssueChecker::check(const AboutXmlMod& mod,
                                                const CheckContext& ctx) const {
-    if (mod.supported_versions.isEmpty()) {
+    if (mod.supportedVersions.isEmpty()) {
         return {};
     }
-    if (ctx.no_version_warning.contains(mod.package_id)) {
+    if (ctx.noVersionWarning.contains(mod.packageId)) {
         return {};
     }
 
     // Only major.minor is compared, so a patch-level target still matches "1.5" support.
-    const QStringList target_parts = ctx.target_version.split(QLatin1Char('.')).mid(0, 2);
-    const QString target_major_minor = target_parts.join(QLatin1Char('.'));
-    if (mod.supported_versions.contains(target_major_minor)) {
+    const QStringList targetParts = ctx.targetVersion.split(QLatin1Char('.')).mid(0, 2);
+    const QString targetMajorMinor = targetParts.join(QLatin1Char('.'));
+    if (mod.supportedVersions.contains(targetMajorMinor)) {
         return {};
     }
 
-    QStringList supported(mod.supported_versions.cbegin(), mod.supported_versions.cend());
+    QStringList supported(mod.supportedVersions.cbegin(), mod.supportedVersions.cend());
     std::ranges::sort(supported);
     return {ModIssue{
         .category = QStringLiteral("version_mismatch"),
-        .severity = IssueSeverity::Warning,
-        .short_message = QStringLiteral("Version mismatch"),
-        .category_display_name = category_display_name(),
-        .detail_message = QStringLiteral("Mod supports %1, but game is on %2")
-                              .arg(supported.join(QStringLiteral(", ")), target_major_minor),
-        .related_package_ids = {},
+        .severity = IssueSeverity::kWarning,
+        .shortMessage = QStringLiteral("Version mismatch"),
+        .categoryDisplayName = categoryDisplayName(),
+        .detailMessage = QStringLiteral("Mod supports %1, but game is on %2")
+                              .arg(supported.join(QStringLiteral(", ")), targetMajorMinor),
+        .relatedPackageIds = {},
     }};
 }
 
 QList<ModIssue> ReplacementIssueChecker::check(const AboutXmlMod& mod,
                                                const CheckContext& ctx) const {
-    const std::optional<QString> pfid = mod.published_file_id();
+    const std::optional<QString> pfid = mod.publishedFileId();
     if (!pfid || pfid->isEmpty()) {
         return {};
     }
 
-    const auto replacement = ctx.use_this_instead.constFind(*pfid);
-    if (replacement == ctx.use_this_instead.cend()) {
+    const auto replacement = ctx.useThisInstead.constFind(*pfid);
+    if (replacement == ctx.useThisInstead.cend()) {
         return {};
     }
     const ReplacementInfo& info = replacement.value();
 
     return {ModIssue{
         .category = QStringLiteral("replacement_available"),
-        .severity = IssueSeverity::Warning,
-        .short_message = QStringLiteral("Replacement available"),
-        .category_display_name = category_display_name(),
-        .detail_message = QStringLiteral("Recommended replacement: %1 (%2) by %3")
+        .severity = IssueSeverity::kWarning,
+        .shortMessage = QStringLiteral("Replacement available"),
+        .categoryDisplayName = categoryDisplayName(),
+        .detailMessage = QStringLiteral("Recommended replacement: %1 (%2) by %3")
                               .arg(info.name, info.packageid, info.author),
-        .related_package_ids = {PackageId(info.packageid)},
+        .relatedPackageIds = {PackageId(info.packageid)},
     }};
 }
 

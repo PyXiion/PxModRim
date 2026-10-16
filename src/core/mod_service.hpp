@@ -27,19 +27,19 @@ public:
     // `ctx` is not owned and must outlive the service. Without a `metadata_cache`, one is created
     // in the config folder when the context has a config service.
     ModService(CoreContext& ctx, providers::ProviderList providers,
-               std::unique_ptr<services::MetadataCache> metadata_cache = nullptr);
+               std::unique_ptr<services::MetadataCache> metadataCache = nullptr);
 
-    startup_impact::StartupImpactService& startup_impact() noexcept { return startup_impact_; }
+    startup_impact::StartupImpactService& startupImpact() noexcept { return m_startupImpact; }
 
     // Replaces the provider set.
-    void reset_providers(providers::ProviderList providers);
+    void resetProviders(providers::ProviderList providers);
     // The provider with `provider_id`, or nullptr.
-    providers::BaseModProvider* get_provider(const QString& provider_id) const;
-    QHash<QString, QString> provider_colors() const;
+    providers::BaseModProvider* getProvider(const QString& providerId) const;
+    QHash<QString, QString> providerColors() const;
 
     // Runs all providers in parallel and loads the results into the context. `timer` is optional;
     // without one, the profile report goes to the debug log.
-    QCoro::Task<Result<void>> discover(Profiler* timer = nullptr, bool force_reparse = false);
+    QCoro::Task<Result<void>> discover(Profiler* timer = nullptr, bool forceReparse = false);
 
     // One-time startup work: snapshot the mod list, discover, initialize diagnostics, load impact.
     QCoro::Task<Result<void>> initialize();
@@ -47,31 +47,31 @@ public:
     QCoro::Task<Result<void>> reload(bool full = false);
 
     // Available mod-list snapshots, newest first.
-    QStringList get_snapshots() const;
+    QStringList getSnapshots() const;
     // Restores a snapshot to ModsConfig.xml and reloads live state.
-    QCoro::Task<bool> restore_snapshot(QString snapshot_path);
+    QCoro::Task<bool> restoreSnapshot(QString snapshotPath);
     // Persists the given active UUIDs as ModsConfig.xml.
-    QCoro::Task<bool> save_active_layout(QStringList active_ids);
+    QCoro::Task<bool> saveActiveLayout(QStringList activeIds);
 
     QCoro::Task<void> close();
     // Synchronous teardown for use after the event loop has stopped.
-    void close_sync();
+    void closeSync();
 
-    Event<std::monostate> mods_changed;
+    Event<std::monostate> modsChanged;
 
 private:
-    QCoro::Task<Result<providers::ModMap>> discover_one(providers::BaseModProvider& provider,
-                                                        Profiler& timer, bool force_reparse);
-    QCoro::Task<Result<void>> run_refresh_pipeline(const QString& label, bool force_reparse);
-    void snapshot_current_config();
-    std::optional<QString> snapshots_dir() const;
+    QCoro::Task<Result<providers::ModMap>> discoverOne(providers::BaseModProvider& provider,
+                                                        Profiler& timer, bool forceReparse);
+    QCoro::Task<Result<void>> runRefreshPipeline(const QString& label, bool forceReparse);
+    void snapshotCurrentConfig();
+    std::optional<QString> snapshotsDir() const;
 
-    CoreContext& ctx_;
-    providers::ProviderList providers_;
-    std::unique_ptr<services::MetadataCache> metadata_cache_;
-    startup_impact::StartupImpactService startup_impact_;
+    CoreContext& m_ctx;
+    providers::ProviderList m_providers;
+    std::unique_ptr<services::MetadataCache> m_metadataCache;
+    startup_impact::StartupImpactService m_startupImpact;
     // Serializes ModsConfig.xml writes; they run on the thread pool.
-    mutable QMutex save_mutex_;
+    mutable QMutex m_saveMutex;
 };
 
 }  // namespace px::modrim

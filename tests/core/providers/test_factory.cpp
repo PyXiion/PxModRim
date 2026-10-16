@@ -8,11 +8,11 @@
 #include "core/providers/local.hpp"
 
 using px::modrim::PathConfig;
-using px::modrim::providers::create_providers;
+using px::modrim::providers::createProviders;
 using px::modrim::providers::SteamWorkshopModProvider;
 
 TEST_CASE("no configured paths produce no providers") {
-    CHECK(create_providers(PathConfig{}).empty());
+    CHECK(createProviders(PathConfig{}).empty());
 }
 
 TEST_CASE("each configured path yields its providers in core, local, downloaded, steam order") {
@@ -21,10 +21,10 @@ TEST_CASE("each configured path yields its providers in core, local, downloaded,
     paths.local = "/mods";
     paths.workshop = "/steam/workshop";
 
-    const auto providers = create_providers(paths);
+    const auto providers = createProviders(paths);
     QStringList ids;
     for (const auto& provider : providers) {
-        ids.append(provider->provider_id());
+        ids.append(provider->providerId());
     }
     CHECK(ids == QStringList{"core", "local", "downloaded", "steam"});
     CHECK(providers[0]->path() == QStringLiteral("/games/rimworld"));
@@ -37,8 +37,8 @@ TEST_CASE("each configured path yields its providers in core, local, downloaded,
 TEST_CASE("only the configured paths produce providers") {
     PathConfig paths;
     paths.local = "/mods";
-    const auto providers = create_providers(paths);
+    const auto providers = createProviders(paths);
     REQUIRE(providers.size() == 2);
-    CHECK(providers[0]->provider_id() == QStringLiteral("local"));
-    CHECK(providers[1]->provider_id() == QStringLiteral("downloaded"));
+    CHECK(providers[0]->providerId() == QStringLiteral("local"));
+    CHECK(providers[1]->providerId() == QStringLiteral("downloaded"));
 }

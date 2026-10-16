@@ -52,7 +52,7 @@ TEST_CASE("initials abbreviates titles") {
 
 TEST_CASE("generate preview returns a non-null image of the requested size") {
     application();
-    const QImage image = px::modrim::generate_preview(QStringLiteral("[AV] Framework"), 120, 60);
+    const QImage image = px::modrim::generatePreview(QStringLiteral("[AV] Framework"), 120, 60);
     REQUIRE(!image.isNull());
     CHECK(image.width() == 120);
     CHECK(image.height() == 60);
@@ -60,9 +60,9 @@ TEST_CASE("generate preview returns a non-null image of the requested size") {
 
 TEST_CASE("generate preview returns the cached image for the same request") {
     application();
-    const QImage image = px::modrim::generate_preview(QStringLiteral("[AV] Framework"), 120, 60);
+    const QImage image = px::modrim::generatePreview(QStringLiteral("[AV] Framework"), 120, 60);
     REQUIRE(!image.isNull());
     // QImage shares its data implicitly, so a cache hit is identified by the shared data's cacheKey.
-    const QImage again = px::modrim::generate_preview(QStringLiteral("[AV] Framework"), 120, 60);
+    const QImage again = px::modrim::generatePreview(QStringLiteral("[AV] Framework"), 120, 60);
     CHECK(again.cacheKey() == image.cacheKey());
 }

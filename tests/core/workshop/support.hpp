@@ -83,13 +83,13 @@ inline constexpr std::string_view kCollectionJson = R"JSON({
   "no_common_version": false
 })JSON";
 
-inline px::modrim::workshop::CatalogMod decode_mod(std::string_view json) {
+inline px::modrim::workshop::CatalogMod decodeMod(std::string_view json) {
     px::modrim::workshop::CatalogMod mod;
     REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(mod, std::string(json)));
     return mod;
 }
 
-inline px::modrim::workshop::CatalogCollection decode_collection(std::string_view json) {
+inline px::modrim::workshop::CatalogCollection decodeCollection(std::string_view json) {
     px::modrim::workshop::CatalogCollection collection;
     REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(collection, std::string(json)));
     return collection;
@@ -124,19 +124,19 @@ using Handler = std::function<HttpResponse(const HttpRequest&)>;
 // A loopback catalog: answers each request with `handler`, one request per connection.
 class FakeCatalog {
 public:
-    explicit FakeCatalog(Handler handler) : handler_(std::move(handler)) {
-        REQUIRE(server_.listen(QHostAddress::LocalHost));
-        QObject::connect(&server_, &QTcpServer::newConnection, &server_, [this] { accept(); });
+    explicit FakeCatalog(Handler handler) : m_handler(std::move(handler)) {
+        REQUIRE(m_server.listen(QHostAddress::LocalHost));
+        QObject::connect(&m_server, &QTcpServer::newConnection, &m_server, [this] { accept(); });
     }
 
-    QString url() const { return QStringLiteral("http://127.0.0.1:%1").arg(server_.serverPort()); }
+    QString url() const { return QStringLiteral("http://127.0.0.1:%1").arg(m_server.serverPort()); }
 
     std::vector<HttpRequest> requests;
 
 private:
     void accept() {
-        QTcpSocket* socket = server_.nextPendingConnection();
-        socket->setParent(&server_);
+        QTcpSocket* socket = m_server.nextPendingConnection();
+        socket->setParent(&m_server);
         QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         auto raw = std::make_shared<QByteArray>();
         auto answered = std::make_shared<bool>(false);
@@ -148,21 +148,21 @@ private:
             *answered = true;
             HttpRequest request = parse(*raw);
             requests.push_back(request);
-            socket->write(serialize(handler_(request)));
+            socket->write(serialize(m_handler(request)));
             socket->disconnectFromHost();
         });
     }
 
     // True once the headers and the Content-Length body have arrived.
     static bool complete(const QByteArray& raw) {
-        const qsizetype headers_end = raw.indexOf("\r\n\r\n");
-        if (headers_end < 0) {
+        const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
+        if (headersEnd < 0) {
             return false;
         }
-        return raw.size() - (headers_end + 4) >= content_length(raw.left(headers_end));
+        return raw.size() - (headersEnd + 4) >= contentLength(raw.left(headersEnd));
     }
 
-    static qint64 content_length(const QByteArray& headers) {
+    static qint64 contentLength(const QByteArray& headers) {
         const QByteArray lower = headers.toLower();
         const qsizetype key = lower.indexOf("content-length:");
         if (key < 0) {
@@ -176,13 +176,13 @@ private:
     }
 
     static HttpRequest parse(const QByteArray& raw) {
-        const qsizetype headers_end = raw.indexOf("\r\n\r\n");
-        const QByteArray request_line = raw.left(raw.indexOf("\r\n"));
-        const QList<QByteArray> parts = request_line.split(' ');
+        const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
+        const QByteArray requestLine = raw.left(raw.indexOf("\r\n"));
+        const QList<QByteArray> parts = requestLine.split(' ');
         HttpRequest request;
         request.method = parts.value(0).toStdString();
         request.target = parts.value(1).toStdString();
-        request.body = raw.mid(headers_end + 4, content_length(raw.left(headers_end))).toStdString();
+        request.body = raw.mid(headersEnd + 4, contentLength(raw.left(headersEnd))).toStdString();
         return request;
     }
 
@@ -206,12 +206,12 @@ private:
         }
     }
 
-    QTcpServer server_;
-    Handler handler_;
+    QTcpServer m_server;
+    Handler m_handler;
 };
 
 // A URL that refuses connections: the port was bound, then released.
-inline QString unreachable_url() {
+inline QString unreachableUrl() {
     QTcpServer probe;
     REQUIRE(probe.listen(QHostAddress::LocalHost));
     const quint16 port = probe.serverPort();

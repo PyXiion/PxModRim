@@ -37,7 +37,7 @@ class CoreContext {
 public:
     // `config_service` is not owned and must outlive the context.
     static std::unique_ptr<CoreContext> create(AppConfig cfg,
-                                               ConfigService* config_service = nullptr);
+                                               ConfigService* configService = nullptr);
 
     ~CoreContext();
     CoreContext(const CoreContext&) = delete;
@@ -46,7 +46,7 @@ public:
     CoreContext& operator=(CoreContext&&) = delete;
 
     // Replaces all mods and the active list, taking ownership of the data.
-    void load(QHash<QString, ListedModPtr> mods, QStringList active_uuids);
+    void load(QHash<QString, ListedModPtr> mods, QStringList activeUuids);
     void setActive(QStringList uuids);
     // Enables missing dependencies, then sorts the active mods. Resolves to the number of active
     // mods and the time the sort took in milliseconds.
@@ -55,7 +55,7 @@ public:
     void updateConfig(AppConfig cfg);
     // Rebuilds the providers for new paths.
     void resetProviders(const PathConfig& paths);
-    CollectionStats computeStats(const std::optional<QStringList>& active_ids = std::nullopt) const;
+    CollectionStats computeStats(const std::optional<QStringList>& activeIds = std::nullopt) const;
 
     QCoro::Task<Result<void>> initialize();
     QCoro::Task<void> close();
@@ -64,54 +64,54 @@ public:
 
     void registerPlugin(std::unique_ptr<Plugin> plugin);
 
-    const AppConfig& config() const noexcept { return cfg_; }
-    const QHash<QString, ListedModPtr>& allMods() const noexcept { return mods_; }
-    const QStringList& activeUuids() const noexcept { return active_uuids_; }
+    const AppConfig& config() const noexcept { return m_cfg; }
+    const QHash<QString, ListedModPtr>& allMods() const noexcept { return m_mods; }
+    const QStringList& activeUuids() const noexcept { return m_activeUuids; }
     // Active UUIDs as last loaded from disk, unaffected by later edits.
-    const QStringList& loadedActiveUuids() const noexcept { return loaded_active_uuids_; }
+    const QStringList& loadedActiveUuids() const noexcept { return m_loadedActiveUuids; }
     // "Unknown" when the game is not configured or its version cannot be read.
-    const QString& gameVersion() const noexcept { return game_version_; }
+    const QString& gameVersion() const noexcept { return m_gameVersion; }
     // The "X.Y" part of the game version, or "Unknown".
     QString targetVersion() const;
 
-    Event<QStringList>& activeStateChanged() noexcept { return active_state_changed_; }
-    Event<AppConfig>& configChanged() noexcept { return config_changed_; }
+    Event<QStringList>& activeStateChanged() noexcept { return m_activeStateChanged; }
+    Event<AppConfig>& configChanged() noexcept { return m_configChanged; }
 
-    bool hasConfigService() const noexcept { return config_service_ != nullptr; }
+    bool hasConfigService() const noexcept { return m_configService != nullptr; }
     ConfigService& configService() const;
-    QNetworkAccessManager& network() noexcept { return network_; }
+    QNetworkAccessManager& network() noexcept { return m_network; }
 
-    ModService& modService() noexcept { return *mod_service_; }
-    DiagnosticsService& diagnosticsService() noexcept { return *diagnostics_service_; }
-    SortService& sortService() noexcept { return *sort_service_; }
-    ActivationService& activation() noexcept { return *activation_; }
-    services::GameLauncher& gameLauncher() noexcept { return *game_launcher_; }
+    ModService& modService() noexcept { return *m_modService; }
+    DiagnosticsService& diagnosticsService() noexcept { return *m_diagnosticsService; }
+    SortService& sortService() noexcept { return *m_sortService; }
+    ActivationService& activation() noexcept { return *m_activation; }
+    services::GameLauncher& gameLauncher() noexcept { return *m_gameLauncher; }
     DownloadManager& downloads() const;
-    PluginRegistry& plugins() noexcept { return plugins_; }
+    PluginRegistry& plugins() noexcept { return m_plugins; }
 
 private:
-    CoreContext(AppConfig cfg, ConfigService* config_service);
-    void refresh_game_version();
+    CoreContext(AppConfig cfg, ConfigService* configService);
+    void refreshGameVersion();
 
-    AppConfig cfg_;
-    ConfigService* config_service_;
-    QHash<QString, ListedModPtr> mods_;
-    QStringList active_uuids_;
-    QStringList loaded_active_uuids_;
-    QString game_version_;
-    Event<QStringList> active_state_changed_;
-    Event<AppConfig> config_changed_;
+    AppConfig m_cfg;
+    ConfigService* m_configService;
+    QHash<QString, ListedModPtr> m_mods;
+    QStringList m_activeUuids;
+    QStringList m_loadedActiveUuids;
+    QString m_gameVersion;
+    Event<QStringList> m_activeStateChanged;
+    Event<AppConfig> m_configChanged;
     // Shared by providers and the network; declared before the services so they outlive them.
-    QThreadPool pool_;
-    QNetworkAccessManager network_;
+    QThreadPool m_pool;
+    QNetworkAccessManager m_network;
     // Services are declared before the plugins, so plugins (which disconnect from service
     // events in their destructors) are destroyed first.
-    std::unique_ptr<ModService> mod_service_;
-    std::unique_ptr<DiagnosticsService> diagnostics_service_;
-    std::unique_ptr<SortService> sort_service_;
-    std::unique_ptr<services::GameLauncher> game_launcher_;
-    std::unique_ptr<ActivationService> activation_;
-    PluginRegistry plugins_;
+    std::unique_ptr<ModService> m_modService;
+    std::unique_ptr<DiagnosticsService> m_diagnosticsService;
+    std::unique_ptr<SortService> m_sortService;
+    std::unique_ptr<services::GameLauncher> m_gameLauncher;
+    std::unique_ptr<ActivationService> m_activation;
+    PluginRegistry m_plugins;
 };
 
 }  // namespace px::modrim

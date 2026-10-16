@@ -8,21 +8,21 @@ namespace px::modrim {
 struct DownloadProgress {
     int total = 0;
     int completed = 0;
-    qint64 bytes_done = 0;
-    qint64 bytes_total = 0;
+    qint64 bytesDone = 0;
+    qint64 bytesTotal = 0;
 };
 
 // `status` is "downloading", "success" or "error".
 struct DownloadItemStatus {
-    QString mod_id;
+    QString modId;
     QString status;
-    qint64 bytes_done = 0;
-    qint64 bytes_total = 0;
+    qint64 bytesDone = 0;
+    qint64 bytesTotal = 0;
     QString error;
 };
 
 struct DownloadItemTitle {
-    QString mod_id;
+    QString modId;
     QString title;
 };
 

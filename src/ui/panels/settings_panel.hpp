@@ -20,13 +20,13 @@ class SettingsBackend : public QObject {
     Q_PROPERTY(bool cacheBusy READ cacheBusy NOTIFY cacheChanged)
 public:
     SettingsBackend(CoreContext& ctx, QDialog* dialog, const std::vector<SettingsSection*>& sections);
-    QVariantMap initial() const { return initial_; }
-    QVariantList sections() const { return sections_; }
-    QString communityStatus() const { return communityStatus_; }
-    bool communityBusy() const { return communityBusy_; }
-    QString cacheStatus() const { return cacheStatus_; }
-    bool cacheAvailable() const { return cacheAvailable_; }
-    bool cacheBusy() const { return cacheBusy_; }
+    QVariantMap initial() const { return m_initial; }
+    QVariantList sections() const { return m_sections; }
+    QString communityStatus() const { return m_communityStatus; }
+    bool communityBusy() const { return m_communityBusy; }
+    QString cacheStatus() const { return m_cacheStatus; }
+    bool cacheAvailable() const { return m_cacheAvailable; }
+    bool cacheBusy() const { return m_cacheBusy; }
     Q_INVOKABLE QCoro::Task<void> browse(QString key);
     Q_INVOKABLE QString localCandidate(const QString& gamePath) const;
     Q_INVOKABLE void autoDetect();
@@ -42,12 +42,12 @@ signals:
     void communityChanged();
     void cacheChanged();
 private:
-    CoreContext& ctx_;
-    QDialog* dialog_;
-    QVariantMap initial_;
-    QVariantList sections_;
-    QString communityStatus_, cacheStatus_;
-    bool communityBusy_ = false, cacheBusy_ = false, cacheAvailable_ = false;
+    CoreContext& m_ctx;
+    QDialog* m_dialog;
+    QVariantMap m_initial;
+    QVariantList m_sections;
+    QString m_communityStatus, m_cacheStatus;
+    bool m_communityBusy = false, m_cacheBusy = false, m_cacheAvailable = false;
 };
 class SettingsPanel : public QDialog {
     Q_OBJECT
@@ -56,12 +56,12 @@ public:
                   const std::vector<SettingsSectionFactory>& sections = {});
     SettingsPanel(AppContext& app, QQmlEngine* engine, QWidget* parent);
     ~SettingsPanel() override;
-    const AppConfig& getConfig() const { return config_; }
+    const AppConfig& getConfig() const { return m_config; }
 private:
     void save(const QVariantMap& values);
-    AppConfig config_;
-    std::vector<SettingsSection*> sections_;
-    SettingsBackend* backend_;
-    QQuickWidget* qml_;
+    AppConfig m_config;
+    std::vector<SettingsSection*> m_sections;
+    SettingsBackend* m_backend;
+    QQuickWidget* m_qml;
 };
 } // namespace px::modrim

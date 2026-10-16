@@ -10,9 +10,9 @@ public:
     LocalModProvider(QString localPath, QThreadPool* pool = nullptr,
                      MetadataCacheStore* metadataCache = nullptr);
 
-    QCoro::Task<Result<ModMap>> discover(QString target_version, Profiler* timer = nullptr,
-                                         MetadataCacheStore* metadata_cache = nullptr,
-                                         bool force_reparse = false) override;
+    QCoro::Task<Result<ModMap>> discover(QString targetVersion, Profiler* timer = nullptr,
+                                         MetadataCacheStore* metadataCache = nullptr,
+                                         bool forceReparse = false) override;
 };
 
 // Mods downloaded by the app into the local folder: directories that carry a published file id.
@@ -21,9 +21,9 @@ public:
     DownloadedModProvider(QString localPath, QThreadPool* pool = nullptr,
                           MetadataCacheStore* metadataCache = nullptr);
 
-    QCoro::Task<Result<ModMap>> discover(QString target_version, Profiler* timer = nullptr,
-                                         MetadataCacheStore* metadata_cache = nullptr,
-                                         bool force_reparse = false) override;
+    QCoro::Task<Result<ModMap>> discover(QString targetVersion, Profiler* timer = nullptr,
+                                         MetadataCacheStore* metadataCache = nullptr,
+                                         bool forceReparse = false) override;
 
 protected:
     DownloadedModProvider(QString providerId, QString path, QThreadPool* pool,

@@ -12,7 +12,7 @@ namespace px::modrim::services {
 
 namespace {
 
-QString strip_steam(QString value) {
+QString stripSteam(QString value) {
     if (value.endsWith(QLatin1String("_steam"), Qt::CaseInsensitive)) {
         value.chop(6);
     }
@@ -21,37 +21,37 @@ QString strip_steam(QString value) {
 
 }  // namespace
 
-QStringList resolve_active_uuids(const QHash<QString, ListedModPtr>& all_mods,
-                                 const QString& config_folder) {
-    if (config_folder.isEmpty()) {
+QStringList resolveActiveUuids(const QHash<QString, ListedModPtr>& allMods,
+                                 const QString& configFolder) {
+    if (configFolder.isEmpty()) {
         return {};
     }
-    const QString path = QDir(config_folder).filePath(QStringLiteral("ModsConfig.xml"));
-    const auto data = parse_mods_config(path);
+    const QString path = QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+    const auto data = parseModsConfig(path);
     if (!data) {
         return {};
     }
 
     // Sort UUIDs so the first-match tiebreaker is deterministic across hash iterations.
-    QStringList uuids = all_mods.keys();
+    QStringList uuids = allMods.keys();
     std::ranges::sort(uuids);
 
-    QHash<QString, QString> pid_to_uuid;
+    QHash<QString, QString> pidToUuid;
     for (const QString& uuid : uuids) {
-        const auto mod = std::dynamic_pointer_cast<AboutXmlMod>(all_mods.value(uuid));
+        const auto mod = std::dynamic_pointer_cast<AboutXmlMod>(allMods.value(uuid));
         if (!mod) {
             continue;
         }
-        const QString pid = strip_steam(mod->package_id.str());
-        if (!pid_to_uuid.contains(pid)) {
-            pid_to_uuid.insert(pid, uuid);
+        const QString pid = stripSteam(mod->packageId.str());
+        if (!pidToUuid.contains(pid)) {
+            pidToUuid.insert(pid, uuid);
         }
     }
 
     QStringList active;
     for (const CaseInsensitiveStr& pid : data->activeMods) {
-        const QString normalized = strip_steam(pid.str());
-        if (const auto found = pid_to_uuid.constFind(normalized); found != pid_to_uuid.constEnd()) {
+        const QString normalized = stripSteam(pid.str());
+        if (const auto found = pidToUuid.constFind(normalized); found != pidToUuid.constEnd()) {
             active.append(*found);
         }
     }

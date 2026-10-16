@@ -18,17 +18,17 @@
 namespace px::modrim::services {
 
 enum class Platform {
-    Linux,
-    Windows,
-    MacOS,
+    kLinux,
+    kWindows,
+    kMacOs,
 };
 
 // Returns the host's platform.
-Platform current_platform();
+Platform currentPlatform();
 
 // Splits a command line the way the platform's launcher does: POSIX shell quoting, or the
 // Windows command-line rules. Fails on unbalanced quotes.
-Result<QStringList> split_arguments(const QString& text, Platform platform = current_platform());
+Result<QStringList> splitArguments(const QString& text, Platform platform = currentPlatform());
 
 struct DirectCommand {
     QStringList argv;
@@ -38,24 +38,24 @@ struct DirectCommand {
 // Expands wrapper and arguments into argv plus extra environment variables. Leading KEY=VALUE
 // tokens in the wrapper set environment variables. %command% marks where the game goes;
 // without it the wrapper is a prefix. Fails on unbalanced quotes.
-Result<DirectCommand> build_direct_command(const QString& exe, const QString& wrapper,
+Result<DirectCommand> buildDirectCommand(const QString& exe, const QString& wrapper,
                                            const QString& args,
-                                           Platform platform = current_platform());
+                                           Platform platform = currentPlatform());
 
 // Locates the RimWorld executable inside `game_path`, preferring modern Waylith binaries over
 // leftover Unity files on disk.
-std::optional<QString> find_executable(const QString& game_path,
-                                       Platform platform = current_platform());
+std::optional<QString> findExecutable(const QString& gamePath,
+                                       Platform platform = currentPlatform());
 
 // Writes steam_appid.txt containing the RimWorld Steam app id into the game folder, unless it
 // already exists. On macOS the file lives in the game directory's parent.
-void ensure_steam_appid(const QString& game_path, Platform platform = current_platform());
+void ensureSteamAppid(const QString& gamePath, Platform platform = currentPlatform());
 
 // The steam:// URL that launches RimWorld with the given launch arguments.
-QString steam_run_url(const QString& launch_args);
+QString steamRunUrl(const QString& launchArgs);
 
 // Hands the steam:// URL to the desktop's handler. Fails when no opener could be started.
-Result<void> open_steam_url(const QString& launch_args);
+Result<void> openSteamUrl(const QString& launchArgs);
 
 // A running process seen on the host.
 struct ProcessInfo {
@@ -68,17 +68,17 @@ struct ProcessInfo {
 using ProcessLister = std::function<std::vector<ProcessInfo>()>;
 
 // Reads /proc on Linux, Toolhelp32Snapshot on Windows, libproc on macOS.
-std::vector<ProcessInfo> host_process_lister();
+std::vector<ProcessInfo> hostProcessLister();
 
 // Returns true when a non-zombie RimWorld game process is currently running.
-bool is_game_running(const ProcessLister& lister = host_process_lister);
+bool isGameRunning(const ProcessLister& lister = hostProcessLister);
 
 // Returns the set of non-zombie RimWorld PIDs found by `lister`.
-QSet<qint64> live_game_pids(const ProcessLister& lister = host_process_lister);
+QSet<qint64> liveGamePids(const ProcessLister& lister = hostProcessLister);
 
 struct MonitorTiming {
-    std::chrono::milliseconds poll_start{500};
-    std::chrono::milliseconds poll_exit{2000};
+    std::chrono::milliseconds pollStart{500};
+    std::chrono::milliseconds pollExit{2000};
 };
 
 // Tracks the game process lifecycle: detects when a newly spawned game process starts, and when
@@ -86,7 +86,7 @@ struct MonitorTiming {
 // methods never blocks the event loop.
 class GameProcessMonitor {
 public:
-    explicit GameProcessMonitor(ProcessLister lister = host_process_lister,
+    explicit GameProcessMonitor(ProcessLister lister = hostProcessLister,
                                 MonitorTiming timing = {});
     ~GameProcessMonitor();
 
@@ -94,29 +94,29 @@ public:
     GameProcessMonitor& operator=(const GameProcessMonitor&) = delete;
 
     // Records the game PIDs already running, so they are not counted as newly started.
-    QCoro::Task<void> capture_baseline();
+    QCoro::Task<void> captureBaseline();
 
     // Takes ownership of the spawned process; it must already be started.
-    void attach_process(std::unique_ptr<QProcess> proc);
+    void attachProcess(std::unique_ptr<QProcess> proc);
 
     // Waits until a non-baseline game process appears. Returns false if the timeout expires or
     // the spawned process dies before a game process appears.
-    QCoro::Task<bool> wait_for_start(std::chrono::milliseconds timeout = std::chrono::milliseconds(60'000));
+    QCoro::Task<bool> waitForStart(std::chrono::milliseconds timeout = std::chrono::milliseconds(60'000));
 
     // Waits until every non-baseline game process exits. Returns the spawned process's exit code
     // if one was attached and has exited, or nullopt otherwise.
-    QCoro::Task<std::optional<int>> wait_for_exit();
+    QCoro::Task<std::optional<int>> waitForExit();
 
 private:
-    bool launched_alive() const;
+    bool launchedAlive() const;
     // Forgets the spawned process. A child still running is released rather than destroyed,
     // because destroying a QProcess kills its child and the game must outlive the manager.
-    void drop_process();
+    void dropProcess();
 
-    ProcessLister lister_;
-    MonitorTiming timing_;
-    QSet<qint64> baseline_;
-    std::unique_ptr<QProcess> proc_;
+    ProcessLister m_lister;
+    MonitorTiming m_timing;
+    QSet<qint64> m_baseline;
+    std::unique_ptr<QProcess> m_proc;
 };
 
 }  // namespace px::modrim::services

@@ -31,21 +31,25 @@ struct ErrorEnvelope {
     ErrorMessage error;
 };
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct BatchWire {
     std::vector<CatalogMod> items;
     std::vector<std::string> unavailable_ids;
 };
+// NOLINTEND(readability-identifier-naming)
 
 struct IdsBody {
     std::vector<std::string> ids;
 };
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct ResolveBody {
     std::vector<std::string> ids;
     std::vector<std::string> collection_ids;
 };
+// NOLINTEND(readability-identifier-naming)
 
-std::vector<std::string> to_utf8(const QStringList& list) {
+std::vector<std::string> toUtf8(const QStringList& list) {
     std::vector<std::string> out;
     out.reserve(static_cast<std::size_t>(list.size()));
     for (const QString& value : list) {
@@ -55,11 +59,11 @@ std::vector<std::string> to_utf8(const QStringList& list) {
 }
 
 // Percent-encodes everything except the unreserved characters, as Python's quote(safe="") does.
-QString encode_segment(const QString& segment) {
+QString encodeSegment(const QString& segment) {
     return QString::fromLatin1(QUrl::toPercentEncoding(segment));
 }
 
-QUrlQuery query_of(const CatalogQuery& query) {
+QUrlQuery queryOf(const CatalogQuery& query) {
     QUrlQuery params;
     params.addQueryItem(QStringLiteral("q"), query.query);
     params.addQueryItem(QStringLiteral("sort"), query.sort);
@@ -78,7 +82,7 @@ QUrlQuery query_of(const CatalogQuery& query) {
 }
 
 template <class T>
-std::string to_json(const T& value) {
+std::string toJson(const T& value) {
     auto text = glz::write<kWireOpts>(value);
     Q_ASSERT(text.has_value());
     return std::move(*text);
@@ -94,7 +98,7 @@ CatalogResult<T> decode(const std::string& body, int status) {
 }
 
 // Appends the values not seen before, keeping first-occurrence order (Python dict.fromkeys).
-void add_unique(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
+void addUnique(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
                 const std::vector<std::string>& values) {
     for (const std::string& value : values) {
         if (seen.insert(value).second) {
@@ -105,7 +109,7 @@ void add_unique(std::vector<std::string>& out, std::unordered_set<std::string>& 
 
 }  // namespace
 
-QString normalize_base_url(QString url) {
+QString normalizeBaseUrl(QString url) {
     url = url.trimmed();
     while (url.endsWith(u'/')) {
         url.chop(1);
@@ -113,24 +117,24 @@ QString normalize_base_url(QString url) {
     return url;
 }
 
-CatalogClient::CatalogClient(QString base_url) : base_url_(normalize_base_url(std::move(base_url))) {}
+CatalogClient::CatalogClient(QString baseUrl) : m_baseUrl(normalizeBaseUrl(std::move(baseUrl))) {}
 
 void CatalogClient::shutdown() {
     // abort() can resume waiting requests, which remove themselves from pending_: iterate a copy.
-    const auto replies = pending_;
+    const auto replies = m_pending;
     for (QNetworkReply* reply : replies) {
         reply->abort();
     }
 }
 
 QUrl CatalogClient::endpoint(const QString& path, const QUrlQuery& query) const {
-    QUrl url(base_url_ + QStringLiteral("/catalog/") + path);
+    QUrl url(m_baseUrl + QStringLiteral("/catalog/") + path);
     url.setQuery(query);
     return url;
 }
 
 QCoro::Task<CatalogResult<CatalogClient::Reply>> CatalogClient::send(bool post, QUrl url, std::string payload) {
-    if (base_url_.isEmpty()) {
+    if (m_baseUrl.isEmpty()) {
         co_return std::unexpected(CatalogError{QStringLiteral("Workshop catalog is disabled."), std::nullopt});
     }
 
@@ -139,11 +143,11 @@ QCoro::Task<CatalogResult<CatalogClient::Reply>> CatalogClient::send(bool post, 
     QNetworkReply* reply = nullptr;
     if (post) {
         request.setHeader(QNetworkRequest::ContentTypeHeader, QByteArrayLiteral("application/json"));
-        reply = network_.post(request, QByteArray::fromStdString(payload));
+        reply = m_network.post(request, QByteArray::fromStdString(payload));
     } else {
-        reply = network_.get(request);
+        reply = m_network.get(request);
     }
-    pending_.insert(reply);
+    m_pending.insert(reply);
     // Runs however the coroutine leaves, so a finished reply is never left registered for abort.
     struct Release {
         QSet<QNetworkReply*>& pending;
@@ -152,18 +156,18 @@ QCoro::Task<CatalogResult<CatalogClient::Reply>> CatalogClient::send(bool post, 
             pending.remove(reply);
             reply->deleteLater();
         }
-    } release{pending_, reply};
+    } release{m_pending, reply};
 
     co_await qCoro(reply).waitForFinished();
 
     // An HTTP status is only present when the server answered; without one the request failed in transport.
-    const QVariant status_attribute = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
-    if (!status_attribute.isValid()) {
+    const QVariant statusAttribute = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    if (!statusAttribute.isValid()) {
         co_return std::unexpected(CatalogError{
             QStringLiteral("Cannot reach the Workshop catalog: %1").arg(reply->errorString()), std::nullopt});
     }
 
-    const int status = status_attribute.toInt();
+    const int status = statusAttribute.toInt();
     Reply received{status, reply->readAll().toStdString()};
     if (status >= 200 && status < 300) {
         co_return received;
@@ -196,16 +200,16 @@ QCoro::Task<CatalogResult<Discover>> CatalogClient::discover() {
 }
 
 QCoro::Task<CatalogResult<CatalogPage<CatalogMod>>> CatalogClient::mods(CatalogQuery query) {
-    co_return co_await call<CatalogPage<CatalogMod>>(false, endpoint(QStringLiteral("mods"), query_of(query)));
+    co_return co_await call<CatalogPage<CatalogMod>>(false, endpoint(QStringLiteral("mods"), queryOf(query)));
 }
 
 QCoro::Task<CatalogResult<CatalogPage<CatalogCollection>>> CatalogClient::collections(CatalogQuery query) {
     co_return co_await call<CatalogPage<CatalogCollection>>(
-        false, endpoint(QStringLiteral("collections"), query_of(query)));
+        false, endpoint(QStringLiteral("collections"), queryOf(query)));
 }
 
 QCoro::Task<CatalogResult<std::optional<CatalogMod>>> CatalogClient::mod(QString id) {
-    auto found = co_await call<CatalogMod>(false, endpoint(QStringLiteral("mods/") + encode_segment(id)));
+    auto found = co_await call<CatalogMod>(false, endpoint(QStringLiteral("mods/") + encodeSegment(id)));
     if (found) {
         co_return std::optional<CatalogMod>(std::move(*found));
     }
@@ -226,7 +230,7 @@ QCoro::Task<CatalogResult<std::optional<CollectionDetail>>> CatalogClient::colle
     }
 
     auto found = co_await call<CollectionDetail>(
-        false, endpoint(QStringLiteral("collections/") + source + QLatin1Char('/') + encode_segment(key)));
+        false, endpoint(QStringLiteral("collections/") + source + QLatin1Char('/') + encodeSegment(key)));
     if (found) {
         co_return std::optional<CollectionDetail>(std::move(*found));
     }
@@ -236,50 +240,50 @@ QCoro::Task<CatalogResult<std::optional<CollectionDetail>>> CatalogClient::colle
     co_return std::unexpected(found.error());
 }
 
-QCoro::Task<CatalogResult<CatalogClient::BatchResult>> CatalogClient::mods_batch(QStringList ids) {
+QCoro::Task<CatalogResult<CatalogClient::BatchResult>> CatalogClient::modsBatch(QStringList ids) {
     BatchResult result;
     for (qsizetype start = 0; start < ids.size(); start += kIdsPerBatch) {
         auto batch = co_await call<BatchWire>(
             true, endpoint(QStringLiteral("mods/batch")),
-            to_json(IdsBody{to_utf8(ids.mid(start, kIdsPerBatch))}));
+            toJson(IdsBody{toUtf8(ids.mid(start, kIdsPerBatch))}));
         if (!batch) {
             co_return std::unexpected(batch.error());
         }
         result.items.insert(result.items.end(), std::make_move_iterator(batch->items.begin()),
                             std::make_move_iterator(batch->items.end()));
-        result.unavailable_ids.insert(result.unavailable_ids.end(), batch->unavailable_ids.begin(),
+        result.unavailableIds.insert(result.unavailableIds.end(), batch->unavailable_ids.begin(),
                                       batch->unavailable_ids.end());
     }
     co_return result;
 }
 
-QCoro::Task<CatalogResult<ResolvedDownload>> CatalogClient::resolve(QStringList ids, QStringList collection_ids) {
+QCoro::Task<CatalogResult<ResolvedDownload>> CatalogClient::resolve(QStringList ids, QStringList collectionIds) {
     // One request covers up to 50 mods and 10 collections; the longer list sets the number of requests.
     const qsizetype batches = std::max({(ids.size() + kModIdsPerResolve - 1) / kModIdsPerResolve,
-                                        (collection_ids.size() + kCollectionIdsPerResolve - 1) / kCollectionIdsPerResolve,
+                                        (collectionIds.size() + kCollectionIdsPerResolve - 1) / kCollectionIdsPerResolve,
                                         qsizetype{1}});
     ResolvedDownload merged;
     merged.is_complete = true;
-    std::unordered_set<std::string> roots_seen;
-    std::unordered_set<std::string> mod_ids_seen;
-    std::unordered_set<std::string> unavailable_seen;
-    std::unordered_set<std::string> incomplete_seen;
+    std::unordered_set<std::string> rootsSeen;
+    std::unordered_set<std::string> modIdsSeen;
+    std::unordered_set<std::string> unavailableSeen;
+    std::unordered_set<std::string> incompleteSeen;
     for (qsizetype batch = 0; batch < batches; ++batch) {
         ResolveBody body{
-            to_utf8(ids.mid(batch * kModIdsPerResolve, kModIdsPerResolve)),
-            to_utf8(collection_ids.mid(batch * kCollectionIdsPerResolve, kCollectionIdsPerResolve)),
+            toUtf8(ids.mid(batch * kModIdsPerResolve, kModIdsPerResolve)),
+            toUtf8(collectionIds.mid(batch * kCollectionIdsPerResolve, kCollectionIdsPerResolve)),
         };
-        auto resolved = co_await call<ResolvedDownload>(true, endpoint(QStringLiteral("resolve")), to_json(body));
+        auto resolved = co_await call<ResolvedDownload>(true, endpoint(QStringLiteral("resolve")), toJson(body));
         if (!resolved) {
             co_return std::unexpected(resolved.error());
         }
-        add_unique(merged.roots, roots_seen, resolved->roots);
+        addUnique(merged.roots, rootsSeen, resolved->roots);
         for (auto& [id, entry] : resolved->items) {
             merged.items.insert_or_assign(id, std::move(entry));
         }
-        add_unique(merged.mod_ids, mod_ids_seen, resolved->mod_ids);
-        add_unique(merged.unavailable_ids, unavailable_seen, resolved->unavailable_ids);
-        add_unique(merged.incomplete_collection_ids, incomplete_seen, resolved->incomplete_collection_ids);
+        addUnique(merged.mod_ids, modIdsSeen, resolved->mod_ids);
+        addUnique(merged.unavailable_ids, unavailableSeen, resolved->unavailable_ids);
+        addUnique(merged.incomplete_collection_ids, incompleteSeen, resolved->incomplete_collection_ids);
         merged.is_complete = merged.is_complete && resolved->is_complete;
     }
     co_return merged;

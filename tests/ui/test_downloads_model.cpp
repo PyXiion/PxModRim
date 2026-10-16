@@ -9,8 +9,8 @@ QHash<QString, QString> states(const px::modrim::DownloadsModel& model) {
     QHash<QString, QString> result;
     for (int row = 0; row < model.rowCount(); ++row) {
         const auto index = model.index(row);
-        result.insert(model.data(index, px::modrim::DownloadsModel::IdRole).toString(),
-                      model.data(index, px::modrim::DownloadsModel::StateRole).toString());
+        result.insert(model.data(index, px::modrim::DownloadsModel::kIdRole).toString(),
+                      model.data(index, px::modrim::DownloadsModel::kStateRole).toString());
     }
     return result;
 }
@@ -33,7 +33,7 @@ TEST_CASE("download item events resolve states and cancel leftover rows") {
     CHECK(model.unchanged() == 1);
     CHECK(model.failed() == 3);
     CHECK(model.active() == 0);
-    CHECK(model.failed_ids() == QStringList{"2", "4", "5"});
+    CHECK(model.failedIds() == QStringList{"2", "4", "5"});
 }
 
 TEST_CASE("download filters limit visible rows and keep fallback titles") {
@@ -43,7 +43,7 @@ TEST_CASE("download filters limit visible rows and keep fallback titles") {
     model.flush();
     model.setFilter(QStringLiteral("failed"));
     REQUIRE(model.rowCount() == 1);
-    CHECK(model.data(model.index(0), px::modrim::DownloadsModel::TitleRole).toString() == "2");
+    CHECK(model.data(model.index(0), px::modrim::DownloadsModel::kTitleRole).toString() == "2");
     model.setFilter(QStringLiteral("all"));
     CHECK(model.rowCount() == 2);
 }

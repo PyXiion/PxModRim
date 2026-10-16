@@ -66,7 +66,7 @@ QString AboutPanel::creditsHtml() {
 }
 
 AboutPanel::AboutPanel(QWidget* parent, CoreContext& ctx, Notifier& toast)
-    : QDialog(parent), ctx_(ctx), toast_(toast) {
+    : QDialog(parent), m_ctx(ctx), m_toast(toast) {
     setObjectName(QStringLiteral("aboutPanel"));
     setWindowTitle(tr("About PxModRim"));
     setModal(true);
@@ -198,13 +198,13 @@ AboutPanel::AboutPanel(QWidget* parent, CoreContext& ctx, Notifier& toast)
     copy->setObjectName(QStringLiteral("appBtn"));
     connect(copy, &QPushButton::clicked, this, [this] {
         QApplication::clipboard()->setText(systemInformation());
-        toast_.success(tr("System info copied"));
+        m_toast.success(tr("System info copied"));
     });
     actions->addWidget(copy);
-    upload_ = new QPushButton(tr("Upload log && system info…"), this);
-    upload_->setObjectName(QStringLiteral("appBtn"));
-    connect(upload_, &QPushButton::clicked, this, [this] { uploadReport(); });
-    actions->addWidget(upload_);
+    m_upload = new QPushButton(tr("Upload log && system info…"), this);
+    m_upload->setObjectName(QStringLiteral("appBtn"));
+    connect(m_upload, &QPushButton::clicked, this, [this] { uploadReport(); });
+    actions->addWidget(m_upload);
     auto* showCredits = new QPushButton(tr("Open-source credits"), this);
     showCredits->setObjectName(QStringLiteral("appBtn"));
     connect(showCredits, &QPushButton::clicked, credits, &QDialog::open);
@@ -225,9 +225,9 @@ AboutPanel::AboutPanel(QWidget* parent, CoreContext& ctx, Notifier& toast)
 }
 
 QCoro::Task<void> AboutPanel::uploadReport() {
-    QPointer<QPushButton> button(upload_);
-    upload_->setEnabled(false);
-    co_await handle_upload_report(this, ctx_, toast_);
+    QPointer<QPushButton> button(m_upload);
+    m_upload->setEnabled(false);
+    co_await handleUploadReport(this, m_ctx, m_toast);
     if (button) button->setEnabled(true);
 }
 }  // namespace px::modrim

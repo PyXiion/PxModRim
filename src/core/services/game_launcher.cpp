@@ -19,16 +19,16 @@ namespace px::modrim::services {
 
 namespace {
 
-Result<QStringList> direct_argv(const QString& exe, const AppConfig& cfg, QHash<QString, QString>& env) {
+Result<QStringList> directArgv(const QString& exe, const AppConfig& cfg, QHash<QString, QString>& env) {
     const QString args = QString::fromStdString(cfg.launch_args);
-    if (current_platform() == Platform::MacOS) {
-        auto split = split_arguments(args);
+    if (currentPlatform() == Platform::kMacOs) {
+        auto split = splitArguments(args);
         if (!split) {
             return std::unexpected(split.error());
         }
         return QStringList{QStringLiteral("open"), exe, QStringLiteral("--args")} + *split;
     }
-    auto command = build_direct_command(exe, QString::fromStdString(cfg.launch_wrapper), args);
+    auto command = buildDirectCommand(exe, QString::fromStdString(cfg.launch_wrapper), args);
     if (!command) {
         return std::unexpected(command.error());
     }
@@ -39,47 +39,47 @@ Result<QStringList> direct_argv(const QString& exe, const AppConfig& cfg, QHash<
 }  // namespace
 
 GameLauncher::GameLauncher(CoreContext& ctx, ProcessLister lister, MonitorTiming timing)
-    : ctx_(ctx), lister_(lister), monitor_(std::move(lister), timing) {}
+    : m_ctx(ctx), m_lister(lister), m_monitor(std::move(lister), timing) {}
 
 QCoro::Task<Result<QString>> GameLauncher::launch(LaunchStrategy strategy) {
-    if (ctx_.config().paths.game.empty()) {
+    if (m_ctx.config().paths.game.empty()) {
         spdlog::warn("Launch aborted — game path not configured");
         co_return std::unexpected(Error{QStringLiteral("Game path not configured")});
     }
 
     spdlog::info("Launching game with strategy: {}",
-                 strategy == LaunchStrategy::Direct ? "Direct" : "Steam");
-    co_await monitor_.capture_baseline();
-    if (strategy == LaunchStrategy::Direct) {
-        co_return co_await launch_direct();
+                 strategy == LaunchStrategy::kDirect ? "Direct" : "Steam");
+    co_await m_monitor.captureBaseline();
+    if (strategy == LaunchStrategy::kDirect) {
+        co_return co_await launchDirect();
     }
-    co_return co_await launch_steam();
+    co_return co_await launchSteam();
 }
 
-bool GameLauncher::is_running() const {
-    return is_game_running(lister_);
+bool GameLauncher::isRunning() const {
+    return isGameRunning(m_lister);
 }
 
-QCoro::Task<bool> GameLauncher::wait_for_start(std::chrono::milliseconds timeout) {
-    return monitor_.wait_for_start(timeout);
+QCoro::Task<bool> GameLauncher::waitForStart(std::chrono::milliseconds timeout) {
+    return m_monitor.waitForStart(timeout);
 }
 
-QCoro::Task<std::optional<int>> GameLauncher::wait_for_exit() {
-    return monitor_.wait_for_exit();
+QCoro::Task<std::optional<int>> GameLauncher::waitForExit() {
+    return m_monitor.waitForExit();
 }
 
-QCoro::Task<Result<QString>> GameLauncher::launch_direct() {
-    const QString game = QString::fromStdString(ctx_.config().paths.game);
-    const auto exe = find_executable(game);
+QCoro::Task<Result<QString>> GameLauncher::launchDirect() {
+    const QString game = QString::fromStdString(m_ctx.config().paths.game);
+    const auto exe = findExecutable(game);
     if (!exe) {
         spdlog::warn("Direct launch failed — executable not found in {}", game.toStdString());
         co_return std::unexpected(Error{QStringLiteral("Game executable not found")});
     }
 
-    ensure_steam_appid(game);
+    ensureSteamAppid(game);
 
     QHash<QString, QString> env;
-    auto argv = direct_argv(*exe, ctx_.config(), env);
+    auto argv = directArgv(*exe, m_ctx.config(), env);
     if (!argv) {
         spdlog::warn("Invalid launch arguments: {}", argv.error().message.toStdString());
         co_return std::unexpected(
@@ -110,14 +110,14 @@ QCoro::Task<Result<QString>> GameLauncher::launch_direct() {
         co_return std::unexpected(Error{QStringLiteral("Failed to launch: %1").arg(reason)});
     }
 
-    monitor_.attach_process(std::move(proc));
+    m_monitor.attachProcess(std::move(proc));
     co_return QStringLiteral("Game launched");
 }
 
-QCoro::Task<Result<QString>> GameLauncher::launch_steam() {
-    const QString args = QString::fromStdString(ctx_.config().launch_args);
+QCoro::Task<Result<QString>> GameLauncher::launchSteam() {
+    const QString args = QString::fromStdString(m_ctx.config().launch_args);
     auto opened = co_await providers::runOnPool<Result<void>>(nullptr, [args] {
-        return open_steam_url(args);
+        return openSteamUrl(args);
     });
     if (!opened) {
         spdlog::warn("Steam launch failed: {}", opened.error().message.toStdString());

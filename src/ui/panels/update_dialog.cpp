@@ -35,7 +35,7 @@ UpdateDialog::UpdateDialog(const services::ReleaseInfo& release,
     auto* buttons = new QHBoxLayout;
     auto* skip = new QPushButton(tr("Skip This Version"), this);
     skip->setObjectName(QStringLiteral("appBtn"));
-    connect(skip, &QPushButton::clicked, this, [this] { done(SKIP_RESULT); });
+    connect(skip, &QPushButton::clicked, this, [this] { done(kSkipResult); });
     auto* later = new QPushButton(tr("Later"), this);
     later->setObjectName(QStringLiteral("appBtn"));
     connect(later, &QPushButton::clicked, this, &QDialog::reject);

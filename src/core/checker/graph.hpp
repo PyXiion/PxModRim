@@ -16,18 +16,18 @@
 namespace px::modrim::checker {
 
 enum class EdgeType : std::uint8_t {
-    Dependency,
-    LoadAfter,
-    LoadBefore,
-    Incompatibility,
-    Alternative,
+    kDependency,
+    kLoadAfter,
+    kLoadBefore,
+    kIncompatibility,
+    kAlternative,
 };
 
 inline constexpr std::size_t kEdgeTypeCount = 5;
 
 enum class EdgeOrigin : std::uint8_t {
-    AboutXml,
-    CommunityRules,
+    kAboutXml,
+    kCommunityRules,
 };
 
 struct ConstraintEdge {
@@ -49,63 +49,63 @@ class ConstraintGraph {
 public:
     using Alternatives = QHash<PackageId, PackageId>;
 
-    const QSet<PackageId>& nodes() const noexcept { return nodes_; }
-    bool has_node(const PackageId& pid) const { return nodes_.contains(pid); }
+    const QSet<PackageId>& nodes() const noexcept { return m_nodes; }
+    bool hasNode(const PackageId& pid) const { return m_nodes.contains(pid); }
 
     // Union over all edge types. Returned by value: Qt containers are implicitly shared.
     QSet<ConstraintEdge> outgoing(const PackageId& pid) const;
     QSet<ConstraintEdge> incoming(const PackageId& pid) const;
     QSet<PackageId> neighbors(const PackageId& pid) const;
-    QSet<ConstraintEdge> edges_of_type(const PackageId& pid, EdgeType type) const;
-    QSet<ConstraintEdge> incoming_of_type(const PackageId& pid, EdgeType type) const;
+    QSet<ConstraintEdge> edgesOfType(const PackageId& pid, EdgeType type) const;
+    QSet<ConstraintEdge> incomingOfType(const PackageId& pid, EdgeType type) const;
 
-    int index_of(const PackageId& pid) const { return pid_to_index_.value(pid, -1); }
-    const QHash<PackageId, int>& pid_to_index() const noexcept { return pid_to_index_; }
+    int indexOf(const PackageId& pid) const { return m_pidToIndex.value(pid, -1); }
+    const QHash<PackageId, int>& pidToIndex() const noexcept { return m_pidToIndex; }
 
     // Replaces all edges. A null or empty `community_rules` means no community rules.
-    void build(const QHash<PackageId, AboutXmlModPtr>& active_mods,
-               const QList<PackageId>& ordered_pids,
+    void build(const QHash<PackageId, AboutXmlModPtr>& activeMods,
+               const QList<PackageId>& orderedPids,
                const sort::SortSettings& settings,
-               const sort::CommunityRules* community_rules = nullptr);
+               const sort::CommunityRules* communityRules = nullptr);
 
-    void remove_mod(const PackageId& pid);
+    void removeMod(const PackageId& pid);
 
     // Replaces the mod ordering without touching edges.
-    void update_order(const QList<PackageId>& ordered_pids);
+    void updateOrder(const QList<PackageId>& orderedPids);
 
     // Strongly connected components that contain a dependency or load-after cycle. Members are
     // sorted by load index. Cached until the edges change.
-    QList<QList<PackageId>> find_cycles();
+    QList<QList<PackageId>> findCycles();
 
 private:
     using EdgesByType = std::array<QSet<ConstraintEdge>, kEdgeTypeCount>;
 
     template <typename Targets>
-    void add_edges(const PackageId& source,
+    void addEdges(const PackageId& source,
                    const Targets& targets,
                    EdgeType type,
                    EdgeOrigin origin,
                    const Alternatives& alternatives);
-    void add_rules(const PackageId& pid,
+    void addRules(const PackageId& pid,
                    const BaseRules& rules,
                    EdgeOrigin origin,
                    const Alternatives& alternatives);
-    void add_load_rules(const PackageId& pid,
-                        const CaseInsensitiveSet& load_before,
-                        const CaseInsensitiveSet& load_after,
-                        const CaseInsensitiveSet& incompatible_with,
+    void addLoadRules(const PackageId& pid,
+                        const CaseInsensitiveSet& loadBefore,
+                        const CaseInsensitiveSet& loadAfter,
+                        const CaseInsensitiveSet& incompatibleWith,
                         EdgeOrigin origin,
                         const Alternatives& alternatives);
-    void rebuild_index();
-    QList<QList<PackageId>> find_cycle_components() const;
+    void rebuildIndex();
+    QList<QList<PackageId>> findCycleComponents() const;
 
-    QHash<PackageId, EdgesByType> outgoing_;
-    QHash<PackageId, EdgesByType> incoming_;
-    QSet<PackageId> nodes_;
-    QHash<PackageId, int> pid_to_index_;
-    QList<PackageId> ordered_pids_;
+    QHash<PackageId, EdgesByType> m_outgoing;
+    QHash<PackageId, EdgesByType> m_incoming;
+    QSet<PackageId> m_nodes;
+    QHash<PackageId, int> m_pidToIndex;
+    QList<PackageId> m_orderedPids;
     // Cycle membership depends only on edges, so it survives reorders.
-    std::optional<QList<QList<PackageId>>> cycle_components_;
+    std::optional<QList<QList<PackageId>>> m_cycleComponents;
 };
 
 }  // namespace px::modrim::checker

@@ -5,7 +5,7 @@
 
 namespace px::modrim::providers {
 
-ProviderList create_providers(const PathConfig& paths, QThreadPool* pool) {
+ProviderList createProviders(const PathConfig& paths, QThreadPool* pool) {
     ProviderList providers;
     if (!paths.game.empty()) {
         providers.push_back(std::make_unique<CoreModProvider>(QString::fromStdString(paths.game)));

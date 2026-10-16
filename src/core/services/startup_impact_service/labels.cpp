@@ -9,7 +9,7 @@ namespace {
 
 constexpr QLatin1StringView kPrefix{"LoadingProgress.StartupImpact."};
 
-const QHash<QString, QString>& metric_labels() {
+const QHash<QString, QString>& metricLabels() {
     static const QHash<QString, QString> labels{
         {QStringLiteral("ModConstructor"), QStringLiteral("Running mod constructor")},
         {QStringLiteral("LoadDefs"), QStringLiteral("Loading defs")},
@@ -85,8 +85,8 @@ const QHash<QString, QString>& metric_labels() {
 }
 
 // The exact key, else its last dot-separated segment, else the key itself.
-QString base_label(const QString& key) {
-    const auto& labels = metric_labels();
+QString baseLabel(const QString& key) {
+    const auto& labels = metricLabels();
     if (const auto found = labels.constFind(key); found != labels.cend()) {
         return *found;
     }
@@ -99,16 +99,16 @@ QString base_label(const QString& key) {
 
 }  // namespace
 
-QString strip_metric_prefix(const QString& key) {
+QString stripMetricPrefix(const QString& key) {
     return key.startsWith(kPrefix) ? key.mid(kPrefix.size()) : key;
 }
 
-QString metric_label(const QString& key) {
-    const QString stripped = strip_metric_prefix(key);
+QString metricLabel(const QString& key) {
+    const QString stripped = stripMetricPrefix(key);
     const qsizetype bar = stripped.indexOf(u'|');
     const QString base = bar < 0 ? stripped : stripped.left(bar);
     const QString target = bar < 0 ? QString() : stripped.mid(bar + 1);
-    const QString label = base_label(base);
+    const QString label = baseLabel(base);
     if (target.isEmpty()) {
         return label;
     }

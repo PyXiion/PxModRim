@@ -11,7 +11,7 @@ class QVBoxLayout;
 
 namespace px::modrim {
 
-enum class ToastLevel { Info, Success, Warning, Error };
+enum class ToastLevel { kInfo, kSuccess, kWarning, kError };
 
 // One message card. Fades in on show; dismiss() fades it out and then emits dismissed().
 class Toast : public QWidget {
@@ -27,10 +27,10 @@ Q_SIGNALS:
     void dismissed();
 
 private:
-    QGraphicsOpacityEffect* opacity_effect_ = nullptr;
-    QPropertyAnimation* opacity_anim_ = nullptr;
-    QPropertyAnimation* fade_out_anim_ = nullptr;
-    bool dismissing_ = false;
+    QGraphicsOpacityEffect* m_opacityEffect = nullptr;
+    QPropertyAnimation* m_opacityAnim = nullptr;
+    QPropertyAnimation* m_fadeOutAnim = nullptr;
+    bool m_dismissing = false;
 };
 
 // Stacks toasts bottom-right over its parent. Durations are milliseconds; 0 keeps the toast
@@ -41,7 +41,7 @@ class ToastManager : public QWidget, public Notifier {
 public:
     explicit ToastManager(QWidget* parent = nullptr);
 
-    void showToast(const QString& message, ToastLevel level = ToastLevel::Info, int durationMs = 3000);
+    void showToast(const QString& message, ToastLevel level = ToastLevel::kInfo, int durationMs = 3000);
 
     void info(const QString& message, int durationMs = 3000) override;
     void success(const QString& message, int durationMs = 3000) override;
@@ -54,7 +54,7 @@ public:
 private:
     void remove(Toast* toast);
 
-    QVBoxLayout* layout_ = nullptr;
+    QVBoxLayout* m_layout = nullptr;
 };
 
 }  // namespace px::modrim

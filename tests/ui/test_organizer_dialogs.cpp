@@ -13,12 +13,12 @@ using px::modrim::DeleteFolderDialog;
 namespace {
 
 // The shared QApplication is created by tests/ui/main.cpp.
-QApplication& widget_app() { return *static_cast<QApplication*>(QApplication::instance()); }
+QApplication& widgetApp() { return *static_cast<QApplication*>(QApplication::instance()); }
 
 }  // namespace
 
 TEST_CASE("delete folder dialog confirms with yes button") {
-    widget_app();
+    widgetApp();
     QWidget parent;
     DeleteFolderDialog dialog(QStringLiteral("Fixes"), &parent);
     auto* yes = qobject_cast<QPushButton*>(dialog.button(QMessageBox::Yes));

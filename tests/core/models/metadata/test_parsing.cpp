@@ -46,21 +46,21 @@ TEST_CASE("basic About.xml fields are parsed") {
     CHECK(mod->valid);
     CHECK(mod->name == QStringLiteral("Test Mod"));
     CHECK(mod->authors == QStringList{QStringLiteral("Tester")});
-    CHECK(mod->package_id.str() == QStringLiteral("test.mod"));
+    CHECK(mod->packageId.str() == QStringLiteral("test.mod"));
     CHECK(mod->description == QStringLiteral("A test mod."));
-    CHECK(mod->supported_versions == QSet<QString>{QStringLiteral("1.5")});
+    CHECK(mod->supportedVersions == QSet<QString>{QStringLiteral("1.5")});
 }
 
 TEST_CASE("About.xml without packageId is invalid") {
     const auto mod = aboutFromXml("<ModMetaData><name>No ID Mod</name></ModMetaData>");
     CHECK_FALSE(mod->valid);
-    CHECK(mod->package_id.str() == QStringLiteral("missing.packageid"));
+    CHECK(mod->packageId.str() == QStringLiteral("missing.packageid"));
 }
 
 TEST_CASE("About.xml with empty packageId is invalid") {
     const auto mod = aboutFromXml("<ModMetaData><packageId></packageId></ModMetaData>");
     CHECK_FALSE(mod->valid);
-    CHECK(mod->package_id.str() == QStringLiteral("missing.packageid"));
+    CHECK(mod->packageId.str() == QStringLiteral("missing.packageid"));
 }
 
 TEST_CASE("versioned entries must match the version key exactly") {
@@ -73,13 +73,13 @@ TEST_CASE("versioned entries must match the version key exactly") {
             <v1.50><li><packageId>wrong.dep</packageId></li></v1.50>
         </modDependenciesByVersion>
     </ModMetaData>)");
-    CHECK(wrong->about_rules.load_after.size() == 0);
-    CHECK(wrong->about_rules.dependencies.isEmpty());
+    CHECK(wrong->aboutRules.loadAfter.size() == 0);
+    CHECK(wrong->aboutRules.dependencies.isEmpty());
 
     const auto right = aboutFromXml(R"(<ModMetaData><packageId>x.y</packageId>
         <loadAfterByVersion><v1.5><li>right</li></v1.5></loadAfterByVersion>
     </ModMetaData>)");
-    CHECK(right->about_rules.load_after.contains(QStringLiteral("right")));
+    CHECK(right->aboutRules.loadAfter.contains(QStringLiteral("right")));
 }
 
 TEST_CASE("versioned dependencies replace the unversioned list") {
@@ -90,8 +90,8 @@ TEST_CASE("versioned dependencies replace the unversioned list") {
         </modDependenciesByVersion>
     </ModMetaData>)");
 
-    REQUIRE(mod->about_rules.dependencies.size() == 1);
-    CHECK(mod->about_rules.dependencies.first().package_id ==
+    REQUIRE(mod->aboutRules.dependencies.size() == 1);
+    CHECK(mod->aboutRules.dependencies.first().packageId ==
           CaseInsensitiveStr(QStringLiteral("versioned.dep")));
 }
 
@@ -104,7 +104,7 @@ TEST_CASE("preferVersioned=false ignores versioned entries") {
     </ModMetaData>)"));
     const auto mod = createAboutModFromElement(doc.document_element(), QStringLiteral("1.5"),
                                                /*preferVersioned=*/false);
-    CHECK(mod->about_rules.dependencies.isEmpty());
+    CHECK(mod->aboutRules.dependencies.isEmpty());
 }
 
 TEST_CASE("dependencies keep declaration order, skip duplicates and null entries") {
@@ -120,13 +120,13 @@ TEST_CASE("dependencies keep declaration order, skip duplicates and null entries
         </modDependencies>
     </ModMetaData>)");
 
-    const auto& deps = mod->about_rules.dependencies;
+    const auto& deps = mod->aboutRules.dependencies;
     REQUIRE(deps.size() == 2);
-    CHECK(deps[0].package_id == CaseInsensitiveStr(QStringLiteral("dep.one")));
+    CHECK(deps[0].packageId == CaseInsensitiveStr(QStringLiteral("dep.one")));
     CHECK(deps[0].name == QStringLiteral("Dep One"));
-    CHECK(deps[0].workshop_url == QStringLiteral("https://example.test/one"));
-    CHECK(deps[0].alternative_package_ids.contains(QStringLiteral("alt.one")));
-    CHECK(deps[1].package_id == CaseInsensitiveStr(QStringLiteral("dep.two")));
+    CHECK(deps[0].workshopUrl == QStringLiteral("https://example.test/one"));
+    CHECK(deps[0].alternativePackageIds.contains(QStringLiteral("alt.one")));
+    CHECK(deps[1].packageId == CaseInsensitiveStr(QStringLiteral("dep.two")));
 }
 
 TEST_CASE("force-load entries are merged into the load-order sets") {
@@ -138,11 +138,11 @@ TEST_CASE("force-load entries are merged into the load-order sets") {
         <incompatibleWith><li>bad.one</li></incompatibleWith>
     </ModMetaData>)");
 
-    CHECK(mod->about_rules.load_before.contains(QStringLiteral("before.a")));
-    CHECK(mod->about_rules.load_before.contains(QStringLiteral("before.b")));
-    CHECK(mod->about_rules.load_after.contains(QStringLiteral("after.a")));
-    CHECK(mod->about_rules.load_after.contains(QStringLiteral("after.b")));
-    CHECK(mod->about_rules.incompatible_with.contains(QStringLiteral("bad.one")));
+    CHECK(mod->aboutRules.loadBefore.contains(QStringLiteral("before.a")));
+    CHECK(mod->aboutRules.loadBefore.contains(QStringLiteral("before.b")));
+    CHECK(mod->aboutRules.loadAfter.contains(QStringLiteral("after.a")));
+    CHECK(mod->aboutRules.loadAfter.contains(QStringLiteral("after.b")));
+    CHECK(mod->aboutRules.incompatibleWith.contains(QStringLiteral("bad.one")));
 }
 
 TEST_CASE("descriptionsByVersion selects the description for the target version") {
@@ -155,7 +155,7 @@ TEST_CASE("descriptionsByVersion selects the description for the target version"
 TEST_CASE("explicit steamAppId is read") {
     const auto mod = aboutFromXml(R"(<ModMetaData><packageId>x.y</packageId>
         <steamAppId>1234</steamAppId></ModMetaData>)");
-    CHECK(mod->steam_app_id == 1234);
+    CHECK(mod->steamAppId == 1234);
 }
 
 TEST_CASE("DLC package ids depend on the RimWorld base game and take the DLC name") {
@@ -164,7 +164,7 @@ TEST_CASE("DLC package ids depend on the RimWorld base game and take the DLC nam
     CHECK(mod->valid);
     CHECK(mod->name == QStringLiteral("Royalty"));
 
-    const auto* base = mod->about_rules.find_dependency(
+    const auto* base = mod->aboutRules.findDependency(
         CaseInsensitiveStr(QStringLiteral("ludeon.rimworld")));
     REQUIRE(base != nullptr);
     CHECK(base->name == QStringLiteral("RimWorld"));
@@ -233,11 +233,11 @@ TEST_CASE("createListedModFromPath parses a valid mod directory") {
     REQUIRE(about != nullptr);
     CHECK(about->name == QStringLiteral("Test Mod"));
     CHECK(about->authors == QStringList{QStringLiteral("TestAuthor")});
-    CHECK(about->package_id.str() == QStringLiteral("test.mod"));
-    CHECK(about->mod_version == QStringLiteral("1.0.0"));
-    CHECK(about->about_rules.load_after.contains(QStringLiteral("ludeon.rimworld")));
-    CHECK(mod->mod_path() == modPath);
-    CHECK(mod->provider_id.isEmpty());
+    CHECK(about->packageId.str() == QStringLiteral("test.mod"));
+    CHECK(about->modVersion == QStringLiteral("1.0.0"));
+    CHECK(about->aboutRules.loadAfter.contains(QStringLiteral("ludeon.rimworld")));
+    CHECK(mod->modPath() == modPath);
+    CHECK(mod->providerId.isEmpty());
     CHECK(about->mtime > 0.0);
 }
 
@@ -262,7 +262,7 @@ TEST_CASE("malformed About.xml yields an invalid AboutXmlMod with the mod path")
     const auto& mod = *result;
     CHECK_FALSE(mod->valid);
     CHECK(dynamic_cast<AboutXmlMod*>(mod.get()) != nullptr);
-    CHECK(mod->mod_path() == modPath);
+    CHECK(mod->modPath() == modPath);
     CHECK(mod->uuid() == modPath);
 }
 

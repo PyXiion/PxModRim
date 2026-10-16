@@ -49,11 +49,11 @@ std::optional<QDateTime> timestampFromStem(const QString& stem) {
         return std::nullopt;
     }
     const QDate day(date.left(4).toInt(), date.mid(4, 2).toInt(), date.mid(6, 2).toInt());
-    const QTime time_of_day(time.left(2).toInt(), time.mid(2, 2).toInt(), time.mid(4, 2).toInt());
-    if (!day.isValid() || !time_of_day.isValid()) {
+    const QTime timeOfDay(time.left(2).toInt(), time.mid(2, 2).toInt(), time.mid(4, 2).toInt());
+    if (!day.isValid() || !timeOfDay.isValid()) {
         return std::nullopt;
     }
-    return QDateTime(day, time_of_day, QTimeZone::utc());
+    return QDateTime(day, timeOfDay, QTimeZone::utc());
 }
 
 QString formatUtc(const QDateTime& when) {
@@ -77,9 +77,9 @@ RestoreSnapshotDialog::RestoreSnapshotDialog(const QStringList& snapshots, QWidg
     setWindowTitle(QStringLiteral("Restore Mod List"));
     resize(560, 420);
 
-    snapshots_.reserve(static_cast<std::size_t>(snapshots.size()));
+    m_snapshots.reserve(static_cast<std::size_t>(snapshots.size()));
     for (const QString& path : snapshots) {
-        snapshots_.push_back(Snapshot{path, parse_mods_config(path)});
+        m_snapshots.push_back(Snapshot{path, parseModsConfig(path)});
     }
 
     auto* layout = new QVBoxLayout(this);
@@ -89,47 +89,47 @@ RestoreSnapshotDialog::RestoreSnapshotDialog(const QStringList& snapshots, QWidg
     instruction->setWordWrap(true);
     layout->addWidget(instruction);
 
-    list_ = new QListWidget(this);
+    m_list = new QListWidget(this);
     populateList();
-    layout->addWidget(list_);
+    layout->addWidget(m_list);
 
-    details_ = new QLabel(this);
-    details_->setWordWrap(true);
-    layout->addWidget(details_);
+    m_details = new QLabel(this);
+    m_details->setWordWrap(true);
+    layout->addWidget(m_details);
 
     auto* buttons = new QHBoxLayout();
     buttons->addStretch();
 
-    restore_ = new QPushButton(QStringLiteral("Restore"), this);
-    restore_->setObjectName(QStringLiteral("primaryAction"));
-    restore_->setEnabled(false);
-    connect(restore_, &QPushButton::clicked, this, &RestoreSnapshotDialog::onRestoreClicked);
+    m_restore = new QPushButton(QStringLiteral("Restore"), this);
+    m_restore->setObjectName(QStringLiteral("primaryAction"));
+    m_restore->setEnabled(false);
+    connect(m_restore, &QPushButton::clicked, this, &RestoreSnapshotDialog::onRestoreClicked);
 
     auto* cancel = new QPushButton(QStringLiteral("Cancel"), this);
     cancel->setObjectName(QStringLiteral("appBtn"));
     connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
 
     buttons->addWidget(cancel);
-    buttons->addWidget(restore_);
+    buttons->addWidget(m_restore);
     layout->addLayout(buttons);
 
-    connect(list_, &QListWidget::currentItemChanged, this, &RestoreSnapshotDialog::onCurrentItemChanged);
-    connect(list_, &QListWidget::itemDoubleClicked, this, &RestoreSnapshotDialog::onRestoreClicked);
+    connect(m_list, &QListWidget::currentItemChanged, this, &RestoreSnapshotDialog::onCurrentItemChanged);
+    connect(m_list, &QListWidget::itemDoubleClicked, this, &RestoreSnapshotDialog::onRestoreClicked);
 
     // Connected before selecting, so the initial selection updates the details and the button.
-    if (list_->count() > 0) {
-        list_->setCurrentRow(0);
+    if (m_list->count() > 0) {
+        m_list->setCurrentRow(0);
     }
 }
 
 std::optional<QString> RestoreSnapshotDialog::selectedSnapshot() const {
-    return selected_;
+    return m_selected;
 }
 
 void RestoreSnapshotDialog::populateList() {
-    for (std::size_t i = 0; i < snapshots_.size(); ++i) {
-        const Snapshot& snapshot = snapshots_[i];
-        auto* item = new QListWidgetItem(list_);
+    for (std::size_t i = 0; i < m_snapshots.size(); ++i) {
+        const Snapshot& snapshot = m_snapshots[i];
+        auto* item = new QListWidgetItem(m_list);
         const QString timestamp = snapshotTimestamp(snapshot.path);
 
         if (snapshot.parsed) {
@@ -150,31 +150,31 @@ void RestoreSnapshotDialog::populateList() {
 
 void RestoreSnapshotDialog::onCurrentItemChanged(QListWidgetItem* current) {
     if (current == nullptr) {
-        selected_.reset();
-        restore_->setEnabled(false);
-        details_->clear();
+        m_selected.reset();
+        m_restore->setEnabled(false);
+        m_details->clear();
         return;
     }
 
-    const Snapshot& snapshot = snapshots_[static_cast<std::size_t>(current->data(Qt::UserRole).toInt())];
+    const Snapshot& snapshot = m_snapshots[static_cast<std::size_t>(current->data(Qt::UserRole).toInt())];
     const QString name = QFileInfo(snapshot.path).fileName();
     if (snapshot.parsed) {
-        selected_ = snapshot.path;
-        restore_->setEnabled(true);
-        details_->setText(QStringLiteral("<b>File:</b> %1<br><b>Active mods:</b> %2 | <b>Game version:</b> %3")
+        m_selected = snapshot.path;
+        m_restore->setEnabled(true);
+        m_details->setText(QStringLiteral("<b>File:</b> %1<br><b>Active mods:</b> %2 | <b>Game version:</b> %3")
                               .arg(name)
                               .arg(QString::number(snapshot.parsed->activeMods.size()))
                               .arg(snapshot.parsed->version));
     } else {
-        selected_.reset();
-        restore_->setEnabled(false);
-        details_->setText(QStringLiteral("<b>This saved mod list cannot be read.</b> %1 will not be restored.")
+        m_selected.reset();
+        m_restore->setEnabled(false);
+        m_details->setText(QStringLiteral("<b>This saved mod list cannot be read.</b> %1 will not be restored.")
                               .arg(name));
     }
 }
 
 void RestoreSnapshotDialog::onRestoreClicked() {
-    if (selected_) {
+    if (m_selected) {
         accept();
     }
 }

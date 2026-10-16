@@ -60,31 +60,31 @@ class Flag {
 public:
     void set() {
         {
-            std::lock_guard lock(mutex_);
-            value_ = true;
+            std::lock_guard lock(m_mutex);
+            m_value = true;
         }
-        cv_.notify_all();
+        m_cv.notify_all();
     }
 
     void clear() {
-        std::lock_guard lock(mutex_);
-        value_ = false;
+        std::lock_guard lock(m_mutex);
+        m_value = false;
     }
 
-    bool is_set() const {
-        std::lock_guard lock(mutex_);
-        return value_;
+    bool isSet() const {
+        std::lock_guard lock(m_mutex);
+        return m_value;
     }
 
-    bool wait_for(std::chrono::milliseconds timeout) {
-        std::unique_lock lock(mutex_);
-        return cv_.wait_for(lock, timeout, [this] { return value_; });
+    bool waitFor(std::chrono::milliseconds timeout) {
+        std::unique_lock lock(m_mutex);
+        return m_cv.wait_for(lock, timeout, [this] { return m_value; });
     }
 
 private:
-    mutable std::mutex mutex_;
-    std::condition_variable cv_;
-    bool value_ = false;
+    mutable std::mutex m_mutex;
+    std::condition_variable m_cv;
+    bool m_value = false;
 };
 
 // Drives an event loop until `task` co_returns. Fails if `timeout` expires.
@@ -95,7 +95,7 @@ QCoro::Task<void> drive(QCoro::Task<T> task, std::optional<T>& out, QEventLoop& 
 }
 
 template <class T>
-T run_loop(QCoro::Task<T> task, std::chrono::milliseconds timeout = 10s) {
+T runLoop(QCoro::Task<T> task, std::chrono::milliseconds timeout = 10s) {
     std::optional<T> out;
     QEventLoop loop;
     QTimer timer;
@@ -111,13 +111,13 @@ T run_loop(QCoro::Task<T> task, std::chrono::milliseconds timeout = 10s) {
     return std::move(*out);
 }
 
-inline QCoro::Task<void> drive_void(QCoro::Task<void> task, bool& done, QEventLoop& loop) {
+inline QCoro::Task<void> driveVoid(QCoro::Task<void> task, bool& done, QEventLoop& loop) {
     co_await std::move(task);
     done = true;
     loop.quit();
 }
 
-inline void run_loop_void(QCoro::Task<void> task, std::chrono::milliseconds timeout = 10s) {
+inline void runLoopVoid(QCoro::Task<void> task, std::chrono::milliseconds timeout = 10s) {
     bool done = false;
     QEventLoop loop;
     QTimer timer;
@@ -125,7 +125,7 @@ inline void run_loop_void(QCoro::Task<void> task, std::chrono::milliseconds time
     QObject::connect(&timer, &QTimer::timeout, &loop, [&loop] { loop.quit(); });
     timer.start(timeout);
 
-    auto driver = drive_void(std::move(task), done, loop);
+    auto driver = driveVoid(std::move(task), done, loop);
     if (!done) {
         loop.exec();
     }
@@ -142,7 +142,7 @@ public:
 
     QHash<std::uint64_t, QString> errors;
     QHash<std::uint64_t, std::shared_ptr<Flag>> gates;
-    QSet<std::uint64_t> network_failures;
+    QSet<std::uint64_t> networkFailures;
     std::shared_ptr<Flag> blocked = std::make_shared<Flag>();
 
     std::vector<Call> calls;
@@ -173,22 +173,22 @@ public:
             }
             if (auto gate = gates.value(id)) {
                 blocked->set();
-                gate->wait_for(5s);
+                gate->waitFor(5s);
             }
 
             const bool cancelled = options.stop.stop_requested();
-            const QString error_text = cancelled ? QStringLiteral("cancelled") : errors.value(id);
-            if (error_text.isEmpty()) {
+            const QString errorText = cancelled ? QStringLiteral("cancelled") : errors.value(id);
+            if (errorText.isEmpty()) {
                 std::error_code ec;
                 std::filesystem::create_directories(root / std::to_string(id), ec);
             }
 
             pxsteamdl::ErrorKind kind = pxsteamdl::ErrorKind::kNone;
-            if (network_failures.contains(id)) {
+            if (networkFailures.contains(id)) {
                 kind = pxsteamdl::ErrorKind::kNetwork;
             } else if (cancelled) {
                 kind = pxsteamdl::ErrorKind::kCancelled;
-            } else if (!error_text.isEmpty()) {
+            } else if (!errorText.isEmpty()) {
                 kind = pxsteamdl::ErrorKind::kOther;
             }
 
@@ -196,7 +196,7 @@ public:
                 .item_id = id,
                 .title = "Title " + std::to_string(id),
                 .path = root / std::to_string(id),
-                .error = error_text.toStdString(),
+                .error = errorText.toStdString(),
                 .error_kind = kind,
                 .downloaded_bytes = 0,
                 .unpacked_bytes = 0,
@@ -216,58 +216,58 @@ public:
 
 struct Service {
     explicit Service(std::deque<std::shared_ptr<WorkshopClient>> clients, bool local = true)
-        : config_dir(),
-          config(config_dir.path()),
+        : configDir(),
+          config(configDir.path()),
           manager(),
-          local_path(local ? config_dir.path() + "/Mods" : QString()),
-          clients_(std::move(clients)) {
+          localPath(local ? configDir.path() + "/Mods" : QString()),
+          clients(std::move(clients)) {
         SteamDownloaderDeps deps{
             .manager = manager,
             .config = config,
-            .local_mods_path = [this] { return local_path; },
-            .installed_mods = [this] { return mods; },
-            .client_factory = [this](LoginOptions opts) { return login(std::move(opts)); },
+            .localModsPath = [this] { return localPath; },
+            .installedMods = [this] { return mods; },
+            .clientFactory = [this](LoginOptions opts) { return login(std::move(opts)); },
         };
         steam = std::make_unique<SteamDownloader>(std::move(deps));
-        manager.register_downloader(*steam);
+        manager.registerDownloader(*steam);
     }
 
     QCoro::Task<Result<std::shared_ptr<WorkshopClient>>> login(LoginOptions opts) {
         logins.push_back(opts);
-        if (clients_.empty()) {
+        if (clients.empty()) {
             co_return std::unexpected(px::modrim::Error{QStringLiteral("logon denied")});
         }
-        auto client = clients_.front();
-        clients_.pop_front();
+        auto client = clients.front();
+        clients.pop_front();
         co_return client;
     }
 
-    QTemporaryDir config_dir;
+    QTemporaryDir configDir;
     ConfigService config;
     DownloadManager manager;
-    QString local_path;
+    QString localPath;
     QList<ListedModPtr> mods;
 
     std::vector<LoginOptions> logins;
-    std::deque<std::shared_ptr<WorkshopClient>> clients_;
+    std::deque<std::shared_ptr<WorkshopClient>> clients;
     std::unique_ptr<SteamDownloader> steam;
 };
 
-ListedModPtr make_mod_at(const QString& path, const QString& pfid = {}) {
+ListedModPtr makeModAt(const QString& path, const QString& pfid = {}) {
     QDir().mkpath(path);
     if (!pfid.isEmpty()) {
         QDir().mkpath(path + "/About");
-        test_support::write_bytes(path + "/About/PublishedFileId.txt", pfid.toStdString());
+        test_support::writeBytes(path + "/About/PublishedFileId.txt", pfid.toStdString());
     }
     auto mod = std::make_shared<ListedMod>();
-    REQUIRE(mod->set_mod_path(path).has_value());
+    REQUIRE(mod->setModPath(path).has_value());
     return mod;
 }
 
-std::optional<double> synced_of(Service& svc, const QString& pid) {
+std::optional<double> syncedOf(Service& svc, const QString& pid) {
     auto mod = std::make_shared<ListedMod>();
-    REQUIRE(mod->set_mod_path(svc.local_path + "/" + pid).has_value());
-    return svc.steam->last_synced(*mod);
+    REQUIRE(mod->setModPath(svc.localPath + "/" + pid).has_value());
+    return svc.steam->lastSynced(*mod);
 }
 
 }  // namespace
@@ -277,7 +277,7 @@ TEST_CASE("login uses configured proxy and timeouts", "[downloads][steam]") {
     auto client = std::make_shared<FakeClient>();
     Service svc({client, client});
 
-    REQUIRE(run_loop(svc.steam->download_mods({"111"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"111"})).has_value());
     svc.steam->settings().update(SteamSettings{
         .auto_update_hours = 0,
         .parallel_items = 8,
@@ -286,11 +286,11 @@ TEST_CASE("login uses configured proxy and timeouts", "[downloads][steam]") {
         .connect_timeout = 3,
         .stall_timeout = 7,
     });
-    REQUIRE(run_loop(svc.steam->download_mods({"222"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"222"})).has_value());
 
     const std::vector<LoginOptions> expected{
-        LoginOptions{.proxy = std::nullopt, .connect_timeout = 10, .stall_timeout = 30},
-        LoginOptions{.proxy = "socks5h://host:1080", .connect_timeout = 3, .stall_timeout = 7},
+        LoginOptions{.proxy = std::nullopt, .connectTimeout = 10, .stallTimeout = 30},
+        LoginOptions{.proxy = "socks5h://host:1080", .connectTimeout = 3, .stallTimeout = 7},
     };
     REQUIRE(svc.logins == expected);
 }
@@ -298,11 +298,11 @@ TEST_CASE("login uses configured proxy and timeouts", "[downloads][steam]") {
 TEST_CASE("network failure triggers new login", "[downloads][steam]") {
     TestApplication app;
     auto client = std::make_shared<FakeClient>();
-    client->network_failures.insert(111);
+    client->networkFailures.insert(111);
     Service svc({client, client});
 
-    REQUIRE(run_loop(svc.steam->download_mods({"111"})).has_value());
-    REQUIRE(run_loop(svc.steam->download_mods({"222"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"111"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"222"})).has_value());
 
     REQUIRE(svc.logins.size() == 2);
 }
@@ -315,39 +315,39 @@ TEST_CASE("downloads into local mods and splits results", "[downloads][steam]") 
 
     std::vector<DownloadItemStatus> statuses;
     std::vector<DownloadResult> finished;
-    svc.steam->download_item_status_changed.connect([&](const auto& s) { statuses.push_back(s); });
-    svc.steam->download_finished.connect([&](const auto& r) { finished.push_back(r); });
+    svc.steam->downloadItemStatusChanged.connect([&](const auto& s) { statuses.push_back(s); });
+    svc.steam->downloadFinished.connect([&](const auto& r) { finished.push_back(r); });
 
-    auto result = run_loop(svc.steam->download_mods({"111", "222", "111"}));
+    auto result = runLoop(svc.steam->downloadMods({"111", "222", "111"}));
 
     REQUIRE(result.has_value());
     REQUIRE(result->succeeded == QStringList{"111"});
     REQUIRE(result->failed == QStringList{"222"});
     REQUIRE(finished.size() == 1);
     REQUIRE(finished[0] == *result);
-    REQUIRE(QFileInfo::exists(svc.local_path + "/111"));
+    REQUIRE(QFileInfo::exists(svc.localPath + "/111"));
     REQUIRE(client->calls.size() == 1);
     REQUIRE(client->calls[0].ids == std::vector<std::uint64_t>{111, 222});
-    REQUIRE(client->calls[0].root == svc.local_path);
+    REQUIRE(client->calls[0].root == svc.localPath);
 
-    QHash<QString, DownloadItemStatus> final_status;
+    QHash<QString, DownloadItemStatus> finalStatus;
     for (const auto& s : statuses) {
         if (s.status != "downloading") {
-            final_status.insert(s.mod_id, s);
+            finalStatus.insert(s.modId, s);
         }
     }
-    REQUIRE(final_status.value("111").status == "success");
-    REQUIRE(final_status.value("222").status == "error");
-    REQUIRE(final_status.value("222").error == "item not found");
+    REQUIRE(finalStatus.value("111").status == "success");
+    REQUIRE(finalStatus.value("222").status == "error");
+    REQUIRE(finalStatus.value("222").error == "item not found");
 }
 
 TEST_CASE("rejects invalid ids", "[downloads][steam]") {
     TestApplication app;
-    const std::vector<QStringList> bad_inputs{
+    const std::vector<QStringList> badInputs{
         {"12a"}, {"\u0661\u0662\u0663"}, {"1 2"}, {}, {"18446744073709551616"}};
-    for (const auto& ids : bad_inputs) {
+    for (const auto& ids : badInputs) {
         Service svc({std::make_shared<FakeClient>()});
-        auto result = run_loop(svc.steam->download_mods(ids));
+        auto result = runLoop(svc.steam->downloadMods(ids));
         REQUIRE_FALSE(result.has_value());
         REQUIRE(svc.logins.empty());
     }
@@ -357,7 +357,7 @@ TEST_CASE("requires local mods path", "[downloads][steam]") {
     TestApplication app;
     Service svc({std::make_shared<FakeClient>()}, /*local=*/false);
 
-    auto result = run_loop(svc.steam->download_mods({"111"}));
+    auto result = runLoop(svc.steam->downloadMods({"111"}));
 
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error().message.contains("Local mods path"));
@@ -369,7 +369,7 @@ TEST_CASE("accepts uint64 max id", "[downloads][steam]") {
     auto client = std::make_shared<FakeClient>();
     Service svc({client});
 
-    auto result = run_loop(svc.steam->download_mods({"18446744073709551615"}));
+    auto result = runLoop(svc.steam->downloadMods({"18446744073709551615"}));
 
     REQUIRE(result.has_value());
     REQUIRE(result->succeeded == QStringList{"18446744073709551615"});
@@ -379,9 +379,9 @@ TEST_CASE("accepts uint64 max id", "[downloads][steam]") {
 TEST_CASE("unwritable local path fails every item", "[downloads][steam]") {
     TestApplication app;
     Service svc({std::make_shared<FakeClient>()});
-    test_support::write_bytes(svc.local_path, "not a directory");
+    test_support::writeBytes(svc.localPath, "not a directory");
 
-    auto result = run_loop(svc.steam->download_mods({"111", "222"}));
+    auto result = runLoop(svc.steam->downloadMods({"111", "222"}));
 
     REQUIRE(result.has_value());
     QStringList failed = result->failed;
@@ -394,10 +394,10 @@ TEST_CASE("login failure fails every item and retries next time", "[downloads][s
     TestApplication app;
     Service svc({});
     std::vector<QString> messages;
-    svc.steam->status_message_changed.connect([&](const QString& m) { messages.push_back(m); });
+    svc.steam->statusMessageChanged.connect([&](const QString& m) { messages.push_back(m); });
 
-    auto first = run_loop(svc.steam->download_mods({"111", "222"}));
-    auto second = run_loop(svc.steam->download_mods({"111"}));
+    auto first = runLoop(svc.steam->downloadMods({"111", "222"}));
+    auto second = runLoop(svc.steam->downloadMods({"111"}));
 
     REQUIRE(first.has_value());
     REQUIRE(first->succeeded.isEmpty());
@@ -405,8 +405,8 @@ TEST_CASE("login failure fails every item and retries next time", "[downloads][s
     failed.sort();
     REQUIRE(failed == QStringList{"111", "222"});
 
-    const bool has_denied = std::ranges::any_of(messages, [](const auto& m) { return m.contains("logon denied"); });
-    REQUIRE(has_denied);
+    const bool hasDenied = std::ranges::any_of(messages, [](const auto& m) { return m.contains("logon denied"); });
+    REQUIRE(hasDenied);
     REQUIRE(svc.logins.size() == 2);
 }
 
@@ -415,8 +415,8 @@ TEST_CASE("client session is reused", "[downloads][steam]") {
     auto client = std::make_shared<FakeClient>();
     Service svc({client});
 
-    REQUIRE(run_loop(svc.steam->download_mods({"111"})).has_value());
-    REQUIRE(run_loop(svc.steam->download_mods({"222"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"111"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"222"})).has_value());
     REQUIRE(svc.logins.size() == 1);
 }
 
@@ -429,7 +429,7 @@ TEST_CASE("uses at most eight download workers", "[downloads][steam]") {
         ids.append(QString::number(i));
     }
 
-    REQUIRE(run_loop(svc.steam->download_mods(ids)).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods(ids)).has_value());
     REQUIRE(client->calls.size() == 1);
     REQUIRE(client->calls[0].workers <= 8);
 }
@@ -443,7 +443,7 @@ TEST_CASE("cancel keeps finished items and returns", "[downloads][steam]") {
 
     QTimer poll;
     QObject::connect(&poll, &QTimer::timeout, &poll, [&] {
-        if (client->blocked->is_set()) {
+        if (client->blocked->isSet()) {
             svc.steam->cancel();
             gate->set();
             poll.stop();
@@ -451,12 +451,12 @@ TEST_CASE("cancel keeps finished items and returns", "[downloads][steam]") {
     });
     poll.start(10ms);
 
-    auto result = run_loop(svc.steam->download_mods({"111", "222", "333"}));
+    auto result = runLoop(svc.steam->downloadMods({"111", "222", "333"}));
 
     REQUIRE(result.has_value());
     REQUIRE(result->succeeded == QStringList{"111"});
     REQUIRE(result->failed.isEmpty());
-    REQUIRE_FALSE(svc.steam->is_downloading());
+    REQUIRE_FALSE(svc.steam->isDownloading());
 }
 
 TEST_CASE("second download while running is rejected", "[downloads][steam]") {
@@ -466,17 +466,17 @@ TEST_CASE("second download while running is rejected", "[downloads][steam]") {
     client->gates.insert(111, gate);
     Service svc({client});
 
-    std::optional<Result<DownloadResult>> first_out;
-    std::optional<Result<DownloadResult>> second_out;
+    std::optional<Result<DownloadResult>> firstOut;
+    std::optional<Result<DownloadResult>> secondOut;
     QEventLoop loop;
 
-    auto first_task = test_support::await_into(svc.steam->download_mods({"111"}), first_out);
+    auto firstTask = test_support::awaitInto(svc.steam->downloadMods({"111"}), firstOut);
 
     QTimer poll;
     QObject::connect(&poll, &QTimer::timeout, &poll, [&] {
-        if (svc.steam->is_downloading()) {
+        if (svc.steam->isDownloading()) {
             poll.stop();
-            auto second_task = test_support::await_into(svc.steam->download_mods({"222"}), second_out);
+            auto secondTask = test_support::awaitInto(svc.steam->downloadMods({"222"}), secondOut);
             gate->set();
             loop.quit();
         }
@@ -484,34 +484,34 @@ TEST_CASE("second download while running is rejected", "[downloads][steam]") {
     poll.start(10ms);
     loop.exec();
 
-    REQUIRE(second_out.has_value());
-    REQUIRE_FALSE(second_out->has_value());
-    REQUIRE(second_out->error().message.contains("already running"));
+    REQUIRE(secondOut.has_value());
+    REQUIRE_FALSE(secondOut->has_value());
+    REQUIRE(secondOut->error().message.contains("already running"));
 }
 
 TEST_CASE("updatable_id only for downloads in local mods", "[downloads][steam]") {
     TestApplication app;
     Service svc({});
-    const QString root = svc.local_path;
-    const auto m1 = make_mod_at(root + "/111", "111");
-    const auto m2 = make_mod_at(root + "/Renamed", "222");
-    const auto m3 = make_mod_at(root + "/333");
-    const auto m4 = make_mod_at(svc.config_dir.path() + "/Workshop/444", "444");
+    const QString root = svc.localPath;
+    const auto m1 = makeModAt(root + "/111", "111");
+    const auto m2 = makeModAt(root + "/Renamed", "222");
+    const auto m3 = makeModAt(root + "/333");
+    const auto m4 = makeModAt(svc.configDir.path() + "/Workshop/444", "444");
     svc.mods = {m1, m2, m3, m4};
 
-    REQUIRE(svc.steam->updatable_id(*m1) == std::optional<QString>("111"));
-    REQUIRE(svc.steam->updatable_id(*m2) == std::nullopt);
-    REQUIRE(svc.steam->updatable_id(*m3) == std::optional<QString>("333"));
-    REQUIRE(svc.steam->updatable_id(*m4) == std::nullopt);
+    REQUIRE(svc.steam->updatableId(*m1) == std::optional<QString>("111"));
+    REQUIRE(svc.steam->updatableId(*m2) == std::nullopt);
+    REQUIRE(svc.steam->updatableId(*m3) == std::optional<QString>("333"));
+    REQUIRE(svc.steam->updatableId(*m4) == std::nullopt);
 
-    REQUIRE(svc.steam->updatable_ids(svc.mods) == QStringList{"111", "333"});
+    REQUIRE(svc.steam->updatableIds(svc.mods) == QStringList{"111", "333"});
 }
 
 TEST_CASE("updatable_id none without local path", "[downloads][steam]") {
     TestApplication app;
     Service svc({}, /*local=*/false);
-    const auto mod = make_mod_at(svc.config_dir.path() + "/Mods/111", "111");
-    REQUIRE(svc.steam->updatable_id(*mod) == std::nullopt);
+    const auto mod = makeModAt(svc.configDir.path() + "/Mods/111", "111");
+    REQUIRE(svc.steam->updatableId(*mod) == std::nullopt);
 }
 
 TEST_CASE("busy changed brackets download", "[downloads][steam]") {
@@ -519,10 +519,10 @@ TEST_CASE("busy changed brackets download", "[downloads][steam]") {
     auto client = std::make_shared<FakeClient>();
     Service svc({client});
     std::vector<QString> events;
-    svc.steam->busy_changed.connect([&](bool busy) { events.push_back(busy ? "busy:1" : "busy:0"); });
-    svc.steam->download_finished.connect([&](const auto&) { events.push_back("finished"); });
+    svc.steam->busyChanged.connect([&](bool busy) { events.push_back(busy ? "busy:1" : "busy:0"); });
+    svc.steam->downloadFinished.connect([&](const auto&) { events.push_back("finished"); });
 
-    REQUIRE(run_loop(svc.steam->download_mods({"111"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"111"})).has_value());
 
     const std::vector<QString> expected{"busy:1", "busy:0", "finished"};
     REQUIRE(events == expected);
@@ -532,9 +532,9 @@ TEST_CASE("invalid ids do not toggle busy", "[downloads][steam]") {
     TestApplication app;
     Service svc({std::make_shared<FakeClient>()});
     std::vector<bool> busy;
-    svc.steam->busy_changed.connect([&](bool b) { busy.push_back(b); });
+    svc.steam->busyChanged.connect([&](bool b) { busy.push_back(b); });
 
-    auto result = run_loop(svc.steam->download_mods({"12a"}));
+    auto result = runLoop(svc.steam->downloadMods({"12a"}));
     REQUIRE_FALSE(result.has_value());
     REQUIRE(busy.empty());
 }
@@ -553,11 +553,11 @@ TEST_CASE("progress counts complete and up to date items", "[downloads][steam]")
 TEST_CASE("updatable_ids limited to given mods and deduplicated", "[downloads][steam]") {
     TestApplication app;
     Service svc({});
-    const auto a = make_mod_at(svc.local_path + "/111", "111");
-    const auto b = make_mod_at(svc.local_path + "/222", "222");
-    const auto other = make_mod_at(svc.config_dir.path() + "/Other/9", "9");
+    const auto a = makeModAt(svc.localPath + "/111", "111");
+    const auto b = makeModAt(svc.localPath + "/222", "222");
+    const auto other = makeModAt(svc.configDir.path() + "/Other/9", "9");
 
-    REQUIRE(svc.steam->updatable_ids({b, b, other}) == QStringList{"222"});
+    REQUIRE(svc.steam->updatableIds({b, b, other}) == QStringList{"222"});
 }
 
 TEST_CASE("result changed excludes up to date items", "[downloads][steam]") {
@@ -565,11 +565,11 @@ TEST_CASE("result changed excludes up to date items", "[downloads][steam]") {
     auto client = std::make_shared<FakeClient>();
     Service svc({client});
 
-    auto result = run_loop(svc.steam->download_mods({"111"}));
+    auto result = runLoop(svc.steam->downloadMods({"111"}));
 
     REQUIRE(result.has_value());
     REQUIRE(result->changed == QStringList{"111"});
-    REQUIRE(svc.steam->active_ids().isEmpty());
+    REQUIRE(svc.steam->activeIds().isEmpty());
 }
 
 TEST_CASE("batch changed ignores zero byte items", "[downloads][steam]") {
@@ -586,9 +586,9 @@ TEST_CASE("success records sync time and persists", "[downloads][steam]") {
     client->errors.insert(222, QStringLiteral("gone"));
     Service svc({client});
 
-    REQUIRE(run_loop(svc.steam->download_mods({"111", "222"})).has_value());
-    REQUIRE(synced_of(svc, "111").has_value());
-    REQUIRE_FALSE(synced_of(svc, "222").has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"111", "222"})).has_value());
+    REQUIRE(syncedOf(svc, "111").has_value());
+    REQUIRE_FALSE(syncedOf(svc, "222").has_value());
 
     auto reloaded = svc.config.load<WorkshopSyncState>(px::modrim::kWorkshopSyncFile);
     REQUIRE(reloaded.has_value());
@@ -603,24 +603,24 @@ TEST_CASE("stale ids never synced first then oldest", "[downloads][steam]") {
     TestApplication app;
     Service svc({});
     for (const char* name : {"1", "2", "3", "4"}) {
-        svc.mods.push_back(make_mod_at(svc.local_path + "/" + name, name));
+        svc.mods.push_back(makeModAt(svc.localPath + "/" + name, name));
     }
     WorkshopSyncState seed;
     seed.synced = {{"1", 1000.0}, {"2", 9000.0}, {"3", 500.0}};
     REQUIRE(svc.config.save(px::modrim::kWorkshopSyncFile, seed).has_value());
-    run_loop_void(svc.steam->load_sync_state());
+    runLoopVoid(svc.steam->loadSyncState());
 
-    REQUIRE(svc.steam->stale_ids(3600.0, 10000.0) == QStringList{"4", "3", "1"});
+    REQUIRE(svc.steam->staleIds(3600.0, 10000.0) == QStringList{"4", "3", "1"});
 }
 
 TEST_CASE("auto update only syncs stale mods when enabled", "[downloads][steam]") {
     TestApplication app;
     auto client = std::make_shared<FakeClient>();
     Service svc({client});
-    svc.mods.push_back(make_mod_at(svc.local_path + "/1", "1"));
+    svc.mods.push_back(makeModAt(svc.localPath + "/1", "1"));
 
-    run_loop_void(svc.steam->auto_update_once());
-    REQUIRE_FALSE(synced_of(svc, "1").has_value());
+    runLoopVoid(svc.steam->autoUpdateOnce());
+    REQUIRE_FALSE(syncedOf(svc, "1").has_value());
 
     svc.steam->settings().update(SteamSettings{
         .auto_update_hours = 6,
@@ -630,12 +630,12 @@ TEST_CASE("auto update only syncs stale mods when enabled", "[downloads][steam]"
         .connect_timeout = 10,
         .stall_timeout = 30,
     });
-    run_loop_void(svc.steam->auto_update_once());
-    REQUIRE(synced_of(svc, "1").has_value());
-    const double first_synced = *synced_of(svc, "1");
+    runLoopVoid(svc.steam->autoUpdateOnce());
+    REQUIRE(syncedOf(svc, "1").has_value());
+    const double firstSynced = *syncedOf(svc, "1");
 
-    run_loop_void(svc.steam->auto_update_once());
-    REQUIRE(*synced_of(svc, "1") == first_synced);
+    runLoopVoid(svc.steam->autoUpdateOnce());
+    REQUIRE(*syncedOf(svc, "1") == firstSynced);
 }
 
 TEST_CASE("titles from steam are emitted", "[downloads][steam]") {
@@ -643,11 +643,11 @@ TEST_CASE("titles from steam are emitted", "[downloads][steam]") {
     auto client = std::make_shared<FakeClient>();
     Service svc({client});
     QHash<QString, QString> titles;
-    svc.steam->download_item_titled.connect([&](const auto& t) { titles.insert(t.mod_id, t.title); });
+    svc.steam->downloadItemTitled.connect([&](const auto& t) { titles.insert(t.modId, t.title); });
     std::vector<QString> phases;
-    svc.steam->download_phase_changed.connect([&](const auto& p) { phases.push_back(p); });
+    svc.steam->downloadPhaseChanged.connect([&](const auto& p) { phases.push_back(p); });
 
-    REQUIRE(run_loop(svc.steam->download_mods({"111", "222"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"111", "222"})).has_value());
 
     REQUIRE(phases == std::vector<QString>{"login", "query", "run"});
     REQUIRE(titles.value("111") == "Title 111");
@@ -660,11 +660,11 @@ TEST_CASE("client is relogged after download raises", "[downloads][steam]") {
     auto fresh = std::make_shared<FakeClient>();
     Service svc({dying, fresh});
 
-    auto first = run_loop(svc.steam->download_mods({"1"}));
+    auto first = runLoop(svc.steam->downloadMods({"1"}));
     REQUIRE(first.has_value());
     REQUIRE(first->failed == QStringList{"1"});
 
-    auto second = run_loop(svc.steam->download_mods({"2"}));
+    auto second = runLoop(svc.steam->downloadMods({"2"}));
     REQUIRE(second.has_value());
     REQUIRE(second->succeeded == QStringList{"2"});
     REQUIRE(svc.logins.size() == 2);
@@ -683,7 +683,7 @@ TEST_CASE("download uses configured parallelism clamped", "[downloads][steam]") 
         .connect_timeout = 10,
         .stall_timeout = 30,
     });
-    REQUIRE(run_loop(svc.steam->download_mods({"1"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"1"})).has_value());
 
     svc.steam->settings().update(SteamSettings{
         .auto_update_hours = 0,
@@ -693,7 +693,7 @@ TEST_CASE("download uses configured parallelism clamped", "[downloads][steam]") 
         .connect_timeout = 10,
         .stall_timeout = 30,
     });
-    REQUIRE(run_loop(svc.steam->download_mods({"2"})).has_value());
+    REQUIRE(runLoop(svc.steam->downloadMods({"2"})).has_value());
 
     REQUIRE(client->calls.size() == 2);
     REQUIRE(client->calls[0].workers == 15);

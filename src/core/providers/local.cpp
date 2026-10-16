@@ -31,9 +31,9 @@ LocalModProvider::LocalModProvider(QString localPath, QThreadPool* pool,
     : BaseModProvider(QStringLiteral("local"), QStringLiteral("#2ecc71"), std::move(localPath),
                       pool, metadataCache) {}
 
-QCoro::Task<Result<ModMap>> LocalModProvider::discover(QString target_version, Profiler* timer,
-                                                       MetadataCacheStore* metadata_cache,
-                                                       bool force_reparse) {
+QCoro::Task<Result<ModMap>> LocalModProvider::discover(QString targetVersion, Profiler* timer,
+                                                       MetadataCacheStore* metadataCache,
+                                                       bool forceReparse) {
     Profiler ownTimer;
     Profiler& tm = timer ? *timer : ownTimer;
 
@@ -56,8 +56,8 @@ QCoro::Task<Result<ModMap>> LocalModProvider::discover(QString target_version, P
         }
     }
 
-    auto discovered = co_await load_mods(std::move(dirs), std::move(target_version), tm,
-                                         metadata_cache, force_reparse);
+    auto discovered = co_await loadMods(std::move(dirs), std::move(targetVersion), tm,
+                                         metadataCache, forceReparse);
     if (discovered) {
         spdlog::info("LocalModProvider discovered {} mods", discovered->size());
     }
@@ -74,10 +74,10 @@ DownloadedModProvider::DownloadedModProvider(QString providerId, QString path,
     : BaseModProvider(std::move(providerId), QStringLiteral("#3498db"), std::move(path), pool,
                       metadataCache) {}
 
-QCoro::Task<Result<ModMap>> DownloadedModProvider::discover(QString target_version,
+QCoro::Task<Result<ModMap>> DownloadedModProvider::discover(QString targetVersion,
                                                             Profiler* timer,
-                                                            MetadataCacheStore* metadata_cache,
-                                                            bool force_reparse) {
+                                                            MetadataCacheStore* metadataCache,
+                                                            bool forceReparse) {
     Profiler ownTimer;
     Profiler& tm = timer ? *timer : ownTimer;
 
@@ -100,10 +100,10 @@ QCoro::Task<Result<ModMap>> DownloadedModProvider::discover(QString target_versi
         }
     }
 
-    auto discovered = co_await load_mods(std::move(dirs), std::move(target_version), tm,
-                                         metadata_cache, force_reparse);
+    auto discovered = co_await loadMods(std::move(dirs), std::move(targetVersion), tm,
+                                         metadataCache, forceReparse);
     if (discovered) {
-        spdlog::info("{} discovered {} mods", provider_id().toStdString(), discovered->size());
+        spdlog::info("{} discovered {} mods", providerId().toStdString(), discovered->size());
     }
     co_return discovered;
 }

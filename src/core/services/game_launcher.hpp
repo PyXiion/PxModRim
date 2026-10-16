@@ -20,28 +20,28 @@ namespace px::modrim::services {
 class GameLauncher {
 public:
     // `ctx` is not owned and must outlive the launcher.
-    GameLauncher(CoreContext& ctx, ProcessLister lister = host_process_lister,
+    GameLauncher(CoreContext& ctx, ProcessLister lister = hostProcessLister,
                  MonitorTiming timing = {});
 
     // Resolves to a status message when the launch was started, or to the reason it was not.
     QCoro::Task<Result<QString>> launch(LaunchStrategy strategy);
 
     // Whether a game process is running right now. Blocks while listing processes.
-    bool is_running() const;
+    bool isRunning() const;
 
-    QCoro::Task<bool> wait_for_start(std::chrono::milliseconds timeout = std::chrono::milliseconds(60'000));
+    QCoro::Task<bool> waitForStart(std::chrono::milliseconds timeout = std::chrono::milliseconds(60'000));
 
     // Resolves to the spawned process's exit code, or nullopt when it was not spawned here or
     // has not exited.
-    QCoro::Task<std::optional<int>> wait_for_exit();
+    QCoro::Task<std::optional<int>> waitForExit();
 
 private:
-    QCoro::Task<Result<QString>> launch_direct();
-    QCoro::Task<Result<QString>> launch_steam();
+    QCoro::Task<Result<QString>> launchDirect();
+    QCoro::Task<Result<QString>> launchSteam();
 
-    CoreContext& ctx_;
-    ProcessLister lister_;
-    GameProcessMonitor monitor_;
+    CoreContext& m_ctx;
+    ProcessLister m_lister;
+    GameProcessMonitor m_monitor;
 };
 
 }  // namespace px::modrim::services

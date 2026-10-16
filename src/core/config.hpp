@@ -34,11 +34,12 @@ using JsonMigration = std::function<void(JsonObject&)>;
 using JsonMigrations = std::map<int, JsonMigration>;
 
 // Version 1 is the first versioned layout, so there is nothing to rewrite yet.
-inline JsonMigrations default_json_migrations() {
+inline JsonMigrations defaultJsonMigrations() {
     return {{1, [](JsonObject&) {}}};
 }
 
 // glaze does not serialise QString, so serialised fields use std::string.
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct PathConfig {
     std::string game;
     std::string local;
@@ -50,7 +51,9 @@ struct PathConfig {
 
     bool operator==(const PathConfig&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct AppConfig {
     PathConfig paths;
     sort::SortSettings sort;
@@ -59,13 +62,14 @@ struct AppConfig {
     std::string log_upload_endpoint = "https://paste.rs/";
     std::string launch_args;
     std::string launch_wrapper;
-    AfterLaunch after_launch = AfterLaunch::Stay;
+    AfterLaunch after_launch = AfterLaunch::kStay;
     bool launch_confirm_errors = true;
     bool launch_confirm_unsaved = true;
     bool launch_confirm_running = true;
 
     bool operator==(const AppConfig&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
 // File-based repository for typed JSON config files in one directory.
 // Versioned files (config.json, ui_prefs.json) carry a schema_version key and
@@ -73,7 +77,7 @@ struct AppConfig {
 // corrupt file loads as the struct defaults, with a warning.
 class ConfigService {
 public:
-    explicit ConfigService(QString config_dir, JsonMigrations migrations = default_json_migrations());
+    explicit ConfigService(QString configDir, JsonMigrations migrations = defaultJsonMigrations());
 
     const QString& directory() const noexcept;
 
@@ -83,36 +87,36 @@ public:
 
     // Like `load`, but nullopt when the file does not exist yet.
     template <class T>
-    Result<std::optional<T>> load_existing(const QString& filename) const;
+    Result<std::optional<T>> loadExisting(const QString& filename) const;
 
     template <class T>
     Result<void> save(const QString& filename, const T& data) const;
 
     // The undecoded top-level object of a file, or {} when it cannot be read.
-    JsonObject load_raw(const QString& filename) const;
+    JsonObject loadRaw(const QString& filename) const;
 
 private:
-    QString file_path(const QString& filename) const;
-    static bool is_versioned(const QString& filename);
+    QString filePath(const QString& filename) const;
+    static bool isVersioned(const QString& filename);
     // Appends the schema marker after the struct's own members, where the legacy writer put it.
-    static std::string with_schema_marker(std::string pretty_object);
-    Result<std::optional<JsonObject>> load_versioned(const QString& filename) const;
+    static std::string withSchemaMarker(std::string prettyObject);
+    Result<std::optional<JsonObject>> loadVersioned(const QString& filename) const;
     Result<void> migrate(JsonObject& data, std::int64_t current) const;
 
-    QString dir_;
-    JsonMigrations migrations_;
+    QString m_dir;
+    JsonMigrations m_migrations;
 };
 
 template <class T>
 Result<T> ConfigService::load(const QString& filename) const {
-    const QString path = file_path(filename);
+    const QString path = filePath(filename);
     if (!QFileInfo::exists(path)) {
         return T{};
     }
 
     std::string text;
-    if (is_versioned(filename)) {
-        auto document = load_versioned(filename);
+    if (isVersioned(filename)) {
+        auto document = loadVersioned(filename);
         if (!document) {
             return std::unexpected(document.error());
         }
@@ -125,7 +129,7 @@ Result<T> ConfigService::load(const QString& filename) const {
         }
         text = std::move(*encoded);
     } else {
-        auto bytes = read_file_bytes(path);
+        auto bytes = readFileBytes(path);
         if (!bytes) {
             return T{};
         }
@@ -141,8 +145,8 @@ Result<T> ConfigService::load(const QString& filename) const {
 }
 
 template <class T>
-Result<std::optional<T>> ConfigService::load_existing(const QString& filename) const {
-    if (!QFileInfo::exists(file_path(filename))) {
+Result<std::optional<T>> ConfigService::loadExisting(const QString& filename) const {
+    if (!QFileInfo::exists(filePath(filename))) {
         return std::optional<T>{};
     }
     auto loaded = load<T>(filename);
@@ -158,19 +162,19 @@ Result<void> ConfigService::save(const QString& filename, const T& data) const {
     if (!text) {
         return std::unexpected(Error{QStringLiteral("Cannot encode %1").arg(filename)});
     }
-    if (is_versioned(filename)) {
-        *text = with_schema_marker(std::move(*text));
+    if (isVersioned(filename)) {
+        *text = withSchemaMarker(std::move(*text));
     }
-    return write_file_atomically(file_path(filename), *text);
+    return writeFileAtomically(filePath(filename), *text);
 }
 
-QString config_dir();
-QString community_rules_file();
+QString configDir();
+QString communityRulesFile();
 
 // The game version string from Version.txt, or nullopt when it is missing or unreadable.
-std::optional<QString> read_game_version(const QString& game_path);
+std::optional<QString> readGameVersion(const QString& gamePath);
 
-PathConfig detect_game_paths();
+PathConfig detectGamePaths();
 
 // Owns the AppConfig lifecycle: load on setup, save on request.
 class AppConfigService {
@@ -182,11 +186,11 @@ public:
     // Valid only after a successful setup().
     const AppConfig& cfg() const;
 
-    Result<void> save_cfg() const;
+    Result<void> saveCfg() const;
 
 private:
-    ConfigService& svc_;
-    std::optional<AppConfig> cfg_;
+    ConfigService& m_svc;
+    std::optional<AppConfig> m_cfg;
 };
 
 }  // namespace px::modrim

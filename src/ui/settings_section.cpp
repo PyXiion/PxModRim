@@ -6,24 +6,24 @@
 namespace px::modrim {
 
 PluginConfigSectionBase::PluginConfigSectionBase(QVariantMap initial, QObject* parent)
-    : SettingsSection(parent), initial_(std::move(initial)) {}
+    : SettingsSection(parent), m_initial(std::move(initial)) {}
 
-QVariantMap PluginConfigSectionBase::initial() const { return initial_; }
+QVariantMap PluginConfigSectionBase::initial() const { return m_initial; }
 
 bool PluginConfigSectionBase::set(const QString& key, const QVariant& value) {
-    if (!initial_.contains(key)) {
+    if (!m_initial.contains(key)) {
         return false;
     }
-    draft_.insert(key, value);
+    m_draft.insert(key, value);
     return true;
 }
 
 Result<void> PluginConfigSectionBase::apply() {
-    if (draft_.isEmpty()) {
+    if (m_draft.isEmpty()) {
         return {};
     }
-    QVariantMap merged = initial_;
-    for (auto it = draft_.cbegin(); it != draft_.cend(); ++it) {
+    QVariantMap merged = m_initial;
+    for (auto it = m_draft.cbegin(); it != m_draft.cend(); ++it) {
         merged.insert(it.key(), it.value());
     }
     return commit(QJsonObject::fromVariantMap(merged));

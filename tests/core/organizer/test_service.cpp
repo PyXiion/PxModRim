@@ -17,23 +17,23 @@
 using namespace px::modrim;
 using namespace px::modrim::organizer;
 using organizer_test::expect;
-using organizer_test::expect_error;
+using organizer_test::expectError;
 using organizer_test::wait;
 using test_support::TestApplication;
 
 namespace {
 
 struct FakeContext {
-    QHash<QString, ListedModPtr> all_mods;
-    QStringList active_uuids;
+    QHash<QString, ListedModPtr> allMods;
+    QStringList activeUuids;
 
     void add(const QString& uuid, const QString& name, const QString& pid,
              const QString& provider = QStringLiteral("local")) {
         auto mod = std::make_shared<AboutXmlMod>();
         mod->name = name;
-        mod->provider_id = provider;
-        mod->package_id = CaseInsensitiveStr(QStringView(pid));
-        all_mods.insert(uuid, mod);
+        mod->providerId = provider;
+        mod->packageId = CaseInsensitiveStr(QStringView(pid));
+        allMods.insert(uuid, mod);
     }
 };
 
@@ -53,8 +53,8 @@ struct TestHarness {
     explicit TestHarness()
         : dir(),
           db(dir.filePath(QStringLiteral("organizer.db"))),
-          svc([this]() -> const auto& { return ctx.all_mods; },
-              [this]() -> const auto& { return ctx.active_uuids; }, db) {
+          svc([this]() -> const auto& { return ctx.allMods; },
+              [this]() -> const auto& { return ctx.activeUuids; }, db) {
         REQUIRE(dir.isValid());
         svc.changed.connect([this](const std::monostate& m) { changes.record(m); });
         wait(svc.init());
@@ -71,18 +71,18 @@ struct TestHarness {
 
 TEST_CASE("bulk folder expansion and collapse persists") {
     TestHarness h;
-    const Folder parent = expect(wait(h.svc.create_folder(QStringLiteral("Parent"))));
-    const Folder child = expect(wait(h.svc.create_folder(QStringLiteral("Child"), parent.id)));
-    const Folder other = expect(wait(h.svc.create_folder(QStringLiteral("Other"))));
+    const Folder parent = expect(wait(h.svc.createFolder(QStringLiteral("Parent"))));
+    const Folder child = expect(wait(h.svc.createFolder(QStringLiteral("Child"), parent.id)));
+    const Folder other = expect(wait(h.svc.createFolder(QStringLiteral("Other"))));
 
-    expect(wait(h.svc.set_all_collapsed(true)));
+    expect(wait(h.svc.setAllCollapsed(true)));
     OrganizerState persisted = expect(wait(h.db.load()));
     CHECK(persisted.folders.value(parent.id).collapsed);
     CHECK(persisted.folders.value(child.id).collapsed);
     CHECK(persisted.folders.value(other.id).collapsed);
 
-    expect(wait(h.svc.set_collapsed(child.id, false)));
-    expect(wait(h.svc.set_all_collapsed(false)));
+    expect(wait(h.svc.setCollapsed(child.id, false)));
+    expect(wait(h.svc.setAllCollapsed(false)));
     persisted = expect(wait(h.db.load()));
     CHECK_FALSE(persisted.folders.value(parent.id).collapsed);
     CHECK_FALSE(persisted.folders.value(child.id).collapsed);
@@ -91,171 +91,171 @@ TEST_CASE("bulk folder expansion and collapse persists") {
 
 TEST_CASE("folder depth cannot exceed maximum depth") {
     TestHarness h;
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("A"))));
-    const Folder b = expect(wait(h.svc.create_folder(QStringLiteral("B"), a.id)));
-    const Folder c = expect(wait(h.svc.create_folder(QStringLiteral("C"), b.id)));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+    const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
+    const Folder c = expect(wait(h.svc.createFolder(QStringLiteral("C"), b.id)));
     CHECK(h.changes.count == 3);
 
-    expect_error(wait(h.svc.create_folder(QStringLiteral("D"), c.id)), QStringLiteral("at most 3 levels"));
+    expectError(wait(h.svc.createFolder(QStringLiteral("D"), c.id)), QStringLiteral("at most 3 levels"));
     CHECK(h.changes.count == 3);
     CHECK(h.svc.state().folders.size() == 4);
 }
 
 TEST_CASE("moving a folder respects subtree height") {
     TestHarness h;
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("A"))));
-    const Folder b = expect(wait(h.svc.create_folder(QStringLiteral("B"), a.id)));
-    const Folder x = expect(wait(h.svc.create_folder(QStringLiteral("X"))));
-    const Folder y = expect(wait(h.svc.create_folder(QStringLiteral("Y"), x.id)));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+    const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
+    const Folder x = expect(wait(h.svc.createFolder(QStringLiteral("X"))));
+    const Folder y = expect(wait(h.svc.createFolder(QStringLiteral("Y"), x.id)));
 
-    expect_error(wait(h.svc.move_folder(x.id, b.id)), QStringLiteral("at most 3 levels"));
+    expectError(wait(h.svc.moveFolder(x.id, b.id)), QStringLiteral("at most 3 levels"));
 
-    expect(wait(h.svc.move_folder(x.id, a.id)));
-    CHECK(h.svc.state().folders.value(x.id).parent_id == a.id);
-    CHECK(h.svc.state().folders.value(y.id).parent_id == x.id);
+    expect(wait(h.svc.moveFolder(x.id, a.id)));
+    CHECK(h.svc.state().folders.value(x.id).parentId == a.id);
+    CHECK(h.svc.state().folders.value(y.id).parentId == x.id);
     CHECK(h.changes.count == 5);
 }
 
 TEST_CASE("moving a folder into its own subtree or moving root is rejected") {
     TestHarness h;
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("A"))));
-    const Folder b = expect(wait(h.svc.create_folder(QStringLiteral("B"), a.id)));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+    const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
 
-    expect_error(wait(h.svc.move_folder(a.id, a.id)), QStringLiteral("into itself"));
-    expect_error(wait(h.svc.move_folder(a.id, b.id)), QStringLiteral("into itself"));
-    expect_error(wait(h.svc.move_folder(ROOT_ID, a.id)));
+    expectError(wait(h.svc.moveFolder(a.id, a.id)), QStringLiteral("into itself"));
+    expectError(wait(h.svc.moveFolder(a.id, b.id)), QStringLiteral("into itself"));
+    expectError(wait(h.svc.moveFolder(kRootId, a.id)));
 
     CHECK(h.changes.count == 2);
-    CHECK(h.svc.state().folders.value(a.id).parent_id == ROOT_ID);
+    CHECK(h.svc.state().folders.value(a.id).parentId == kRootId);
 }
 
 TEST_CASE("folder creation and rename reject duplicate names case-insensitively") {
     TestHarness h;
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("Graphics"))));
-    expect_error(wait(h.svc.create_folder(QStringLiteral("  graphics "))), QStringLiteral("already exists"));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("Graphics"))));
+    expectError(wait(h.svc.createFolder(QStringLiteral("  graphics "))), QStringLiteral("already exists"));
 
-    const Folder other = expect(wait(h.svc.create_folder(QStringLiteral("Other"))));
-    expect_error(wait(h.svc.rename_folder(other.id, QStringLiteral("GRAPHICS"))), QStringLiteral("already exists"));
+    const Folder other = expect(wait(h.svc.createFolder(QStringLiteral("Other"))));
+    expectError(wait(h.svc.renameFolder(other.id, QStringLiteral("GRAPHICS"))), QStringLiteral("already exists"));
 
-    const Folder in_other = expect(wait(h.svc.create_folder(QStringLiteral("Graphics"), other.id)));
-    CHECK(in_other.parent_id == other.id);
+    const Folder inOther = expect(wait(h.svc.createFolder(QStringLiteral("Graphics"), other.id)));
+    CHECK(inOther.parentId == other.id);
 
-    expect(wait(h.svc.rename_folder(a.id, QStringLiteral("graphics"))));
+    expect(wait(h.svc.renameFolder(a.id, QStringLiteral("graphics"))));
     CHECK(h.svc.state().folders.value(a.id).name == QStringLiteral("graphics"));
     CHECK(h.changes.count == 4);
 }
 
 TEST_CASE("empty folder name is rejected") {
     TestHarness h;
-    expect_error(wait(h.svc.create_folder(QStringLiteral("   "))), QStringLiteral("cannot be empty"));
+    expectError(wait(h.svc.createFolder(QStringLiteral("   "))), QStringLiteral("cannot be empty"));
     CHECK(h.changes.count == 0);
 }
 
 TEST_CASE("create_folder_from emits once and rolls back on duplicate") {
     TestHarness h;
-    const Folder f = expect(wait(h.svc.create_folder_from(
+    const Folder f = expect(wait(h.svc.createFolderFrom(
         QStringLiteral("Core"), {QStringLiteral("mod.a"), QStringLiteral("mod.b")})));
     CHECK(h.changes.count == 1);
     CHECK(f.name == QStringLiteral("Core"));
     CHECK(h.svc.state().placements.value(QStringLiteral("mod.a")) == f.id);
     CHECK(h.svc.state().placements.value(QStringLiteral("mod.b")) == f.id);
 
-    const OrganizerState state_before = h.svc.state();
-    const int changes_before = h.changes.count;
+    const OrganizerState stateBefore = h.svc.state();
+    const int changesBefore = h.changes.count;
 
-    expect_error(wait(h.svc.create_folder_from(QStringLiteral("core"), {QStringLiteral("mod.c")})));
-    CHECK(h.changes.count == changes_before);
-    CHECK(h.svc.state() == state_before);
+    expectError(wait(h.svc.createFolderFrom(QStringLiteral("core"), {QStringLiteral("mod.c")})));
+    CHECK(h.changes.count == changesBefore);
+    CHECK(h.svc.state() == stateBefore);
 
-    const OrganizerState db_state = expect(wait(h.db.load()));
-    CHECK_FALSE(db_state.placements.contains(QStringLiteral("mod.c")));
-    CHECK(db_state.folders.size() == state_before.folders.size());
+    const OrganizerState dbState = expect(wait(h.db.load()));
+    CHECK_FALSE(dbState.placements.contains(QStringLiteral("mod.c")));
+    CHECK(dbState.folders.size() == stateBefore.folders.size());
 }
 
 TEST_CASE("deleting a folder ungroups mods to root manual placement") {
     TestHarness h;
     h.ctx.add(QStringLiteral("u1"), QStringLiteral("One"), QStringLiteral("a.one"));
     h.ctx.add(QStringLiteral("u2"), QStringLiteral("Two"), QStringLiteral("a.two"));
-    h.ctx.active_uuids = {QStringLiteral("u1")};
+    h.ctx.activeUuids = {QStringLiteral("u1")};
 
-    const Folder a = expect(wait(h.svc.create_folder_from(QStringLiteral("A"), {QStringLiteral("A.One")})));
-    const Folder b = expect(wait(h.svc.create_folder(QStringLiteral("B"), a.id)));
+    const Folder a = expect(wait(h.svc.createFolderFrom(QStringLiteral("A"), {QStringLiteral("A.One")})));
+    const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
     expect(wait(h.svc.place({QStringLiteral("a.two")}, b.id)));
-    expect(wait(h.svc.set_rules({RuleSpec{.field = RuleField::PackageId, .op = RuleOp::Prefix,
-                                          .pattern = QStringLiteral("a."), .folder_id = a.id}})));
+    expect(wait(h.svc.setRules({RuleSpec{.field = RuleField::kPackageId, .op = RuleOp::kPrefix,
+                                          .pattern = QStringLiteral("a."), .folderId = a.id}})));
     CHECK(h.changes.count == 4);
 
-    QStringList uuids = expect(h.svc.folder_mod_uuids(a.id));
+    QStringList uuids = expect(h.svc.folderModUuids(a.id));
     std::sort(uuids.begin(), uuids.end());
     CHECK(uuids == QStringList{QStringLiteral("u1"), QStringLiteral("u2")});
 
-    expect(wait(h.svc.delete_folder(a.id)));
+    expect(wait(h.svc.deleteFolder(a.id)));
     CHECK(h.changes.count == 5);
-    CHECK(h.svc.state().folders.keys() == QList<qint64>{ROOT_ID});
+    CHECK(h.svc.state().folders.keys() == QList<qint64>{kRootId});
     CHECK(h.svc.state().rules.isEmpty());
 
     const FolderNode root = h.svc.tree();
-    QStringList root_uuids;
+    QStringList rootUuids;
     for (const ModLeaf& leaf : root.mods) {
-        root_uuids.append(leaf.uuid);
-        CHECK(leaf.placement == Placement::Manual);
+        rootUuids.append(leaf.uuid);
+        CHECK(leaf.placement == Placement::kManual);
     }
-    std::sort(root_uuids.begin(), root_uuids.end());
-    CHECK(root_uuids == QStringList{QStringLiteral("u1"), QStringLiteral("u2")});
+    std::sort(rootUuids.begin(), rootUuids.end());
+    CHECK(rootUuids == QStringList{QStringLiteral("u1"), QStringLiteral("u2")});
     CHECK(root.total == 2);
     CHECK(root.enabled == 1);
-    CHECK(root.check == CheckState::Partial);
+    CHECK(root.check == CheckState::kPartial);
 }
 
 TEST_CASE("place, ungroup and reset_to_rules alter placement source") {
     TestHarness h;
     h.ctx.add(QStringLiteral("u1"), QStringLiteral("One"), QStringLiteral("a.one"));
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("A"))));
-    expect(wait(h.svc.set_rules({RuleSpec{.field = RuleField::Name, .op = RuleOp::Equals,
-                                          .pattern = QStringLiteral(" one "), .folder_id = a.id}})));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+    expect(wait(h.svc.setRules({RuleSpec{.field = RuleField::kName, .op = RuleOp::kEquals,
+                                          .pattern = QStringLiteral(" one "), .folderId = a.id}})));
     CHECK(h.svc.state().rules[0].pattern == QStringLiteral("one"));
-    CHECK(h.svc.tree().children[0].mods[0].placement == Placement::Rule);
+    CHECK(h.svc.tree().children[0].mods[0].placement == Placement::kRule);
 
     expect(wait(h.svc.ungroup({QStringLiteral("a.one")})));
-    CHECK(h.svc.tree().mods[0].placement == Placement::Manual);
+    CHECK(h.svc.tree().mods[0].placement == Placement::kManual);
 
-    expect(wait(h.svc.reset_to_rules({QStringLiteral("a.one")})));
-    CHECK(h.svc.tree().children[0].mods[0].placement == Placement::Rule);
+    expect(wait(h.svc.resetToRules({QStringLiteral("a.one")})));
+    CHECK(h.svc.tree().children[0].mods[0].placement == Placement::kRule);
     CHECK(h.changes.count == 4);
 }
 
 TEST_CASE("rules validation rejects root target, empty pattern or missing folder") {
     TestHarness h;
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("A"))));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
 
-    expect_error(wait(h.svc.set_rules({RuleSpec{.field = RuleField::Name, .op = RuleOp::Equals,
-                                                .pattern = QStringLiteral("x"), .folder_id = ROOT_ID}})),
+    expectError(wait(h.svc.setRules({RuleSpec{.field = RuleField::kName, .op = RuleOp::kEquals,
+                                                .pattern = QStringLiteral("x"), .folderId = kRootId}})),
                  QStringLiteral("root"));
 
-    expect_error(wait(h.svc.set_rules({RuleSpec{.field = RuleField::Name, .op = RuleOp::Equals,
-                                                .pattern = QStringLiteral("  "), .folder_id = a.id}})),
+    expectError(wait(h.svc.setRules({RuleSpec{.field = RuleField::kName, .op = RuleOp::kEquals,
+                                                .pattern = QStringLiteral("  "), .folderId = a.id}})),
                  QStringLiteral("pattern cannot be empty"));
 
-    expect_error(wait(h.svc.set_rules({RuleSpec{.field = RuleField::Name, .op = RuleOp::Equals,
-                                                .pattern = QStringLiteral("x"), .folder_id = 999}})));
+    expectError(wait(h.svc.setRules({RuleSpec{.field = RuleField::kName, .op = RuleOp::kEquals,
+                                                .pattern = QStringLiteral("x"), .folderId = 999}})));
     CHECK(h.changes.count == 1);
 }
 
 TEST_CASE("tags lifecycle, validation and removal cascade") {
     TestHarness h;
-    const Tag tag = expect(wait(h.svc.create_tag(QStringLiteral("QoL"), QStringLiteral("#aabbcc"))));
+    const Tag tag = expect(wait(h.svc.createTag(QStringLiteral("QoL"), QStringLiteral("#aabbcc"))));
 
-    expect_error(wait(h.svc.create_tag(QStringLiteral("qol"), QStringLiteral("#000000"))), QStringLiteral("already exists"));
-    expect_error(wait(h.svc.create_tag(QStringLiteral("Other"), QStringLiteral("red"))), QStringLiteral("not a valid color"));
+    expectError(wait(h.svc.createTag(QStringLiteral("qol"), QStringLiteral("#000000"))), QStringLiteral("already exists"));
+    expectError(wait(h.svc.createTag(QStringLiteral("Other"), QStringLiteral("red"))), QStringLiteral("not a valid color"));
 
-    expect(wait(h.svc.set_mod_tags({QStringLiteral("A.Mod")}, {tag.id}, {})));
-    CHECK(h.svc.state().mod_tags.value(QStringLiteral("a.mod")) == QSet<qint64>{tag.id});
+    expect(wait(h.svc.setModTags({QStringLiteral("A.Mod")}, {tag.id}, {})));
+    CHECK(h.svc.state().modTags.value(QStringLiteral("a.mod")) == QSet<qint64>{tag.id});
 
-    expect_error(wait(h.svc.set_mod_tags({QStringLiteral("a.mod")}, {999}, {})));
+    expectError(wait(h.svc.setModTags({QStringLiteral("a.mod")}, {999}, {})));
 
-    expect(wait(h.svc.delete_tag(tag.id)));
+    expect(wait(h.svc.deleteTag(tag.id)));
     CHECK(h.svc.state().tags.isEmpty());
-    CHECK(h.svc.state().mod_tags.value(QStringLiteral("a.mod")).isEmpty());
+    CHECK(h.svc.state().modTags.value(QStringLiteral("a.mod")).isEmpty());
     CHECK(h.changes.count == 3);
 }
 
@@ -263,23 +263,23 @@ TEST_CASE("service state persists across instances") {
     TestApplication app;
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
-    const QString db_file = dir.filePath(QStringLiteral("organizer.db"));
+    const QString dbFile = dir.filePath(QStringLiteral("organizer.db"));
     FakeContext ctx;
 
     Folder folder;
     {
-        OrganizerDb db1(db_file);
-        OrganizerService svc1([&]() -> const auto& { return ctx.all_mods; },
-                              [&]() -> const auto& { return ctx.active_uuids; }, db1);
+        OrganizerDb db1(dbFile);
+        OrganizerService svc1([&]() -> const auto& { return ctx.allMods; },
+                              [&]() -> const auto& { return ctx.activeUuids; }, db1);
         wait(svc1.init());
-        folder = expect(wait(svc1.create_folder(QStringLiteral("Kept"))));
+        folder = expect(wait(svc1.createFolder(QStringLiteral("Kept"))));
         wait(svc1.shutdown());
     }
 
     {
-        OrganizerDb db2(db_file);
-        OrganizerService svc2([&]() -> const auto& { return ctx.all_mods; },
-                              [&]() -> const auto& { return ctx.active_uuids; }, db2);
+        OrganizerDb db2(dbFile);
+        OrganizerService svc2([&]() -> const auto& { return ctx.allMods; },
+                              [&]() -> const auto& { return ctx.activeUuids; }, db2);
         wait(svc2.init());
         CHECK(svc2.state().folders.contains(folder.id));
         CHECK(svc2.state().folders.value(folder.id).name == QStringLiteral("Kept"));
@@ -293,8 +293,8 @@ TEST_CASE("init signals readiness and emits changed") {
     REQUIRE(dir.isValid());
     FakeContext ctx;
     OrganizerDb db(dir.filePath(QStringLiteral("organizer.db")));
-    OrganizerService svc([&]() -> const auto& { return ctx.all_mods; },
-                         [&]() -> const auto& { return ctx.active_uuids; }, db);
+    OrganizerService svc([&]() -> const auto& { return ctx.allMods; },
+                         [&]() -> const auto& { return ctx.activeUuids; }, db);
     ChangeCounter counter;
     svc.changed.connect([&](const std::monostate& m) { counter.record(m); });
 
@@ -311,58 +311,58 @@ TEST_CASE("folder_toggle enables partial/off and disables full") {
     h.ctx.add(QStringLiteral("u2"), QStringLiteral("Two"), QStringLiteral("a.two"));
     h.ctx.add(QStringLiteral("u3"), QStringLiteral("Loose"), QStringLiteral("loose.mod"));
 
-    const Folder a = expect(wait(h.svc.create_folder_from(QStringLiteral("A"), {QStringLiteral("a.one")})));
-    const Folder b = expect(wait(h.svc.create_folder(QStringLiteral("B"), a.id)));
+    const Folder a = expect(wait(h.svc.createFolderFrom(QStringLiteral("A"), {QStringLiteral("a.one")})));
+    const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
     expect(wait(h.svc.place({QStringLiteral("a.two")}, b.id)));
 
-    h.ctx.active_uuids = {QStringLiteral("u1")};
-    FolderToggle toggle = expect(h.svc.folder_toggle(a.id));
+    h.ctx.activeUuids = {QStringLiteral("u1")};
+    FolderToggle toggle = expect(h.svc.folderToggle(a.id));
     toggle.enable.sort();
     CHECK(toggle.enable == QStringList{QStringLiteral("u1"), QStringLiteral("u2")});
     CHECK(toggle.disable.isEmpty());
 
-    h.ctx.active_uuids = {QStringLiteral("u1"), QStringLiteral("u2")};
-    toggle = expect(h.svc.folder_toggle(a.id));
+    h.ctx.activeUuids = {QStringLiteral("u1"), QStringLiteral("u2")};
+    toggle = expect(h.svc.folderToggle(a.id));
     toggle.disable.sort();
     CHECK(toggle.enable.isEmpty());
     CHECK(toggle.disable == QStringList{QStringLiteral("u1"), QStringLiteral("u2")});
 
-    toggle = expect(h.svc.folder_toggle(ROOT_ID, /*recursive=*/false));
+    toggle = expect(h.svc.folderToggle(kRootId, /*recursive=*/false));
     CHECK(toggle.enable == QStringList{QStringLiteral("u3")});
     CHECK(toggle.disable.isEmpty());
 
-    h.ctx.active_uuids = {QStringLiteral("u3")};
-    toggle = expect(h.svc.folder_toggle(ROOT_ID, /*recursive=*/false));
+    h.ctx.activeUuids = {QStringLiteral("u3")};
+    toggle = expect(h.svc.folderToggle(kRootId, /*recursive=*/false));
     CHECK(toggle.enable.isEmpty());
     CHECK(toggle.disable == QStringList{QStringLiteral("u3")});
 
-    CHECK(expect(h.svc.folder_mod_uuids(ROOT_ID, /*recursive=*/false)) == QStringList{QStringLiteral("u3")});
+    CHECK(expect(h.svc.folderModUuids(kRootId, /*recursive=*/false)) == QStringList{QStringLiteral("u3")});
 }
 
 TEST_CASE("folder_move_targets respects subtree depth and duplicate names") {
     TestHarness h;
-    const Folder a = expect(wait(h.svc.create_folder(QStringLiteral("A"))));
-    const Folder b = expect(wait(h.svc.create_folder(QStringLiteral("B"), a.id)));
-    const Folder c = expect(wait(h.svc.create_folder(QStringLiteral("C"), b.id)));
-    const Folder x = expect(wait(h.svc.create_folder(QStringLiteral("X"))));
-    const Folder y = expect(wait(h.svc.create_folder(QStringLiteral("Y"), x.id)));
-    const Folder clash = expect(wait(h.svc.create_folder(QStringLiteral("Clash"))));
-    const Folder inner_x = expect(wait(h.svc.create_folder(QStringLiteral("X"), clash.id)));
+    const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+    const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
+    const Folder c = expect(wait(h.svc.createFolder(QStringLiteral("C"), b.id)));
+    const Folder x = expect(wait(h.svc.createFolder(QStringLiteral("X"))));
+    const Folder y = expect(wait(h.svc.createFolder(QStringLiteral("Y"), x.id)));
+    const Folder clash = expect(wait(h.svc.createFolder(QStringLiteral("Clash"))));
+    const Folder innerX = expect(wait(h.svc.createFolder(QStringLiteral("X"), clash.id)));
 
-    CHECK(expect(h.svc.folder_move_targets(b.id)) == QSet<qint64>{x.id, clash.id, ROOT_ID});
-    CHECK(expect(h.svc.folder_move_targets(x.id)) == QSet<qint64>{a.id});
-    CHECK(expect(h.svc.folder_move_targets(c.id)) == QSet<qint64>{a.id, x.id, y.id, clash.id, inner_x.id, ROOT_ID});
-    expect_error(h.svc.folder_move_targets(ROOT_ID));
+    CHECK(expect(h.svc.folderMoveTargets(b.id)) == QSet<qint64>{x.id, clash.id, kRootId});
+    CHECK(expect(h.svc.folderMoveTargets(x.id)) == QSet<qint64>{a.id});
+    CHECK(expect(h.svc.folderMoveTargets(c.id)) == QSet<qint64>{a.id, x.id, y.id, clash.id, innerX.id, kRootId});
+    expectError(h.svc.folderMoveTargets(kRootId));
 }
 
 TEST_CASE("service tree_filters counts status and providers") {
     TestHarness h;
     h.ctx.add(QStringLiteral("u1"), QStringLiteral("One"), QStringLiteral("a.one"));
     h.ctx.add(QStringLiteral("u2"), QStringLiteral("Two"), QStringLiteral("a.two"));
-    h.ctx.active_uuids = {QStringLiteral("u1")};
+    h.ctx.activeUuids = {QStringLiteral("u1")};
 
     QHash<QString, int> counts;
-    for (const TreeFilter& f : h.svc.tree_filters()) {
+    for (const TreeFilter& f : h.svc.treeFilters()) {
         counts[f.key] = f.count;
     }
     CHECK(counts.value(QStringLiteral("all")) == 2);
@@ -377,41 +377,41 @@ TEST_CASE("service tree_filters with persisted tags and empty tag") {
     h.ctx.add(QStringLiteral("u2"), QStringLiteral("Two"), QStringLiteral("a.two"));
     h.ctx.add(QStringLiteral("u3"), QStringLiteral("Three"), QStringLiteral("a.three"));
 
-    const Tag t1 = expect(wait(h.svc.create_tag(QStringLiteral("Medieval"), QStringLiteral("#5eead4"))));
-    const Tag t2 = expect(wait(h.svc.create_tag(QStringLiteral("Combat"), QStringLiteral("#fb923c"))));
-    const Tag t3 = expect(wait(h.svc.create_tag(QStringLiteral("Empty"), QStringLiteral("#a3e635"))));
+    const Tag t1 = expect(wait(h.svc.createTag(QStringLiteral("Medieval"), QStringLiteral("#5eead4"))));
+    const Tag t2 = expect(wait(h.svc.createTag(QStringLiteral("Combat"), QStringLiteral("#fb923c"))));
+    const Tag t3 = expect(wait(h.svc.createTag(QStringLiteral("Empty"), QStringLiteral("#a3e635"))));
 
-    expect(wait(h.svc.set_mod_tags({QStringLiteral("a.one")}, {t1.id, t2.id}, {})));
-    expect(wait(h.svc.set_mod_tags({QStringLiteral("a.two")}, {t1.id}, {})));
+    expect(wait(h.svc.setModTags({QStringLiteral("a.one")}, {t1.id, t2.id}, {})));
+    expect(wait(h.svc.setModTags({QStringLiteral("a.two")}, {t1.id}, {})));
 
-    QHash<QString, TreeFilter> filter_map;
-    for (const TreeFilter& f : h.svc.tree_filters()) {
-        filter_map[f.key] = f;
+    QHash<QString, TreeFilter> filterMap;
+    for (const TreeFilter& f : h.svc.treeFilters()) {
+        filterMap[f.key] = f;
     }
 
     const QString k1 = QStringLiteral("tag:%1").arg(t1.id);
     const QString k2 = QStringLiteral("tag:%1").arg(t2.id);
     const QString k3 = QStringLiteral("tag:%1").arg(t3.id);
 
-    REQUIRE(filter_map.contains(k1));
-    CHECK(filter_map[k1].count == 2);
-    CHECK(filter_map[k1].label == QStringLiteral("Medieval"));
+    REQUIRE(filterMap.contains(k1));
+    CHECK(filterMap[k1].count == 2);
+    CHECK(filterMap[k1].label == QStringLiteral("Medieval"));
 
-    REQUIRE(filter_map.contains(k2));
-    CHECK(filter_map[k2].count == 1);
-    CHECK(filter_map[k2].label == QStringLiteral("Combat"));
+    REQUIRE(filterMap.contains(k2));
+    CHECK(filterMap[k2].count == 1);
+    CHECK(filterMap[k2].label == QStringLiteral("Combat"));
 
-    REQUIRE(filter_map.contains(k3));
-    CHECK(filter_map[k3].count == 0);
-    CHECK(filter_map[k3].label == QStringLiteral("Empty"));
+    REQUIRE(filterMap.contains(k3));
+    CHECK(filterMap[k3].count == 0);
+    CHECK(filterMap[k3].label == QStringLiteral("Empty"));
 
-    expect(wait(h.svc.delete_tag(t2.id)));
-    filter_map.clear();
-    for (const TreeFilter& f : h.svc.tree_filters()) {
-        filter_map[f.key] = f;
+    expect(wait(h.svc.deleteTag(t2.id)));
+    filterMap.clear();
+    for (const TreeFilter& f : h.svc.treeFilters()) {
+        filterMap[f.key] = f;
     }
-    CHECK_FALSE(filter_map.contains(k2));
-    CHECK(filter_map.contains(k1));
+    CHECK_FALSE(filterMap.contains(k2));
+    CHECK(filterMap.contains(k1));
 }
 
 TEST_CASE("service tree_filters counts shared package ids across copies") {
@@ -420,11 +420,11 @@ TEST_CASE("service tree_filters counts shared package ids across copies") {
     h.ctx.add(QStringLiteral("u2"), QStringLiteral("Local Copy"), QStringLiteral("shared.pkg"), QStringLiteral("local"));
     h.ctx.add(QStringLiteral("u3"), QStringLiteral("Other Mod"), QStringLiteral("other.pkg"), QStringLiteral("local"));
 
-    const Tag tag = expect(wait(h.svc.create_tag(QStringLiteral("Overhaul"), QStringLiteral("#5eead4"))));
-    expect(wait(h.svc.set_mod_tags({QStringLiteral("shared.pkg")}, {tag.id}, {})));
+    const Tag tag = expect(wait(h.svc.createTag(QStringLiteral("Overhaul"), QStringLiteral("#5eead4"))));
+    expect(wait(h.svc.setModTags({QStringLiteral("shared.pkg")}, {tag.id}, {})));
 
     QHash<QString, int> counts;
-    for (const TreeFilter& f : h.svc.tree_filters()) {
+    for (const TreeFilter& f : h.svc.treeFilters()) {
         counts[f.key] = f.count;
     }
     CHECK(counts.value(QStringLiteral("tag:%1").arg(tag.id)) == 2);
@@ -432,26 +432,26 @@ TEST_CASE("service tree_filters counts shared package ids across copies") {
 
 TEST_CASE("add_standard_rules is fresh and idempotent") {
     TestHarness h;
-    const int total = static_cast<int>(standard_rules().size());
+    const int total = static_cast<int>(standardRules().size());
     QSet<QString> names;
-    for (const StandardRule& r : standard_rules()) {
+    for (const StandardRule& r : standardRules()) {
         names.insert(r.folder);
     }
 
-    CHECK(expect(wait(h.svc.add_standard_rules())) == total);
+    CHECK(expect(wait(h.svc.addStandardRules())) == total);
     CHECK(h.changes.count == 1);
 
-    QSet<QString> top_folders;
+    QSet<QString> topFolders;
     for (const Folder& f : h.svc.state().folders) {
-        if (f.parent_id == ROOT_ID) {
-            top_folders.insert(f.name);
+        if (f.parentId == kRootId) {
+            topFolders.insert(f.name);
         }
     }
-    CHECK(top_folders == names);
+    CHECK(topFolders == names);
     CHECK(h.svc.state().folders.size() == names.size() + 1);
     CHECK(h.svc.state().rules.size() == total);
 
-    CHECK(expect(wait(h.svc.add_standard_rules())) == 0);
+    CHECK(expect(wait(h.svc.addStandardRules())) == 0);
     CHECK(h.changes.count == 1);
     CHECK(h.svc.state().rules.size() == total);
     CHECK(h.svc.state().folders.size() == names.size() + 1);
@@ -459,16 +459,16 @@ TEST_CASE("add_standard_rules is fresh and idempotent") {
 
 TEST_CASE("add_standard_rules reuses existing folders and preserves user rules") {
     TestHarness h;
-    const Folder official = expect(wait(h.svc.create_folder(QStringLiteral("OFFICIAL"))));
-    const Folder mine = expect(wait(h.svc.create_folder(QStringLiteral("Mine"))));
-    expect(wait(h.svc.set_rules({
-        RuleSpec{.field = RuleField::Author, .op = RuleOp::Contains, .pattern = QStringLiteral("me"), .folder_id = mine.id},
-        RuleSpec{.field = RuleField::PackageId, .op = RuleOp::Prefix, .pattern = QStringLiteral("SARG."), .folder_id = mine.id},
+    const Folder official = expect(wait(h.svc.createFolder(QStringLiteral("OFFICIAL"))));
+    const Folder mine = expect(wait(h.svc.createFolder(QStringLiteral("Mine"))));
+    expect(wait(h.svc.setRules({
+        RuleSpec{.field = RuleField::kAuthor, .op = RuleOp::kContains, .pattern = QStringLiteral("me"), .folderId = mine.id},
+        RuleSpec{.field = RuleField::kPackageId, .op = RuleOp::kPrefix, .pattern = QStringLiteral("SARG."), .folderId = mine.id},
     })));
     h.changes.count = 0;
 
-    const int total = static_cast<int>(standard_rules().size());
-    CHECK(expect(wait(h.svc.add_standard_rules())) == total - 1);
+    const int total = static_cast<int>(standardRules().size());
+    CHECK(expect(wait(h.svc.addStandardRules())) == total - 1);
     CHECK(h.changes.count == 1);
 
     QStringList names;
@@ -481,56 +481,56 @@ TEST_CASE("add_standard_rules reuses existing folders and preserves user rules")
 
     const auto& rules = h.svc.state().rules;
     REQUIRE(rules.size() >= 3);
-    CHECK(h.svc.state().folders.value(rules[0].folder_id).name == QStringLiteral("Mine"));
+    CHECK(h.svc.state().folders.value(rules[0].folderId).name == QStringLiteral("Mine"));
     CHECK(rules[0].pattern == QStringLiteral("me"));
-    CHECK(h.svc.state().folders.value(rules[1].folder_id).name == QStringLiteral("Mine"));
+    CHECK(h.svc.state().folders.value(rules[1].folderId).name == QStringLiteral("Mine"));
     CHECK(rules[1].pattern == QStringLiteral("SARG."));
 
     // The first standard rule for Official got re-targeted to the existing OFFICIAL folder.
-    CHECK(rules[2].folder_id == official.id);
+    CHECK(rules[2].folderId == official.id);
 }
 
 TEST_CASE("standard rules resolve mods correctly") {
     TestHarness h;
-    expect(wait(h.svc.add_standard_rules()));
+    expect(wait(h.svc.addStandardRules()));
     const OrganizerState& state = h.svc.state();
 
-    const auto folder_name = [&](const QString& pid, const QString& name = QStringLiteral("Mod"),
+    const auto folderName = [&](const QString& pid, const QString& name = QStringLiteral("Mod"),
                                  const QString& author = {}) {
-        const auto [fid, _] = folder_for(state, pid, name, author);
+        const auto [fid, _] = folderFor(state, pid, name, author);
         return state.folders.value(fid).name;
     };
 
-    CHECK(folder_name(QStringLiteral("oskarpotocki.vfe.core")) == QStringLiteral("Vanilla Expanded"));
-    CHECK(folder_name(QStringLiteral("someone.vfe"), QStringLiteral("Mod"), QStringLiteral("Oskar Potocki, Taranchuk")) ==
+    CHECK(folderName(QStringLiteral("oskarpotocki.vfe.core")) == QStringLiteral("Vanilla Expanded"));
+    CHECK(folderName(QStringLiteral("someone.vfe"), QStringLiteral("Mod"), QStringLiteral("Oskar Potocki, Taranchuk")) ==
           QStringLiteral("Vanilla Expanded"));
-    CHECK(folder_name(QStringLiteral("ludeon.rimworld.biotech"), QStringLiteral("Biotech")) == QStringLiteral("Official"));
-    CHECK(folder_name(QStringLiteral("brrainz.harmony"), QStringLiteral("Harmony")) == QStringLiteral("Frameworks & Libraries"));
-    CHECK(folder_name(QStringLiteral("ceteam.combatextended"), QStringLiteral("Combat Extended")) == QStringLiteral("Combat Extended"));
-    CHECK(folder_name(QStringLiteral("sarg.alphagenes")) == QStringLiteral("Alpha Mods"));
-    CHECK(folder_name(QStringLiteral("bs.performance"), QStringLiteral("Performance Fish")) == QStringLiteral("Performance"));
-    CHECK(folder_name(QStringLiteral("oskarpotocki.vanillafactionsexpanded.core")) == QStringLiteral("Frameworks & Libraries"));
-    CHECK(folder_name(QStringLiteral("vanillaracesexpanded.sanguophage")) == QStringLiteral("Vanilla Expanded"));
-    CHECK(folder_name(QStringLiteral("dubwise.dubsperformanceanalyzer.steam")) == QStringLiteral("Performance"));
-    CHECK(folder_name(QStringLiteral("dubwise.rimatomics")) == QStringLiteral("Dubs Mods"));
-    CHECK(folder_name(QStringLiteral("brrainz.achtung"), QStringLiteral("Achtung!")) == QStringLiteral("Quality of Life"));
-    CHECK(folder_name(QStringLiteral("brrainz.jobsofopportunity")) == QStringLiteral("Root"));
-    CHECK(folder_name(QStringLiteral("smartkar.athena.framework"), QStringLiteral("Athena Framework")) == QStringLiteral("Root"));
-    CHECK(folder_name(QStringLiteral("someone.perf"), QStringLiteral("Performance Tweaks")) == QStringLiteral("Root"));
-    CHECK(folder_name(QStringLiteral("someone.other"), QStringLiteral("Other")) == QStringLiteral("Root"));
+    CHECK(folderName(QStringLiteral("ludeon.rimworld.biotech"), QStringLiteral("Biotech")) == QStringLiteral("Official"));
+    CHECK(folderName(QStringLiteral("brrainz.harmony"), QStringLiteral("Harmony")) == QStringLiteral("Frameworks & Libraries"));
+    CHECK(folderName(QStringLiteral("ceteam.combatextended"), QStringLiteral("Combat Extended")) == QStringLiteral("Combat Extended"));
+    CHECK(folderName(QStringLiteral("sarg.alphagenes")) == QStringLiteral("Alpha Mods"));
+    CHECK(folderName(QStringLiteral("bs.performance"), QStringLiteral("Performance Fish")) == QStringLiteral("Performance"));
+    CHECK(folderName(QStringLiteral("oskarpotocki.vanillafactionsexpanded.core")) == QStringLiteral("Frameworks & Libraries"));
+    CHECK(folderName(QStringLiteral("vanillaracesexpanded.sanguophage")) == QStringLiteral("Vanilla Expanded"));
+    CHECK(folderName(QStringLiteral("dubwise.dubsperformanceanalyzer.steam")) == QStringLiteral("Performance"));
+    CHECK(folderName(QStringLiteral("dubwise.rimatomics")) == QStringLiteral("Dubs Mods"));
+    CHECK(folderName(QStringLiteral("brrainz.achtung"), QStringLiteral("Achtung!")) == QStringLiteral("Quality of Life"));
+    CHECK(folderName(QStringLiteral("brrainz.jobsofopportunity")) == QStringLiteral("Root"));
+    CHECK(folderName(QStringLiteral("smartkar.athena.framework"), QStringLiteral("Athena Framework")) == QStringLiteral("Root"));
+    CHECK(folderName(QStringLiteral("someone.perf"), QStringLiteral("Performance Tweaks")) == QStringLiteral("Root"));
+    CHECK(folderName(QStringLiteral("someone.other"), QStringLiteral("Other")) == QStringLiteral("Root"));
 }
 
 TEST_CASE("standard package_id rules are not shadowed") {
     TestHarness h;
-    expect(wait(h.svc.add_standard_rules()));
+    expect(wait(h.svc.addStandardRules()));
     const OrganizerState& state = h.svc.state();
 
-    for (const StandardRule& rule : standard_rules()) {
-        if (rule.field != RuleField::PackageId) {
+    for (const StandardRule& rule : standardRules()) {
+        if (rule.field != RuleField::kPackageId) {
             continue;
         }
-        const QString probe = rule.op == RuleOp::Equals ? rule.pattern : rule.pattern + QStringLiteral("x");
-        const auto [fid, _] = folder_for(state, probe, QStringLiteral("Mod"), {});
+        const QString probe = rule.op == RuleOp::kEquals ? rule.pattern : rule.pattern + QStringLiteral("x");
+        const auto [fid, _] = folderFor(state, probe, QStringLiteral("Mod"), {});
         CHECK(state.folders.value(fid).name == rule.folder);
     }
 }

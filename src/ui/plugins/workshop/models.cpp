@@ -16,26 +16,26 @@ namespace px::modrim::workshop {
 namespace {
 using namespace workshop;
 
-constexpr std::array<const char*, 25> roles = {
+constexpr std::array<const char*, 25> kRoles = {
     "itemId", "kind", "title", "author", "previewUrl", "collage", "sourceLabel", "versions", "tags",
     "state", "active", "stateLabel", "actionLabel", "incompatible", "memberCount", "description",
     "workshopUrl", "fileSize", "votes", "votesUp", "votesDown", "queued", "favourite", "summary", "compatLabel"};
 
-QString size_label(const std::optional<std::string>& bytes) {
+QString sizeLabel(const std::optional<std::string>& bytes) {
     return bytes ? QString::number(QString::fromStdString(*bytes).toDouble() / 1048576.0, 'f', 1) + " MB"
                  : QStringLiteral("Unknown");
 }
 
-QString compat_label(const QSet<QString>& versions, const QString& game, bool incompatible, bool no_common) {
+QString compatLabel(const QSet<QString>& versions, const QString& game, bool incompatible, bool noCommon) {
     if (game.isEmpty()) return {};
-    if (no_common) return QStringLiteral("No common version");
+    if (noCommon) return QStringLiteral("No common version");
     if (incompatible) return "Not for " + game;
     if (versions.isEmpty()) return QStringLiteral("Version not stated");
     return "Works with " + game;
 }
 }  // namespace
 
-QString safe_url(const QString& value) {
+QString safeUrl(const QString& value) {
     for (const QChar ch : value) {
         if (ch.isSpace() || ch.unicode() < 32) return {};
     }
@@ -61,52 +61,52 @@ QString summarize(const QString& text, const QString& format) {
     return result + QChar(0x2026);
 }
 
-QVariantMap item_row(const CatalogEntry& entry,
-                     const std::function<InstallState(const CatalogMod&)>& install_state,
-                     const QString& game_version, bool detail) {
+QVariantMap itemRow(const CatalogEntry& entry,
+                     const std::function<InstallState(const CatalogMod&)>& installState,
+                     const QString& gameVersion, bool detail) {
     return std::visit([&](const auto& item) {
         using Item = std::decay_t<decltype(item)>;
-        constexpr bool collection = std::is_same_v<Item, CatalogCollection>;
+        constexpr bool kCollection = std::is_same_v<Item, CatalogCollection>;
         QSet<QString> versions;
         for (const auto& version : item.supported_versions) versions.insert(QString::fromStdString(version));
-        if constexpr (collection) {
-            static const QRegularExpression version_tag(QStringLiteral(R"(^\d+\.\d+(?:\.\d+)?$)"));
+        if constexpr (kCollection) {
+            static const QRegularExpression versionTag(QStringLiteral(R"(^\d+\.\d+(?:\.\d+)?$)"));
             for (const auto& tag : item.tags) {
                 const QString value = QString::fromStdString(tag);
-                if (version_tag.match(value).hasMatch()) versions.insert(value);
+                if (versionTag.match(value).hasMatch()) versions.insert(value);
             }
         }
-        bool incompatible = !game_version.isEmpty() && !versions.isEmpty() && !versions.contains(game_version);
-        bool no_common = false;
-        InstallState state = InstallState::missing;
+        bool incompatible = !gameVersion.isEmpty() && !versions.isEmpty() && !versions.contains(gameVersion);
+        bool noCommon = false;
+        InstallState state = InstallState::kMissing;
         QString source, action, size, votes = QStringLiteral("Unrated"), up = "0", down = "0";
-        QString workshop_url, format = QStringLiteral("bbcode");
+        QString workshopUrl, format = QStringLiteral("bbcode");
         QStringList collage;
-        qlonglong member_count = 0;
-        if constexpr (collection) {
-            source = item.source == CollectionSource::picked ? "PxModRim pick" : "Steam collection";
+        qlonglong memberCount = 0;
+        if constexpr (kCollection) {
+            source = item.source == CollectionSource::kPicked ? "PxModRim pick" : "Steam collection";
             action = QStringLiteral("Download all");
-            member_count = item.member_count;
-            size = size_label(item.total_size);
-            no_common = item.no_common_version && versions.isEmpty();
-            incompatible = incompatible || no_common;
-            if (item.workshop_url) workshop_url = QString::fromStdString(*item.workshop_url);
-            if (item.description_format == CollectionDescriptionFormat::text) format = QStringLiteral("text");
+            memberCount = item.member_count;
+            size = sizeLabel(item.total_size);
+            noCommon = item.no_common_version && versions.isEmpty();
+            incompatible = incompatible || noCommon;
+            if (item.workshop_url) workshopUrl = QString::fromStdString(*item.workshop_url);
+            if (item.description_format == CollectionDescriptionFormat::kText) format = QStringLiteral("text");
             for (const auto& preview : item.member_previews) {
-                const QString url = safe_url(QString::fromStdString(preview));
+                const QString url = safeUrl(QString::fromStdString(preview));
                 if (!url.isEmpty()) collage.append(url);
             }
         } else {
-            state = install_state(item);
+            state = installState(item);
             incompatible = incompatible || item.incompatible;
             source = QStringLiteral("Steam Workshop");
             switch (state) {
-            case InstallState::missing: action = QStringLiteral("Download"); break;
-            case InstallState::installed: action = QStringLiteral("Installed"); break;
-            case InstallState::outdated: action = QStringLiteral("Update"); break;
+            case InstallState::kMissing: action = QStringLiteral("Download"); break;
+            case InstallState::kInstalled: action = QStringLiteral("Installed"); break;
+            case InstallState::kOutdated: action = QStringLiteral("Update"); break;
             }
-            size = size_label(item.file_size);
-            workshop_url = QString::fromStdString(item.workshop_url);
+            size = sizeLabel(item.file_size);
+            workshopUrl = QString::fromStdString(item.workshop_url);
             if (item.votes) {
                 const QLocale locale(QLocale::English, QLocale::UnitedStates);
                 up = locale.toString(static_cast<qlonglong>(item.votes->up));
@@ -115,16 +115,16 @@ QVariantMap item_row(const CatalogEntry& entry,
                 if (total != 0) votes = QString::number(std::nearbyint(100.0 * item.votes->up / total), 'f', 0) + '%';
             }
         }
-        QString state_name, state_label;
+        QString stateName, stateLabel;
         switch (state) {
-        case InstallState::missing: state_name = "missing"; state_label = "Not installed"; break;
-        case InstallState::installed: state_name = "installed"; state_label = "Installed"; break;
-        case InstallState::outdated: state_name = "outdated"; state_label = "Update available"; break;
+        case InstallState::kMissing: stateName = "missing"; stateLabel = "Not installed"; break;
+        case InstallState::kInstalled: stateName = "installed"; stateLabel = "Installed"; break;
+        case InstallState::kOutdated: stateName = "outdated"; stateLabel = "Update available"; break;
         }
         QString preview = item.preview_url ? QString::fromStdString(*item.preview_url) : QString{};
         if (preview.isEmpty()) {
             for (const auto& image : item.previews) {
-                if (image.type == PreviewType::image) {
+                if (image.type == PreviewType::kImage) {
                     preview = QString::fromStdString(image.url);
                     break;
                 }
@@ -142,34 +142,34 @@ QVariantMap item_row(const CatalogEntry& entry,
             sorted.emplace_back(std::move(parts), version);
         }
         std::sort(sorted.begin(), sorted.end());
-        QStringList version_labels, tag_labels;
-        for (const auto& version : sorted) version_labels.append(version.second);
+        QStringList versionLabels, tagLabels;
+        for (const auto& version : sorted) versionLabels.append(version.second);
         for (const auto& tag : item.tags) {
             const QString value = QString::fromStdString(tag);
-            if (!versions.contains(value)) tag_labels.append(value);
+            if (!versions.contains(value)) tagLabels.append(value);
         }
         const QString description = QString::fromStdString(item.description);
         return QVariantMap{
-            {"itemId", QString::fromStdString(item.id)}, {"kind", collection ? "collection" : "mod"},
-            {"title", QString::fromStdString(item.title)}, {"author", author}, {"previewUrl", safe_url(preview)},
+            {"itemId", QString::fromStdString(item.id)}, {"kind", kCollection ? "collection" : "mod"},
+            {"title", QString::fromStdString(item.title)}, {"author", author}, {"previewUrl", safeUrl(preview)},
             {"collage", collage}, {"sourceLabel", source},
-            {"versions", version_labels.isEmpty() ? QStringLiteral("Not specified") : version_labels.join(", ")},
-            {"tags", tag_labels.join(QStringLiteral(" · "))}, {"state", state_name}, {"active", false},
-            {"queued", false}, {"favourite", false}, {"stateLabel", state_label}, {"actionLabel", action},
-            {"incompatible", incompatible}, {"memberCount", member_count},
-            {"description", detail ? px::modrim::description_to_html(description, format) : QString{}},
-            {"workshopUrl", safe_url(workshop_url)}, {"fileSize", size}, {"votes", votes},
+            {"versions", versionLabels.isEmpty() ? QStringLiteral("Not specified") : versionLabels.join(", ")},
+            {"tags", tagLabels.join(QStringLiteral(" · "))}, {"state", stateName}, {"active", false},
+            {"queued", false}, {"favourite", false}, {"stateLabel", stateLabel}, {"actionLabel", action},
+            {"incompatible", incompatible}, {"memberCount", memberCount},
+            {"description", detail ? px::modrim::descriptionToHtml(description, format) : QString{}},
+            {"workshopUrl", safeUrl(workshopUrl)}, {"fileSize", size}, {"votes", votes},
             {"votesUp", up}, {"votesDown", down}, {"summary", summarize(description, format)},
-            {"compatLabel", compat_label(versions, game_version, incompatible, no_common)}};
+            {"compatLabel", compatLabel(versions, gameVersion, incompatible, noCommon)}};
     }, entry);
 }
 
 CatalogListModel::CatalogListModel(QObject* parent) : QAbstractListModel(parent) {}
 
-void CatalogListModel::set_page(QList<QVariantMap> rows, int total, std::optional<QString> cursor, bool append) {
+void CatalogListModel::setPage(QList<QVariantMap> rows, int total, std::optional<QString> cursor, bool append) {
     if (append) {
         QSet<QString> known;
-        for (const auto& row : rows_) known.insert(row.value("itemId").toString());
+        for (const auto& row : m_rows) known.insert(row.value("itemId").toString());
         QList<QVariantMap> additions;
         for (auto& row : rows) {
             const QString id = row.value("itemId").toString();
@@ -180,30 +180,30 @@ void CatalogListModel::set_page(QList<QVariantMap> rows, int total, std::optiona
         }
         if (!additions.isEmpty()) {
             beginInsertRows({}, count(), count() + static_cast<int>(additions.size()) - 1);
-            rows_.append(std::move(additions));
+            m_rows.append(std::move(additions));
             endInsertRows();
         }
-    } else if (rows.size() == rows_.size() && std::equal(rows.cbegin(), rows.cend(), rows_.cbegin(),
+    } else if (rows.size() == m_rows.size() && std::equal(rows.cbegin(), rows.cend(), m_rows.cbegin(),
                    [](const auto& a, const auto& b) { return a.value("itemId") == b.value("itemId"); })) {
         for (qsizetype i = 0; i < rows.size(); ++i) {
-            if (rows.at(i) != rows_.at(i)) {
-                rows_[i] = std::move(rows[i]);
+            if (rows.at(i) != m_rows.at(i)) {
+                m_rows[i] = std::move(rows[i]);
                 emit dataChanged(index(static_cast<int>(i)), index(static_cast<int>(i)));
             }
         }
     } else {
         beginResetModel();
-        rows_ = std::move(rows);
+        m_rows = std::move(rows);
         endResetModel();
     }
-    total_ = total;
-    cursor_ = std::move(cursor);
+    m_total = total;
+    m_cursor = std::move(cursor);
     emit changed();
 }
 
-void CatalogListModel::refresh_rows(const std::function<QVariantMap(const QVariantMap&)>& convert) {
-    for (auto& row : rows_) row = convert(row);
-    if (!rows_.isEmpty()) emit dataChanged(index(0), index(count() - 1));
+void CatalogListModel::refreshRows(const std::function<QVariantMap(const QVariantMap&)>& convert) {
+    for (auto& row : m_rows) row = convert(row);
+    if (!m_rows.isEmpty()) emit dataChanged(index(0), index(count() - 1));
 }
 
 int CatalogListModel::rowCount(const QModelIndex& parent) const {
@@ -212,13 +212,13 @@ int CatalogListModel::rowCount(const QModelIndex& parent) const {
 
 QVariant CatalogListModel::data(const QModelIndex& index, int role) const {
     const int offset = role - Qt::UserRole - 1;
-    if (!index.isValid() || index.row() < 0 || index.row() >= count() || offset < 0 || offset >= static_cast<int>(roles.size())) return {};
-    return rows_.at(index.row()).value(QString::fromLatin1(roles[offset]));
+    if (!index.isValid() || index.row() < 0 || index.row() >= count() || offset < 0 || offset >= static_cast<int>(kRoles.size())) return {};
+    return m_rows.at(index.row()).value(QString::fromLatin1(kRoles[offset]));
 }
 
 QHash<int, QByteArray> CatalogListModel::roleNames() const {
     QHash<int, QByteArray> names;
-    for (std::size_t i = 0; i < roles.size(); ++i) names.insert(Qt::UserRole + static_cast<int>(i) + 1, roles[i]);
+    for (std::size_t i = 0; i < kRoles.size(); ++i) names.insert(Qt::UserRole + static_cast<int>(i) + 1, kRoles[i]);
     return names;
 }
 

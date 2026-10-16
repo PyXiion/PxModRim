@@ -8,19 +8,19 @@ namespace px::modrim::view {
 
 // UI-agnostic diagnostics summary for one mod.
 struct ModDiagnosticsView {
-    bool has_errors = false;
-    bool has_warnings = false;
-    QString error_tooltip;
-    QString warning_tooltip;
+    bool hasErrors = false;
+    bool hasWarnings = false;
+    QString errorTooltip;
+    QString warningTooltip;
 
     bool operator==(const ModDiagnosticsView&) const = default;
 };
 
 struct ModIssueView {
     QString category;
-    QString category_display_name;
+    QString categoryDisplayName;
     std::optional<QString> detail;
-    bool is_error = false;
+    bool isError = false;
 
     bool operator==(const ModIssueView&) const = default;
 };

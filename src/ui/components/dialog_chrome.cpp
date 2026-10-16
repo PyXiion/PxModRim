@@ -43,31 +43,31 @@ public:
         setObjectName(QStringLiteral("dialogCloseBtn"));
         setFixedSize(kCloseSize, kCloseSize);
         // A global QPushButton min-height would otherwise beat setFixedSize.
-        constexpr int inner = kCloseSize - 2;  // the 1px QSS border sits outside the content box
+        constexpr int kInner = kCloseSize - 2;  // the 1px QSS border sits outside the content box
         setStyleSheet(QStringLiteral("min-width: %1px; max-width: %1px; min-height: %1px; max-height: %1px;")
-                          .arg(inner));
+                          .arg(kInner));
         setToolTip(QStringLiteral("Close"));
         setCursor(Qt::PointingHandCursor);
         setFocusPolicy(Qt::NoFocus);
-        normal_icon_ = requireIcon(u"close", 12, paletteValue(u"DANGER"));
-        hover_icon_ = requireIcon(u"close", 12, paletteValue(u"TEXT_ON_ACCENT"));
-        setIcon(normal_icon_);
+        m_normalIcon = requireIcon(u"close", 12, paletteValue(u"DANGER"));
+        m_hoverIcon = requireIcon(u"close", 12, paletteValue(u"TEXT_ON_ACCENT"));
+        setIcon(m_normalIcon);
     }
 
 protected:
     void enterEvent(QEnterEvent* event) override {
-        setIcon(hover_icon_);
+        setIcon(m_hoverIcon);
         QPushButton::enterEvent(event);
     }
 
     void leaveEvent(QEvent* event) override {
-        setIcon(normal_icon_);
+        setIcon(m_normalIcon);
         QPushButton::leaveEvent(event);
     }
 
 private:
-    QIcon normal_icon_;
-    QIcon hover_icon_;
+    QIcon m_normalIcon;
+    QIcon m_hoverIcon;
 };
 
 // Closes the dialog the way Escape does: a message box clicks its escape button
@@ -123,16 +123,16 @@ protected:
 // Keeps the overlay title bar and size grip pinned to the dialog frame.
 class Chrome : public QObject {
 public:
-    Chrome(QDialog* dialog, bool closable, bool resizable) : QObject(dialog), dialog_(dialog) {
-        bar_ = new TitleBar(dialog, closable);
-        grip_ = resizable ? new QSizeGrip(dialog) : nullptr;
+    Chrome(QDialog* dialog, bool closable, bool resizable) : QObject(dialog), m_dialog(dialog) {
+        m_bar = new TitleBar(dialog, closable);
+        m_grip = resizable ? new QSizeGrip(dialog) : nullptr;
         dialog->installEventFilter(this);
         place();
     }
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override {
-        if (watched == dialog_ && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+        if (watched == m_dialog && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
             place();
         }
         return false;
@@ -140,19 +140,19 @@ protected:
 
 private:
     void place() {
-        const int width = dialog_->width();
-        bar_->setGeometry(kBorder, kBorder, width - 2 * kBorder, kTitleBarHeight);
-        bar_->raise();
-        if (grip_) {
-            grip_->setGeometry(width - kGripSize - kBorder, dialog_->height() - kGripSize - kBorder,
+        const int width = m_dialog->width();
+        m_bar->setGeometry(kBorder, kBorder, width - 2 * kBorder, kTitleBarHeight);
+        m_bar->raise();
+        if (m_grip) {
+            m_grip->setGeometry(width - kGripSize - kBorder, m_dialog->height() - kGripSize - kBorder,
                                kGripSize, kGripSize);
-            grip_->raise();
+            m_grip->raise();
         }
     }
 
-    QDialog* dialog_;
-    TitleBar* bar_ = nullptr;
-    QSizeGrip* grip_ = nullptr;
+    QDialog* m_dialog;
+    TitleBar* m_bar = nullptr;
+    QSizeGrip* m_grip = nullptr;
 };
 
 }  // namespace

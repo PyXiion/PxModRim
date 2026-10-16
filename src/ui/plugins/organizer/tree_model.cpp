@@ -9,18 +9,18 @@ namespace px::modrim {
 namespace {
 using namespace organizer;
 
-QString provider_icon(const QString& id) {
+QString providerIcon(const QString& id) {
     if (id == "steam" || id == "downloaded") return QStringLiteral("steam");
     if (id == "core") return QStringLiteral("grid");
     if (id == "git") return QStringLiteral("git");
     return QStringLiteral("folder");
 }
 
-int check_state(CheckState state) {
+int checkState(CheckState state) {
     switch (state) {
-        case CheckState::On: return Qt::Checked;
-        case CheckState::Partial: return Qt::PartiallyChecked;
-        case CheckState::Off: return Qt::Unchecked;
+        case CheckState::kOn: return Qt::Checked;
+        case CheckState::kPartial: return Qt::PartiallyChecked;
+        case CheckState::kOff: return Qt::Unchecked;
     }
     return Qt::Unchecked;
 }
@@ -28,7 +28,7 @@ int check_state(CheckState state) {
 std::unique_ptr<TreeNode> build(const FolderNode& root, const ModsByUuid& mods, bool filtering) {
     auto top = std::make_unique<TreeNode>();
     top->kind = QStringLiteral("root");
-    auto add_mods = [&](TreeNode* parent, const QList<ModLeaf>& leaves) {
+    auto addMods = [&](TreeNode* parent, const QList<ModLeaf>& leaves) {
         for (const auto& leaf : leaves) {
             auto item = std::make_unique<TreeNode>();
             item->kind = QStringLiteral("mod");
@@ -37,15 +37,15 @@ std::unique_ptr<TreeNode> build(const FolderNode& root, const ModsByUuid& mods, 
             const auto it = mods.constFind(leaf.uuid);
             if (it != mods.cend() && *it) {
                 const auto& mod = **it;
-                item->provider_id = mod.provider_id;
-                item->provider_label = provider_label(mod.provider_id, mod_package_id(mod).value_or(QString{}));
+                item->providerId = mod.providerId;
+                item->providerLabel = providerLabel(mod.providerId, modPackageId(mod).value_or(QString{}));
                 if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod))
-                    item->mod_version = about->mod_version;
+                    item->modVersion = about->modVersion;
             }
             parent->add(std::move(item));
         }
     };
-    auto add_folder = [&](auto&& self, TreeNode* parent, const FolderNode& folder) -> void {
+    auto addFolder = [&](auto&& self, TreeNode* parent, const FolderNode& folder) -> void {
         auto item = std::make_unique<TreeNode>();
         item->kind = QStringLiteral("folder");
         item->key = "f:" + QString::number(folder.folder.id);
@@ -53,39 +53,39 @@ std::unique_ptr<TreeNode> build(const FolderNode& root, const ModsByUuid& mods, 
         TreeNode* ptr = item.get();
         parent->add(std::move(item));
         for (const auto& child : folder.children) self(self, ptr, child);
-        add_mods(ptr, folder.mods);
+        addMods(ptr, folder.mods);
     };
-    for (const auto& child : root.children) add_folder(add_folder, top.get(), child);
+    for (const auto& child : root.children) addFolder(addFolder, top.get(), child);
     if (!root.mods.isEmpty() || !filtering) {
         auto item = std::make_unique<TreeNode>();
         item->kind = QStringLiteral("ungrouped");
-        item->key = UNGROUPED_KEY;
+        item->key = kUngroupedKey;
         item->folder = &root;
-        add_mods(item.get(), root.mods);
+        addMods(item.get(), root.mods);
         top->add(std::move(item));
     }
     return top;
 }
 
-bool same_shape(const TreeNode& a, const TreeNode& b) {
+bool sameShape(const TreeNode& a, const TreeNode& b) {
     if (a.key != b.key || a.children.size() != b.children.size()) return false;
     for (size_t i = 0; i < a.children.size(); ++i)
-        if (!same_shape(*a.children[i], *b.children[i])) return false;
+        if (!sameShape(*a.children[i], *b.children[i])) return false;
     return true;
 }
 
-void copy_payload(TreeNode& dst, TreeNode& src) {
+void copyPayload(TreeNode& dst, TreeNode& src) {
     dst.folder = src.folder;
     dst.leaf = src.leaf;
-    dst.provider_id = std::move(src.provider_id);
-    dst.provider_label = std::move(src.provider_label);
-    dst.mod_version = std::move(src.mod_version);
+    dst.providerId = std::move(src.providerId);
+    dst.providerLabel = std::move(src.providerLabel);
+    dst.modVersion = std::move(src.modVersion);
     for (size_t i = 0; i < dst.children.size(); ++i)
-        copy_payload(*dst.children[i], *src.children[i]);
+        copyPayload(*dst.children[i], *src.children[i]);
 }
 
-const QList<int> diagnostic_roles{ModTreeModel::HasErrorRole, ModTreeModel::ErrorTooltipRole,
-    ModTreeModel::HasWarningRole, ModTreeModel::WarningTooltipRole};
+const QList<int> kDiagnosticRoles{ModTreeModel::kHasErrorRole, ModTreeModel::kErrorTooltipRole,
+    ModTreeModel::kHasWarningRole, ModTreeModel::kWarningTooltipRole};
 }  // namespace
 
 void TreeNode::add(std::unique_ptr<TreeNode> child) {
@@ -107,26 +107,26 @@ QList<TreeNode*> TreeNode::walk() const {
 }
 TreeNode::TreeNode(QString kind, QString key, TreeNode* parent,
     const organizer::FolderNode* folder, const organizer::ModLeaf* leaf,
-    QString provider_id)
+    QString providerId)
     : kind(std::move(kind)), key(std::move(key)), parent(parent), folder(folder), leaf(leaf),
-      provider_id(std::move(provider_id)) {}
+      providerId(std::move(providerId)) {}
 
 
-qint64 TreeNode::folder_id() const {
+qint64 TreeNode::folderId() const {
     if (kind == "folder" && folder) return folder->folder.id;
-    if (kind == "mod" && parent) return parent->folder_id();
-    return organizer::ROOT_ID;
+    if (kind == "mod" && parent) return parent->folderId();
+    return organizer::kRootId;
 }
 
-bool TreeNode::is_container() const { return kind == "folder" || kind == "ungrouped"; }
+bool TreeNode::isContainer() const { return kind == "folder" || kind == "ungrouped"; }
 
-ModTreeModel::ModTreeModel(SummaryFor summary_for, QObject* parent)
-    : QAbstractItemModel(parent), summary_for_(std::move(summary_for)), root_(std::make_unique<TreeNode>()) {
-    root_->kind = QStringLiteral("root");
+ModTreeModel::ModTreeModel(SummaryFor summaryFor, QObject* parent)
+    : QAbstractItemModel(parent), m_summaryFor(std::move(summaryFor)), m_root(std::make_unique<TreeNode>()) {
+    m_root->kind = QStringLiteral("root");
 }
 
 TreeNode* ModTreeModel::node(const QModelIndex& index) const {
-    return index.isValid() ? static_cast<TreeNode*>(index.internalPointer()) : root_.get();
+    return index.isValid() ? static_cast<TreeNode*>(index.internalPointer()) : m_root.get();
 }
 
 QModelIndex ModTreeModel::index(int row, int column, const QModelIndex& parent) const {
@@ -138,7 +138,7 @@ QModelIndex ModTreeModel::index(int row, int column, const QModelIndex& parent) 
 QModelIndex ModTreeModel::parent(const QModelIndex& child) const {
     if (!child.isValid()) return {};
     const auto* up = node(child)->parent;
-    return !up || up == root_.get() ? QModelIndex{} : index_of(up);
+    return !up || up == m_root.get() ? QModelIndex{} : indexOf(up);
 }
 
 int ModTreeModel::rowCount(const QModelIndex& parent) const {
@@ -154,126 +154,126 @@ QVariant ModTreeModel::data(const QModelIndex& index, int role) const {
         if (item->kind == "folder" && item->folder) return item->folder->folder.name;
         return item->leaf ? item->leaf->name : QString{};
     }
-    if (role == KindRole) return item->kind;
-    if (role == KeyRole) return item->key;
-    if (role == SelectedRole) return selected_.contains(item->key);
-    if (role == FilteringRole) return filtering_;
+    if (role == kKindRole) return item->kind;
+    if (role == kKeyRole) return item->key;
+    if (role == kSelectedRole) return m_selected.contains(item->key);
+    if (role == kFilteringRole) return m_filtering;
     if (item->kind != "mod") {
         if (!item->folder) return {};
         const auto& folder = *item->folder;
         const bool own = item->kind == "ungrouped";
         switch (role) {
-            case CheckStateRole: return check_state(own ? folder.own_check() : folder.check);
-            case EnabledCountRole: return own ? folder.own_enabled : folder.enabled;
-            case TotalCountRole: return own ? folder.own_total : folder.total;
-            case VisibleCountRole: return own ? static_cast<int>(folder.mods.size()) : folder.visible_total;
-            case HasRuleRole: return folder.has_rules && !own;
+            case kCheckStateRole: return checkState(own ? folder.ownCheck() : folder.check);
+            case kEnabledCountRole: return own ? folder.ownEnabled : folder.enabled;
+            case kTotalCountRole: return own ? folder.ownTotal : folder.total;
+            case kVisibleCountRole: return own ? static_cast<int>(folder.mods.size()) : folder.visibleTotal;
+            case kHasRuleRole: return folder.hasRules && !own;
             default: return {};
         }
     }
     if (!item->leaf) return {};
     const auto& leaf = *item->leaf;
     switch (role) {
-        case UuidRole: return leaf.uuid;
-        case PackageIdRole: return leaf.package_id.value_or(QString{});
-        case CheckStateRole: return leaf.enabled ? Qt::Checked : Qt::Unchecked;
-        case ProviderLabelRole: return item->provider_label;
-        case ModVersionRole: return item->mod_version;
-        case ProviderIconRole: return provider_icon(item->provider_id);
-        case ProviderColorRole: {
-            const auto it = provider_colors_.constFind(item->provider_id);
-            return it != provider_colors_.cend() ? *it : paletteValue(u"TEXT_DIM");
+        case kUuidRole: return leaf.uuid;
+        case kPackageIdRole: return leaf.packageId.value_or(QString{});
+        case kCheckStateRole: return leaf.enabled ? Qt::Checked : Qt::Unchecked;
+        case kProviderLabelRole: return item->providerLabel;
+        case kModVersionRole: return item->modVersion;
+        case kProviderIconRole: return providerIcon(item->providerId);
+        case kProviderColorRole: {
+            const auto it = m_providerColors.constFind(item->providerId);
+            return it != m_providerColors.cend() ? *it : paletteValue(u"TEXT_DIM");
         }
-        case CanPlaceRole: return leaf.package_id.has_value();
-        case TagsRole: return tag_rows_.value(leaf.package_id.value_or(QString{}));
+        case kCanPlaceRole: return leaf.packageId.has_value();
+        case kTagsRole: return m_tagRows.value(leaf.packageId.value_or(QString{}));
         default: break;
     }
-    if (diagnostic_roles.contains(role)) {
-        const auto summary = leaf.enabled ? summary_for_(leaf.uuid) : std::nullopt;
-        if (role == HasErrorRole) return summary && summary->has_errors;
-        if (role == HasWarningRole) return summary && summary->has_warnings;
-        if (role == ErrorTooltipRole) return summary ? summary->error_tooltip : QString{};
-        return summary ? summary->warning_tooltip : QString{};
+    if (kDiagnosticRoles.contains(role)) {
+        const auto summary = leaf.enabled ? m_summaryFor(leaf.uuid) : std::nullopt;
+        if (role == kHasErrorRole) return summary && summary->hasErrors;
+        if (role == kHasWarningRole) return summary && summary->hasWarnings;
+        if (role == kErrorTooltipRole) return summary ? summary->errorTooltip : QString{};
+        return summary ? summary->warningTooltip : QString{};
     }
     return {};
 }
 
 QHash<int, QByteArray> ModTreeModel::roleNames() const {
-    return {{Qt::DisplayRole, "name"}, {KindRole, "kind"}, {KeyRole, "key"},
-        {UuidRole, "uuid"}, {PackageIdRole, "packageId"}, {CheckStateRole, "checkState"},
-        {EnabledCountRole, "enabledCount"}, {TotalCountRole, "totalCount"},
-        {VisibleCountRole, "visibleCount"}, {FilteringRole, "filtering"}, {HasRuleRole, "hasRule"},
-        {ProviderIconRole, "providerIcon"}, {ProviderLabelRole, "providerLabel"},
-        {ModVersionRole, "modVersion"}, {ProviderColorRole, "providerColor"},
-        {HasErrorRole, "hasError"}, {ErrorTooltipRole, "errorTooltip"},
-        {HasWarningRole, "hasWarning"}, {WarningTooltipRole, "warningTooltip"},
-        {CanPlaceRole, "canPlace"}, {SelectedRole, "selected"}, {TagsRole, "tags"}};
+    return {{Qt::DisplayRole, "name"}, {kKindRole, "kind"}, {kKeyRole, "key"},
+        {kUuidRole, "uuid"}, {kPackageIdRole, "packageId"}, {kCheckStateRole, "checkState"},
+        {kEnabledCountRole, "enabledCount"}, {kTotalCountRole, "totalCount"},
+        {kVisibleCountRole, "visibleCount"}, {kFilteringRole, "filtering"}, {kHasRuleRole, "hasRule"},
+        {kProviderIconRole, "providerIcon"}, {kProviderLabelRole, "providerLabel"},
+        {kModVersionRole, "modVersion"}, {kProviderColorRole, "providerColor"},
+        {kHasErrorRole, "hasError"}, {kErrorTooltipRole, "errorTooltip"},
+        {kHasWarningRole, "hasWarning"}, {kWarningTooltipRole, "warningTooltip"},
+        {kCanPlaceRole, "canPlace"}, {kSelectedRole, "selected"}, {kTagsRole, "tags"}};
 }
 
-bool ModTreeModel::filtering() const { return filtering_; }
+bool ModTreeModel::filtering() const { return m_filtering; }
 
-void ModTreeModel::set_tree(const organizer::FolderNode& root,
-    const organizer::ModsByUuid& mods, const QHash<QString, QString>& provider_colors,
+void ModTreeModel::setTree(const organizer::FolderNode& root,
+    const organizer::ModsByUuid& mods, const QHash<QString, QString>& providerColors,
     bool filtering, const QHash<qint64, organizer::Tag>& tags) {
     auto payload = std::make_unique<organizer::FolderNode>(root);
     auto fresh = build(*payload, mods, filtering);
-    provider_colors_ = provider_colors;
-    tag_rows_.clear();
+    m_providerColors = providerColors;
+    m_tagRows.clear();
     for (const auto* item : fresh->walk()) {
-        if (!item->leaf || !item->leaf->package_id || item->leaf->package_id->isEmpty() || item->leaf->tag_ids.isEmpty()) continue;
-        QList<qint64> ids(item->leaf->tag_ids.begin(), item->leaf->tag_ids.end());
+        if (!item->leaf || !item->leaf->packageId || item->leaf->packageId->isEmpty() || item->leaf->tagIds.isEmpty()) continue;
+        QList<qint64> ids(item->leaf->tagIds.begin(), item->leaf->tagIds.end());
         std::sort(ids.begin(), ids.end());
         QVariantList rows;
         for (qint64 id : ids) {
             const auto tag = tags.constFind(id);
             if (tag != tags.cend()) rows.append(QVariantMap{{"name", tag->name}, {"color", tag->color}});
         }
-        tag_rows_.insert(*item->leaf->package_id, rows);
+        m_tagRows.insert(*item->leaf->packageId, rows);
     }
-    if (filtering_ == filtering && same_shape(*root_, *fresh)) {
-        copy_payload(*root_, *fresh);
-        payload_ = std::move(payload);
-        emit_all_changed(root_.get());
+    if (m_filtering == filtering && sameShape(*m_root, *fresh)) {
+        copyPayload(*m_root, *fresh);
+        m_payload = std::move(payload);
+        emitAllChanged(m_root.get());
     } else {
         beginResetModel();
-        root_ = std::move(fresh);
-        payload_ = std::move(payload);
-        filtering_ = filtering;
+        m_root = std::move(fresh);
+        m_payload = std::move(payload);
+        m_filtering = filtering;
         endResetModel();
     }
     QSet<QString> live;
-    for (const auto* item : root_->walk()) live.insert(item->key);
-    selected_.intersect(live);
+    for (const auto* item : m_root->walk()) live.insert(item->key);
+    m_selected.intersect(live);
 }
 
-QModelIndex ModTreeModel::index_of(const TreeNode* item) const {
-    return item == root_.get() ? QModelIndex{} : createIndex(item->row, 0, const_cast<TreeNode*>(item));
+QModelIndex ModTreeModel::indexOf(const TreeNode* item) const {
+    return item == m_root.get() ? QModelIndex{} : createIndex(item->row, 0, const_cast<TreeNode*>(item));
 }
 
-void ModTreeModel::emit_all_changed(TreeNode* item, const QList<int>& roles) {
+void ModTreeModel::emitAllChanged(TreeNode* item, const QList<int>& roles) {
     if (item->children.empty()) return;
-    const auto parent = index_of(item);
+    const auto parent = indexOf(item);
     emit dataChanged(index(0, 0, parent), index(static_cast<int>(item->children.size()) - 1, 0, parent), roles);
-    for (const auto& child : item->children) emit_all_changed(child.get(), roles);
+    for (const auto& child : item->children) emitAllChanged(child.get(), roles);
 }
 
-void ModTreeModel::refresh_diagnostics() { emit_all_changed(root_.get(), diagnostic_roles); }
-TreeNode* ModTreeModel::node_at(const QModelIndex& index) const { return index.isValid() ? node(index) : nullptr; }
-QModelIndex ModTreeModel::index_for_key(const QString& key) const {
-    for (const auto* item : root_->walk()) if (item->key == key) return index_of(item);
+void ModTreeModel::refreshDiagnostics() { emitAllChanged(m_root.get(), kDiagnosticRoles); }
+TreeNode* ModTreeModel::nodeAt(const QModelIndex& index) const { return index.isValid() ? node(index) : nullptr; }
+QModelIndex ModTreeModel::indexForKey(const QString& key) const {
+    for (const auto* item : m_root->walk()) if (item->key == key) return indexOf(item);
     return {};
 }
-QModelIndex ModTreeModel::index_for_uuid(const QString& uuid) const {
-    for (const auto* item : root_->walk())
-        if (item->kind == "mod" && item->leaf && item->leaf->uuid == uuid) return index_of(item);
+QModelIndex ModTreeModel::indexForUuid(const QString& uuid) const {
+    for (const auto* item : m_root->walk())
+        if (item->kind == "mod" && item->leaf && item->leaf->uuid == uuid) return indexOf(item);
     return {};
 }
-QList<QModelIndex> ModTreeModel::expanded_indexes(const QModelIndex& parent) const {
+QList<QModelIndex> ModTreeModel::expandedIndexes(const QModelIndex& parent) const {
     QList<QModelIndex> result;
     auto visit = [&](auto&& self, const TreeNode* item) -> void {
         for (const auto& child : item->children) {
-            if (child->is_container() && (filtering_ || (child->folder && !child->folder->folder.collapsed))) {
-                result.append(index_of(child.get()));
+            if (child->isContainer() && (m_filtering || (child->folder && !child->folder->folder.collapsed))) {
+                result.append(indexOf(child.get()));
                 self(self, child.get());
             }
         }
@@ -281,34 +281,34 @@ QList<QModelIndex> ModTreeModel::expanded_indexes(const QModelIndex& parent) con
     visit(visit, node(parent));
     return result;
 }
-QList<TreeNode*> ModTreeModel::selected_nodes() const {
+QList<TreeNode*> ModTreeModel::selectedNodes() const {
     QList<TreeNode*> result;
-    for (auto* item : root_->walk()) if (selected_.contains(item->key)) result.append(item);
+    for (auto* item : m_root->walk()) if (m_selected.contains(item->key)) result.append(item);
     return result;
 }
-bool ModTreeModel::is_selected(const QModelIndex& index) const {
-    const auto* item = node_at(index);
-    return item && selected_.contains(item->key);
+bool ModTreeModel::isSelected(const QModelIndex& index) const {
+    const auto* item = nodeAt(index);
+    return item && m_selected.contains(item->key);
 }
 void ModTreeModel::select(const QList<QModelIndex>& indexes, const QString& mode) {
     QSet<QString> keys;
-    for (const auto& index : indexes) if (const auto* item = node_at(index)) keys.insert(item->key);
-    const auto before = selected_;
-    if (mode == "replace") selected_ = keys;
-    else if (mode == "toggle") selected_ = (selected_ - keys) | (keys - selected_);
-    else selected_.unite(keys);
-    notify_selection((before - selected_) | (selected_ - before));
+    for (const auto& index : indexes) if (const auto* item = nodeAt(index)) keys.insert(item->key);
+    const auto before = m_selected;
+    if (mode == "replace") m_selected = keys;
+    else if (mode == "toggle") m_selected = (m_selected - keys) | (keys - m_selected);
+    else m_selected.unite(keys);
+    notifySelection((before - m_selected) | (m_selected - before));
 }
-void ModTreeModel::clear_selection() {
-    const auto before = selected_;
-    selected_.clear();
-    notify_selection(before);
+void ModTreeModel::clearSelection() {
+    const auto before = m_selected;
+    m_selected.clear();
+    notifySelection(before);
 }
-void ModTreeModel::notify_selection(const QSet<QString>& changed) {
+void ModTreeModel::notifySelection(const QSet<QString>& changed) {
     if (changed.isEmpty()) return;
-    for (const auto* item : root_->walk()) if (changed.contains(item->key)) {
-        const auto index = index_of(item);
-        emit dataChanged(index, index, {SelectedRole});
+    for (const auto* item : m_root->walk()) if (changed.contains(item->key)) {
+        const auto index = indexOf(item);
+        emit dataChanged(index, index, {kSelectedRole});
     }
 }
 

@@ -16,8 +16,8 @@ public:
     void setIconColor(const QString& color);
 
 private:
-    QString icon_name_;
-    int icon_px_;
+    QString m_iconName;
+    int m_iconPx;
 };
 
 }  // namespace px::modrim

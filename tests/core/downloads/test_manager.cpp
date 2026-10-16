@@ -26,20 +26,20 @@ using px::modrim::DownloadResult;
 using px::modrim::ListedMod;
 using px::modrim::ListedModPtr;
 using px::modrim::Result;
-using test_support::run_sync;
+using test_support::runSync;
 
 // Claims ids that start with `prefix`, and records each batch it was asked to download.
 class FakeDownloader : public Downloader {
 public:
     FakeDownloader(QString name, QString label, QString prefix, DownloadManager& manager)
-        : Downloader(std::move(name), std::move(label), manager), prefix_(std::move(prefix)) {}
+        : Downloader(std::move(name), std::move(label), manager), m_prefix(std::move(prefix)) {}
 
-    bool is_downloading() const override { return busy_; }
-    QSet<QString> active_ids() const override { return {}; }
-    bool accepts(const QString& mod_id) const override { return mod_id.startsWith(prefix_); }
+    bool isDownloading() const override { return m_busy; }
+    QSet<QString> activeIds() const override { return {}; }
+    bool accepts(const QString& modId) const override { return modId.startsWith(m_prefix); }
 
-    std::optional<QString> updatable_id(const ListedMod& mod) const override {
-        const auto& path = mod.mod_path();
+    std::optional<QString> updatableId(const ListedMod& mod) const override {
+        const auto& path = mod.modPath();
         if (!path) {
             return std::nullopt;
         }
@@ -47,18 +47,18 @@ public:
         return accepts(id) ? std::optional<QString>(id) : std::nullopt;
     }
 
-    std::optional<double> last_synced(const ListedMod& mod) const override {
-        return updatable_id(mod) ? std::optional<double>(1.0) : std::nullopt;
+    std::optional<double> lastSynced(const ListedMod& mod) const override {
+        return updatableId(mod) ? std::optional<double>(1.0) : std::nullopt;
     }
 
-    QCoro::Task<Result<DownloadResult>> download_mods(QStringList mod_ids) override {
-        calls.push_back(mod_ids);
-        busy_ = true;
-        busy_changed.notify(true);
-        busy_ = false;
-        busy_changed.notify(false);
-        DownloadResult result{.succeeded = mod_ids, .failed = {}, .changed = {}};
-        download_finished.notify(result);
+    QCoro::Task<Result<DownloadResult>> downloadMods(QStringList modIds) override {
+        calls.push_back(modIds);
+        m_busy = true;
+        busyChanged.notify(true);
+        m_busy = false;
+        busyChanged.notify(false);
+        DownloadResult result{.succeeded = modIds, .failed = {}, .changed = {}};
+        downloadFinished.notify(result);
         co_return result;
     }
 
@@ -68,8 +68,8 @@ public:
     bool cancelled = false;
 
 private:
-    QString prefix_;
-    bool busy_ = false;
+    QString m_prefix;
+    bool m_busy = false;
 };
 
 class FakeSteam : public FakeDownloader {
@@ -82,9 +82,9 @@ public:
     explicit FakeGithub(DownloadManager& manager) : FakeDownloader("github", "Github", "g", manager) {}
 };
 
-ListedModPtr make_mod(const QString& folder) {
+ListedModPtr makeMod(const QString& folder) {
     auto mod = std::make_shared<ListedMod>();
-    REQUIRE(mod->set_mod_path(QStringLiteral("/mods/%1").arg(folder)).has_value());
+    REQUIRE(mod->setModPath(QStringLiteral("/mods/%1").arg(folder)).has_value());
     return mod;
 }
 
@@ -93,18 +93,18 @@ ListedModPtr make_mod(const QString& folder) {
 TEST_CASE("empty manager offers nothing", "[downloads][manager]") {
     DownloadManager manager;
     REQUIRE_FALSE(manager.available());
-    REQUIRE(manager.updatable_ids({make_mod("s1")}).isEmpty());
-    REQUIRE(manager.source_of(*make_mod("s1")) == nullptr);
+    REQUIRE(manager.updatableIds({makeMod("s1")}).isEmpty());
+    REQUIRE(manager.sourceOf(*makeMod("s1")) == nullptr);
 }
 
 TEST_CASE("download routes ids to the accepting downloader", "[downloads][manager]") {
     DownloadManager manager;
     FakeSteam steam(manager);
     FakeGithub github(manager);
-    manager.register_downloader(steam);
-    manager.register_downloader(github);
+    manager.registerDownloader(steam);
+    manager.registerDownloader(github);
 
-    auto result = run_sync(manager.download_mods({"s1", "g1", "s2", "s1"}));
+    auto result = runSync(manager.downloadMods({"s1", "g1", "s2", "s1"}));
 
     REQUIRE(result.has_value());
     REQUIRE(steam.calls == std::vector<QStringList>{{"s1", "s2"}});
@@ -117,9 +117,9 @@ TEST_CASE("download routes ids to the accepting downloader", "[downloads][manage
 TEST_CASE("unclaimed id is rejected before anything starts", "[downloads][manager]") {
     DownloadManager manager;
     FakeSteam steam(manager);
-    manager.register_downloader(steam);
+    manager.registerDownloader(steam);
 
-    auto result = run_sync(manager.download_mods({"s1", "x1"}));
+    auto result = runSync(manager.downloadMods({"s1", "x1"}));
 
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error().message.contains("x1"));
@@ -130,30 +130,30 @@ TEST_CASE("source and ids come from the owning downloader", "[downloads][manager
     DownloadManager manager;
     FakeSteam steam(manager);
     FakeGithub github(manager);
-    manager.register_downloader(steam);
-    manager.register_downloader(github);
-    const auto g1 = make_mod("g1");
-    const auto other = make_mod("other");
-    const QList<ListedModPtr> mods{make_mod("s1"), g1, other};
+    manager.registerDownloader(steam);
+    manager.registerDownloader(github);
+    const auto g1 = makeMod("g1");
+    const auto other = makeMod("other");
+    const QList<ListedModPtr> mods{makeMod("s1"), g1, other};
 
-    const Downloader* source = manager.source_of(*g1);
+    const Downloader* source = manager.sourceOf(*g1);
     REQUIRE(source != nullptr);
     REQUIRE(source->label() == "Github");
-    REQUIRE(manager.updatable_ids(mods) == QStringList{"s1", "g1"});
-    REQUIRE_FALSE(manager.last_synced(*other).has_value());
+    REQUIRE(manager.updatableIds(mods) == QStringList{"s1", "g1"});
+    REQUIRE_FALSE(manager.lastSynced(*other).has_value());
 }
 
 TEST_CASE("busy reflects any downloader and cancel stops the rest", "[downloads][manager]") {
     DownloadManager manager;
     FakeSteam steam(manager);
     FakeGithub github(manager);
-    manager.register_downloader(steam);
-    manager.register_downloader(github);
+    manager.registerDownloader(steam);
+    manager.registerDownloader(github);
     std::vector<bool> busy;
-    manager.busy_changed.connect([&busy](const bool& value) { busy.push_back(value); });
+    manager.busyChanged.connect([&busy](const bool& value) { busy.push_back(value); });
 
-    steam.download_finished.connect([&manager](const DownloadResult&) { manager.cancel(); });
-    auto result = run_sync(manager.download_mods({"s1", "g1"}));
+    steam.downloadFinished.connect([&manager](const DownloadResult&) { manager.cancel(); });
+    auto result = runSync(manager.downloadMods({"s1", "g1"}));
 
     REQUIRE(result.has_value());
     REQUIRE(github.calls.empty());
@@ -163,11 +163,11 @@ TEST_CASE("busy reflects any downloader and cancel stops the rest", "[downloads]
 TEST_CASE("names are keyed by source id, not workshop id", "[downloads][manager]") {
     DownloadManager manager;
     FakeGithub github(manager);
-    manager.register_downloader(github);
-    const auto mod = make_mod("g1");
+    manager.registerDownloader(github);
+    const auto mod = makeMod("g1");
     mod->name = QStringLiteral("Git Mod");
 
-    const QHash<QString, QString> names = manager.names_by_id({mod, make_mod("s1")});
+    const QHash<QString, QString> names = manager.namesById({mod, makeMod("s1")});
 
     REQUIRE(names == QHash<QString, QString>{{"g1", "Git Mod"}});
 }

@@ -25,20 +25,20 @@ public:
 protected:
     void showEvent(QShowEvent* event) override;
 private:
-    void ensure_initialized();
+    void ensureInitialized();
     QObject* web() const;
-    void run_js(const QString& code);
-    DownloadSidebar* sidebar_;
-    QQuickWidget* qml_;
-    SteamWorkshopUiPlugin* plugin_ = nullptr;
-    bool initialized_ = false;
-    Event<QStringList>::Id badges_id_ = 0;
-    Event<QStringList>::Id active_id_ = 0;
-    Event<SidebarSync>::Id sidebar_id_ = 0;
-    Event<DownloadItemStatus>::Id status_id_ = 0;
-    Event<bool>::Id busy_id_ = 0;
-    Event<QString>::Id uncheck_id_ = 0;
-    Event<std::monostate>::Id clear_id_ = 0;
+    void runJs(const QString& code);
+    DownloadSidebar* m_sidebar;
+    QQuickWidget* m_qml;
+    SteamWorkshopUiPlugin* m_plugin = nullptr;
+    bool m_initialized = false;
+    Event<QStringList>::Id m_badgesId = 0;
+    Event<QStringList>::Id m_activeId = 0;
+    Event<SidebarSync>::Id m_sidebarId = 0;
+    Event<DownloadItemStatus>::Id m_statusId = 0;
+    Event<bool>::Id m_busyId = 0;
+    Event<QString>::Id m_uncheckId = 0;
+    Event<std::monostate>::Id m_clearId = 0;
 };
 
 }  // namespace px::modrim

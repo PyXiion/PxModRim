@@ -38,60 +38,60 @@ bool hasEntries(const QString& dirPath) {
 
 CaseInsensitiveSet::CaseInsensitiveSet(const QStringList& values) {
     for (const QString& value : values) {
-        data_.insert(CaseInsensitiveStr(value));
+        m_data.insert(CaseInsensitiveStr(value));
     }
 }
 
 CaseInsensitiveSet::CaseInsensitiveSet(const QList<CaseInsensitiveStr>& values) {
     for (const CaseInsensitiveStr& value : values) {
-        data_.insert(value);
+        m_data.insert(value);
     }
 }
 
 bool CaseInsensitiveSet::contains(QStringView value) const {
-    return data_.contains(CaseInsensitiveStr(value));
+    return m_data.contains(CaseInsensitiveStr(value));
 }
 
 bool CaseInsensitiveSet::contains(const CaseInsensitiveStr& value) const {
-    return data_.contains(value);
+    return m_data.contains(value);
 }
 
-void CaseInsensitiveSet::add(QStringView value) { data_.insert(CaseInsensitiveStr(value)); }
+void CaseInsensitiveSet::add(QStringView value) { m_data.insert(CaseInsensitiveStr(value)); }
 
-void CaseInsensitiveSet::add(const CaseInsensitiveStr& value) { data_.insert(value); }
+void CaseInsensitiveSet::add(const CaseInsensitiveStr& value) { m_data.insert(value); }
 
-void CaseInsensitiveSet::discard(QStringView value) { data_.remove(CaseInsensitiveStr(value)); }
+void CaseInsensitiveSet::discard(QStringView value) { m_data.remove(CaseInsensitiveStr(value)); }
 
-void CaseInsensitiveSet::discard(const CaseInsensitiveStr& value) { data_.remove(value); }
+void CaseInsensitiveSet::discard(const CaseInsensitiveStr& value) { m_data.remove(value); }
 
 CaseInsensitiveSet CaseInsensitiveSet::operator|(const CaseInsensitiveSet& other) const {
     CaseInsensitiveSet result = *this;
-    result.data_.unite(other.data_);
+    result.m_data.unite(other.m_data);
     return result;
 }
 
-bool ModsConfig::check_active_duplicates() const {
+bool ModsConfig::checkActiveDuplicates() const {
     const QSet<CaseInsensitiveStr> unique(activeMods.cbegin(), activeMods.cend());
     return activeMods.size() != unique.size();
 }
 
-bool ModsConfig::check_expansions_duplicates() const {
+bool ModsConfig::checkExpansionsDuplicates() const {
     const QSet<CaseInsensitiveStr> unique(knownExpansions.cbegin(), knownExpansions.cend());
     return knownExpansions.size() != unique.size();
 }
 
-const DependencyMod* BaseRules::find_dependency(const CaseInsensitiveStr& package_id) const {
+const DependencyMod* BaseRules::findDependency(const CaseInsensitiveStr& packageId) const {
     for (const DependencyMod& dependency : dependencies) {
-        if (dependency.package_id == package_id) {
+        if (dependency.packageId == packageId) {
             return &dependency;
         }
     }
     return nullptr;
 }
 
-void BaseRules::set_dependency(DependencyMod dependency) {
+void BaseRules::setDependency(DependencyMod dependency) {
     for (DependencyMod& existing : dependencies) {
-        if (existing.package_id == dependency.package_id) {
+        if (existing.packageId == dependency.packageId) {
             existing = std::move(dependency);
             return;
         }
@@ -102,43 +102,43 @@ void BaseRules::set_dependency(DependencyMod dependency) {
 QString ListedMod::newUuid() { return QUuid::createUuid().toString(QUuid::WithoutBraces); }
 
 QString ListedMod::uuid() const {
-    if (mod_path_) {
-        return *mod_path_;
+    if (m_modPath) {
+        return *m_modPath;
     }
-    return uuid_;
+    return m_uuid;
 }
 
-Result<void> ListedMod::set_mod_path(const QString& path) {
-    if (mod_path_) {
+Result<void> ListedMod::setModPath(const QString& path) {
+    if (m_modPath) {
         return std::unexpected(Error{QStringLiteral("Mod path already set. Cannot override.")});
     }
-    mod_path_ = path;
-    published_file_id_cache_.reset();
+    m_modPath = path;
+    m_publishedFileIdCache.reset();
     return {};
 }
 
-std::optional<QString> ListedMod::mod_folder() const {
-    if (!mod_path_) {
+std::optional<QString> ListedMod::modFolder() const {
+    if (!m_modPath) {
         return std::nullopt;
     }
-    return pathStem(QFileInfo(QDir::cleanPath(*mod_path_)).fileName());
+    return pathStem(QFileInfo(QDir::cleanPath(*m_modPath)).fileName());
 }
 
-qint64 ListedMod::internal_time_touched() const {
-    if (!mod_path_ || !QFileInfo::exists(*mod_path_)) {
+qint64 ListedMod::internalTimeTouched() const {
+    if (!m_modPath || !QFileInfo::exists(*m_modPath)) {
         return -1;
     }
-    return QFileInfo(*mod_path_).lastModified().toSecsSinceEpoch();
+    return QFileInfo(*m_modPath).lastModified().toSecsSinceEpoch();
 }
 
-std::optional<QString> ListedMod::published_file_id() const {
-    if (!published_file_id_cache_) {
-        published_file_id_cache_ = [this]() -> std::optional<QString> {
-            if (!mod_path_) {
+std::optional<QString> ListedMod::publishedFileId() const {
+    if (!m_publishedFileIdCache) {
+        m_publishedFileIdCache = [this]() -> std::optional<QString> {
+            if (!m_modPath) {
                 return std::nullopt;
             }
             const QString pfidPath =
-                QDir(*mod_path_).filePath(QStringLiteral("About/PublishedFileId.txt"));
+                QDir(*m_modPath).filePath(QStringLiteral("About/PublishedFileId.txt"));
             if (QFileInfo::exists(pfidPath)) {
                 QFile file(pfidPath);
                 if (!file.open(QIODevice::ReadOnly)) {
@@ -154,36 +154,36 @@ std::optional<QString> ListedMod::published_file_id() const {
                     return content;
                 }
             }
-            const std::optional<QString> folder = mod_folder();
+            const std::optional<QString> folder = modFolder();
             if (folder && isAsciiDigits(*folder)) {
                 return folder;
             }
             return std::nullopt;
         }();
     }
-    return *published_file_id_cache_;
+    return *m_publishedFileIdCache;
 }
 
-bool ListedMod::c_sharp_mod() const {
-    if (!c_sharp_mod_cache_) {
-        c_sharp_mod_cache_ = [this] {
-            if (!mod_path_) {
+bool ListedMod::cSharpMod() const {
+    if (!m_cSharpModCache) {
+        m_cSharpModCache = [this] {
+            if (!m_modPath) {
                 return false;
             }
-            const QString assemblies = QDir(*mod_path_).filePath(QStringLiteral("Assemblies"));
+            const QString assemblies = QDir(*m_modPath).filePath(QStringLiteral("Assemblies"));
             return QFileInfo(assemblies).isDir() && hasEntries(assemblies);
         }();
     }
-    return *c_sharp_mod_cache_;
+    return *m_cSharpModCache;
 }
 
-bool ListedMod::xml_patch_mod() const {
-    if (!xml_patch_mod_cache_) {
-        xml_patch_mod_cache_ = [this] {
-            if (!mod_path_) {
+bool ListedMod::xmlPatchMod() const {
+    if (!m_xmlPatchModCache) {
+        m_xmlPatchModCache = [this] {
+            if (!m_modPath) {
                 return false;
             }
-            const QString patches = QDir(*mod_path_).filePath(QStringLiteral("Patches"));
+            const QString patches = QDir(*m_modPath).filePath(QStringLiteral("Patches"));
             if (!QFileInfo(patches).isDir()) {
                 return false;
             }
@@ -197,22 +197,22 @@ bool ListedMod::xml_patch_mod() const {
             return false;
         }();
     }
-    return *xml_patch_mod_cache_;
+    return *m_xmlPatchModCache;
 }
 
-std::optional<QString> ListedMod::preview_img_path() const {
-    if (!mod_path_) {
+std::optional<QString> ListedMod::previewImgPath() const {
+    if (!m_modPath) {
         return std::nullopt;
     }
-    const QString candidate = QDir(*mod_path_).filePath(QStringLiteral("About/Preview.png"));
+    const QString candidate = QDir(*m_modPath).filePath(QStringLiteral("About/Preview.png"));
     if (QFileInfo::exists(candidate)) {
         return candidate;
     }
     return std::nullopt;
 }
 
-std::optional<QString> AboutXmlMod::get_dlc_name() const {
-    if (const RimWorldDlc* dlc = findRimWorldDlcByPackageId(package_id.str())) {
+std::optional<QString> AboutXmlMod::getDlcName() const {
+    if (const RimWorldDlc* dlc = findRimWorldDlcByPackageId(packageId.str())) {
         return QString(dlc->name);
     }
     return std::nullopt;

@@ -72,7 +72,7 @@ public:
     int getCalls = 0;
     QList<CachedMod> stored;
 
-    QCoro::Task<px::modrim::providers::CacheLookup> get_mods(
+    QCoro::Task<px::modrim::providers::CacheLookup> getMods(
         QList<ModCandidate> candidates, QString /*target_version*/) override {
         ++getCalls;
         px::modrim::providers::CacheLookup lookup;
@@ -84,7 +84,7 @@ public:
         co_return lookup;
     }
 
-    QCoro::Task<void> put_mods(QList<CachedMod> entries, QString /*target_version*/) override {
+    QCoro::Task<void> putMods(QList<CachedMod> entries, QString /*target_version*/) override {
         stored.append(entries);
         co_return;
     }
@@ -100,15 +100,15 @@ TEST_CASE("workshop provider discovers mods that carry a published file id") {
                                     QStringLiteral("author.workshop"), true);
 
     SteamWorkshopModProvider provider(workshop);
-    CHECK(provider.provider_id() == QStringLiteral("steam"));
+    CHECK(provider.providerId() == QStringLiteral("steam"));
     CHECK(provider.path() == workshop);
 
     const auto discovered = runToCompletion(provider.discover(QStringLiteral("1.5")));
     REQUIRE(discovered.has_value());
     REQUIRE(discovered->size() == 1);
     const ListedModPtr mod = discovered->constBegin().value();
-    CHECK(mod->mod_path() == modPath);
-    CHECK(mod->provider_id == QStringLiteral("steam"));
+    CHECK(mod->modPath() == modPath);
+    CHECK(mod->providerId == QStringLiteral("steam"));
 }
 
 TEST_CASE("local and downloaded providers split mods on the published file id") {
@@ -121,8 +121,8 @@ TEST_CASE("local and downloaded providers split mods on the published file id") 
 
     LocalModProvider localProvider(local);
     DownloadedModProvider downloadedProvider(local);
-    CHECK(localProvider.provider_id() == QStringLiteral("local"));
-    CHECK(downloadedProvider.provider_id() == QStringLiteral("downloaded"));
+    CHECK(localProvider.providerId() == QStringLiteral("local"));
+    CHECK(downloadedProvider.providerId() == QStringLiteral("downloaded"));
 
     const auto localMods = runToCompletion(localProvider.discover(QStringLiteral("1.5")));
     REQUIRE(localMods.has_value());
@@ -158,7 +158,7 @@ TEST_CASE("core provider reads mods from the game's Data directory") {
     QTemporaryDir game;
     REQUIRE(game.isValid());
     CoreModProvider provider(game.path());
-    CHECK(provider.provider_id() == QStringLiteral("core"));
+    CHECK(provider.providerId() == QStringLiteral("core"));
     CHECK(provider.color() == QStringLiteral("#e67e22"));
 
     // No Data/ directory: nothing to discover.
@@ -183,14 +183,14 @@ TEST_CASE("cached metadata is returned without parsing") {
     FakeCache cache;
     cache.serveCached = true;
     cache.cachedMod = std::make_shared<px::modrim::AboutXmlMod>();
-    REQUIRE(cache.cachedMod->set_mod_path(plain));
+    REQUIRE(cache.cachedMod->setModPath(plain));
 
     LocalModProvider provider(root.path(), nullptr, &cache);
     const auto discovered = runToCompletion(provider.discover(QStringLiteral("1.5")));
     REQUIRE(discovered.has_value());
     REQUIRE(discovered->size() == 1);
     CHECK(discovered->constBegin().value() == cache.cachedMod);
-    CHECK(cache.cachedMod->provider_id == QStringLiteral("local"));
+    CHECK(cache.cachedMod->providerId == QStringLiteral("local"));
     CHECK(cache.stored.isEmpty());
 }
 

@@ -15,8 +15,8 @@ ViewRailPanel::ViewRailPanel(const QVariantList& tabs, const QVariantList& helpE
     : QQuickWidget(engine, parent) {
     setResizeMode(QQuickWidget::SizeRootObjectToView);
     setClearColor(paletteColor(u"ELEVATE_2"));
-    setMinimumWidth(RAIL_MIN_WIDTH);
-    setMaximumWidth(RAIL_MAX_WIDTH);
+    setMinimumWidth(kRailMinWidth);
+    setMaximumWidth(kRailMaxWidth);
 
     rootContext()->setContextProperty(QStringLiteral("railModel"), tabs);
     rootContext()->setContextProperty(QStringLiteral("railHelpEntries"), helpEntries);

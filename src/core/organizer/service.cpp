@@ -17,7 +17,7 @@ namespace {
 const QHash<QString, ListedModPtr> kEmptyMods;
 const QStringList kEmptyActive;
 
-Result<QString> clean_name(const QString& name, const QString& what) {
+Result<QString> cleanName(const QString& name, const QString& what) {
     const QString cleaned = name.trimmed();
     if (cleaned.isEmpty()) {
         return std::unexpected(Error{QStringLiteral("%1 name cannot be empty.").arg(what)});
@@ -28,42 +28,42 @@ Result<QString> clean_name(const QString& name, const QString& what) {
 }  // namespace
 
 OrganizerService::OrganizerService(CoreContext& ctx, OrganizerDb& db)
-    : Plugin(QStringLiteral("organizer")), ctx_(&ctx), db_(db) {}
+    : Plugin(QStringLiteral("organizer")), m_ctx(&ctx), m_db(db) {}
 
-OrganizerService::OrganizerService(AllModsFn all_mods, ActiveUuidsFn active_uuids, OrganizerDb& db)
+OrganizerService::OrganizerService(AllModsFn allMods, ActiveUuidsFn activeUuids, OrganizerDb& db)
     : Plugin(QStringLiteral("organizer")),
-      all_mods_fn_(std::move(all_mods)),
-      active_uuids_fn_(std::move(active_uuids)),
-      db_(db) {}
+      m_allModsFn(std::move(allMods)),
+      m_activeUuidsFn(std::move(activeUuids)),
+      m_db(db) {}
 
-const QHash<QString, ListedModPtr>& OrganizerService::all_mods() const {
-    if (all_mods_fn_) {
-        return all_mods_fn_();
+const QHash<QString, ListedModPtr>& OrganizerService::allMods() const {
+    if (m_allModsFn) {
+        return m_allModsFn();
     }
-    if (ctx_) {
-        return ctx_->allMods();
+    if (m_ctx) {
+        return m_ctx->allMods();
     }
     return kEmptyMods;
 }
 
-const QStringList& OrganizerService::active_uuids() const {
-    if (active_uuids_fn_) {
-        return active_uuids_fn_();
+const QStringList& OrganizerService::activeUuids() const {
+    if (m_activeUuidsFn) {
+        return m_activeUuidsFn();
     }
-    if (ctx_) {
-        return ctx_->activeUuids();
+    if (m_ctx) {
+        return m_ctx->activeUuids();
     }
     return kEmptyActive;
 }
 
 QCoro::Task<void> OrganizerService::init() {
-    auto loaded = co_await db_.load();
+    auto loaded = co_await m_db.load();
     if (!loaded) {
         // Plugin::init cannot report failure, so the service stays not ready and says why.
         spdlog::error("Cannot load organizer state: {}", loaded.error().message.toStdString());
         co_return;
     }
-    state_ = std::move(*loaded);
+    m_state = std::move(*loaded);
     changed.notify({});
 }
 
@@ -72,79 +72,79 @@ QCoro::Task<void> OrganizerService::init(CoreContext&) {
 }
 
 QCoro::Task<void> OrganizerService::shutdown() {
-    co_await db_.close();
+    co_await m_db.close();
 }
 
 bool OrganizerService::ready() const noexcept {
-    return state_.has_value();
+    return m_state.has_value();
 }
 
 const OrganizerState& OrganizerService::state() const {
-    Q_ASSERT(state_.has_value());
-    return *state_;
+    Q_ASSERT(m_state.has_value());
+    return *m_state;
 }
 
 QCoro::Task<Result<void>> OrganizerService::commit() {
-    auto loaded = co_await db_.load();
+    auto loaded = co_await m_db.load();
     if (!loaded) {
         co_return std::unexpected(loaded.error());
     }
-    state_ = std::move(*loaded);
+    m_state = std::move(*loaded);
     changed.notify({});
     co_return {};
 }
 
 // ── Validation helpers ───────────────────────────────────────────────────────
 
-Result<Folder> OrganizerService::find_folder(qint64 folder_id) const {
+Result<Folder> OrganizerService::findFolder(qint64 folderId) const {
     const auto& folders = state().folders;
-    const auto it = folders.constFind(folder_id);
+    const auto it = folders.constFind(folderId);
     if (it == folders.cend()) {
         return std::unexpected(Error{QStringLiteral("That folder no longer exists.")});
     }
     return it.value();
 }
 
-Result<Folder> OrganizerService::find_non_root(qint64 folder_id) const {
-    if (folder_id == ROOT_ID) {
+Result<Folder> OrganizerService::findNonRoot(qint64 folderId) const {
+    if (folderId == kRootId) {
         return std::unexpected(Error{QStringLiteral("The root folder cannot be changed.")});
     }
-    return find_folder(folder_id);
+    return findFolder(folderId);
 }
 
-Result<Tag> OrganizerService::find_tag(qint64 tag_id) const {
+Result<Tag> OrganizerService::findTag(qint64 tagId) const {
     const auto& tags = state().tags;
-    const auto it = tags.constFind(tag_id);
+    const auto it = tags.constFind(tagId);
     if (it == tags.cend()) {
         return std::unexpected(Error{QStringLiteral("That tag no longer exists.")});
     }
     return it.value();
 }
 
-int OrganizerService::depth(qint64 folder_id) const {
+int OrganizerService::depth(qint64 folderId) const {
     const auto& folders = state().folders;
     int count = 0;
-    Folder current = folders.value(folder_id);
-    while (current.parent_id) {
+    Folder current = folders.value(folderId);
+    while (current.parentId) {
         ++count;
-        current = folders.value(*current.parent_id);
+        current = folders.value(*current.parentId);
     }
     return count;
 }
 
-QList<Folder> OrganizerService::children(qint64 folder_id) const {
+QList<Folder> OrganizerService::children(qint64 folderId) const {
     QList<Folder> result;
     for (const Folder& folder : state().folders) {
-        if (folder.parent_id == folder_id) {
+        if (folder.parentId == folderId) {
             result.append(folder);
         }
     }
     return result;
 }
 
-QSet<qint64> OrganizerService::subtree_ids(qint64 folder_id) const {
-    QSet<qint64> ids{folder_id};
-    QList<qint64> pending{folder_id};
+QSet<qint64> OrganizerService::subtreeIds(qint64 folderId) const {
+    QSet<qint64> ids{folderId};
+    QList<qint64> pending{folderId};
     while (!pending.isEmpty()) {
         const qint64 current = pending.takeLast();
         for (const Folder& child : children(current)) {
@@ -157,26 +157,26 @@ QSet<qint64> OrganizerService::subtree_ids(qint64 folder_id) const {
     return ids;
 }
 
-int OrganizerService::height(qint64 folder_id) const {
+int OrganizerService::height(qint64 folderId) const {
     int tallest = 0;
-    for (const Folder& child : children(folder_id)) {
+    for (const Folder& child : children(folderId)) {
         tallest = std::max(tallest, height(child.id));
     }
     return 1 + tallest;
 }
 
-Result<void> OrganizerService::check_depth(qint64 parent_id, int tree_height) const {
-    if (depth(parent_id) + tree_height > MAX_DEPTH) {
+Result<void> OrganizerService::checkDepth(qint64 parentId, int treeHeight) const {
+    if (depth(parentId) + treeHeight > kMaxDepth) {
         return std::unexpected(
-            Error{QStringLiteral("Folders can be nested at most %1 levels deep.").arg(MAX_DEPTH)});
+            Error{QStringLiteral("Folders can be nested at most %1 levels deep.").arg(kMaxDepth)});
     }
     return {};
 }
 
-Result<void> OrganizerService::check_unique_folder_name(qint64 parent_id, const QString& name,
+Result<void> OrganizerService::checkUniqueFolderName(qint64 parentId, const QString& name,
                                                         std::optional<qint64> exclude) const {
     const QString key = name.toCaseFolded();
-    for (const Folder& sibling : children(parent_id)) {
+    for (const Folder& sibling : children(parentId)) {
         if (exclude && sibling.id == *exclude) {
             continue;
         }
@@ -187,9 +187,9 @@ Result<void> OrganizerService::check_unique_folder_name(qint64 parent_id, const 
     return {};
 }
 
-Result<QString> OrganizerService::check_tag(const QString& name, const QString& color,
+Result<QString> OrganizerService::checkTag(const QString& name, const QString& color,
                                             std::optional<qint64> exclude) const {
-    auto cleaned = clean_name(name, QStringLiteral("Tag"));
+    auto cleaned = cleanName(name, QStringLiteral("Tag"));
     if (!cleaned) {
         return std::unexpected(cleaned.error());
     }
@@ -202,43 +202,43 @@ Result<QString> OrganizerService::check_tag(const QString& name, const QString& 
             return std::unexpected(Error{QStringLiteral("A tag named \"%1\" already exists.").arg(*cleaned)});
         }
     }
-    static const QRegularExpression color_pattern(QStringLiteral(R"(\A#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\z)"));
-    if (!color_pattern.match(color).hasMatch()) {
+    static const QRegularExpression colorPattern(QStringLiteral(R"(\A#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\z)"));
+    if (!colorPattern.match(color).hasMatch()) {
         return std::unexpected(Error{QStringLiteral("\"%1\" is not a valid color (use #RRGGBB).").arg(color)});
     }
     return *cleaned;
 }
 
-Result<QString> OrganizerService::validate_new_folder(const QString& name, qint64 parent_id) const {
-    auto cleaned = clean_name(name, QStringLiteral("Folder"));
+Result<QString> OrganizerService::validateNewFolder(const QString& name, qint64 parentId) const {
+    auto cleaned = cleanName(name, QStringLiteral("Folder"));
     if (!cleaned) {
         return std::unexpected(cleaned.error());
     }
-    if (auto parent = find_folder(parent_id); !parent) {
+    if (auto parent = findFolder(parentId); !parent) {
         return std::unexpected(parent.error());
     }
-    if (auto fits = check_depth(parent_id, 1); !fits) {
+    if (auto fits = checkDepth(parentId, 1); !fits) {
         return std::unexpected(fits.error());
     }
-    if (auto unique = check_unique_folder_name(parent_id, *cleaned); !unique) {
+    if (auto unique = checkUniqueFolderName(parentId, *cleaned); !unique) {
         return std::unexpected(unique.error());
     }
     return *cleaned;
 }
 
-QSet<QString> OrganizerService::active_set() const {
-    const QStringList& active = active_uuids();
+QSet<QString> OrganizerService::activeSet() const {
+    const QStringList& active = activeUuids();
     return QSet<QString>(active.cbegin(), active.cend());
 }
 
 // ── Folders ──────────────────────────────────────────────────────────────────
 
-QCoro::Task<Result<Folder>> OrganizerService::create_folder(QString name, qint64 parent_id) {
-    auto cleaned = validate_new_folder(name, parent_id);
+QCoro::Task<Result<Folder>> OrganizerService::createFolder(QString name, qint64 parentId) {
+    auto cleaned = validateNewFolder(name, parentId);
     if (!cleaned) {
         co_return std::unexpected(cleaned.error());
     }
-    auto created = co_await db_.create_folder(parent_id, *cleaned);
+    auto created = co_await m_db.createFolder(parentId, *cleaned);
     if (!created) {
         co_return std::unexpected(created.error());
     }
@@ -248,13 +248,13 @@ QCoro::Task<Result<Folder>> OrganizerService::create_folder(QString name, qint64
     co_return *created;
 }
 
-QCoro::Task<Result<Folder>> OrganizerService::create_folder_from(QString name, QStringList package_ids,
-                                                                 qint64 parent_id) {
-    auto cleaned = validate_new_folder(name, parent_id);
+QCoro::Task<Result<Folder>> OrganizerService::createFolderFrom(QString name, QStringList packageIds,
+                                                                 qint64 parentId) {
+    auto cleaned = validateNewFolder(name, parentId);
     if (!cleaned) {
         co_return std::unexpected(cleaned.error());
     }
-    auto created = co_await db_.create_folder_with(parent_id, *cleaned, clean_package_ids(package_ids));
+    auto created = co_await m_db.createFolderWith(parentId, *cleaned, cleanPackageIds(packageIds));
     if (!created) {
         co_return std::unexpected(created.error());
     }
@@ -264,86 +264,86 @@ QCoro::Task<Result<Folder>> OrganizerService::create_folder_from(QString name, Q
     co_return *created;
 }
 
-QCoro::Task<Result<void>> OrganizerService::rename_folder(qint64 folder_id, QString name) {
-    auto existing = find_non_root(folder_id);
+QCoro::Task<Result<void>> OrganizerService::renameFolder(qint64 folderId, QString name) {
+    auto existing = findNonRoot(folderId);
     if (!existing) {
         co_return std::unexpected(existing.error());
     }
-    auto cleaned = clean_name(name, QStringLiteral("Folder"));
+    auto cleaned = cleanName(name, QStringLiteral("Folder"));
     if (!cleaned) {
         co_return std::unexpected(cleaned.error());
     }
     if (*cleaned == existing->name) {
         co_return {};
     }
-    const qint64 parent_id = existing->parent_id.value_or(ROOT_ID);
-    if (auto unique = check_unique_folder_name(parent_id, *cleaned, folder_id); !unique) {
+    const qint64 parentId = existing->parentId.value_or(kRootId);
+    if (auto unique = checkUniqueFolderName(parentId, *cleaned, folderId); !unique) {
         co_return std::unexpected(unique.error());
     }
-    if (auto renamed = co_await db_.rename_folder(folder_id, *cleaned); !renamed) {
+    if (auto renamed = co_await m_db.renameFolder(folderId, *cleaned); !renamed) {
         co_return std::unexpected(renamed.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::move_folder(qint64 folder_id, qint64 parent_id) {
-    auto folder = find_non_root(folder_id);
+QCoro::Task<Result<void>> OrganizerService::moveFolder(qint64 folderId, qint64 parentId) {
+    auto folder = findNonRoot(folderId);
     if (!folder) {
         co_return std::unexpected(folder.error());
     }
-    if (auto target = find_folder(parent_id); !target) {
+    if (auto target = findFolder(parentId); !target) {
         co_return std::unexpected(target.error());
     }
-    if (folder->parent_id == parent_id) {
+    if (folder->parentId == parentId) {
         co_return {};
     }
-    if (subtree_ids(folder_id).contains(parent_id)) {
+    if (subtreeIds(folderId).contains(parentId)) {
         co_return std::unexpected(Error{QStringLiteral("A folder cannot be moved into itself.")});
     }
     // The whole subtree moves, so its height counts against the depth limit.
-    if (auto fits = check_depth(parent_id, height(folder_id)); !fits) {
+    if (auto fits = checkDepth(parentId, height(folderId)); !fits) {
         co_return std::unexpected(fits.error());
     }
-    if (auto unique = check_unique_folder_name(parent_id, folder->name, folder_id); !unique) {
+    if (auto unique = checkUniqueFolderName(parentId, folder->name, folderId); !unique) {
         co_return std::unexpected(unique.error());
     }
-    if (auto moved = co_await db_.set_parent(folder_id, parent_id); !moved) {
+    if (auto moved = co_await m_db.setParent(folderId, parentId); !moved) {
         co_return std::unexpected(moved.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::set_collapsed(qint64 folder_id, bool collapsed) {
-    auto folder = find_folder(folder_id);
+QCoro::Task<Result<void>> OrganizerService::setCollapsed(qint64 folderId, bool collapsed) {
+    auto folder = findFolder(folderId);
     if (!folder) {
         co_return std::unexpected(folder.error());
     }
     if (folder->collapsed == collapsed) {
         co_return {};
     }
-    if (auto updated = co_await db_.set_collapsed(folder_id, collapsed); !updated) {
+    if (auto updated = co_await m_db.setCollapsed(folderId, collapsed); !updated) {
         co_return std::unexpected(updated.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::set_all_collapsed(bool collapsed) {
+QCoro::Task<Result<void>> OrganizerService::setAllCollapsed(bool collapsed) {
     const bool unchanged = std::all_of(state().folders.cbegin(), state().folders.cend(),
                                        [collapsed](const Folder& folder) { return folder.collapsed == collapsed; });
     if (unchanged) {
         co_return {};
     }
-    if (auto updated = co_await db_.set_all_collapsed(collapsed); !updated) {
+    if (auto updated = co_await m_db.setAllCollapsed(collapsed); !updated) {
         co_return std::unexpected(updated.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::delete_folder(qint64 folder_id) {
-    if (auto folder = find_non_root(folder_id); !folder) {
+QCoro::Task<Result<void>> OrganizerService::deleteFolder(qint64 folderId) {
+    if (auto folder = findNonRoot(folderId); !folder) {
         co_return std::unexpected(folder.error());
     }
-    if (auto deleted = co_await db_.delete_folder(folder_id); !deleted) {
+    if (auto deleted = co_await m_db.deleteFolder(folderId); !deleted) {
         co_return std::unexpected(deleted.error());
     }
     co_return co_await commit();
@@ -351,30 +351,30 @@ QCoro::Task<Result<void>> OrganizerService::delete_folder(qint64 folder_id) {
 
 // ── Placement ────────────────────────────────────────────────────────────────
 
-QCoro::Task<Result<void>> OrganizerService::place(QStringList package_ids, qint64 folder_id) {
-    if (auto folder = find_folder(folder_id); !folder) {
+QCoro::Task<Result<void>> OrganizerService::place(QStringList packageIds, qint64 folderId) {
+    if (auto folder = findFolder(folderId); !folder) {
         co_return std::unexpected(folder.error());
     }
-    const QStringList pids = clean_package_ids(package_ids);
+    const QStringList pids = cleanPackageIds(packageIds);
     if (pids.isEmpty()) {
         co_return {};
     }
-    if (auto placed = co_await db_.place(pids, folder_id); !placed) {
+    if (auto placed = co_await m_db.place(pids, folderId); !placed) {
         co_return std::unexpected(placed.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::ungroup(QStringList package_ids) {
-    co_return co_await place(std::move(package_ids), ROOT_ID);
+QCoro::Task<Result<void>> OrganizerService::ungroup(QStringList packageIds) {
+    co_return co_await place(std::move(packageIds), kRootId);
 }
 
-QCoro::Task<Result<void>> OrganizerService::reset_to_rules(QStringList package_ids) {
-    const QStringList pids = clean_package_ids(package_ids);
+QCoro::Task<Result<void>> OrganizerService::resetToRules(QStringList packageIds) {
+    const QStringList pids = cleanPackageIds(packageIds);
     if (pids.isEmpty()) {
         co_return {};
     }
-    if (auto unplaced = co_await db_.unplace(pids); !unplaced) {
+    if (auto unplaced = co_await m_db.unplace(pids); !unplaced) {
         co_return std::unexpected(unplaced.error());
     }
     co_return co_await commit();
@@ -382,12 +382,12 @@ QCoro::Task<Result<void>> OrganizerService::reset_to_rules(QStringList package_i
 
 // ── Tags ─────────────────────────────────────────────────────────────────────
 
-QCoro::Task<Result<Tag>> OrganizerService::create_tag(QString name, QString color) {
-    auto cleaned = check_tag(name, color);
+QCoro::Task<Result<Tag>> OrganizerService::createTag(QString name, QString color) {
+    auto cleaned = checkTag(name, color);
     if (!cleaned) {
         co_return std::unexpected(cleaned.error());
     }
-    auto created = co_await db_.create_tag(*cleaned, color);
+    auto created = co_await m_db.createTag(*cleaned, color);
     if (!created) {
         co_return std::unexpected(created.error());
     }
@@ -397,45 +397,45 @@ QCoro::Task<Result<Tag>> OrganizerService::create_tag(QString name, QString colo
     co_return *created;
 }
 
-QCoro::Task<Result<void>> OrganizerService::update_tag(qint64 tag_id, QString name, QString color) {
-    if (auto tag = find_tag(tag_id); !tag) {
+QCoro::Task<Result<void>> OrganizerService::updateTag(qint64 tagId, QString name, QString color) {
+    if (auto tag = findTag(tagId); !tag) {
         co_return std::unexpected(tag.error());
     }
-    auto cleaned = check_tag(name, color, tag_id);
+    auto cleaned = checkTag(name, color, tagId);
     if (!cleaned) {
         co_return std::unexpected(cleaned.error());
     }
-    if (auto updated = co_await db_.update_tag(tag_id, *cleaned, color); !updated) {
+    if (auto updated = co_await m_db.updateTag(tagId, *cleaned, color); !updated) {
         co_return std::unexpected(updated.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::delete_tag(qint64 tag_id) {
-    if (auto tag = find_tag(tag_id); !tag) {
+QCoro::Task<Result<void>> OrganizerService::deleteTag(qint64 tagId) {
+    if (auto tag = findTag(tagId); !tag) {
         co_return std::unexpected(tag.error());
     }
-    if (auto deleted = co_await db_.delete_tag(tag_id); !deleted) {
+    if (auto deleted = co_await m_db.deleteTag(tagId); !deleted) {
         co_return std::unexpected(deleted.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<void>> OrganizerService::set_mod_tags(QStringList package_ids, QSet<qint64> add,
+QCoro::Task<Result<void>> OrganizerService::setModTags(QStringList packageIds, QSet<qint64> add,
                                                          QSet<qint64> remove) {
-    const QStringList pids = clean_package_ids(package_ids);
+    const QStringList pids = cleanPackageIds(packageIds);
     if (add.intersects(remove)) {
         co_return std::unexpected(Error{QStringLiteral("A tag cannot be added and removed at once.")});
     }
-    for (qint64 tag_id : add | remove) {
-        if (auto tag = find_tag(tag_id); !tag) {
+    for (qint64 tagId : add | remove) {
+        if (auto tag = findTag(tagId); !tag) {
             co_return std::unexpected(tag.error());
         }
     }
     if (pids.isEmpty() || (add.isEmpty() && remove.isEmpty())) {
         co_return {};
     }
-    if (auto updated = co_await db_.set_mod_tags(pids, add, remove); !updated) {
+    if (auto updated = co_await m_db.setModTags(pids, add, remove); !updated) {
         co_return std::unexpected(updated.error());
     }
     co_return co_await commit();
@@ -443,7 +443,7 @@ QCoro::Task<Result<void>> OrganizerService::set_mod_tags(QStringList package_ids
 
 // ── Rules ────────────────────────────────────────────────────────────────────
 
-QCoro::Task<Result<void>> OrganizerService::set_rules(QList<RuleSpec> specs) {
+QCoro::Task<Result<void>> OrganizerService::setRules(QList<RuleSpec> specs) {
     QList<RuleSpec> cleaned;
     cleaned.reserve(specs.size());
     for (RuleSpec spec : specs) {
@@ -451,21 +451,21 @@ QCoro::Task<Result<void>> OrganizerService::set_rules(QList<RuleSpec> specs) {
         if (spec.pattern.isEmpty()) {
             co_return std::unexpected(Error{QStringLiteral("Rule pattern cannot be empty.")});
         }
-        if (spec.folder_id == ROOT_ID) {
+        if (spec.folderId == kRootId) {
             co_return std::unexpected(Error{QStringLiteral("Rules must target a folder, not the root.")});
         }
-        if (auto target = find_folder(spec.folder_id); !target) {
+        if (auto target = findFolder(spec.folderId); !target) {
             co_return std::unexpected(target.error());
         }
         cleaned.append(std::move(spec));
     }
-    if (auto replaced = co_await db_.replace_rules(cleaned); !replaced) {
+    if (auto replaced = co_await m_db.replaceRules(cleaned); !replaced) {
         co_return std::unexpected(replaced.error());
     }
     co_return co_await commit();
 }
 
-QCoro::Task<Result<int>> OrganizerService::add_standard_rules() {
+QCoro::Task<Result<int>> OrganizerService::addStandardRules() {
     // (field, op, casefolded pattern) identifies a rule regardless of folder or position.
     using RuleKey = std::tuple<int, int, QString>;
     std::set<RuleKey> present;
@@ -474,14 +474,14 @@ QCoro::Task<Result<int>> OrganizerService::add_standard_rules() {
     }
 
     QSet<QString> existing;
-    for (const Folder& folder : children(ROOT_ID)) {
+    for (const Folder& folder : children(kRootId)) {
         existing.insert(folder.name.toCaseFolded());
     }
 
     QList<StandardRule> rules;
-    QStringList new_folders;
-    QSet<QString> new_folder_keys;
-    for (const StandardRule& rule : standard_rules()) {
+    QStringList newFolders;
+    QSet<QString> newFolderKeys;
+    for (const StandardRule& rule : standardRules()) {
         const RuleKey key{static_cast<int>(rule.field), static_cast<int>(rule.op), rule.pattern.toCaseFolded()};
         if (present.contains(key)) {
             continue;
@@ -489,16 +489,16 @@ QCoro::Task<Result<int>> OrganizerService::add_standard_rules() {
         present.insert(key);
         rules.append(rule);
         // The first spelling of a missing top-level folder names it, as in the legacy service.
-        const QString folder_key = rule.folder.toCaseFolded();
-        if (!existing.contains(folder_key) && !new_folder_keys.contains(folder_key)) {
-            new_folder_keys.insert(folder_key);
-            new_folders.append(rule.folder);
+        const QString folderKey = rule.folder.toCaseFolded();
+        if (!existing.contains(folderKey) && !newFolderKeys.contains(folderKey)) {
+            newFolderKeys.insert(folderKey);
+            newFolders.append(rule.folder);
         }
     }
     if (rules.isEmpty()) {
         co_return 0;
     }
-    if (auto appended = co_await db_.append_named_rules(ROOT_ID, new_folders, rules); !appended) {
+    if (auto appended = co_await m_db.appendNamedRules(kRootId, newFolders, rules); !appended) {
         co_return std::unexpected(appended.error());
     }
     if (auto committed = co_await commit(); !committed) {
@@ -510,19 +510,19 @@ QCoro::Task<Result<int>> OrganizerService::add_standard_rules() {
 // ── Read helpers ─────────────────────────────────────────────────────────────
 
 FolderNode OrganizerService::tree(const std::optional<TreeQuery>& query) const {
-    return build_tree(state(), all_mods(), active_set(), query);
+    return buildTree(state(), allMods(), activeSet(), query);
 }
 
-Result<QStringList> OrganizerService::folder_mod_uuids(qint64 folder_id, bool recursive) const {
-    if (auto folder = find_folder(folder_id); !folder) {
+Result<QStringList> OrganizerService::folderModUuids(qint64 folderId, bool recursive) const {
+    if (auto folder = findFolder(folderId); !folder) {
         return std::unexpected(folder.error());
     }
     const FolderNode root = tree();
     for (const FolderNode* node : root.walk()) {
-        if (node->folder.id != folder_id) {
+        if (node->folder.id != folderId) {
             continue;
         }
-        const QList<ModLeaf> leaves = recursive ? node->all_mods() : node->mods;
+        const QList<ModLeaf> leaves = recursive ? node->allMods() : node->mods;
         QStringList uuids;
         for (const ModLeaf& leaf : leaves) {
             uuids.append(leaf.uuid);
@@ -532,22 +532,22 @@ Result<QStringList> OrganizerService::folder_mod_uuids(qint64 folder_id, bool re
     return QStringList{};
 }
 
-Result<FolderToggle> OrganizerService::folder_toggle(qint64 folder_id, bool recursive) const {
-    if (auto folder = find_folder(folder_id); !folder) {
+Result<FolderToggle> OrganizerService::folderToggle(qint64 folderId, bool recursive) const {
+    if (auto folder = findFolder(folderId); !folder) {
         return std::unexpected(folder.error());
     }
     const FolderNode root = tree();
     for (const FolderNode* node : root.walk()) {
-        if (node->folder.id != folder_id) {
+        if (node->folder.id != folderId) {
             continue;
         }
-        const QList<ModLeaf> leaves = recursive ? node->all_mods() : node->mods;
+        const QList<ModLeaf> leaves = recursive ? node->allMods() : node->mods;
         QStringList uuids;
         for (const ModLeaf& leaf : leaves) {
             uuids.append(leaf.uuid);
         }
-        const CheckState check = recursive ? node->check : node->own_check();
-        if (check == CheckState::On) {
+        const CheckState check = recursive ? node->check : node->ownCheck();
+        if (check == CheckState::kOn) {
             return FolderToggle{QStringList{}, uuids};
         }
         return FolderToggle{uuids, QStringList{}};
@@ -555,21 +555,21 @@ Result<FolderToggle> OrganizerService::folder_toggle(qint64 folder_id, bool recu
     return FolderToggle{};
 }
 
-Result<QSet<qint64>> OrganizerService::folder_move_targets(qint64 folder_id) const {
-    auto folder = find_non_root(folder_id);
+Result<QSet<qint64>> OrganizerService::folderMoveTargets(qint64 folderId) const {
+    auto folder = findNonRoot(folderId);
     if (!folder) {
         return std::unexpected(folder.error());
     }
-    const QSet<qint64> subtree = subtree_ids(folder_id);
-    const int tree_height = height(folder_id);
+    const QSet<qint64> subtree = subtreeIds(folderId);
+    const int treeHeight = height(folderId);
     const QString key = folder->name.toCaseFolded();
 
     QSet<qint64> targets;
     for (const Folder& candidate : state().folders) {
-        if (subtree.contains(candidate.id) || candidate.id == folder->parent_id) {
+        if (subtree.contains(candidate.id) || candidate.id == folder->parentId) {
             continue;
         }
-        if (depth(candidate.id) + tree_height > MAX_DEPTH) {
+        if (depth(candidate.id) + treeHeight > kMaxDepth) {
             continue;
         }
         const QList<Folder> siblings = children(candidate.id);
@@ -582,8 +582,8 @@ Result<QSet<qint64>> OrganizerService::folder_move_targets(qint64 folder_id) con
     return targets;
 }
 
-QList<TreeFilter> OrganizerService::tree_filters() const {
-    return organizer::tree_filters(all_mods(), active_set(), &state());
+QList<TreeFilter> OrganizerService::treeFilters() const {
+    return organizer::treeFilters(allMods(), activeSet(), &state());
 }
 
 }  // namespace px::modrim::organizer

@@ -64,8 +64,8 @@ protected:
     virtual Result<void> commit(const QJsonObject& merged) = 0;
 
 private:
-    QVariantMap initial_;
-    QVariantMap draft_;
+    QVariantMap m_initial;
+    QVariantMap m_draft;
 };
 
 // Edits a PluginConfig<T>. Keys and values follow T's JSON layout.
@@ -73,7 +73,7 @@ template <class T>
 class PluginConfigSection : public PluginConfigSectionBase {
 public:
     PluginConfigSection(PluginConfig<T>& config, QObject* parent)
-        : PluginConfigSectionBase(toVariantMap(config.value()), parent), config_(config) {}
+        : PluginConfigSectionBase(toVariantMap(config.value()), parent), m_config(config) {}
 
 protected:
     Result<void> commit(const QJsonObject& merged) override {
@@ -82,7 +82,7 @@ protected:
         if (auto error = glz::read<kJsonReadOpts>(value, text)) {
             return std::unexpected(Error{QString::fromStdString(glz::format_error(error, text))});
         }
-        config_.update(std::move(value));
+        m_config.update(std::move(value));
         return {};
     }
 
@@ -96,7 +96,7 @@ private:
         return QJsonDocument::fromJson(QByteArray::fromStdString(*text)).object().toVariantMap();
     }
 
-    PluginConfig<T>& config_;
+    PluginConfig<T>& m_config;
 };
 
 }  // namespace px::modrim

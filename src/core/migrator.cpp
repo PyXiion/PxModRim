@@ -24,12 +24,12 @@ Result<void> execute(QSqlDatabase& db, const QString& sql) {
 // QSqlQuery runs one statement per exec, so a schema script is split first.
 // Semicolons inside string literals, quoted identifiers, and comments do not split.
 // CREATE TRIGGER bodies are not recognised: their inner semicolons split and fail.
-QStringList split_statements(const QString& script) {
+QStringList splitStatements(const QString& script) {
     QStringList statements;
     QString current;
     QChar quote;
-    bool in_line_comment = false;
-    bool in_block_comment = false;
+    bool inLineComment = false;
+    bool inBlockComment = false;
 
     const auto flush = [&statements](QString& text) {
         if (const QString statement = text.trimmed(); !statement.isEmpty()) {
@@ -42,11 +42,11 @@ QStringList split_statements(const QString& script) {
         const QChar c = script[i];
         const QChar next = i + 1 < script.size() ? script[i + 1] : QChar();
         current.append(c);
-        if (in_line_comment) {
-            in_line_comment = c != u'\n';
-        } else if (in_block_comment) {
+        if (inLineComment) {
+            inLineComment = c != u'\n';
+        } else if (inBlockComment) {
             if (c == u'*' && next == u'/') {
-                in_block_comment = false;
+                inBlockComment = false;
                 current.append(next);
                 ++i;
             }
@@ -60,9 +60,9 @@ QStringList split_statements(const QString& script) {
                 }
             }
         } else if (c == u'-' && next == u'-') {
-            in_line_comment = true;
+            inLineComment = true;
         } else if (c == u'/' && next == u'*') {
-            in_block_comment = true;
+            inBlockComment = true;
             current.append(next);
             ++i;
         } else if (c == u'\'' || c == u'"' || c == u'`') {
@@ -75,8 +75,8 @@ QStringList split_statements(const QString& script) {
     return statements;
 }
 
-Result<void> execute_script(QSqlDatabase& db, const QString& script) {
-    for (const auto& statement : split_statements(script)) {
+Result<void> executeScript(QSqlDatabase& db, const QString& script) {
+    for (const auto& statement : splitStatements(script)) {
         if (auto applied = execute(db, statement); !applied) {
             return applied;
         }
@@ -84,7 +84,7 @@ Result<void> execute_script(QSqlDatabase& db, const QString& script) {
     return {};
 }
 
-Result<int> user_version(QSqlDatabase& db) {
+Result<int> userVersion(QSqlDatabase& db) {
     QSqlQuery query(db);
     if (!query.exec(QStringLiteral("PRAGMA user_version"))) {
         return std::unexpected(Error{query.lastError().text()});
@@ -93,7 +93,7 @@ Result<int> user_version(QSqlDatabase& db) {
 }
 
 // `path` with its last suffix replaced, as Python's Path.with_suffix does.
-QString with_suffix(const QString& path, const QString& suffix) {
+QString withSuffix(const QString& path, const QString& suffix) {
     const QFileInfo info(path);
     const QString name = info.fileName();
     const qsizetype dot = name.lastIndexOf(u'.');
@@ -103,15 +103,15 @@ QString with_suffix(const QString& path, const QString& suffix) {
 
 }  // namespace
 
-Result<void> ensure_schema(QSqlDatabase& db, const QString& schema_sql, int schema_version,
-                           const MigrationSteps& steps, const std::optional<QString>& backup_path,
+Result<void> ensureSchema(QSqlDatabase& db, const QString& schemaSql, int schemaVersion,
+                           const MigrationSteps& steps, const std::optional<QString>& backupPath,
                            const QString& label) {
-    auto current_version = user_version(db);
-    if (!current_version) {
-        return std::unexpected(current_version.error());
+    auto currentVersion = userVersion(db);
+    if (!currentVersion) {
+        return std::unexpected(currentVersion.error());
     }
-    const int current = *current_version;
-    if (current >= schema_version) {
+    const int current = *currentVersion;
+    if (current >= schemaVersion) {
         return {};
     }
 
@@ -120,33 +120,33 @@ Result<void> ensure_schema(QSqlDatabase& db, const QString& schema_sql, int sche
     };
 
     if (current == 0) {
-        spdlog::info("Initializing {} (version {})", label.toStdString(), schema_version);
-        if (auto initialized = execute_script(db, schema_sql); !initialized) {
+        spdlog::info("Initializing {} (version {})", label.toStdString(), schemaVersion);
+        if (auto initialized = executeScript(db, schemaSql); !initialized) {
             return initialized;
         }
-        return stamp(schema_version);
+        return stamp(schemaVersion);
     }
 
-    spdlog::info("Migrating {} {} -> {}", label.toStdString(), current, schema_version);
-    if (backup_path) {
+    spdlog::info("Migrating {} {} -> {}", label.toStdString(), current, schemaVersion);
+    if (backupPath) {
         // Fold the WAL into the main file so the copy below is complete.
         if (auto checkpointed = execute(db, QStringLiteral("PRAGMA wal_checkpoint(FULL)")); !checkpointed) {
             return checkpointed;
         }
-        const QString backup = with_suffix(
-            *backup_path, QStringLiteral(".db.bak.%1").arg(QDateTime::currentSecsSinceEpoch()));
-        if (auto copied = copy_file_replacing(*backup_path, backup); !copied) {
+        const QString backup = withSuffix(
+            *backupPath, QStringLiteral(".db.bak.%1").arg(QDateTime::currentSecsSinceEpoch()));
+        if (auto copied = copyFileReplacing(*backupPath, backup); !copied) {
             return copied;
         }
     }
 
-    for (int target = current + 1; target <= schema_version; ++target) {
+    for (int target = current + 1; target <= schemaVersion; ++target) {
         if (!steps.contains(target)) {
             return std::unexpected(
                 Error{QStringLiteral("Missing migration step for target version %1").arg(target)});
         }
     }
-    for (int target = current + 1; target <= schema_version; ++target) {
+    for (int target = current + 1; target <= schemaVersion; ++target) {
         if (auto applied = steps.at(target)(); !applied) {
             return applied;
         }

@@ -107,7 +107,7 @@ QCoro::Task<void> teardown(px::modrim::AppContext& appContext, px::modrim::CoreC
 QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
     spdlog::info("Starting PxModRim");
 
-    px::modrim::ConfigService configService(px::modrim::config_dir());
+    px::modrim::ConfigService configService(px::modrim::configDir());
     px::modrim::AppConfigService appConfigService(configService);
     px::modrim::UiPrefsService uiPrefsService(configService);
 
@@ -126,7 +126,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
 
     if (cfg.paths.game.empty()) {
         spdlog::info("No game path in config, attempting auto-detect");
-        if (auto detected = px::modrim::detect_game_paths(); !detected.game.empty()) {
+        if (auto detected = px::modrim::detectGamePaths(); !detected.game.empty()) {
             cfg.paths = detected;
             if (auto saved = configService.save(QStringLiteral("config.json"), cfg); !saved) {
                 spdlog::warn("Cannot save detected game paths: {}", saved.error().message.toStdString());
@@ -135,7 +135,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
     }
 
     // Declared before the context, so it outlives the organizer service that holds it.
-    px::modrim::organizer::OrganizerDb organizerDb(px::modrim::organizer::db_path(configService.directory()));
+    px::modrim::organizer::OrganizerDb organizerDb(px::modrim::organizer::dbPath(configService.directory()));
     auto ctx = px::modrim::CoreContext::create(cfg, &configService);
     const QStringList downloaders = px::modrim::registerCorePlugins(*ctx, configService, organizerDb, disabled);
 
@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
     px::modrim::applyAppTheme(qtApp);
     qtApp.installEventFilter(new px::modrim::QuickPopupParenting(&qtApp));
 
-    configureLogging(QDir(px::modrim::config_dir()).filePath(QStringLiteral("logs")));
+    configureLogging(QDir(px::modrim::configDir()).filePath(QStringLiteral("logs")));
 
     if (const int smokeMs = smokeExitMs(); smokeMs > 0) {
         QTimer::singleShot(smokeMs, &qtApp, &QCoreApplication::quit);

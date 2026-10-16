@@ -26,18 +26,18 @@ struct ParsedVersion {
 };
 
 // Python's str.strip("-._ ") on both ends.
-QString strip_separators(QString text) {
-    constexpr QStringView separators = u"-._ ";
-    while (!text.isEmpty() && separators.contains(text.front())) {
+QString stripSeparators(QString text) {
+    constexpr QStringView kSeparators = u"-._ ";
+    while (!text.isEmpty() && kSeparators.contains(text.front())) {
         text.removeFirst();
     }
-    while (!text.isEmpty() && separators.contains(text.back())) {
+    while (!text.isEmpty() && kSeparators.contains(text.back())) {
         text.chop(1);
     }
     return text;
 }
 
-std::optional<ParsedVersion> split_version(const QString& text) {
+std::optional<ParsedVersion> splitVersion(const QString& text) {
     static const QRegularExpression pattern(QStringLiteral(R"(^v?([0-9]+(?:\.[0-9]+)*)([^+]*))"));
     const QRegularExpressionMatch match = pattern.match(text.trimmed());
     if (!match.hasMatch()) {
@@ -47,13 +47,13 @@ std::optional<ParsedVersion> split_version(const QString& text) {
     for (const QString& part : match.captured(1).split(u'.')) {
         parsed.numbers.push_back(part.toLongLong());
     }
-    parsed.suffix = strip_separators(match.captured(2)).toLower();
+    parsed.suffix = stripSeparators(match.captured(2)).toLower();
     return parsed;
 }
 
 // Orders two versions the way the legacy key did: padded numbers, then release over
 // pre-release, then the suffix text.
-int compare_versions(const ParsedVersion& a, const ParsedVersion& b) {
+int compareVersions(const ParsedVersion& a, const ParsedVersion& b) {
     const std::size_t width = std::max(a.numbers.size(), b.numbers.size());
     auto padded = [width](std::vector<qint64> numbers) {
         numbers.resize(width, 0);
@@ -79,7 +79,7 @@ struct ReplyDeleter {
     void operator()(QNetworkReply* reply) const { reply->deleteLater(); }
 };
 
-QString string_field(const QJsonObject& object, const char* key) {
+QString stringField(const QJsonObject& object, const char* key) {
     const QJsonValue value = object.value(QLatin1StringView(key));
     if (value.isString()) {
         return value.toString();
@@ -92,36 +92,36 @@ QString string_field(const QJsonObject& object, const char* key) {
 
 }  // namespace
 
-std::optional<std::vector<qint64>> parse_version(const QString& text) {
-    const auto parsed = split_version(text);
+std::optional<std::vector<qint64>> parseVersion(const QString& text) {
+    const auto parsed = splitVersion(text);
     if (!parsed) {
         return std::nullopt;
     }
     return parsed->numbers;
 }
 
-bool is_newer(const QString& tag, const QString& current) {
-    const auto latest = split_version(tag);
-    const auto running = split_version(current);
+bool isNewer(const QString& tag, const QString& current) {
+    const auto latest = splitVersion(tag);
+    const auto running = splitVersion(current);
     if (!latest || !running) {
         return false;
     }
-    return compare_versions(*latest, *running) > 0;
+    return compareVersions(*latest, *running) > 0;
 }
 
-UpdateService::UpdateService(QString current_version, QNetworkAccessManager& network,
-                             QString release_url)
-    : current_(std::move(current_version)),
-      network_(network),
-      release_url_(std::move(release_url)) {}
+UpdateService::UpdateService(QString currentVersion, QNetworkAccessManager& network,
+                             QString releaseUrl)
+    : m_current(std::move(currentVersion)),
+      m_network(network),
+      m_releaseUrl(std::move(releaseUrl)) {}
 
 QCoro::Task<Result<std::optional<ReleaseInfo>>> UpdateService::check() {
-    QNetworkRequest request{QUrl(release_url_)};
+    QNetworkRequest request{QUrl(m_releaseUrl)};
     request.setRawHeader("Accept", "application/vnd.github+json");
-    request.setRawHeader("User-Agent", QStringLiteral("PxModRim/%1").arg(current_).toUtf8());
+    request.setRawHeader("User-Agent", QStringLiteral("PxModRim/%1").arg(m_current).toUtf8());
     request.setTransferTimeout(kTransferTimeoutMs);
 
-    QNetworkReply* pending = network_.get(request);
+    QNetworkReply* pending = m_network.get(request);
     std::unique_ptr<QNetworkReply, ReplyDeleter> reply(pending);
     co_await pending;
 
@@ -130,7 +130,7 @@ QCoro::Task<Result<std::optional<ReleaseInfo>>> UpdateService::check() {
         co_return std::unexpected(Error{reply->errorString()});
     }
     if (status < 200 || status >= 300) {
-        co_return std::unexpected(Error{QStringLiteral("HTTP %1 from %2").arg(status).arg(release_url_)});
+        co_return std::unexpected(Error{QStringLiteral("HTTP %1 from %2").arg(status).arg(m_releaseUrl)});
     }
 
     const QByteArray body = reply->readAll();
@@ -144,23 +144,23 @@ QCoro::Task<Result<std::optional<ReleaseInfo>>> UpdateService::check() {
     }
 
     const QJsonObject data = document.object();
-    const QString tag = string_field(data, "tag_name");
-    const QString url = string_field(data, "html_url");
+    const QString tag = stringField(data, "tag_name");
+    const QString url = stringField(data, "html_url");
     if (tag.isEmpty() || url.isEmpty()) {
         co_return std::unexpected(Error{QStringLiteral("Latest release response lacks tag_name/html_url")});
     }
-    if (!is_newer(tag, current_)) {
-        spdlog::debug("No update: latest {} vs running {}", tag.toStdString(), current_.toStdString());
+    if (!isNewer(tag, m_current)) {
+        spdlog::debug("No update: latest {} vs running {}", tag.toStdString(), m_current.toStdString());
         co_return std::optional<ReleaseInfo>{};
     }
 
-    spdlog::info("Update available: {} (running {})", tag.toStdString(), current_.toStdString());
-    QString name = string_field(data, "name");
+    spdlog::info("Update available: {} (running {})", tag.toStdString(), m_current.toStdString());
+    QString name = stringField(data, "name");
     if (name.isEmpty()) {
         name = tag;
     }
     co_return std::optional<ReleaseInfo>(
-        ReleaseInfo{tag, name, string_field(data, "body"), url});
+        ReleaseInfo{tag, name, stringField(data, "body"), url});
 }
 
 }  // namespace px::modrim::services

@@ -10,9 +10,9 @@ public:
     // `gamePath` is the RimWorld install root; `Data/` is resolved inside it.
     explicit CoreModProvider(QString gamePath, MetadataCacheStore* metadataCache = nullptr);
 
-    QCoro::Task<Result<ModMap>> discover(QString target_version, Profiler* timer = nullptr,
-                                         MetadataCacheStore* metadata_cache = nullptr,
-                                         bool force_reparse = false) override;
+    QCoro::Task<Result<ModMap>> discover(QString targetVersion, Profiler* timer = nullptr,
+                                         MetadataCacheStore* metadataCache = nullptr,
+                                         bool forceReparse = false) override;
 };
 
 }  // namespace px::modrim::providers

@@ -11,32 +11,32 @@
 namespace px::modrim {
 
 DownloadSidebar::DownloadSidebar(QQmlEngine* engine, QWidget* parent)
-    : QWidget(parent), model_(new DownloadQueueModel(this)), qml_(new QQuickWidget(engine, this)) {
+    : QWidget(parent), m_model(new DownloadQueueModel(this)), m_qml(new QQuickWidget(engine, this)) {
     setObjectName(QStringLiteral("downloadSidebar"));
-    setFixedWidth(SIDEBAR_WIDTH);
+    setFixedWidth(kSidebarWidth);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    qml_->setClearColor(paletteColor(QStringLiteral("ELEVATE_2")));
-    qml_->rootContext()->setContextProperty(QStringLiteral("downloadSidebar"), this);
-    qml_->rootContext()->setContextProperty(QStringLiteral("downloadQueueModel"), model_);
-    qml_->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/DownloadSidebar.qml")));
-    layout->addWidget(qml_);
+    m_qml->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    m_qml->setClearColor(paletteColor(QStringLiteral("ELEVATE_2")));
+    m_qml->rootContext()->setContextProperty(QStringLiteral("downloadSidebar"), this);
+    m_qml->rootContext()->setContextProperty(QStringLiteral("downloadQueueModel"), m_model);
+    m_qml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/DownloadSidebar.qml")));
+    layout->addWidget(m_qml);
 }
 
-void DownloadSidebar::downloadRequested() { emit download_requested(); }
-void DownloadSidebar::stopRequested() { emit stop_requested(); }
-void DownloadSidebar::removeItem(const QString& id) { emit item_removed(id); }
-void DownloadSidebar::clearQueue() { emit clear_requested(); }
-void DownloadSidebar::set_download_enabled(bool enabled) {
-    if (auto* root = qml_->rootObject()) root->setProperty("downloadEnabled", enabled);
+void DownloadSidebar::downloadRequested() { emit downloadTriggered(); }
+void DownloadSidebar::stopRequested() { emit stopTriggered(); }
+void DownloadSidebar::removeItem(const QString& id) { emit itemRemoved(id); }
+void DownloadSidebar::clearQueue() { emit clearRequested(); }
+void DownloadSidebar::setDownloadEnabled(bool enabled) {
+    if (auto* root = m_qml->rootObject()) root->setProperty("downloadEnabled", enabled);
 }
-void DownloadSidebar::sync_from(const CheckedDownloads& checked, const QHash<QString, QString>& statuses) {
-    model_->sync_from(checked, statuses);
+void DownloadSidebar::syncFrom(const CheckedDownloads& checked, const QHash<QString, QString>& statuses) {
+    m_model->syncFrom(checked, statuses);
 }
-void DownloadSidebar::update_status(const QString& id, const QString& status, qint64 done, qint64 total) {
-    model_->update_status(id, status, done, total);
+void DownloadSidebar::updateStatus(const QString& id, const QString& status, qint64 done, qint64 total) {
+    m_model->updateStatus(id, status, done, total);
 }
 
 }  // namespace px::modrim

@@ -33,7 +33,7 @@ TEST_CASE("loading state reports the innermost frame and pops back to its parent
     {
         auto outer = state.task(QStringLiteral("outer"), 4);
         REQUIRE(state.statuses() == QStringList{"outer"});
-        state.set_progress(1);
+        state.setProgress(1);
         {
             auto inner = state.task(QStringLiteral("inner"));
             REQUIRE(state.statuses() == QStringList{"outer", "inner"});
@@ -56,7 +56,7 @@ TEST_CASE("percent truncates the float quotient, as the legacy progress did") {
                          emissions.append(Emission{status, pct, current, total});
                      });
     state.push(QStringLiteral("p"), 100);
-    state.set_progress(29);
+    state.setProgress(29);
     REQUIRE(emissions.last() == Emission{QStringLiteral("p"), 28, 29, 100});
 }
 
@@ -68,11 +68,11 @@ TEST_CASE("set_total clamps to at least one step and progress stays within bound
                          emissions.append(Emission{status, pct, current, total});
                      });
     state.push(QStringLiteral("t"), 10);
-    state.set_total(0);
+    state.setTotal(0);
     REQUIRE(emissions.last() == Emission{QStringLiteral("t"), 0, 0, 1});
-    state.set_progress(50);
+    state.setProgress(50);
     REQUIRE(emissions.last() == Emission{QStringLiteral("t"), 100, 1, 1});
-    state.set_progress(-5);
+    state.setProgress(-5);
     REQUIRE(emissions.last() == Emission{QStringLiteral("t"), 0, 0, 1});
 }
 

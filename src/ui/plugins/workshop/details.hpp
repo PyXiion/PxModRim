@@ -13,9 +13,9 @@ struct Detail {
     bool operator==(const Detail&) const = default;
 };
 
-QCoro::Task<workshop::CatalogResult<Detail>> fetch_detail(
-    workshop::WorkshopCatalog& catalog, QString item_id, QString kind);
-QString incomplete_plan_notice(const workshop::DownloadPlan& plan);
-QString queued_notice(qsizetype count);
+QCoro::Task<workshop::CatalogResult<Detail>> fetchDetail(
+    workshop::WorkshopCatalog& catalog, QString itemId, QString kind);
+QString incompletePlanNotice(const workshop::DownloadPlan& plan);
+QString queuedNotice(qsizetype count);
 
 }  // namespace px::modrim::workshop

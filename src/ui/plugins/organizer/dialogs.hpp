@@ -26,7 +26,7 @@ public:
     QString textValue() const;
 
 private:
-    QLineEdit* edit_ = nullptr;
+    QLineEdit* m_edit = nullptr;
 };
 
 // Confirms deleting a folder. Its mods become ungrouped; load order is unchanged.
@@ -45,10 +45,10 @@ public:
                        const QString& verb = QStringLiteral("Move"));
 
     // The id of the highlighted folder. Only meaningful once the confirm button is enabled.
-    qint64 folder_id() const;
+    qint64 folderId() const;
 
 private:
-    QTreeWidget* tree_ = nullptr;
+    QTreeWidget* m_tree = nullptr;
 };
 
 }  // namespace px::modrim

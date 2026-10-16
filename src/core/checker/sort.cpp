@@ -16,53 +16,53 @@ using sort::Tier;
 
 // Dependency edges point from a mod to the mods that must load before it; load-before edges are
 // reversed so both shapes end up in the same map.
-std::pair<PackageGraph, PackageGraph> build_deps_and_rev_deps(const ConstraintGraph& graph,
-                                                              const QSet<PackageId>& all_pids) {
+std::pair<PackageGraph, PackageGraph> buildDepsAndRevDeps(const ConstraintGraph& graph,
+                                                              const QSet<PackageId>& allPids) {
     PackageGraph deps;
-    PackageGraph rev_deps;
-    for (const PackageId& pid : all_pids) {
+    PackageGraph revDeps;
+    for (const PackageId& pid : allPids) {
         deps.insert(pid, {});
-        rev_deps.insert(pid, {});
+        revDeps.insert(pid, {});
     }
 
     for (const PackageId& pid : graph.nodes()) {
-        if (!all_pids.contains(pid)) {
+        if (!allPids.contains(pid)) {
             continue;
         }
         for (const ConstraintEdge& edge : graph.outgoing(pid)) {
-            if (!all_pids.contains(edge.target)) {
+            if (!allPids.contains(edge.target)) {
                 continue;
             }
             switch (edge.type) {
-                case EdgeType::LoadBefore:
+                case EdgeType::kLoadBefore:
                     deps[edge.target].insert(pid);
-                    rev_deps[pid].insert(edge.target);
+                    revDeps[pid].insert(edge.target);
                     break;
-                case EdgeType::LoadAfter:
-                case EdgeType::Dependency:
+                case EdgeType::kLoadAfter:
+                case EdgeType::kDependency:
                     deps[pid].insert(edge.target);
-                    rev_deps[edge.target].insert(pid);
+                    revDeps[edge.target].insert(pid);
                     break;
-                case EdgeType::Incompatibility:
-                case EdgeType::Alternative:
+                case EdgeType::kIncompatibility:
+                case EdgeType::kAlternative:
                     break;
             }
         }
     }
 
-    return {std::move(deps), std::move(rev_deps)};
+    return {std::move(deps), std::move(revDeps)};
 }
 
 // Mods that community rules flag through `flag`, or none when community rules are disabled.
-QSet<PackageId> community_flagged(const sort::CommunityRules* rules,
-                                  const QSet<PackageId>& all_pids,
+QSet<PackageId> communityFlagged(const sort::CommunityRules* rules,
+                                  const QSet<PackageId>& allPids,
                                   const sort::SortSettings& settings,
                                   bool sort::CommunityRule::*flag) {
     QSet<PackageId> flagged;
     if (!settings.use_community_rules || rules == nullptr || rules->isEmpty()) {
         return flagged;
     }
-    for (const PackageId& pid : all_pids) {
+    for (const PackageId& pid : allPids) {
         const auto rule = rules->constFind(pid);
         if (rule != rules->cend() && rule.value().*flag) {
             flagged.insert(pid);
@@ -72,15 +72,15 @@ QSet<PackageId> community_flagged(const sort::CommunityRules* rules,
 }
 
 // Position of each package id in the tier config, so the user's explicit picks sort first.
-QHash<PackageId, int> build_config_priority(const sort::TierConfig& tier_config) {
+QHash<PackageId, int> buildConfigPriority(const sort::TierConfig& tierConfig) {
     QHash<PackageId, int> priority;
-    for (std::size_t i = 0; i < tier_config.tier_0.size(); ++i) {
-        priority.insert(tier_config.tier_0[i], static_cast<int>(i));
+    for (std::size_t i = 0; i < tierConfig.tier_0.size(); ++i) {
+        priority.insert(tierConfig.tier_0[i], static_cast<int>(i));
     }
     // Tier 1 and tier 3 only fill in ids that tier 0 did not already place, and they are
     // numbered after the earlier lists.
-    int base = static_cast<int>(tier_config.tier_0.size());
-    for (const auto* list : {&tier_config.tier_1, &tier_config.tier_3}) {
+    int base = static_cast<int>(tierConfig.tier_0.size());
+    for (const auto* list : {&tierConfig.tier_1, &tierConfig.tier_3}) {
         for (std::size_t i = 0; i < list->size(); ++i) {
             const PackageId& pid = (*list)[i];
             if (!priority.contains(pid)) {
@@ -98,13 +98,13 @@ struct SortKey {
     PackageId pid;
 };
 
-SortKey make_key(const PackageId& pid, const QHash<PackageId, int>& config_priority) {
-    return SortKey{config_priority.value(pid, static_cast<int>(config_priority.size())),
+SortKey makeKey(const PackageId& pid, const QHash<PackageId, int>& configPriority) {
+    return SortKey{configPriority.value(pid, static_cast<int>(configPriority.size())),
                    pid.str(),
                    pid};
 }
 
-bool key_less(const SortKey& a, const SortKey& b) {
+bool keyLess(const SortKey& a, const SortKey& b) {
     if (a.priority != b.priority) {
         return a.priority < b.priority;
     }
@@ -112,81 +112,81 @@ bool key_less(const SortKey& a, const SortKey& b) {
 }
 
 // Heap order that pops the smallest key first.
-bool key_greater(const SortKey& a, const SortKey& b) {
-    return key_less(b, a);
+bool keyGreater(const SortKey& a, const SortKey& b) {
+    return keyLess(b, a);
 }
 
 }  // namespace
 
-QList<PackageId> topological_sort(const QHash<PackageId, std::shared_ptr<AboutXmlMod>>& active_mods,
+QList<PackageId> topologicalSort(const QHash<PackageId, std::shared_ptr<AboutXmlMod>>& activeMods,
                                   const ConstraintGraph& graph,
                                   const sort::SortSettings& settings,
-                                  const sort::CommunityRules* community_rules,
+                                  const sort::CommunityRules* communityRules,
                                   Profiler* timer) {
     Profiler local;
     Profiler& t = timer != nullptr ? *timer : local;
 
-    const QSet<PackageId> all_pids(active_mods.keyBegin(), active_mods.keyEnd());
-    if (all_pids.isEmpty()) {
+    const QSet<PackageId> allPids(activeMods.keyBegin(), activeMods.keyEnd());
+    if (allPids.isEmpty()) {
         return {};
     }
 
     PackageGraph deps;
-    PackageGraph rev_deps;
+    PackageGraph revDeps;
     {
         auto scope = t("build_deps");
-        std::tie(deps, rev_deps) = build_deps_and_rev_deps(graph, all_pids);
+        std::tie(deps, revDeps) = buildDepsAndRevDeps(graph, allPids);
     }
-    QSet<PackageId> load_first;
+    QSet<PackageId> loadFirst;
     {
         auto scope = t("build_load_first");
-        load_first = community_flagged(community_rules,
-                                       all_pids,
+        loadFirst = communityFlagged(communityRules,
+                                       allPids,
                                        settings,
-                                       &sort::CommunityRule::load_first);
+                                       &sort::CommunityRule::loadFirst);
     }
-    QSet<PackageId> load_last;
+    QSet<PackageId> loadLast;
     {
         auto scope = t("build_load_last");
-        load_last = community_flagged(community_rules,
-                                      all_pids,
+        loadLast = communityFlagged(communityRules,
+                                      allPids,
                                       settings,
-                                      &sort::CommunityRule::load_last);
+                                      &sort::CommunityRule::loadLast);
     }
 
     QHash<PackageId, Tier> tiers;
     {
         auto scope = t("assign_tiers");
-        tiers = sort::assign_tiers(all_pids,
+        tiers = sort::assignTiers(allPids,
                                    deps,
-                                   rev_deps,
-                                   load_first,
-                                   load_last,
+                                   revDeps,
+                                   loadFirst,
+                                   loadLast,
                                    settings.tier_config);
     }
 
-    constexpr std::array<std::pair<Tier, const char*>, 4> tier_passes{{
-        {Tier::Tier0, "kahn_tier_0"},
-        {Tier::Tier1, "kahn_tier_1"},
-        {Tier::Tier2, "kahn_tier_2"},
-        {Tier::Tier3, "kahn_tier_3"},
+    constexpr std::array<std::pair<Tier, const char*>, 4> kTierPasses{{
+        {Tier::kTier0, "kahn_tier_0"},
+        {Tier::kTier1, "kahn_tier_1"},
+        {Tier::kTier2, "kahn_tier_2"},
+        {Tier::kTier3, "kahn_tier_3"},
     }};
-    const QHash<PackageId, int> config_priority = build_config_priority(settings.tier_config);
+    const QHash<PackageId, int> configPriority = buildConfigPriority(settings.tier_config);
 
     QList<PackageId> order;
     QSet<PackageId> ordered;
-    for (const auto& [tier, label] : tier_passes) {
-        QSet<PackageId> tier_pids;
-        for (const PackageId& pid : all_pids) {
+    for (const auto& [tier, label] : kTierPasses) {
+        QSet<PackageId> tierPids;
+        for (const PackageId& pid : allPids) {
             if (ordered.contains(pid)) {
                 continue;
             }
             const auto assigned = tiers.constFind(pid);
             if (assigned != tiers.cend() && assigned.value() == tier) {
-                tier_pids.insert(pid);
+                tierPids.insert(pid);
             }
         }
-        if (tier_pids.isEmpty()) {
+        if (tierPids.isEmpty()) {
             continue;
         }
 
@@ -196,25 +196,25 @@ QList<PackageId> topological_sort(const QHash<PackageId, std::shared_ptr<AboutXm
         // later tiers must not hold up this one.
         QHash<PackageId, int> indegree;
         QHash<PackageId, QSet<PackageId>> rev;
-        for (const PackageId& pid : tier_pids) {
-            QSet<PackageId> sub_deps = deps.value(pid);
-            sub_deps.intersect(tier_pids);
-            indegree.insert(pid, static_cast<int>(sub_deps.size()));
-            for (const PackageId& dep : sub_deps) {
+        for (const PackageId& pid : tierPids) {
+            QSet<PackageId> subDeps = deps.value(pid);
+            subDeps.intersect(tierPids);
+            indegree.insert(pid, static_cast<int>(subDeps.size()));
+            for (const PackageId& dep : subDeps) {
                 rev[dep].insert(pid);
             }
         }
 
         std::vector<SortKey> queue;
-        for (const PackageId& pid : tier_pids) {
+        for (const PackageId& pid : tierPids) {
             if (indegree.value(pid) == 0) {
-                queue.push_back(make_key(pid, config_priority));
+                queue.push_back(makeKey(pid, configPriority));
             }
         }
-        std::ranges::make_heap(queue, key_greater);
+        std::ranges::make_heap(queue, keyGreater);
 
         while (!queue.empty()) {
-            std::ranges::pop_heap(queue, key_greater);
+            std::ranges::pop_heap(queue, keyGreater);
             const PackageId pid = queue.back().pid;
             queue.pop_back();
             order.append(pid);
@@ -222,20 +222,20 @@ QList<PackageId> topological_sort(const QHash<PackageId, std::shared_ptr<AboutXm
 
             for (const PackageId& dependent : rev.value(pid)) {
                 if (--indegree[dependent] == 0) {
-                    queue.push_back(make_key(dependent, config_priority));
-                    std::ranges::push_heap(queue, key_greater);
+                    queue.push_back(makeKey(dependent, configPriority));
+                    std::ranges::push_heap(queue, keyGreater);
                 }
             }
         }
 
         // Whatever is left sits on a dependency cycle; keep it deterministic at the tier's end.
         std::vector<SortKey> remaining;
-        for (const PackageId& pid : tier_pids) {
+        for (const PackageId& pid : tierPids) {
             if (!ordered.contains(pid)) {
-                remaining.push_back(make_key(pid, config_priority));
+                remaining.push_back(makeKey(pid, configPriority));
             }
         }
-        std::ranges::sort(remaining, key_less);
+        std::ranges::sort(remaining, keyLess);
         for (const SortKey& key : remaining) {
             order.append(key.pid);
             ordered.insert(key.pid);

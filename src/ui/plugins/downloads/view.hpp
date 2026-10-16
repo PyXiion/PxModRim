@@ -19,15 +19,15 @@ public:
     Q_INVOKABLE QCoro::QmlTask retryFailed();
 
 private:
-    QCoro::Task<void> retry_failed();
-    DownloadManager& downloads_;
-    DownloadsModel* model_;
-    Event<QStringList>::Id batch_id_;
-    Event<DownloadItemStatus>::Id status_id_;
-    Event<DownloadItemTitle>::Id title_id_;
-    Event<QString>::Id phase_id_;
-    Event<DownloadResult>::Id finished_id_;
-    Event<bool>::Id busy_id_;
+    QCoro::Task<void> retryFailedAsync();
+    DownloadManager& m_downloads;
+    DownloadsModel* m_model;
+    Event<QStringList>::Id m_batchId;
+    Event<DownloadItemStatus>::Id m_statusId;
+    Event<DownloadItemTitle>::Id m_titleId;
+    Event<QString>::Id m_phaseId;
+    Event<DownloadResult>::Id m_finishedId;
+    Event<bool>::Id m_busyId;
 };
 
 }  // namespace px::modrim

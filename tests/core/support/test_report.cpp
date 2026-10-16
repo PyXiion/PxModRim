@@ -22,7 +22,7 @@ using namespace px::modrim;
 using namespace px::modrim::support;
 using px::modrim::Result;
 using test_support::TestApplication;
-using test_support::write_bytes;
+using test_support::writeBytes;
 
 namespace {
 
@@ -32,7 +32,7 @@ T wait(QCoro::Task<T> task) {
     return QCoro::waitFor(std::move(task));
 }
 
-void require_error(const Result<QString>& result, const QString& fragment) {
+void requireError(const Result<QString>& result, const QString& fragment) {
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().message.contains(fragment));
 }
@@ -41,38 +41,38 @@ void require_error(const Result<QString>& result, const QString& fragment) {
 // hit the client's timeout. The request is recorded for inspection.
 class CannedServer {
 public:
-    explicit CannedServer(QByteArray response) : response_(std::move(response)) {
-        REQUIRE(server_.listen(QHostAddress::LocalHost));
-        QObject::connect(&server_, &QTcpServer::newConnection, [this] { accept(); });
+    explicit CannedServer(QByteArray response) : m_response(std::move(response)) {
+        REQUIRE(m_server.listen(QHostAddress::LocalHost));
+        QObject::connect(&m_server, &QTcpServer::newConnection, [this] { accept(); });
     }
 
     QString url() const {
-        return QStringLiteral("http://127.0.0.1:%1/").arg(server_.serverPort());
+        return QStringLiteral("http://127.0.0.1:%1/").arg(m_server.serverPort());
     }
 
-    const QByteArray& request() const { return request_; }
+    const QByteArray& request() const { return m_request; }
 
 private:
     void accept() {
-        QTcpSocket* socket = server_.nextPendingConnection();
-        socket->setParent(&server_);
+        QTcpSocket* socket = m_server.nextPendingConnection();
+        socket->setParent(&m_server);
         QObject::connect(socket, &QTcpSocket::readyRead, socket, [this, socket] {
-            request_ += socket->readAll();
-            if (response_.isEmpty() || !complete(request_)) {
+            m_request += socket->readAll();
+            if (m_response.isEmpty() || !complete(m_request)) {
                 return;
             }
-            socket->write(response_);
+            socket->write(m_response);
             socket->disconnectFromHost();
         });
     }
 
     // True once the headers have arrived and the Content-Length body is complete.
     static bool complete(const QByteArray& raw) {
-        const qsizetype headers_end = raw.indexOf("\r\n\r\n");
-        if (headers_end < 0) {
+        const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
+        if (headersEnd < 0) {
             return false;
         }
-        const QByteArray headers = raw.left(headers_end).toLower();
+        const QByteArray headers = raw.left(headersEnd).toLower();
         const qsizetype key = headers.indexOf("content-length:");
         if (key < 0) {
             return true;
@@ -82,23 +82,23 @@ private:
             eol = headers.size();
         }
         const qint64 length = headers.mid(key + 15, eol - key - 15).trimmed().toLongLong();
-        return raw.size() - (headers_end + 4) >= length;
+        return raw.size() - (headersEnd + 4) >= length;
     }
 
-    QTcpServer server_;
-    QByteArray response_;
-    QByteArray request_;
+    QTcpServer m_server;
+    QByteArray m_response;
+    QByteArray m_request;
 };
 
-QByteArray http_response(const QByteArray& status_line, const QByteArray& body) {
-    return "HTTP/1.1 " + status_line + "\r\nContent-Type: text/plain\r\nContent-Length: " +
+QByteArray httpResponse(const QByteArray& statusLine, const QByteArray& body) {
+    return "HTTP/1.1 " + statusLine + "\r\nContent-Type: text/plain\r\nContent-Length: " +
            QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body;
 }
 
-ListedModPtr about_mod(const QString& name, const QString& package_id) {
+ListedModPtr aboutMod(const QString& name, const QString& packageId) {
     auto mod = std::make_shared<AboutXmlMod>();
     mod->name = name;
-    mod->package_id = CaseInsensitiveStr(package_id);
+    mod->packageId = CaseInsensitiveStr(packageId);
     return mod;
 }
 
@@ -154,7 +154,7 @@ TEST_CASE("read_log_tail reports a missing file") {
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
     const QString content =
-        read_log_tail(QDir(dir.path()).filePath(QStringLiteral("does_not_exist.log")));
+        readLogTail(QDir(dir.path()).filePath(QStringLiteral("does_not_exist.log")));
     CHECK(content.contains(QStringLiteral("<no log file found>")));
 }
 
@@ -162,8 +162,8 @@ TEST_CASE("read_log_tail reports an empty file") {
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
     const QString path = QDir(dir.path()).filePath(QStringLiteral("empty.log"));
-    REQUIRE(write_bytes(path, ""));
-    CHECK(read_log_tail(path).contains(QStringLiteral("<empty log file>")));
+    REQUIRE(writeBytes(path, ""));
+    CHECK(readLogTail(path).contains(QStringLiteral("<empty log file>")));
 }
 
 TEST_CASE("read_log_tail returns a small file unchanged") {
@@ -171,21 +171,21 @@ TEST_CASE("read_log_tail returns a small file unchanged") {
     REQUIRE(dir.isValid());
     const QString path = QDir(dir.path()).filePath(QStringLiteral("app.log"));
     const char* text = "Line 1\nLine 2\nLine 3\n";
-    REQUIRE(write_bytes(path, text));
-    CHECK(read_log_tail(path) == QString::fromLatin1(text));
+    REQUIRE(writeBytes(path, text));
+    CHECK(readLogTail(path) == QString::fromLatin1(text));
 }
 
 TEST_CASE("read_log_tail unpacks loguru JSON records") {
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
     const QString path = QDir(dir.path()).filePath(QStringLiteral("json.log"));
-    REQUIRE(write_bytes(path,
+    REQUIRE(writeBytes(path,
                         R"({"text": "2026-09-28 | INFO | Loaded mods\n", "record": {"id": 1}})"
                         "\n"
                         "Plain log line\n"
                         R"({"text": "2026-09-28 | INFO | Ready\n", "record": {"id": 2}})"
                         "\n"));
-    const QString content = read_log_tail(path);
+    const QString content = readLogTail(path);
     CHECK(content == QStringLiteral("2026-09-28 | INFO | Loaded mods\n"
                                     "Plain log line\n"
                                     "2026-09-28 | INFO | Ready\n"));
@@ -200,9 +200,9 @@ TEST_CASE("read_log_tail keeps the end of a large file and adds a banner") {
     for (int i = 0; i < 200; ++i) {
         lines.append(QStringLiteral("Log record number %1 with some extra padding").arg(i, 4, 10, QLatin1Char('0')));
     }
-    REQUIRE(write_bytes(path, lines.join(QLatin1Char('\n')).toStdString()));
+    REQUIRE(writeBytes(path, lines.join(QLatin1Char('\n')).toStdString()));
 
-    const QString content = read_log_tail(path, 200);
+    const QString content = readLogTail(path, 200);
     CHECK(content.startsWith(QStringLiteral("[... truncated, showing last ")));
     CHECK(content.contains(QStringLiteral(" of ")));
     CHECK(content.contains(QStringLiteral("Log record number 0199")));
@@ -211,31 +211,31 @@ TEST_CASE("read_log_tail keeps the end of a large file and adds a banner") {
 
 TEST_CASE("build_report contains every section with active mods in load order") {
     TestApplication app;
-    QTemporaryDir home_dir;
-    REQUIRE(home_dir.isValid());
-    QTemporaryDir log_dir;
-    REQUIRE(log_dir.isValid());
+    QTemporaryDir homeDir;
+    REQUIRE(homeDir.isValid());
+    QTemporaryDir logDir;
+    REQUIRE(logDir.isValid());
 
-    const QString home = QDir(home_dir.path()).filePath(QStringLiteral("home/testuser"));
+    const QString home = QDir(homeDir.path()).filePath(QStringLiteral("home/testuser"));
     REQUIRE(QDir().mkpath(home));
 
     ReportSource source;
-    source.game_version = QStringLiteral("1.5.4243");
+    source.gameVersion = QStringLiteral("1.5.4243");
     source.paths.game = QDir(home).filePath(QStringLiteral("Games/RimWorld")).toStdString();
     source.paths.config_folder = QDir(home).filePath(QStringLiteral(".config/unity3d")).toStdString();
     source.paths.local = QDir(home).filePath(QStringLiteral("Games/RimWorld/Mods")).toStdString();
-    source.all_mods = {
-        {QStringLiteral("u1"), about_mod(QStringLiteral("Harmony"), QStringLiteral("brrainz.harmony"))},
-        {QStringLiteral("u2"), about_mod(QStringLiteral("Core"), QStringLiteral("ludeon.rimworld"))},
-        {QStringLiteral("u3"), about_mod(QStringLiteral("Royalty"), QStringLiteral("ludeon.rimworld.royalty"))},
+    source.allMods = {
+        {QStringLiteral("u1"), aboutMod(QStringLiteral("Harmony"), QStringLiteral("brrainz.harmony"))},
+        {QStringLiteral("u2"), aboutMod(QStringLiteral("Core"), QStringLiteral("ludeon.rimworld"))},
+        {QStringLiteral("u3"), aboutMod(QStringLiteral("Royalty"), QStringLiteral("ludeon.rimworld.royalty"))},
     };
-    source.active_uuids = {QStringLiteral("u2"), QStringLiteral("u1"), QStringLiteral("u3")};
+    source.activeUuids = {QStringLiteral("u2"), QStringLiteral("u1"), QStringLiteral("u3")};
 
-    const QString log_path = QDir(log_dir.path()).filePath(QStringLiteral("app.log"));
-    REQUIRE(write_bytes(log_path, "INFO | Loaded /home/testuser/mods for testuser\n"));
+    const QString logPath = QDir(logDir.path()).filePath(QStringLiteral("app.log"));
+    REQUIRE(writeBytes(logPath, "INFO | Loaded /home/testuser/mods for testuser\n"));
 
     const QString report =
-        build_report(source, log_path, home, QStringLiteral("testuser"));
+        buildReport(source, logPath, home, QStringLiteral("testuser"));
 
     CHECK(report.contains(QStringLiteral("=== PxModRim System Report ===")));
     CHECK(report.contains(QStringLiteral("=== RimWorld Configuration ===")));
@@ -248,9 +248,9 @@ TEST_CASE("build_report contains every section with active mods in load order") 
     CHECK(report.contains(QStringLiteral("OS: ")));
 
     CHECK(report.contains(QStringLiteral("Game Version: 1.5.4243")));
-    const QString slashed_report = QString(report).replace(u'\\', u'/');
-    CHECK(slashed_report.contains(QStringLiteral("~/Games/RimWorld")));
-    CHECK(slashed_report.contains(QStringLiteral("~/.config/unity3d")));
+    const QString slashedReport = QString(report).replace(u'\\', u'/');
+    CHECK(slashedReport.contains(QStringLiteral("~/Games/RimWorld")));
+    CHECK(slashedReport.contains(QStringLiteral("~/.config/unity3d")));
     CHECK_FALSE(report.contains(home));
 
     CHECK(report.contains(QStringLiteral("Total Mods: 3")));
@@ -265,21 +265,21 @@ TEST_CASE("build_report contains every section with active mods in load order") 
 
 TEST_CASE("build_report names active uuids it cannot resolve") {
     TestApplication app;
-    QTemporaryDir log_dir;
-    REQUIRE(log_dir.isValid());
+    QTemporaryDir logDir;
+    REQUIRE(logDir.isValid());
     ReportSource source;
-    source.active_uuids = {QStringLiteral("/mods/gone")};
+    source.activeUuids = {QStringLiteral("/mods/gone")};
 
-    const QString log_path = QDir(log_dir.path()).filePath(QStringLiteral("app.log"));
-    REQUIRE(write_bytes(log_path, "x\n"));
-    const QString report = build_report(source, log_path);
+    const QString logPath = QDir(logDir.path()).filePath(QStringLiteral("app.log"));
+    REQUIRE(writeBytes(logPath, "x\n"));
+    const QString report = buildReport(source, logPath);
     CHECK(report.contains(QStringLiteral("  1. Unknown Mod (/mods/gone)")));
     CHECK(report.contains(QStringLiteral("Total Mods: 0")));
 }
 
 TEST_CASE("PasteUploader posts the report and returns the URL") {
     TestApplication app;
-    CannedServer server(http_response("201 Created", "https://paste.rs/abc123\n"));
+    CannedServer server(httpResponse("201 Created", "https://paste.rs/abc123\n"));
     QNetworkAccessManager network;
     PasteUploader uploader(network, server.url());
 
@@ -297,33 +297,33 @@ TEST_CASE("PasteUploader rejects empty text without sending it") {
     TestApplication app;
     QNetworkAccessManager network;
     PasteUploader uploader(network, QStringLiteral("http://127.0.0.1:9/"));
-    require_error(wait(uploader.upload(QStringLiteral("   "))), QStringLiteral("Report text is empty"));
+    requireError(wait(uploader.upload(QStringLiteral("   "))), QStringLiteral("Report text is empty"));
 }
 
 TEST_CASE("PasteUploader reports an HTTP error status") {
     TestApplication app;
-    CannedServer server(http_response("403 Forbidden", "nope"));
+    CannedServer server(httpResponse("403 Forbidden", "nope"));
     QNetworkAccessManager network;
     PasteUploader uploader(network, server.url());
-    require_error(wait(uploader.upload(QStringLiteral("Report content"))),
+    requireError(wait(uploader.upload(QStringLiteral("Report content"))),
                   QStringLiteral("HTTP 403 Forbidden"));
 }
 
 TEST_CASE("PasteUploader reports a server error status") {
     TestApplication app;
-    CannedServer server(http_response("500 Internal Server Error", "boom"));
+    CannedServer server(httpResponse("500 Internal Server Error", "boom"));
     QNetworkAccessManager network;
     PasteUploader uploader(network, server.url());
-    require_error(wait(uploader.upload(QStringLiteral("Report content"))),
+    requireError(wait(uploader.upload(QStringLiteral("Report content"))),
                   QStringLiteral("HTTP 500 Internal Server Error"));
 }
 
 TEST_CASE("PasteUploader rejects a success body that is not a URL") {
     TestApplication app;
-    CannedServer server(http_response("200 OK", "Something unexpected went wrong"));
+    CannedServer server(httpResponse("200 OK", "Something unexpected went wrong"));
     QNetworkAccessManager network;
     PasteUploader uploader(network, server.url());
-    require_error(wait(uploader.upload(QStringLiteral("Report content"))),
+    requireError(wait(uploader.upload(QStringLiteral("Report content"))),
                   QStringLiteral("valid URL"));
 }
 
@@ -337,7 +337,7 @@ TEST_CASE("PasteUploader reports a refused connection as a network error") {
 
     QNetworkAccessManager network;
     PasteUploader uploader(network, url);
-    require_error(wait(uploader.upload(QStringLiteral("Report content"))),
+    requireError(wait(uploader.upload(QStringLiteral("Report content"))),
                   QStringLiteral("network error"));
 }
 
@@ -346,6 +346,6 @@ TEST_CASE("PasteUploader reports a request that gets no answer as a timeout") {
     CannedServer server{QByteArray{}};
     QNetworkAccessManager network;
     PasteUploader uploader(network, server.url(), std::chrono::milliseconds(200));
-    require_error(wait(uploader.upload(QStringLiteral("Report content"))),
+    requireError(wait(uploader.upload(QStringLiteral("Report content"))),
                   QStringLiteral("timed out"));
 }

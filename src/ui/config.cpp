@@ -14,27 +14,27 @@ Result<void> saveUiPrefs(const UiPrefs& prefs, const ConfigService& svc) {
     return svc.save(kUiPrefsFile, prefs);
 }
 
-UiPrefsService::UiPrefsService(ConfigService& svc) : svc_(svc) {}
+UiPrefsService::UiPrefsService(ConfigService& svc) : m_svc(svc) {}
 
 QCoro::Task<Result<void>> UiPrefsService::setup() {
-    auto loaded = svc_.load<UiPrefs>(kUiPrefsFile);
+    auto loaded = m_svc.load<UiPrefs>(kUiPrefsFile);
     if (!loaded) {
         co_return std::unexpected(loaded.error());
     }
-    prefs_ = std::move(*loaded);
+    m_prefs = std::move(*loaded);
     co_return {};
 }
 
 const UiPrefs& UiPrefsService::prefs() const {
-    Q_ASSERT(prefs_.has_value());
-    return *prefs_;
+    Q_ASSERT(m_prefs.has_value());
+    return *m_prefs;
 }
 
 Result<void> UiPrefsService::savePrefs() const {
-    if (!prefs_) {
+    if (!m_prefs) {
         return {};
     }
-    return saveUiPrefs(*prefs_, svc_);
+    return saveUiPrefs(*m_prefs, m_svc);
 }
 
 }  // namespace px::modrim

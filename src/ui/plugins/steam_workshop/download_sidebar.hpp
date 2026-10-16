@@ -17,17 +17,17 @@ public:
     Q_INVOKABLE void stopRequested();
     Q_INVOKABLE void removeItem(const QString& id);
     Q_INVOKABLE void clearQueue();
-    void set_download_enabled(bool enabled);
-    void sync_from(const CheckedDownloads& checked, const QHash<QString, QString>& statuses = {});
-    void update_status(const QString& id, const QString& status, qint64 done = 0, qint64 total = 0);
+    void setDownloadEnabled(bool enabled);
+    void syncFrom(const CheckedDownloads& checked, const QHash<QString, QString>& statuses = {});
+    void updateStatus(const QString& id, const QString& status, qint64 done = 0, qint64 total = 0);
 signals:
-    void download_requested();
-    void stop_requested();
-    void item_removed(const QString& id);
-    void clear_requested();
+    void downloadTriggered();
+    void stopTriggered();
+    void itemRemoved(const QString& id);
+    void clearRequested();
 private:
-    DownloadQueueModel* model_;
-    QQuickWidget* qml_;
+    DownloadQueueModel* m_model;
+    QQuickWidget* m_qml;
 };
 
 }  // namespace px::modrim

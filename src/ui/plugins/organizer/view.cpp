@@ -56,20 +56,20 @@ QPushButton* button(const QString& text, QWidget* parent, QHBoxLayout* layout) {
 }
 
 OrganizerViewPanel::OrganizerViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
-    : BaseViewPanel(ctx, engine, parent, app), service_(organizerService(ctx)),
-      model_(new ModTreeModel([&ctx](const QString& uuid) { return ctx.diagnosticsService().summary_for(uuid); }, this)),
-      filters_(new OrganizerFilterModel(this)) {
+    : BaseViewPanel(ctx, engine, parent, app), m_service(organizerService(ctx)),
+      m_model(new ModTreeModel([&ctx](const QString& uuid) { return ctx.diagnosticsService().summaryFor(uuid); }, this)),
+      m_filters(new OrganizerFilterModel(this)) {
     auto* content = new QWidget(this);
     content->setObjectName(QStringLiteral("contentArea"));
     auto* row = new QHBoxLayout(content);
     row->setContentsMargins(0, 0, 0, 0);
     row->setSpacing(0);
-    auto* sidebar = new FilterSidebar(engine, filters_, content);
-    sidebar->setFixedWidth(SIDEBAR_WIDTH);
+    auto* sidebar = new FilterSidebar(engine, m_filters, content);
+    sidebar->setFixedWidth(kSidebarWidth);
     row->addWidget(sidebar);
     connect(sidebar, &FilterSidebar::activated, this, [this](int index) {
-        const auto key = filters_->key_at(index);
-        if (key && *key != filter_key_) { filter_key_ = *key; invalidate(); }
+        const auto key = m_filters->keyAt(index);
+        if (key && *key != m_filterKey) { m_filterKey = *key; invalidate(); }
     });
     auto* main = new QWidget(content);
     main->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
@@ -81,10 +81,10 @@ OrganizerViewPanel::OrganizerViewPanel(CoreContext& ctx, QQmlEngine* engine, QWi
     toolbar->setFixedHeight(56);
     auto* tools = new QHBoxLayout(toolbar);
     tools->setContentsMargins(16, 8, 16, 8);
-    search_ = new QLineEdit(toolbar);
-    search_->setPlaceholderText(QStringLiteral("Search mods, package ID, author…"));
-    search_->setClearButtonEnabled(true);
-    tools->addWidget(search_, 1);
+    m_search = new QLineEdit(toolbar);
+    m_search->setPlaceholderText(QStringLiteral("Search mods, package ID, author…"));
+    m_search->setClearButtonEnabled(true);
+    tools->addWidget(m_search, 1);
     auto* create = button(QStringLiteral("New folder"), toolbar, tools);
     create->setObjectName(QStringLiteral("primaryAction"));
     connect(create, &QPushButton::clicked, this, &OrganizerViewPanel::newFolder);
@@ -95,154 +95,154 @@ OrganizerViewPanel::OrganizerViewPanel(CoreContext& ctx, QQmlEngine* engine, QWi
     connect(button(QStringLiteral("Collapse all"), toolbar, tools), &QPushButton::clicked, this, [this] { treeCommand("collapseAll"); });
     layout->addWidget(toolbar);
 
-    qml_ = new QQuickWidget(engine, main);
-    qml_->setObjectName(QStringLiteral("organizerTree"));
-    qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    qml_->setClearColor(paletteColor(u"ELEVATE_1"));
-    qml_->rootContext()->setContextProperty(QStringLiteral("organizerPanel"), this);
-    qml_->rootContext()->setContextProperty(QStringLiteral("modTreeModel"), model_);
-    qml_->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/ModTree.qml")));
-    rules_dialog_ = new QDialog(this, Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint | Qt::WindowMinMaxButtonsHint);
-    rules_dialog_->setObjectName(QStringLiteral("organizerRuleEditorWindow"));
-    rules_dialog_->setWindowTitle(QStringLiteral("Auto-Folder Rules"));
-    rules_dialog_->setWindowModality(Qt::WindowModal);
-    rules_dialog_->setMinimumSize(720, 520);
-    rules_dialog_->setSizeGripEnabled(true);
-    auto* rules_layout = new QVBoxLayout(rules_dialog_);
-    rules_layout->setContentsMargins(0, 0, 0, 0);
-    rules_qml_ = new QQuickWidget(engine, rules_dialog_);
-    rules_qml_->setObjectName(QStringLiteral("organizerRuleEditorQuickWidget"));
-    rules_qml_->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    rules_qml_->setClearColor(paletteColor(u"ELEVATE_2"));
-    rules_qml_->rootContext()->setContextProperty(QStringLiteral("organizerPanel"), this);
-    rules_qml_->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/RuleEditor.qml")));
-    rules_layout->addWidget(rules_qml_);
-    installDialogChrome(rules_dialog_);
-    connect(rules_dialog_, &QDialog::finished, this, [this] {
-        if (auto* root = rules_qml_->rootObject()) QMetaObject::invokeMethod(root, "closeEditor");
+    m_qml = new QQuickWidget(engine, main);
+    m_qml->setObjectName(QStringLiteral("organizerTree"));
+    m_qml->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    m_qml->setClearColor(paletteColor(u"ELEVATE_1"));
+    m_qml->rootContext()->setContextProperty(QStringLiteral("organizerPanel"), this);
+    m_qml->rootContext()->setContextProperty(QStringLiteral("modTreeModel"), m_model);
+    m_qml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/ModTree.qml")));
+    m_rulesDialog = new QDialog(this, Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint | Qt::WindowMinMaxButtonsHint);
+    m_rulesDialog->setObjectName(QStringLiteral("organizerRuleEditorWindow"));
+    m_rulesDialog->setWindowTitle(QStringLiteral("Auto-Folder Rules"));
+    m_rulesDialog->setWindowModality(Qt::WindowModal);
+    m_rulesDialog->setMinimumSize(720, 520);
+    m_rulesDialog->setSizeGripEnabled(true);
+    auto* rulesLayout = new QVBoxLayout(m_rulesDialog);
+    rulesLayout->setContentsMargins(0, 0, 0, 0);
+    m_rulesQml = new QQuickWidget(engine, m_rulesDialog);
+    m_rulesQml->setObjectName(QStringLiteral("organizerRuleEditorQuickWidget"));
+    m_rulesQml->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    m_rulesQml->setClearColor(paletteColor(u"ELEVATE_2"));
+    m_rulesQml->rootContext()->setContextProperty(QStringLiteral("organizerPanel"), this);
+    m_rulesQml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/RuleEditor.qml")));
+    rulesLayout->addWidget(m_rulesQml);
+    installDialogChrome(m_rulesDialog);
+    connect(m_rulesDialog, &QDialog::finished, this, [this] {
+        if (auto* root = m_rulesQml->rootObject()) QMetaObject::invokeMethod(root, "closeEditor");
     });
     auto* hint = new QWidget(main);
     hint->setObjectName(QStringLiteral("organizerHint"));
     auto* hints = new QHBoxLayout(hint);
     hints->setContentsMargins(12, 5, 12, 5);
-    auto* hint_text = new QLabel(QStringLiteral("Folders and tags are for browsing only. Edit load order in Mods; checkboxes enable or disable the same mods."), hint);
-    hint_text->setWordWrap(true);
-    hints->addWidget(hint_text, 1);
+    auto* hintText = new QLabel(QStringLiteral("Folders and tags are for browsing only. Edit load order in Mods; checkboxes enable or disable the same mods."), hint);
+    hintText->setWordWrap(true);
+    hints->addWidget(hintText, 1);
     auto* dismiss = button(QStringLiteral("×"), hint, hints);
     dismiss->setToolTip(QStringLiteral("Dismiss"));
     connect(dismiss, &QPushButton::clicked, hint, &QWidget::hide);
     layout->addWidget(hint);
-    layout->addWidget(qml_, 1);
-    selection_bar_ = new QWidget(main);
-    auto* bar = new QHBoxLayout(selection_bar_);
+    layout->addWidget(m_qml, 1);
+    m_selectionBar = new QWidget(main);
+    auto* bar = new QHBoxLayout(m_selectionBar);
     bar->setContentsMargins(12, 6, 12, 6);
-    selection_label_ = new QLabel(selection_bar_);
-    bar->addWidget(selection_label_);
+    m_selectionLabel = new QLabel(m_selectionBar);
+    bar->addWidget(m_selectionLabel);
     const QList<QPair<QString, QString>> actions{{QStringLiteral("Enable"), QStringLiteral("enable")}, {QStringLiteral("Disable"), QStringLiteral("disable")}, {QStringLiteral("Move to folder…"), QStringLiteral("move")}, {QStringLiteral("Manage tags…"), QStringLiteral("tags")}, {QStringLiteral("Create folder from selection"), QStringLiteral("create")}, {QStringLiteral("Update"), QStringLiteral("update")}};
     for (const auto& [label, action] : actions) {
-        auto* item = button(label, selection_bar_, bar);
-        if (action == QStringLiteral("update")) update_button_ = item;
+        auto* item = button(label, m_selectionBar, bar);
+        if (action == QStringLiteral("update")) m_updateButton = item;
         connect(item, &QPushButton::clicked, this, [this, action] { selectionAction(action); });
     }
-    selection_bar_->hide();
-    layout->addWidget(selection_bar_);
+    m_selectionBar->hide();
+    layout->addWidget(m_selectionBar);
     row->addWidget(main, 3);
-    info_ = new ModInfoPanel(ctx, engine, app.uiPrefs(), content);
-    info_->setObjectName(QStringLiteral("modInfoPanel"));
-    info_->setMinimumWidth(300);
-    row->addWidget(info_, 2);
-    selection_ = std::make_unique<ModSelectionPresenter>(ctx, *info_);
-    connect(info_, &ModInfoPanel::modRequested, this, [this](const QString& uuid) {
-        const auto index = model_->index_for_uuid(uuid);
+    m_info = new ModInfoPanel(ctx, engine, app.uiPrefs(), content);
+    m_info->setObjectName(QStringLiteral("modInfoPanel"));
+    m_info->setMinimumWidth(300);
+    row->addWidget(m_info, 2);
+    m_selection = std::make_unique<ModSelectionPresenter>(ctx, *m_info);
+    connect(m_info, &ModInfoPanel::modRequested, this, [this](const QString& uuid) {
+        const auto index = m_model->indexForUuid(uuid);
         if (index.isValid()) selectSingle(index);
     });
-    root_->addWidget(content, 1);
-    status_ = new QLabel(this);
-    status_->setObjectName(QStringLiteral("organizerStatus"));
-    root_->addWidget(status_);
-    menu_ = new QMenu(this);
-    menu_->setToolTipsVisible(true);
-    search_timer_ = new QTimer(this);
-    search_timer_->setSingleShot(true);
-    search_timer_->setInterval(220);
-    connect(search_, &QLineEdit::textChanged, this, [this] { search_timer_->start(); });
-    connect(search_timer_, &QTimer::timeout, this, [this] {
-        if (search_text_ != search_->text()) { search_text_ = search_->text(); invalidate(); }
+    m_root->addWidget(content, 1);
+    m_status = new QLabel(this);
+    m_status->setObjectName(QStringLiteral("organizerStatus"));
+    m_root->addWidget(m_status);
+    m_menu = new QMenu(this);
+    m_menu->setToolTipsVisible(true);
+    m_searchTimer = new QTimer(this);
+    m_searchTimer->setSingleShot(true);
+    m_searchTimer->setInterval(220);
+    connect(m_search, &QLineEdit::textChanged, this, [this] { m_searchTimer->start(); });
+    connect(m_searchTimer, &QTimer::timeout, this, [this] {
+        if (m_searchText != m_search->text()) { m_searchText = m_search->text(); invalidate(); }
     });
-    connect(model_, &QAbstractItemModel::modelReset, this, [this] { selection_anchor_ = QPersistentModelIndex{}; });
-    changed_id_ = service_.changed.connect([this](const auto&) { invalidate(); Q_EMIT editorChanged(); });
-    active_id_ = ctx.activeStateChanged().connect([this](const auto&) { invalidate(); });
-    mods_id_ = ctx.modService().mods_changed.connect([this](const auto&) { invalidate(); });
-    diagnostics_id_ = ctx.diagnosticsService().diagnostics_summary_changed.connect([this](const auto&) {
-        model_->refresh_diagnostics();
-        if (!selected_uuid_.isEmpty()) info_->setIssues(ctx_.diagnosticsService().issues_for(selected_uuid_));
+    connect(m_model, &QAbstractItemModel::modelReset, this, [this] { m_selectionAnchor = QPersistentModelIndex{}; });
+    m_changedId = m_service.changed.connect([this](const auto&) { invalidate(); Q_EMIT editorChanged(); });
+    m_activeId = ctx.activeStateChanged().connect([this](const auto&) { invalidate(); });
+    m_modsId = ctx.modService().modsChanged.connect([this](const auto&) { invalidate(); });
+    m_diagnosticsId = ctx.diagnosticsService().diagnosticsSummaryChanged.connect([this](const auto&) {
+        m_model->refreshDiagnostics();
+        if (!m_selectedUuid.isEmpty()) m_info->setIssues(m_ctx.diagnosticsService().issuesFor(m_selectedUuid));
     });
-    busy_id_ = ctx.downloads().busy_changed.connect([this](bool) { syncInfo(); });
+    m_busyId = ctx.downloads().busyChanged.connect([this](bool) { syncInfo(); });
 }
 
 OrganizerViewPanel::~OrganizerViewPanel() {
-    service_.changed.disconnect(changed_id_);
-    ctx_.activeStateChanged().disconnect(active_id_);
-    ctx_.modService().mods_changed.disconnect(mods_id_);
-    ctx_.diagnosticsService().diagnostics_summary_changed.disconnect(diagnostics_id_);
-    ctx_.downloads().busy_changed.disconnect(busy_id_);
+    m_service.changed.disconnect(m_changedId);
+    m_ctx.activeStateChanged().disconnect(m_activeId);
+    m_ctx.modService().modsChanged.disconnect(m_modsId);
+    m_ctx.diagnosticsService().diagnosticsSummaryChanged.disconnect(m_diagnosticsId);
+    m_ctx.downloads().busyChanged.disconnect(m_busyId);
 }
-bool OrganizerViewPanel::ready() const { return service_.ready(); }
+bool OrganizerViewPanel::ready() const { return m_service.ready(); }
 void OrganizerViewPanel::showEvent(QShowEvent* event) {
     BaseViewPanel::showEvent(event);
-    if (dirty_) rebuild();
+    if (m_dirty) rebuild();
     Q_EMIT readyChanged();
-    if (auto* root = rules_qml_->rootObject()) QMetaObject::invokeMethod(root, "schedulePreview");
+    if (auto* root = m_rulesQml->rootObject()) QMetaObject::invokeMethod(root, "schedulePreview");
 }
-void OrganizerViewPanel::invalidate() { dirty_ = true; if (isVisible()) rebuild(); }
+void OrganizerViewPanel::invalidate() { m_dirty = true; if (isVisible()) rebuild(); }
 void OrganizerViewPanel::rebuild() {
     if (!ready()) return;
-    dirty_ = false;
-    filters_->update(service_.tree_filters());
-    const auto query = filters_->for_key(filter_key_).query(search_text_);
-    const auto tree = service_.tree(query);
-    model_->set_tree(tree, ctx_.allMods(), ctx_.modService().provider_colors(), !query.is_empty(), service_.state().tags);
-    const auto ungrouped = query.is_empty() ? tree.mods.size() : service_.tree().mods.size();
-    status_->setText(QStringLiteral("%1 · %2 active · %3 · %4 ungrouped").arg(plural(ctx_.allMods().size(), QStringLiteral("mod"))).arg(ctx_.activeUuids().size()).arg(plural(service_.state().folders.size() - 1, QStringLiteral("folder"))).arg(ungrouped));
+    m_dirty = false;
+    m_filters->update(m_service.treeFilters());
+    const auto query = m_filters->forKey(m_filterKey).query(m_searchText);
+    const auto tree = m_service.tree(query);
+    m_model->setTree(tree, m_ctx.allMods(), m_ctx.modService().providerColors(), !query.isEmpty(), m_service.state().tags);
+    const auto ungrouped = query.isEmpty() ? tree.mods.size() : m_service.tree().mods.size();
+    m_status->setText(QStringLiteral("%1 · %2 active · %3 · %4 ungrouped").arg(plural(m_ctx.allMods().size(), QStringLiteral("mod"))).arg(m_ctx.activeUuids().size()).arg(plural(m_service.state().folders.size() - 1, QStringLiteral("folder"))).arg(ungrouped));
     syncInfo(true);
     Q_EMIT readyChanged();
 }
 QStringList OrganizerViewPanel::selectedPackageIds() const {
     QStringList result;
-    for (const auto* node : model_->selected_nodes()) if (node->leaf && node->leaf->package_id && !result.contains(*node->leaf->package_id)) result.append(*node->leaf->package_id);
+    for (const auto* node : m_model->selectedNodes()) if (node->leaf && node->leaf->packageId && !result.contains(*node->leaf->packageId)) result.append(*node->leaf->packageId);
     return result;
 }
 QStringList OrganizerViewPanel::selectedUuids() const {
     QStringList result;
-    for (const auto* node : model_->selected_nodes()) if (node->leaf) result.append(node->leaf->uuid);
+    for (const auto* node : m_model->selectedNodes()) if (node->leaf) result.append(node->leaf->uuid);
     return result;
 }
 void OrganizerViewPanel::syncInfo(bool force) {
-    const auto nodes = model_->selected_nodes();
+    const auto nodes = m_model->selectedNodes();
     const auto uuids = selectedUuids();
     Q_EMIT editorChanged();
-    selection_label_->setText(plural(uuids.size(), QStringLiteral("mod")) + QStringLiteral(" selected"));
-    selection_bar_->setVisible(uuids.size() > 1);
-    const auto state = update_state(ctx_, uuids);
-    update_button_->setVisible(ctx_.downloads().available());
-    update_button_->setText(state.label);
-    update_button_->setEnabled(state.enabled);
-    update_button_->setToolTip(state.tooltip);
+    m_selectionLabel->setText(plural(uuids.size(), QStringLiteral("mod")) + QStringLiteral(" selected"));
+    m_selectionBar->setVisible(uuids.size() > 1);
+    const auto state = updateState(m_ctx, uuids);
+    m_updateButton->setVisible(m_ctx.downloads().available());
+    m_updateButton->setText(state.label);
+    m_updateButton->setEnabled(state.enabled);
+    m_updateButton->setToolTip(state.tooltip);
     const QString uuid = nodes.size() == 1 && nodes.front()->leaf ? nodes.front()->leaf->uuid : QString{};
-    if (uuid == selected_uuid_ && !force) return;
-    selected_uuid_ = uuid;
-    if (uuid.isEmpty()) selection_->clear(); else selection_->show(uuid);
+    if (uuid == m_selectedUuid && !force) return;
+    m_selectedUuid = uuid;
+    if (uuid.isEmpty()) m_selection->clear(); else m_selection->show(uuid);
 }
 int OrganizerViewPanel::selectedTagCount() const { return selectedPackageIds().size(); }
 QVariantList OrganizerViewPanel::tagRows() const {
     QVariantList result;
     if (!ready()) return result;
-    auto tags = service_.state().tags.values();
+    auto tags = m_service.state().tags.values();
     std::ranges::sort(tags, [](const Tag& a, const Tag& b) { return a.name.toCaseFolded() < b.name.toCaseFolded(); });
     const auto pids = selectedPackageIds();
     for (const auto& tag : tags) {
         int matched = 0;
-        for (const auto& pid : pids) if (service_.state().mod_tags.value(pid).contains(tag.id)) ++matched;
+        for (const auto& pid : pids) if (m_service.state().modTags.value(pid).contains(tag.id)) ++matched;
         result.append(QVariantMap{{QStringLiteral("id"), tag.id}, {QStringLiteral("name"), tag.name}, {QStringLiteral("color"), tag.color}, {QStringLiteral("checkState"), matched > 0 && matched < pids.size() ? 2 : int(matched > 0)}});
     }
     return result;
@@ -250,23 +250,23 @@ QVariantList OrganizerViewPanel::tagRows() const {
 QVariantList OrganizerViewPanel::ruleRows() const {
     QVariantList result;
     if (!ready()) return result;
-    for (const auto& rule : service_.state().rules) result.append(QVariantMap{{QStringLiteral("field"), QString(rule_field_name(rule.field))}, {QStringLiteral("op"), QString(rule_op_name(rule.op))}, {QStringLiteral("pattern"), rule.pattern}, {QStringLiteral("folder_id"), rule.folder_id}});
+    for (const auto& rule : m_service.state().rules) result.append(QVariantMap{{QStringLiteral("field"), QString(ruleFieldName(rule.field))}, {QStringLiteral("op"), QString(ruleOpName(rule.op))}, {QStringLiteral("pattern"), rule.pattern}, {QStringLiteral("folder_id"), rule.folderId}});
     return result;
 }
 QVariantList OrganizerViewPanel::ruleFolders() const {
     QVariantList result;
     if (!ready()) return result;
-    const auto& folders = service_.state().folders;
+    const auto& folders = m_service.state().folders;
     QList<QPair<QString, qint64>> paths;
     paths.reserve(folders.size() - 1);
     for (const auto& folder : folders) {
-        if (folder.id == ROOT_ID) continue;
+        if (folder.id == kRootId) continue;
         QStringList names;
         qint64 id = folder.id;
-        while (id != ROOT_ID) {
+        while (id != kRootId) {
             const auto& ancestor = *folders.constFind(id);
             names.prepend(ancestor.name);
-            id = *ancestor.parent_id;
+            id = *ancestor.parentId;
         }
         paths.append({names.join(QStringLiteral(" / ")), folder.id});
     }
@@ -283,8 +283,8 @@ Result<QList<RuleSpec>> OrganizerViewPanel::ruleSpecs(const QVariantList& rows) 
     specs.reserve(rows.size());
     for (const auto& value : rows) {
         const auto row = value.toMap();
-        const auto field = parse_rule_field(row.value(QStringLiteral("field")).toString());
-        const auto op = parse_rule_op(row.value(QStringLiteral("op")).toString());
+        const auto field = parseRuleField(row.value(QStringLiteral("field")).toString());
+        const auto op = parseRuleOp(row.value(QStringLiteral("op")).toString());
         if (!field || !op) return std::unexpected(Error{QStringLiteral("Invalid rule field or operator")});
         specs.append(RuleSpec{*field, *op, row.value(QStringLiteral("pattern")).toString(), row.value(QStringLiteral("folder_id")).toLongLong()});
     }
@@ -296,7 +296,7 @@ QCoro::Task<void> OrganizerViewPanel::calculateRulePreview(QVariantList rows, in
     const auto specs = ruleSpecs(rows);
     if (!specs) co_return;
     const QPointer<OrganizerViewPanel> alive(this);
-    auto future = QtConcurrent::run([state = service_.state(), mods = ctx_.allMods(), specs = *specs] { return preview_rule_matches(state, mods, specs); });
+    auto future = QtConcurrent::run([state = m_service.state(), mods = m_ctx.allMods(), specs = *specs] { return previewRuleMatches(state, mods, specs); });
     const auto preview = co_await future;
     if (!alive) co_return;
     QVariantList counts;
@@ -308,31 +308,31 @@ QCoro::Task<void> OrganizerViewPanel::calculateRulePreview(QVariantList rows, in
     Q_EMIT rulePreviewReady(revision, result);
 }
 void OrganizerViewPanel::setEditorError(QString message) {
-    if (message != editor_error_) { editor_error_ = std::move(message); Q_EMIT editorChanged(); }
+    if (message != m_editorError) { m_editorError = std::move(message); Q_EMIT editorChanged(); }
 }
 void OrganizerViewPanel::reportError(const Error& error) {
-    if (auto* toasts = app_.toasts()) toasts->error(error.message);
+    if (auto* toasts = m_app.toasts()) toasts->error(error.message);
     else spdlog::warn("organizer: {}", error.message.toStdString());
 }
-void OrganizerViewPanel::treeCommand(const char* method) { if (auto* root = qml_->rootObject()) QMetaObject::invokeMethod(root, method); }
+void OrganizerViewPanel::treeCommand(const char* method) { if (auto* root = m_qml->rootObject()) QMetaObject::invokeMethod(root, method); }
 void OrganizerViewPanel::openTags() { setEditorError(); treeCommand("openTags"); }
 void OrganizerViewPanel::openRules() {
     setEditorError();
-    auto* root = rules_qml_->rootObject();
+    auto* root = m_rulesQml->rootObject();
     if (!root) return;
     auto* host = window();
-    if (!rules_opened_once_) {
+    if (!m_rulesOpenedOnce) {
         const auto available = host->screen()->availableGeometry();
-        rules_dialog_->resize(std::min({960, std::max(800, host->width() - 48), available.width() - 32}), std::min({760, std::max(600, host->height() - 80), available.height() - 32}));
-        rules_opened_once_ = true;
+        m_rulesDialog->resize(std::min({960, std::max(800, host->width() - 48), available.width() - 32}), std::min({760, std::max(600, host->height() - 80), available.height() - 32}));
+        m_rulesOpenedOnce = true;
     }
-    rules_dialog_->move(host->frameGeometry().center() - rules_dialog_->rect().center());
-    rules_dialog_->open();
-    rules_dialog_->activateWindow();
-    rules_qml_->setFocus(Qt::OtherFocusReason);
+    m_rulesDialog->move(host->frameGeometry().center() - m_rulesDialog->rect().center());
+    m_rulesDialog->open();
+    m_rulesDialog->activateWindow();
+    m_rulesQml->setFocus(Qt::OtherFocusReason);
     QMetaObject::invokeMethod(root, "prepareForOpen");
 }
-void OrganizerViewPanel::closeRules() { rules_dialog_->close(); }
+void OrganizerViewPanel::closeRules() { m_rulesDialog->close(); }
 QCoro::QmlTask OrganizerViewPanel::createTag(QString name, QString color) { return mutateTag(QStringLiteral("create"), 0, std::move(name), std::move(color)); }
 QCoro::QmlTask OrganizerViewPanel::updateTag(qint64 id, QString name, QString color) { return mutateTag(QStringLiteral("update"), id, std::move(name), std::move(color)); }
 QCoro::QmlTask OrganizerViewPanel::deleteTag(qint64 id) { return mutateTag(QStringLiteral("delete"), id); }
@@ -340,15 +340,15 @@ QCoro::QmlTask OrganizerViewPanel::assignTag(qint64 id, bool add) { return mutat
 QCoro::Task<void> OrganizerViewPanel::mutateTag(QString operation, qint64 id, QString name, QString color, bool add) {
     const QPointer<OrganizerViewPanel> alive(this);
     if (operation == QStringLiteral("create")) {
-        const auto result = co_await service_.create_tag(std::move(name), std::move(color));
+        const auto result = co_await m_service.createTag(std::move(name), std::move(color));
         if (!alive) co_return;
         if (!result) { setEditorError(result.error().message); co_return; }
         Q_EMIT tagCreated();
     } else {
         Result<void> result;
-        if (operation == QStringLiteral("update")) result = co_await service_.update_tag(id, std::move(name), std::move(color));
-        else if (operation == QStringLiteral("delete")) result = co_await service_.delete_tag(id);
-        else result = co_await service_.set_mod_tags(selectedPackageIds(), add ? QSet<qint64>{id} : QSet<qint64>{}, add ? QSet<qint64>{} : QSet<qint64>{id});
+        if (operation == QStringLiteral("update")) result = co_await m_service.updateTag(id, std::move(name), std::move(color));
+        else if (operation == QStringLiteral("delete")) result = co_await m_service.deleteTag(id);
+        else result = co_await m_service.setModTags(selectedPackageIds(), add ? QSet<qint64>{id} : QSet<qint64>{}, add ? QSet<qint64>{} : QSet<qint64>{id});
         if (!alive) co_return;
         if (!result) { setEditorError(result.error().message); co_return; }
         if (operation == QStringLiteral("update")) Q_EMIT tagUpdated(id);
@@ -360,7 +360,7 @@ QCoro::Task<void> OrganizerViewPanel::persistRules(QVariantList rows) {
     const QPointer<OrganizerViewPanel> alive(this);
     auto specs = ruleSpecs(rows);
     if (!specs) { setEditorError(specs.error().message); co_return; }
-    const auto result = co_await service_.set_rules(std::move(*specs));
+    const auto result = co_await m_service.setRules(std::move(*specs));
     if (!alive) co_return;
     if (!result) { setEditorError(result.error().message); co_return; }
     setEditorError();
@@ -369,56 +369,56 @@ QCoro::Task<void> OrganizerViewPanel::persistRules(QVariantList rows) {
 QCoro::QmlTask OrganizerViewPanel::addStandardRules() { return standardRules(); }
 QCoro::Task<void> OrganizerViewPanel::standardRules() {
     const QPointer<OrganizerViewPanel> alive(this);
-    const auto result = co_await service_.add_standard_rules();
+    const auto result = co_await m_service.addStandardRules();
     if (!alive) co_return;
     setEditorError(result ? QString{} : result.error().message);
 }
 QVariantList OrganizerViewPanel::expandedIndexes() const {
     QVariantList result;
-    for (const auto& index : model_->expanded_indexes()) result.append(QVariant::fromValue(index));
+    for (const auto& index : m_model->expandedIndexes()) result.append(QVariant::fromValue(index));
     return result;
 }
 void OrganizerViewPanel::selectRow(const QModelIndex& index, int modifiers, const QVariantList& range) {
-    if ((modifiers & Qt::ShiftModifier) && selection_anchor_.isValid()) {
+    if ((modifiers & Qt::ShiftModifier) && m_selectionAnchor.isValid()) {
         QList<QModelIndex> indexes;
         for (const auto& value : range) indexes.append(value.value<QModelIndex>());
-        model_->select(indexes);
+        m_model->select(indexes);
     } else {
-        model_->select({index}, modifiers & Qt::ControlModifier ? QStringLiteral("toggle") : QStringLiteral("replace"));
-        selection_anchor_ = index;
+        m_model->select({index}, modifiers & Qt::ControlModifier ? QStringLiteral("toggle") : QStringLiteral("replace"));
+        m_selectionAnchor = index;
     }
     syncInfo();
 }
 void OrganizerViewPanel::selectSingle(const QModelIndex& index) {
-    if (!model_->is_selected(index)) model_->select({index});
-    selection_anchor_ = index;
+    if (!m_model->isSelected(index)) m_model->select({index});
+    m_selectionAnchor = index;
     syncInfo();
 }
 QCoro::QmlTask OrganizerViewPanel::persistAllCollapsed(bool collapsed) { return persistAllCollapse(collapsed); }
 QCoro::Task<void> OrganizerViewPanel::persistAllCollapse(bool collapsed) {
     const QPointer<OrganizerViewPanel> alive(this);
-    const auto result = co_await service_.set_all_collapsed(collapsed);
+    const auto result = co_await m_service.setAllCollapsed(collapsed);
     if (!alive) co_return;
     if (!result) reportError(result.error());
 }
 QCoro::QmlTask OrganizerViewPanel::persistCollapsed(const QModelIndex& index, bool collapsed) { return persistCollapse(index, collapsed); }
 QCoro::Task<void> OrganizerViewPanel::persistCollapse(QModelIndex index, bool collapsed) {
-    const auto* node = model_->node_at(index);
-    if (!node || !node->is_container() || model_->filtering()) co_return;
+    const auto* node = m_model->nodeAt(index);
+    if (!node || !node->isContainer() || m_model->filtering()) co_return;
     const QPointer<OrganizerViewPanel> alive(this);
-    const auto result = co_await service_.set_collapsed(node->folder_id(), collapsed);
+    const auto result = co_await m_service.setCollapsed(node->folderId(), collapsed);
     if (!alive) co_return;
     if (!result) reportError(result.error());
 }
 QCoro::QmlTask OrganizerViewPanel::toggleCheck(const QModelIndex& index) { return toggle(index); }
 QCoro::Task<void> OrganizerViewPanel::toggle(QModelIndex index) {
-    const auto* node = model_->node_at(index);
+    const auto* node = m_model->nodeAt(index);
     if (!node) co_return;
-    if (node->leaf) co_await toggle_mods(ctx_, this, {node->leaf->uuid});
-    else if (node->is_container()) {
-        const auto change = service_.folder_toggle(node->folder_id(), node->kind != QStringLiteral("ungrouped"));
+    if (node->leaf) co_await toggleMods(m_ctx, this, {node->leaf->uuid});
+    else if (node->isContainer()) {
+        const auto change = m_service.folderToggle(node->folderId(), node->kind != QStringLiteral("ungrouped"));
         if (!change) { reportError(change.error()); co_return; }
-        if (!change->enable.isEmpty() || !change->disable.isEmpty()) co_await apply_activation(ctx_, this, change->enable, change->disable);
+        if (!change->enable.isEmpty() || !change->disable.isEmpty()) co_await applyActivation(m_ctx, this, change->enable, change->disable);
     }
 }
 QCoro::QmlTask OrganizerViewPanel::selectionAction(const QString& action) { return runSelectionAction(action); }
@@ -428,10 +428,10 @@ QCoro::Task<void> OrganizerViewPanel::runSelectionAction(QString action) {
     if (action == QStringLiteral("tags")) openTags();
     else if (action == QStringLiteral("move") || action == QStringLiteral("create")) {
         const auto pids = selectedPackageIds();
-        if (!pids.isEmpty()) co_await editFolder(action, ROOT_ID, pids);
-    } else if (action == QStringLiteral("update")) co_await update_mods(ctx_, uuids, this);
-    else if (action == QStringLiteral("enable")) co_await apply_activation(ctx_, this, uuids);
-    else if (action == QStringLiteral("disable")) co_await apply_activation(ctx_, this, {}, uuids);
+        if (!pids.isEmpty()) co_await editFolder(action, kRootId, pids);
+    } else if (action == QStringLiteral("update")) co_await updateMods(m_ctx, uuids, this);
+    else if (action == QStringLiteral("enable")) co_await applyActivation(m_ctx, this, uuids);
+    else if (action == QStringLiteral("disable")) co_await applyActivation(m_ctx, this, {}, uuids);
 }
 QCoro::QmlTask OrganizerViewPanel::newFolder() { return editFolder(QStringLiteral("new")); }
 QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStringList pids) {
@@ -439,7 +439,7 @@ QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStr
     Result<void> result;
     if (action == QStringLiteral("new") || action == QStringLiteral("create") || action == QStringLiteral("rename")) {
         const bool rename = action == QStringLiteral("rename");
-        const QString initial = rename ? service_.state().folders.value(id).name : QString{};
+        const QString initial = rename ? m_service.state().folders.value(id).name : QString{};
         QString title;
         if (rename) title = QStringLiteral("Rename Folder");
         else if (action == QStringLiteral("create")) title = QStringLiteral("Create Folder from Selection");
@@ -450,11 +450,11 @@ QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStr
         if (!alive) co_return;
         if (code != QDialog::Accepted) co_return;
         const auto name = dialog->textValue();
-        if (rename) result = co_await service_.rename_folder(id, name);
+        if (rename) result = co_await m_service.renameFolder(id, name);
         else {
             Result<organizer::Folder> created;
-            if (action == QStringLiteral("create")) created = co_await service_.create_folder_from(name, pids);
-            else created = co_await service_.create_folder(name, id);
+            if (action == QStringLiteral("create")) created = co_await m_service.createFolderFrom(name, pids);
+            else created = co_await m_service.createFolder(name, id);
             if (!alive) co_return;
             if (!created) reportError(created.error());
             co_return;
@@ -462,26 +462,26 @@ QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStr
     } else if (action == QStringLiteral("move") || action == QStringLiteral("moveFolder")) {
         QSet<qint64> allowed;
         if (action == QStringLiteral("moveFolder")) {
-            const auto targets = service_.folder_move_targets(id);
+            const auto targets = m_service.folderMoveTargets(id);
             if (!targets) { reportError(targets.error()); co_return; }
             allowed = *targets;
         } else {
-            for (auto it = service_.state().folders.cbegin(); it != service_.state().folders.cend(); ++it) allowed.insert(it.key());
+            for (auto it = m_service.state().folders.cbegin(); it != m_service.state().folders.cend(); ++it) allowed.insert(it.key());
         }
-        const auto pickerResult = co_await awaitDialog<FolderPickerDialog>(service_.tree(), action == QStringLiteral("move") ? QStringLiteral("Move to Folder") : QStringLiteral("Move Folder"), allowed, this);
+        const auto pickerResult = co_await awaitDialog<FolderPickerDialog>(m_service.tree(), action == QStringLiteral("move") ? QStringLiteral("Move to Folder") : QStringLiteral("Move Folder"), allowed, this);
         const int code = pickerResult.first;
         auto* const dialog = pickerResult.second;
         if (!alive) co_return;
         if (code != QDialog::Accepted) co_return;
-        const auto destination = dialog->folder_id();
-        if (action == QStringLiteral("moveFolder")) result = co_await service_.move_folder(id, destination);
+        const auto destination = dialog->folderId();
+        if (action == QStringLiteral("moveFolder")) result = co_await m_service.moveFolder(id, destination);
         else { co_await placeMods(pids, destination); co_return; }
     } else if (action == QStringLiteral("delete")) {
-        const auto deleteResult = co_await awaitDialog<DeleteFolderDialog>(service_.state().folders.value(id).name, this);
+        const auto deleteResult = co_await awaitDialog<DeleteFolderDialog>(m_service.state().folders.value(id).name, this);
         const int code = deleteResult.first;
         if (!alive) co_return;
         if (code != QMessageBox::Yes) co_return;
-        result = co_await service_.delete_folder(id);
+        result = co_await m_service.deleteFolder(id);
     }
     if (!alive) co_return;
     if (!result) reportError(result.error());
@@ -489,97 +489,97 @@ QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id, QStr
 QCoro::Task<void> OrganizerViewPanel::placeMods(QStringList pids, qint64 destination) {
     const QPointer<OrganizerViewPanel> alive(this);
     Result<void> result;
-    if (destination == ROOT_ID) result = co_await service_.ungroup(pids);
-    else result = co_await service_.place(pids, destination);
+    if (destination == kRootId) result = co_await m_service.ungroup(pids);
+    else result = co_await m_service.place(pids, destination);
     if (!alive) co_return;
     if (!result) reportError(result.error());
 }
 QCoro::Task<void> OrganizerViewPanel::resetRules(QStringList pids) {
     const QPointer<OrganizerViewPanel> alive(this);
-    const auto result = co_await service_.reset_to_rules(pids);
+    const auto result = co_await m_service.resetToRules(pids);
     if (!alive) co_return;
     if (!result) reportError(result.error());
 }
 void OrganizerViewPanel::contextMenu(const QModelIndex& index) {
-    const auto* node = model_->node_at(index);
-    menu_->clear();
-    if (!node) menu_->addAction(QStringLiteral("New folder…"), this, &OrganizerViewPanel::newFolder);
+    const auto* node = m_model->nodeAt(index);
+    m_menu->clear();
+    if (!node) m_menu->addAction(QStringLiteral("New folder…"), this, &OrganizerViewPanel::newFolder);
     else if (node->leaf) { selectSingle(index); modMenu(); }
-    else { model_->select({index}); folderMenu(*node); }
+    else { m_model->select({index}); folderMenu(*node); }
     syncInfo();
-    menu_->popup(QCursor::pos());
+    m_menu->popup(QCursor::pos());
 }
 void OrganizerViewPanel::modMenu() {
-    const auto nodes = model_->selected_nodes();
+    const auto nodes = m_model->selectedNodes();
     const auto uuids = selectedUuids();
     bool inactive = false, active = false;
-    for (const auto& uuid : uuids) { if (ctx_.activeUuids().contains(uuid)) active = true; else inactive = true; }
-    if (inactive) menu_->addAction(QStringLiteral("Enable"), this, [this, uuids] { apply_activation(ctx_, this, uuids); });
-    if (active) menu_->addAction(QStringLiteral("Disable"), this, [this, uuids] { apply_activation(ctx_, this, {}, uuids); });
-    add_update_action(menu_, ctx_, uuids, [this, uuids] { update_mods(ctx_, uuids, this); });
-    menu_->addSeparator();
+    for (const auto& uuid : uuids) { if (m_ctx.activeUuids().contains(uuid)) active = true; else inactive = true; }
+    if (inactive) m_menu->addAction(QStringLiteral("Enable"), this, [this, uuids] { applyActivation(m_ctx, this, uuids); });
+    if (active) m_menu->addAction(QStringLiteral("Disable"), this, [this, uuids] { applyActivation(m_ctx, this, {}, uuids); });
+    addUpdateAction(m_menu, m_ctx, uuids, [this, uuids] { updateMods(m_ctx, uuids, this); });
+    m_menu->addSeparator();
     const auto pids = selectedPackageIds();
     bool placeable = !pids.isEmpty(), grouped = false;
     QStringList manual;
     for (const auto* node : nodes) if (node->leaf) {
-        placeable &= node->leaf->package_id.has_value();
-        grouped |= node->folder_id() != ROOT_ID;
-        if (node->leaf->package_id && node->leaf->placement == Placement::Manual && !manual.contains(*node->leaf->package_id)) manual.append(*node->leaf->package_id);
+        placeable &= node->leaf->packageId.has_value();
+        grouped |= node->folderId() != kRootId;
+        if (node->leaf->packageId && node->leaf->placement == Placement::kManual && !manual.contains(*node->leaf->packageId)) manual.append(*node->leaf->packageId);
     }
-    auto* move = menu_->addAction(QStringLiteral("Move to folder…"), this, [this, pids] { editFolder(QStringLiteral("move"), ROOT_ID, pids); });
-    auto* remove = menu_->addAction(QStringLiteral("Remove from folder"), this, [this, pids] { placeMods(pids, ROOT_ID); });
-    auto* create = menu_->addAction(QStringLiteral("Create folder from selection…"), this, [this, pids] { editFolder(QStringLiteral("create"), ROOT_ID, pids); });
+    auto* move = m_menu->addAction(QStringLiteral("Move to folder…"), this, [this, pids] { editFolder(QStringLiteral("move"), kRootId, pids); });
+    auto* remove = m_menu->addAction(QStringLiteral("Remove from folder"), this, [this, pids] { placeMods(pids, kRootId); });
+    auto* create = m_menu->addAction(QStringLiteral("Create folder from selection…"), this, [this, pids] { editFolder(QStringLiteral("create"), kRootId, pids); });
     for (auto* action : {move, remove, create}) { action->setEnabled(placeable); action->setToolTip(placeable ? QString{} : QStringLiteral("Mods without a package ID cannot be placed in folders")); }
     remove->setEnabled(placeable && grouped);
-    menu_->addAction(QStringLiteral("Manage tags…"), this, &OrganizerViewPanel::openTags)->setEnabled(placeable);
-    if (placeable && !manual.isEmpty()) menu_->addAction(QStringLiteral("Use auto rules"), this, [this, manual] { resetRules(manual); });
+    m_menu->addAction(QStringLiteral("Manage tags…"), this, &OrganizerViewPanel::openTags)->setEnabled(placeable);
+    if (placeable && !manual.isEmpty()) m_menu->addAction(QStringLiteral("Use auto rules"), this, [this, manual] { resetRules(manual); });
 }
 void OrganizerViewPanel::folderMenu(const TreeNode& node) {
-    const auto id = node.folder_id();
-    const auto result = service_.folder_mod_uuids(id, node.kind != QStringLiteral("ungrouped"));
+    const auto id = node.folderId();
+    const auto result = m_service.folderModUuids(id, node.kind != QStringLiteral("ungrouped"));
     if (!result) { reportError(result.error()); return; }
     const auto uuids = *result;
-    menu_->addAction(QStringLiteral("Enable all"), this, [this, uuids] { apply_activation(ctx_, this, uuids); })->setEnabled(!uuids.isEmpty());
-    menu_->addAction(QStringLiteral("Disable all"), this, [this, uuids] { apply_activation(ctx_, this, {}, uuids); })->setEnabled(!uuids.isEmpty());
-    add_update_action(menu_, ctx_, uuids, [this, uuids] { update_mods(ctx_, uuids, this); });
-    menu_->addSeparator();
-    if (node.kind == QStringLiteral("ungrouped")) { menu_->addAction(QStringLiteral("New folder…"), this, &OrganizerViewPanel::newFolder); return; }
-    if (node.folder && node.folder->depth < MAX_DEPTH) menu_->addAction(QStringLiteral("New subfolder…"), this, [this, id] { editFolder(QStringLiteral("new"), id); });
-    menu_->addAction(QStringLiteral("Rename…"), this, [this, id] { editFolder(QStringLiteral("rename"), id); });
-    const auto targets = service_.folder_move_targets(id);
-    menu_->addAction(QStringLiteral("Move to…"), this, [this, id] { editFolder(QStringLiteral("moveFolder"), id); })->setEnabled(targets && !targets->isEmpty());
-    menu_->addAction(QStringLiteral("Delete…"), this, [this, id] { editFolder(QStringLiteral("delete"), id); });
+    m_menu->addAction(QStringLiteral("Enable all"), this, [this, uuids] { applyActivation(m_ctx, this, uuids); })->setEnabled(!uuids.isEmpty());
+    m_menu->addAction(QStringLiteral("Disable all"), this, [this, uuids] { applyActivation(m_ctx, this, {}, uuids); })->setEnabled(!uuids.isEmpty());
+    addUpdateAction(m_menu, m_ctx, uuids, [this, uuids] { updateMods(m_ctx, uuids, this); });
+    m_menu->addSeparator();
+    if (node.kind == QStringLiteral("ungrouped")) { m_menu->addAction(QStringLiteral("New folder…"), this, &OrganizerViewPanel::newFolder); return; }
+    if (node.folder && node.folder->depth < kMaxDepth) m_menu->addAction(QStringLiteral("New subfolder…"), this, [this, id] { editFolder(QStringLiteral("new"), id); });
+    m_menu->addAction(QStringLiteral("Rename…"), this, [this, id] { editFolder(QStringLiteral("rename"), id); });
+    const auto targets = m_service.folderMoveTargets(id);
+    m_menu->addAction(QStringLiteral("Move to…"), this, [this, id] { editFolder(QStringLiteral("moveFolder"), id); })->setEnabled(targets && !targets->isEmpty());
+    m_menu->addAction(QStringLiteral("Delete…"), this, [this, id] { editFolder(QStringLiteral("delete"), id); });
 }
 bool OrganizerViewPanel::canDrop(const QModelIndex& source, const QModelIndex& target) const {
-    const auto* src = model_->node_at(source);
-    const auto* dst = model_->node_at(target);
-    if (!src || !dst || !dst->is_container() || src == dst) return false;
+    const auto* src = m_model->nodeAt(source);
+    const auto* dst = m_model->nodeAt(target);
+    if (!src || !dst || !dst->isContainer() || src == dst) return false;
     if (src->leaf) {
-        if (!model_->is_selected(source)) return src->leaf->package_id.has_value();
+        if (!m_model->isSelected(source)) return src->leaf->packageId.has_value();
         bool any = false;
-        for (const auto* node : model_->selected_nodes()) {
+        for (const auto* node : m_model->selectedNodes()) {
             if (!node->leaf) continue;
             any = true;
-            if (!node->leaf->package_id) return false;
+            if (!node->leaf->packageId) return false;
         }
         return any;
     }
-    if (src->kind == QStringLiteral("folder")) { const auto targets = service_.folder_move_targets(src->folder_id()); return targets && targets->contains(dst->folder_id()); }
+    if (src->kind == QStringLiteral("folder")) { const auto targets = m_service.folderMoveTargets(src->folderId()); return targets && targets->contains(dst->folderId()); }
     return false;
 }
 QCoro::QmlTask OrganizerViewPanel::dropOn(const QModelIndex& source, const QModelIndex& target) { return performDrop(source, target); }
 QCoro::Task<void> OrganizerViewPanel::performDrop(QModelIndex source, QModelIndex target) {
     const QPointer<OrganizerViewPanel> alive(this);
     if (!canDrop(source, target)) co_return;
-    const auto* src = model_->node_at(source);
-    const auto* dst = model_->node_at(target);
-    const auto destination = dst->folder_id();
+    const auto* src = m_model->nodeAt(source);
+    const auto* dst = m_model->nodeAt(target);
+    const auto destination = dst->folderId();
     if (src->kind == QStringLiteral("folder")) {
-        const auto result = co_await service_.move_folder(src->folder_id(), destination);
+        const auto result = co_await m_service.moveFolder(src->folderId(), destination);
         if (!alive) co_return;
         if (!result) reportError(result.error());
     } else {
-        const auto pids = model_->is_selected(source) ? selectedPackageIds() : QStringList{*src->leaf->package_id};
+        const auto pids = m_model->isSelected(source) ? selectedPackageIds() : QStringList{*src->leaf->packageId};
         co_await placeMods(pids, destination);
     }
 }

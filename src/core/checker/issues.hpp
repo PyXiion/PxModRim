@@ -15,15 +15,15 @@ class ModIssueChecker {
 public:
     virtual ~ModIssueChecker() = default;
 
-    const QString& category_display_name() const noexcept { return category_display_name_; }
+    const QString& categoryDisplayName() const noexcept { return m_categoryDisplayName; }
 
     // Order-independent results are reused when only the load order changes.
-    bool order_dependent() const noexcept { return order_dependent_; }
+    bool orderDependent() const noexcept { return m_orderDependent; }
 
-    virtual bool should_check(const AboutXmlMod&, const CheckContext&) const { return true; }
+    virtual bool shouldCheck(const AboutXmlMod&, const CheckContext&) const { return true; }
 
     // Mods whose results may change when `moved` changed index; nullopt means all mods.
-    virtual std::optional<QSet<PackageId>> affected_by_moves(const CheckContext&,
+    virtual std::optional<QSet<PackageId>> affectedByMoves(const CheckContext&,
                                                              const QSet<PackageId>&) const {
         return std::nullopt;
     }
@@ -31,13 +31,13 @@ public:
     virtual QList<ModIssue> check(const AboutXmlMod& mod, const CheckContext& ctx) const = 0;
 
 protected:
-    ModIssueChecker(QString category_display_name, bool order_dependent)
-        : category_display_name_(std::move(category_display_name)),
-          order_dependent_(order_dependent) {}
+    ModIssueChecker(QString categoryDisplayName, bool orderDependent)
+        : m_categoryDisplayName(std::move(categoryDisplayName)),
+          m_orderDependent(orderDependent) {}
 
 private:
-    QString category_display_name_;
-    bool order_dependent_;
+    QString m_categoryDisplayName;
+    bool m_orderDependent;
 };
 
 // Missing or unsatisfied mod dependencies, honouring alternative package ids when enabled.
@@ -45,7 +45,7 @@ class DependencyIssueChecker final : public ModIssueChecker {
 public:
     DependencyIssueChecker() : ModIssueChecker(QStringLiteral("Missing Dependency"), false) {}
 
-    bool should_check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
+    bool shouldCheck(const AboutXmlMod& mod, const CheckContext& ctx) const override;
     QList<ModIssue> check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
 };
 
@@ -54,7 +54,7 @@ class IncompatibilityIssueChecker final : public ModIssueChecker {
 public:
     IncompatibilityIssueChecker() : ModIssueChecker(QStringLiteral("Incompatibility"), false) {}
 
-    bool should_check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
+    bool shouldCheck(const AboutXmlMod& mod, const CheckContext& ctx) const override;
     QList<ModIssue> check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
 };
 
@@ -63,8 +63,8 @@ class LoadOrderIssueChecker final : public ModIssueChecker {
 public:
     LoadOrderIssueChecker() : ModIssueChecker(QStringLiteral("Load Order"), true) {}
 
-    bool should_check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
-    std::optional<QSet<PackageId>> affected_by_moves(const CheckContext& ctx,
+    bool shouldCheck(const AboutXmlMod& mod, const CheckContext& ctx) const override;
+    std::optional<QSet<PackageId>> affectedByMoves(const CheckContext& ctx,
                                                      const QSet<PackageId>& moved) const override;
     QList<ModIssue> check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
 };
@@ -82,7 +82,7 @@ class GameVersionIssueChecker final : public ModIssueChecker {
 public:
     GameVersionIssueChecker() : ModIssueChecker(QStringLiteral("Version Mismatch"), false) {}
 
-    bool should_check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
+    bool shouldCheck(const AboutXmlMod& mod, const CheckContext& ctx) const override;
     QList<ModIssue> check(const AboutXmlMod& mod, const CheckContext& ctx) const override;
 };
 

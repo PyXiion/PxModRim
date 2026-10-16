@@ -14,13 +14,13 @@ class PxModRimBridge final : public QObject {
     Q_OBJECT
 public:
     PxModRimBridge(SteamWorkshopUiPlugin& plugin, QObject* parent);
-    Q_INVOKABLE void call(const QString& request_id, const QString& method, const QString& payload);
+    Q_INVOKABLE void call(const QString& requestId, const QString& method, const QString& payload);
 signals:
-    void result_ready(const QString& request_id, const QString& payload);
+    void resultReady(const QString& requestId, const QString& payload);
 private:
-    QCoro::Task<void> handle(QString request_id, QString method, QString payload);
-    void respond(const QString& request_id, bool ok, const QJsonValue& result = QJsonValue(QJsonValue::Null), const QString& error = {});
-    SteamWorkshopUiPlugin& plugin_;
+    QCoro::Task<void> handle(QString requestId, QString method, QString payload);
+    void respond(const QString& requestId, bool ok, const QJsonValue& result = QJsonValue(QJsonValue::Null), const QString& error = {});
+    SteamWorkshopUiPlugin& m_plugin;
 };
 
 }  // namespace px::modrim

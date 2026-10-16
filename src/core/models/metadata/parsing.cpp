@@ -25,7 +25,7 @@ void setInvalid(ListedMod& mod, const QString& message) {
 }
 
 CaseInsensitiveStr missingPackageId() {
-    return CaseInsensitiveStr(QString(DEFAULT_MISSING_PACKAGEID));
+    return CaseInsensitiveStr(QString(kDefaultMissingPackageid));
 }
 
 // Text or <li> list of an element; nullopt when the element is absent or empty.
@@ -93,19 +93,19 @@ QString officialModName(const QString& packageId, const QString& name) {
 DependencyMod dependencyFromLi(pugi::xml_node li) {
     DependencyMod dep;
     if (const auto packageId = childText(li, "packageId")) {
-        dep.package_id = CaseInsensitiveStr(*packageId);
+        dep.packageId = CaseInsensitiveStr(*packageId);
     }
     if (const auto name = childText(li, "displayName")) {
         dep.name = *name;
     }
     if (const auto url = childText(li, "workshopUrl")) {
-        dep.workshop_url = *url;
+        dep.workshopUrl = *url;
     }
     if (pugi::xml_node alternatives = li.child("alternativePackageIds")) {
         for (pugi::xml_node alternative : alternatives.children("li")) {
             const QString text = rawText(alternative).trimmed();
             if (!text.isEmpty()) {
-                dep.alternative_package_ids.add(text);
+                dep.alternativePackageIds.add(text);
             }
         }
     }
@@ -130,7 +130,7 @@ std::shared_ptr<AboutXmlMod> aboutModWithoutXml() {
 
 template <class T>
 Result<std::shared_ptr<T>> withModPath(std::shared_ptr<T> mod, const QString& path) {
-    if (auto set = mod->set_mod_path(path); !set) {
+    if (auto set = mod->setModPath(path); !set) {
         return std::unexpected(set.error());
     }
     return mod;
@@ -193,12 +193,12 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
             hasPackageId = true;
             const auto text = asText(elementValue(child));
             if (text && !text->isEmpty()) {
-                mod->package_id = CaseInsensitiveStr(*text);
+                mod->packageId = CaseInsensitiveStr(*text);
             } else {
                 setInvalid(*mod, QStringLiteral("packageId missing or invalid. Assigned sentinel "
                                                 "'%1'.")
-                                    .arg(QString(DEFAULT_MISSING_PACKAGEID)));
-                mod->package_id = missingPackageId();
+                                    .arg(QString(kDefaultMissingPackageid)));
+                mod->packageId = missingPackageId();
             }
         } else if (tag == "steamAppId") {
             const auto text = asText(elementValue(child));
@@ -206,7 +206,7 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
                 bool ok = false;
                 const qint64 appId = text->toLongLong(&ok);
                 if (ok) {
-                    mod->steam_app_id = appId;
+                    mod->steamAppId = appId;
                 }
             }
         } else if (tag == "name") {
@@ -227,15 +227,15 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
             }
         } else if (tag == "supportedVersions") {
             if (const auto list = asList(elementValue(child))) {
-                mod->supported_versions = QSet<QString>(list->cbegin(), list->cend());
+                mod->supportedVersions = QSet<QString>(list->cbegin(), list->cend());
             }
         } else if (tag == "modVersion") {
             if (const auto text = asText(elementValue(child))) {
-                mod->mod_version = *text;
+                mod->modVersion = *text;
             }
         } else if (tag == "modIconPath") {
             if (const auto text = asText(elementValue(child))) {
-                mod->mod_icon_path = *text;
+                mod->modIconPath = *text;
             }
         } else if (tag == "url") {
             if (const auto text = asText(elementValue(child))) {
@@ -302,8 +302,8 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
 
     if (!hasPackageId) {
         setInvalid(*mod, QStringLiteral("packageId missing or invalid. Assigned sentinel '%1'.")
-                             .arg(QString(DEFAULT_MISSING_PACKAGEID)));
-        mod->package_id = missingPackageId();
+                             .arg(QString(kDefaultMissingPackageid)));
+        mod->packageId = missingPackageId();
     }
 
     // Versioned overrides replace the unversioned lists they shadow.
@@ -327,9 +327,9 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
     loadAfterLi.append(forceAfterLi);
 
     BaseRules rules;
-    rules.load_before = CaseInsensitiveSet(loadBeforeLi);
-    rules.load_after = CaseInsensitiveSet(loadAfterLi);
-    rules.incompatible_with = CaseInsensitiveSet(incompatLi);
+    rules.loadBefore = CaseInsensitiveSet(loadBeforeLi);
+    rules.loadAfter = CaseInsensitiveSet(loadAfterLi);
+    rules.incompatibleWith = CaseInsensitiveSet(incompatLi);
 
     if (depsEl) {
         for (pugi::xml_node li = depsEl.first_child(); li; li = li.next_sibling()) {
@@ -343,34 +343,34 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(pugi::xml_node root,
                 continue;
             }
             DependencyMod dep = dependencyFromLi(li);
-            if (rules.find_dependency(dep.package_id)) {
+            if (rules.findDependency(dep.packageId)) {
                 spdlog::warn("Duplicate dependency found: {}. Skipping.",
-                             utf8(dep.package_id.str()));
+                             utf8(dep.packageId.str()));
             } else {
                 rules.dependencies.append(std::move(dep));
             }
         }
     }
 
-    const QString packageId = mod->package_id.str();
+    const QString packageId = mod->packageId.str();
     mod->name = officialModName(packageId, mod->name);
     const RimWorldDlc* dlc = findRimWorldDlcByPackageId(packageId);
     if (dlc && mod->description.isEmpty()) {
         mod->description = QString(dlc->description);
     }
     // DLC cannot load without the base game, so it always depends on RimWorld.
-    if (dlc && QLatin1StringView(dlc->appId) != RIMWORLD_STEAM_APP_ID) {
+    if (dlc && QLatin1StringView(dlc->appId) != kRimworldSteamAppId) {
         const CaseInsensitiveStr rimworldPid(QStringLiteral("ludeon.rimworld"));
-        if (!rules.has_dependency(rimworldPid)) {
+        if (!rules.hasDependency(rimworldPid)) {
             DependencyMod rimworld;
             rimworld.name = QStringLiteral("RimWorld");
-            rimworld.package_id = rimworldPid;
-            rimworld.workshop_url = QStringLiteral("https://store.steampowered.com/app/294100/RimWorld");
+            rimworld.packageId = rimworldPid;
+            rimworld.workshopUrl = QStringLiteral("https://store.steampowered.com/app/294100/RimWorld");
             rules.dependencies.append(std::move(rimworld));
         }
     }
 
-    mod->about_rules = std::move(rules);
+    mod->aboutRules = std::move(rules);
     return mod;
 }
 

@@ -24,17 +24,17 @@ namespace {
 
 // Recency weights: the newest session weighs WEIGHT_SPREAD, the next WEIGHT_SPREAD-1, and so
 // on down to 1. Sessions beyond HISTORY_DEPTH are not kept.
-constexpr int HISTORY_DEPTH = 5;
-constexpr int WEIGHT_SPREAD = 10;
+constexpr int kHistoryDepth = 5;
+constexpr int kWeightSpread = 10;
 
-constexpr int SCHEMA_VERSION = 1;
+constexpr int kSchemaVersion = 1;
 
 // Above this size the file is rebuilt after a store, since freed pages are never returned
 // otherwise.
-constexpr qint64 VACUUM_THRESHOLD_BYTES = 10 * 1024 * 1024;
+constexpr qint64 kVacuumThresholdBytes = 10 * 1024 * 1024;
 
 // Schema text is identical to the legacy app's, so both can open the same cache.db.
-constexpr QLatin1StringView SCHEMA{R"sql(
+constexpr QLatin1StringView kSchema{R"sql(
     CREATE TABLE IF NOT EXISTS startup_impact_sessions (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         recorded_at     REAL NOT NULL,
@@ -63,7 +63,7 @@ constexpr QLatin1StringView SCHEMA{R"sql(
 
 // Ranks the newest HISTORY_DEPTH sessions and assigns each a recency weight.
 // Binds, in order: HISTORY_DEPTH, WEIGHT_SPREAD. Exposes columns session_id and weight.
-constexpr QLatin1StringView WEIGHTED_SESSIONS_CTE{R"sql(
+constexpr QLatin1StringView kWeightedSessionsCte{R"sql(
     ranked AS (
         SELECT id AS session_id,
                ROW_NUMBER() OVER (ORDER BY id DESC) AS rn
@@ -79,18 +79,18 @@ constexpr QLatin1StringView WEIGHTED_SESSIONS_CTE{R"sql(
 )sql"};
 
 // Wraps a SELECT that joins the weighted sessions as `w`.
-QString with_weights(const QString& select_sql) {
-    return QStringLiteral("WITH ") + QString(WEIGHTED_SESSIONS_CTE) + select_sql;
+QString withWeights(const QString& selectSql) {
+    return QStringLiteral("WITH ") + QString(kWeightedSessionsCte) + selectSql;
 }
 
 // The CTE's two parameters come first, followed by the query's own.
-QVariantList with_cte_binds(const QVariantList& rest = {}) {
-    QVariantList binds{HISTORY_DEPTH, WEIGHT_SPREAD};
+QVariantList withCteBinds(const QVariantList& rest = {}) {
+    QVariantList binds{kHistoryDepth, kWeightSpread};
     binds.append(rest);
     return binds;
 }
 
-QVariantList to_variants(const QStringList& values) {
+QVariantList toVariants(const QStringList& values) {
     QVariantList binds;
     binds.reserve(values.size());
     for (const QString& value : values) {
@@ -99,7 +99,7 @@ QVariantList to_variants(const QStringList& values) {
     return binds;
 }
 
-QString placeholder_list(qsizetype count) {
+QString placeholderList(qsizetype count) {
     QStringList marks(count, QStringLiteral("?"));
     return marks.join(QLatin1Char(','));
 }
@@ -128,8 +128,8 @@ Result<void> run(QSqlDatabase& db, const QString& sql, const QVariantList& binds
 }
 
 // Stored metric maps hold seconds already. Non-numeric values are skipped.
-Result<QMap<QString, double>> load_metric_map(const QString& json_text) {
-    const QByteArray bytes = json_text.isEmpty() ? QByteArrayLiteral("{}") : json_text.toUtf8();
+Result<QMap<QString, double>> loadMetricMap(const QString& jsonText) {
+    const QByteArray bytes = jsonText.isEmpty() ? QByteArrayLiteral("{}") : jsonText.toUtf8();
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(bytes, &error);
     if (error.error != QJsonParseError::NoError || !document.isObject()) {
@@ -146,7 +146,7 @@ Result<QMap<QString, double>> load_metric_map(const QString& json_text) {
     return values;
 }
 
-QString metrics_to_json(const QMap<QString, double>& metrics) {
+QString metricsToJson(const QMap<QString, double>& metrics) {
     QJsonObject object;
     for (auto it = metrics.cbegin(); it != metrics.cend(); ++it) {
         object.insert(it.key(), it.value());
@@ -154,46 +154,46 @@ QString metrics_to_json(const QMap<QString, double>& metrics) {
     return QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact));
 }
 
-Result<StartupImpactMod> row_to_mod(const QSqlQuery& row) {
-    const QString package_id = row.value(0).toString();
-    const QString mod_name = row.value(1).toString();
+Result<StartupImpactMod> rowToMod(const QSqlQuery& row) {
+    const QString packageId = row.value(0).toString();
+    const QString modName = row.value(1).toString();
     // A report without a package id stores the mod name in its place. Read it back as absent.
-    std::optional<QString> pid = package_id;
-    if (package_id == mod_name && package_id != BASE_GAME_PID) {
+    std::optional<QString> pid = packageId;
+    if (packageId == modName && packageId != kBaseGamePid) {
         pid = std::nullopt;
     }
 
-    auto metrics = load_metric_map(row.value(3).toString());
+    auto metrics = loadMetricMap(row.value(3).toString());
     if (!metrics) {
         return std::unexpected(metrics.error());
     }
-    auto off_thread = load_metric_map(row.value(4).toString());
-    if (!off_thread) {
-        return std::unexpected(off_thread.error());
+    auto offThread = loadMetricMap(row.value(4).toString());
+    if (!offThread) {
+        return std::unexpected(offThread.error());
     }
 
     return StartupImpactMod{
-        .mod_name = mod_name,
-        .package_id = pid,
-        .total_impact_s = row.value(2).toDouble(),
+        .modName = modName,
+        .packageId = pid,
+        .totalImpactS = row.value(2).toDouble(),
         .metrics = std::move(*metrics),
-        .off_thread_metrics = std::move(*off_thread),
-        .off_thread_total_impact_s = row.value(5).toDouble(),
+        .offThreadMetrics = std::move(*offThread),
+        .offThreadTotalImpactS = row.value(5).toDouble(),
     };
 }
 
-Result<QList<StartupImpactMod>> load_mods(QSqlDatabase& db, qlonglong session_id) {
+Result<QList<StartupImpactMod>> loadMods(QSqlDatabase& db, qlonglong sessionId) {
     auto query = exec(db,
                       "SELECT package_id, mod_name, total_impact_s,"
                       " metrics_json, off_thread_metrics_json, off_thread_total_s"
                       " FROM startup_impact_entries WHERE session_id = ?",
-                      {session_id});
+                      {sessionId});
     if (!query) {
         return std::unexpected(query.error());
     }
     QList<StartupImpactMod> mods;
     while (query->next()) {
-        auto mod = row_to_mod(*query);
+        auto mod = rowToMod(*query);
         if (!mod) {
             return std::unexpected(mod.error());
         }
@@ -202,7 +202,7 @@ Result<QList<StartupImpactMod>> load_mods(QSqlDatabase& db, qlonglong session_id
     return mods;
 }
 
-void close_connection(StartupImpactDb::Connection& conn) {
+void closeConnection(StartupImpactDb::Connection& conn) {
     if (!conn.open) {
         return;
     }
@@ -218,11 +218,11 @@ void close_connection(StartupImpactDb::Connection& conn) {
 
 // Opens the connection on the worker, applying the legacy pragmas and schema. Reuses the open
 // connection when the path has not changed.
-Result<QSqlDatabase> open_connection(StartupImpactDb::Connection& conn, const QString& path) {
+Result<QSqlDatabase> openConnection(StartupImpactDb::Connection& conn, const QString& path) {
     if (conn.open && conn.path == path) {
         return QSqlDatabase::database(conn.name, false);
     }
-    close_connection(conn);
+    closeConnection(conn);
 
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn.name);
     db.setDatabaseName(path);
@@ -238,7 +238,7 @@ Result<QSqlDatabase> open_connection(StartupImpactDb::Connection& conn, const QS
                 return applied;
             }
         }
-        return ensure_schema(db, QString(SCHEMA), SCHEMA_VERSION, {}, path,
+        return ensureSchema(db, QString(kSchema), kSchemaVersion, {}, path,
                              QStringLiteral("DB schema"));
     };
 
@@ -254,10 +254,10 @@ Result<QSqlDatabase> open_connection(StartupImpactDb::Connection& conn, const QS
 }
 
 // Read paths return empty results for a missing file rather than creating one.
-bool file_exists(const QString& path) { return QFileInfo::exists(path); }
+bool fileExists(const QString& path) { return QFileInfo::exists(path); }
 
-Result<void> ensure_parent_dir(const QString& path) {
-    if (file_exists(path)) {
+Result<void> ensureParentDir(const QString& path) {
+    if (fileExists(path)) {
         return {};
     }
     const QString dir = QFileInfo(path).absolutePath();
@@ -267,30 +267,30 @@ Result<void> ensure_parent_dir(const QString& path) {
     return {};
 }
 
-Result<void> insert_report(QSqlDatabase& db, const StartupImpactReport& report) {
+Result<void> insertReport(QSqlDatabase& db, const StartupImpactReport& report) {
     const QString timestamp = report.timestamp.isNull() ? QStringLiteral("") : report.timestamp;
     auto session = exec(db,
                         "INSERT INTO startup_impact_sessions"
                         " (recorded_at, loading_time_s, timestamp) VALUES (?, ?, ?)",
-                        {QDateTime::currentMSecsSinceEpoch() / 1000.0, report.loading_time_s,
+                        {QDateTime::currentMSecsSinceEpoch() / 1000.0, report.loadingTimeS,
                          timestamp});
     if (!session) {
         return std::unexpected(session.error());
     }
-    const qlonglong session_id = session->lastInsertId().toLongLong();
+    const qlonglong sessionId = session->lastInsertId().toLongLong();
 
     for (const StartupImpactMod& mod : report.mods) {
-        const bool has_package_id = mod.package_id && !mod.package_id->isEmpty();
-        const QString name = mod.mod_name.isNull() ? QStringLiteral("") : mod.mod_name;
-        const QString pid = has_package_id ? *mod.package_id : name;
+        const bool hasPackageId = mod.packageId && !mod.packageId->isEmpty();
+        const QString name = mod.modName.isNull() ? QStringLiteral("") : mod.modName;
+        const QString pid = hasPackageId ? *mod.packageId : name;
         auto entry = run(db,
                          "INSERT INTO startup_impact_entries"
                          " (session_id, package_id, mod_name, total_impact_s,"
                          "  metrics_json, off_thread_metrics_json, off_thread_total_s)"
                          " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                         {session_id, pid, name, mod.total_impact_s,
-                          metrics_to_json(mod.metrics), metrics_to_json(mod.off_thread_metrics),
-                          mod.off_thread_total_impact_s});
+                         {sessionId, pid, name, mod.totalImpactS,
+                          metricsToJson(mod.metrics), metricsToJson(mod.offThreadMetrics),
+                          mod.offThreadTotalImpactS});
         if (!entry) {
             return entry;
         }
@@ -299,7 +299,7 @@ Result<void> insert_report(QSqlDatabase& db, const StartupImpactReport& report) 
     return run(db,
                "DELETE FROM startup_impact_sessions WHERE id NOT IN"
                " (SELECT id FROM startup_impact_sessions ORDER BY id DESC LIMIT ?)",
-               {HISTORY_DEPTH});
+               {kHistoryDepth});
 }
 
 Result<void> compact(QSqlDatabase& db, const QString& path) {
@@ -310,7 +310,7 @@ Result<void> compact(QSqlDatabase& db, const QString& path) {
     if (auto vacuumed = run(db, "PRAGMA incremental_vacuum"); !vacuumed) {
         return vacuumed;
     }
-    if (QFileInfo(path).size() > VACUUM_THRESHOLD_BYTES) {
+    if (QFileInfo(path).size() > kVacuumThresholdBytes) {
         return run(db, "VACUUM");
     }
     return {};
@@ -318,7 +318,7 @@ Result<void> compact(QSqlDatabase& db, const QString& path) {
 
 // Runs `work` inside one transaction, rolling back when it fails.
 template <class Work>
-Result<void> in_transaction(QSqlDatabase& db, Work&& work) {
+Result<void> inTransaction(QSqlDatabase& db, Work&& work) {
     if (!db.transaction()) {
         return std::unexpected(Error{db.lastError().text()});
     }
@@ -334,28 +334,28 @@ Result<void> in_transaction(QSqlDatabase& db, Work&& work) {
     return {};
 }
 
-Result<void> store_report_sync(StartupImpactDb::Connection& conn, const QString& path,
+Result<void> storeReportSync(StartupImpactDb::Connection& conn, const QString& path,
                                const StartupImpactReport& report) {
-    if (auto dir = ensure_parent_dir(path); !dir) {
+    if (auto dir = ensureParentDir(path); !dir) {
         return dir;
     }
-    auto opened = open_connection(conn, path);
+    auto opened = openConnection(conn, path);
     if (!opened) {
         return std::unexpected(opened.error());
     }
     QSqlDatabase db = *opened;
-    if (auto stored = in_transaction(db, [&] { return insert_report(db, report); }); !stored) {
+    if (auto stored = inTransaction(db, [&] { return insertReport(db, report); }); !stored) {
         return stored;
     }
     return compact(db, path);
 }
 
-Result<std::optional<StartupImpactReport>> get_latest_report_sync(StartupImpactDb::Connection& conn,
+Result<std::optional<StartupImpactReport>> getLatestReportSync(StartupImpactDb::Connection& conn,
                                                                   const QString& path) {
-    if (!file_exists(path)) {
+    if (!fileExists(path)) {
         return std::nullopt;
     }
-    auto opened = open_connection(conn, path);
+    auto opened = openConnection(conn, path);
     if (!opened) {
         return std::unexpected(opened.error());
     }
@@ -370,12 +370,12 @@ Result<std::optional<StartupImpactReport>> get_latest_report_sync(StartupImpactD
     if (!session->next()) {
         return std::nullopt;
     }
-    const qlonglong session_id = session->value(0).toLongLong();
+    const qlonglong sessionId = session->value(0).toLongLong();
     StartupImpactReport report;
-    report.loading_time_s = session->value(1).toDouble();
+    report.loadingTimeS = session->value(1).toDouble();
     report.timestamp = session->value(2).toString();
 
-    auto mods = load_mods(db, session_id);
+    auto mods = loadMods(db, sessionId);
     if (!mods) {
         return std::unexpected(mods.error());
     }
@@ -383,23 +383,23 @@ Result<std::optional<StartupImpactReport>> get_latest_report_sync(StartupImpactD
     return report;
 }
 
-Result<double> average_for(QSqlDatabase& db, const QString& package_id) {
+Result<double> averageFor(QSqlDatabase& db, const QString& packageId) {
     auto query = exec(db,
-                      with_weights("SELECT COALESCE(SUM(e.total_impact_s * w.weight) * 1.0"
+                      withWeights("SELECT COALESCE(SUM(e.total_impact_s * w.weight) * 1.0"
                                    " / NULLIF(SUM(w.weight), 0), 0)"
                                    " FROM startup_impact_entries e"
                                    " JOIN w ON w.session_id = e.session_id"
                                    " WHERE e.package_id = ?"),
-                      with_cte_binds({package_id}));
+                      withCteBinds({packageId}));
     if (!query) {
         return std::unexpected(query.error());
     }
     return query->next() ? query->value(0).toDouble() : 0.0;
 }
 
-Result<QHash<QString, ThreadAverages>> totals_for(QSqlDatabase& db, const QStringList& package_ids) {
+Result<QHash<QString, ThreadAverages>> totalsFor(QSqlDatabase& db, const QStringList& packageIds) {
     auto query = exec(db,
-                      with_weights("SELECT e.package_id,"
+                      withWeights("SELECT e.package_id,"
                                    " COALESCE(SUM(e.total_impact_s * w.weight)"
                                    "     * 1.0 / NULLIF(SUM(w.weight), 0), 0),"
                                    " COALESCE(SUM(e.off_thread_total_s * w.weight)"
@@ -407,9 +407,9 @@ Result<QHash<QString, ThreadAverages>> totals_for(QSqlDatabase& db, const QStrin
                                    " FROM startup_impact_entries e"
                                    " JOIN w ON w.session_id = e.session_id"
                                    " WHERE e.package_id IN (" +
-                                   placeholder_list(package_ids.size()) +
+                                   placeholderList(packageIds.size()) +
                                    ") GROUP BY e.package_id"),
-                      with_cte_binds(to_variants(package_ids)));
+                      withCteBinds(toVariants(packageIds)));
     if (!query) {
         return std::unexpected(query.error());
     }
@@ -421,15 +421,15 @@ Result<QHash<QString, ThreadAverages>> totals_for(QSqlDatabase& db, const QStrin
     return totals;
 }
 
-Result<QHash<QString, double>> all_averages_for(QSqlDatabase& db) {
+Result<QHash<QString, double>> allAveragesFor(QSqlDatabase& db) {
     auto query = exec(db,
-                      with_weights("SELECT e.package_id,"
+                      withWeights("SELECT e.package_id,"
                                    " COALESCE(SUM(e.total_impact_s * w.weight)"
                                    "     * 1.0 / NULLIF(SUM(w.weight), 0), 0)"
                                    " FROM startup_impact_entries e"
                                    " JOIN w ON w.session_id = e.session_id"
                                    " GROUP BY e.package_id"),
-                      with_cte_binds());
+                      withCteBinds());
     if (!query) {
         return std::unexpected(query.error());
     }
@@ -440,16 +440,16 @@ Result<QHash<QString, double>> all_averages_for(QSqlDatabase& db) {
     return averages;
 }
 
-Result<void> clear_sync(StartupImpactDb::Connection& conn, const QString& path) {
-    if (!file_exists(path)) {
+Result<void> clearSync(StartupImpactDb::Connection& conn, const QString& path) {
+    if (!fileExists(path)) {
         return {};
     }
-    auto opened = open_connection(conn, path);
+    auto opened = openConnection(conn, path);
     if (!opened) {
         return std::unexpected(opened.error());
     }
     QSqlDatabase db = *opened;
-    if (auto cleared = in_transaction(db, [&]() -> Result<void> {
+    if (auto cleared = inTransaction(db, [&]() -> Result<void> {
             if (auto entries = run(db, "DELETE FROM startup_impact_entries"); !entries) {
                 return entries;
             }
@@ -466,116 +466,116 @@ Result<void> clear_sync(StartupImpactDb::Connection& conn, const QString& path) 
 
 }  // namespace
 
-QString db_path(const QString& config_dir) {
-    return QDir(config_dir).filePath(QStringLiteral("cache.db"));
+QString dbPath(const QString& configDir) {
+    return QDir(configDir).filePath(QStringLiteral("cache.db"));
 }
 
 StartupImpactDb::StartupImpactDb() {
     // A single thread keeps the connection on one thread. Idle threads must not expire, since
     // the connection is bound to the thread that opened it.
-    pool_.setMaxThreadCount(1);
-    pool_.setExpiryTimeout(-1);
-    conn_.name = QStringLiteral("startup_impact_%1")
+    m_pool.setMaxThreadCount(1);
+    m_pool.setExpiryTimeout(-1);
+    m_conn.name = QStringLiteral("startup_impact_%1")
                      .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
 }
 
-StartupImpactDb::~StartupImpactDb() { close_sync(); }
+StartupImpactDb::~StartupImpactDb() { closeSync(); }
 
-QCoro::Task<Result<void>> StartupImpactDb::store_report(QString path, StartupImpactReport report) {
-    co_return co_await QtConcurrent::run(&pool_, [this, path = std::move(path),
+QCoro::Task<Result<void>> StartupImpactDb::storeReport(QString path, StartupImpactReport report) {
+    co_return co_await QtConcurrent::run(&m_pool, [this, path = std::move(path),
                                                   report = std::move(report)] {
-        return store_report_sync(conn_, path, report);
+        return storeReportSync(m_conn, path, report);
     });
 }
 
-QCoro::Task<Result<std::optional<StartupImpactReport>>> StartupImpactDb::get_latest_report(
+QCoro::Task<Result<std::optional<StartupImpactReport>>> StartupImpactDb::getLatestReport(
     QString path) {
-    co_return co_await QtConcurrent::run(&pool_, [this, path = std::move(path)] {
-        return get_latest_report_sync(conn_, path);
+    co_return co_await QtConcurrent::run(&m_pool, [this, path = std::move(path)] {
+        return getLatestReportSync(m_conn, path);
     });
 }
 
-QCoro::Task<Result<double>> StartupImpactDb::get_average(QString path, QString package_id) {
+QCoro::Task<Result<double>> StartupImpactDb::getAverage(QString path, QString packageId) {
     co_return co_await QtConcurrent::run(
-        &pool_, [this, path = std::move(path), package_id = std::move(package_id)]() -> Result<double> {
-            if (!file_exists(path)) {
+        &m_pool, [this, path = std::move(path), packageId = std::move(packageId)]() -> Result<double> {
+            if (!fileExists(path)) {
                 return 0.0;
             }
-            auto opened = open_connection(conn_, path);
+            auto opened = openConnection(m_conn, path);
             if (!opened) {
                 return std::unexpected(opened.error());
             }
             QSqlDatabase db = *opened;
-            return average_for(db, package_id);
+            return averageFor(db, packageId);
         });
 }
 
-QCoro::Task<Result<QHash<QString, ThreadAverages>>> StartupImpactDb::get_totals_for(
-    QString path, QStringList package_ids) {
+QCoro::Task<Result<QHash<QString, ThreadAverages>>> StartupImpactDb::getTotalsFor(
+    QString path, QStringList packageIds) {
     co_return co_await QtConcurrent::run(
-        &pool_, [this, path = std::move(path), package_ids = std::move(package_ids)]()
+        &m_pool, [this, path = std::move(path), packageIds = std::move(packageIds)]()
                     -> Result<QHash<QString, ThreadAverages>> {
             // Ids without history are left out, so callers treat them as zero.
-            if (package_ids.isEmpty() || !file_exists(path)) {
+            if (packageIds.isEmpty() || !fileExists(path)) {
                 return QHash<QString, ThreadAverages>{};
             }
-            auto opened = open_connection(conn_, path);
+            auto opened = openConnection(m_conn, path);
             if (!opened) {
                 return std::unexpected(opened.error());
             }
             QSqlDatabase db = *opened;
-            return totals_for(db, package_ids);
+            return totalsFor(db, packageIds);
         });
 }
 
-QCoro::Task<Result<QHash<QString, double>>> StartupImpactDb::get_all_averages(QString path) {
+QCoro::Task<Result<QHash<QString, double>>> StartupImpactDb::getAllAverages(QString path) {
     co_return co_await QtConcurrent::run(
-        &pool_, [this, path = std::move(path)]() -> Result<QHash<QString, double>> {
-            if (!file_exists(path)) {
+        &m_pool, [this, path = std::move(path)]() -> Result<QHash<QString, double>> {
+            if (!fileExists(path)) {
                 return QHash<QString, double>{};
             }
-            auto opened = open_connection(conn_, path);
+            auto opened = openConnection(m_conn, path);
             if (!opened) {
                 return std::unexpected(opened.error());
             }
             QSqlDatabase db = *opened;
-            return all_averages_for(db);
+            return allAveragesFor(db);
         });
 }
 
-QCoro::Task<Result<LatestWithAverages>> StartupImpactDb::get_latest_with_averages(
-    QString path, QStringList active_pids, std::optional<QString> selected_pid) {
+QCoro::Task<Result<LatestWithAverages>> StartupImpactDb::getLatestWithAverages(
+    QString path, QStringList activePids, std::optional<QString> selectedPid) {
     co_return co_await QtConcurrent::run(
-        &pool_, [this, path = std::move(path), active_pids = std::move(active_pids),
-                 selected_pid = std::move(selected_pid)]() -> Result<LatestWithAverages> {
+        &m_pool, [this, path = std::move(path), activePids = std::move(activePids),
+                 selectedPid = std::move(selectedPid)]() -> Result<LatestWithAverages> {
             LatestWithAverages result;
-            for (const QString& pid : active_pids) {
+            for (const QString& pid : activePids) {
                 result.totals.insert(pid, ThreadAverages{});
             }
-            if (!file_exists(path)) {
+            if (!fileExists(path)) {
                 return result;
             }
 
-            auto latest = get_latest_report_sync(conn_, path);
+            auto latest = getLatestReportSync(m_conn, path);
             if (!latest) {
                 return std::unexpected(latest.error());
             }
             result.report = std::move(*latest);
 
-            auto opened = open_connection(conn_, path);
+            auto opened = openConnection(m_conn, path);
             if (!opened) {
                 return std::unexpected(opened.error());
             }
             QSqlDatabase db = *opened;
 
-            auto base = average_for(db, QString(BASE_GAME_PID));
+            auto base = averageFor(db, QString(kBaseGamePid));
             if (!base) {
                 return std::unexpected(base.error());
             }
-            result.base_game_avg = *base;
+            result.baseGameAvg = *base;
 
-            if (!active_pids.isEmpty()) {
-                auto totals = totals_for(db, active_pids);
+            if (!activePids.isEmpty()) {
+                auto totals = totalsFor(db, activePids);
                 if (!totals) {
                     return std::unexpected(totals.error());
                 }
@@ -584,29 +584,29 @@ QCoro::Task<Result<LatestWithAverages>> StartupImpactDb::get_latest_with_average
                 }
             }
 
-            if (selected_pid) {
-                auto selected = average_for(db, *selected_pid);
+            if (selectedPid) {
+                auto selected = averageFor(db, *selectedPid);
                 if (!selected) {
                     return std::unexpected(selected.error());
                 }
-                result.selected_avg = *selected;
+                result.selectedAvg = *selected;
             }
             return result;
         });
 }
 
 QCoro::Task<Result<void>> StartupImpactDb::clear(QString path) {
-    co_return co_await QtConcurrent::run(&pool_, [this, path = std::move(path)] {
-        return clear_sync(conn_, path);
+    co_return co_await QtConcurrent::run(&m_pool, [this, path = std::move(path)] {
+        return clearSync(m_conn, path);
     });
 }
 
 QCoro::Task<void> StartupImpactDb::close() {
-    co_await QtConcurrent::run(&pool_, [this] { close_connection(conn_); });
+    co_await QtConcurrent::run(&m_pool, [this] { closeConnection(m_conn); });
 }
 
-void StartupImpactDb::close_sync() {
-    QtConcurrent::run(&pool_, [this] { close_connection(conn_); }).waitForFinished();
+void StartupImpactDb::closeSync() {
+    QtConcurrent::run(&m_pool, [this] { closeConnection(m_conn); }).waitForFinished();
 }
 
 }  // namespace px::modrim::startup_impact

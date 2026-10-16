@@ -27,29 +27,29 @@ int floorHalf(int value) {
 }  // namespace
 
 AspectRatioBanner::AspectRatioBanner(QWidget* parent, int maxHeight)
-    : QWidget(parent), max_height_(maxHeight) {
+    : QWidget(parent), m_maxHeight(maxHeight) {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 }
 
 void AspectRatioBanner::setPixmap(const QPixmap& pixmap) {
-    pixmap_ = pixmap;
+    m_pixmap = pixmap;
     recomputeScaledPixmap();
     updateGeometry();
     update();
 }
 
 void AspectRatioBanner::setTitle(const QString& title) {
-    title_ = title;
+    m_title = title;
     update();
 }
 
 void AspectRatioBanner::setSubtitle(const QString& subtitle) {
-    subtitle_ = subtitle;
+    m_subtitle = subtitle;
     update();
 }
 
 void AspectRatioBanner::setShowOverlay(bool show) {
-    show_overlay_ = show;
+    m_showOverlay = show;
     update();
 }
 
@@ -58,7 +58,7 @@ bool AspectRatioBanner::hasHeightForWidth() const {
 }
 
 int AspectRatioBanner::heightForWidth(int w) const {
-    return std::min(w * BANNER_ASPECT_H / BANNER_ASPECT_W, max_height_);
+    return std::min(w * kBannerAspectH / kBannerAspectW, m_maxHeight);
 }
 
 QSize AspectRatioBanner::sizeHint() const {
@@ -67,12 +67,12 @@ QSize AspectRatioBanner::sizeHint() const {
 }
 
 void AspectRatioBanner::recomputeScaledPixmap() {
-    if (pixmap_.isNull() || width() <= 0) {
-        scaled_pixmap_ = QPixmap();
+    if (m_pixmap.isNull() || width() <= 0) {
+        m_scaledPixmap = QPixmap();
         return;
     }
 
-    scaled_pixmap_ = pixmap_.scaled(width(), heightForWidth(width()), Qt::KeepAspectRatioByExpanding,
+    m_scaledPixmap = m_pixmap.scaled(width(), heightForWidth(width()), Qt::KeepAspectRatioByExpanding,
                                     Qt::SmoothTransformation);
 }
 
@@ -81,26 +81,26 @@ void AspectRatioBanner::paintEvent(QPaintEvent*) {
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
     painter.setClipRect(rect());
 
-    if (scaled_pixmap_.isNull()) {
+    if (m_scaledPixmap.isNull()) {
         painter.fillRect(rect(), panelBgQ());
     } else {
-        const int x = floorHalf(width() - scaled_pixmap_.width());
-        const int y = floorHalf(height() - scaled_pixmap_.height());
-        painter.drawPixmap(x, y, scaled_pixmap_);
+        const int x = floorHalf(width() - m_scaledPixmap.width());
+        const int y = floorHalf(height() - m_scaledPixmap.height());
+        painter.drawPixmap(x, y, m_scaledPixmap);
     }
 
-    if (title_.isEmpty() || !show_overlay_) {
+    if (m_title.isEmpty() || !m_showOverlay) {
         return;
     }
 
-    const int overlay_top = height() - BANNER_OVERLAY_HEIGHT;
-    QLinearGradient gradient(0, overlay_top, 0, height());
+    const int overlayTop = height() - kBannerOverlayHeight;
+    QLinearGradient gradient(0, overlayTop, 0, height());
     gradient.setColorAt(0.0, QColor(0, 0, 0, 0));
     gradient.setColorAt(1.0, QColor(0, 0, 0, 180));
-    painter.fillRect(0, overlay_top, width(), BANNER_OVERLAY_HEIGHT, gradient);
+    painter.fillRect(0, overlayTop, width(), kBannerOverlayHeight, gradient);
 
-    const int text_area_top = overlay_top + 12;
-    const int text_area_w = width() - kOverlayPad * 2;
+    const int textAreaTop = overlayTop + 12;
+    const int textAreaW = width() - kOverlayPad * 2;
 
     QFont font = painter.font();
     font.setPointSize(18);
@@ -108,22 +108,22 @@ void AspectRatioBanner::paintEvent(QPaintEvent*) {
     painter.setFont(font);
     painter.setPen(textMainQ());
 
-    int title_h = BANNER_OVERLAY_HEIGHT - 24;
-    if (!subtitle_.isEmpty()) {
-        title_h = title_h * 3 / 5;
+    int titleH = kBannerOverlayHeight - 24;
+    if (!m_subtitle.isEmpty()) {
+        titleH = titleH * 3 / 5;
     }
-    painter.drawText(kOverlayPad, text_area_top, text_area_w, title_h,
-                     Qt::AlignLeft | Qt::AlignBottom, title_);
+    painter.drawText(kOverlayPad, textAreaTop, textAreaW, titleH,
+                     Qt::AlignLeft | Qt::AlignBottom, m_title);
 
-    if (!subtitle_.isEmpty()) {
+    if (!m_subtitle.isEmpty()) {
         font.setPointSize(12);
         font.setBold(false);
         painter.setFont(font);
         painter.setPen(textMutedQ());
-        const int subtitle_top = text_area_top + title_h + 2;
-        const int subtitle_h = BANNER_OVERLAY_HEIGHT - title_h - 26;
-        painter.drawText(kOverlayPad, subtitle_top, text_area_w, subtitle_h,
-                         Qt::AlignLeft | Qt::AlignTop, subtitle_);
+        const int subtitleTop = textAreaTop + titleH + 2;
+        const int subtitleH = kBannerOverlayHeight - titleH - 26;
+        painter.drawText(kOverlayPad, subtitleTop, textAreaW, subtitleH,
+                         Qt::AlignLeft | Qt::AlignTop, m_subtitle);
     }
 }
 

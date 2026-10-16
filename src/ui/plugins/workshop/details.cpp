@@ -10,11 +10,11 @@ QString joined(const std::vector<std::string>& ids) {
 }
 }
 
-QCoro::Task<workshop::CatalogResult<Detail>> fetch_detail(
-    workshop::WorkshopCatalog& catalog, QString item_id, QString kind) {
+QCoro::Task<workshop::CatalogResult<Detail>> fetchDetail(
+    workshop::WorkshopCatalog& catalog, QString itemId, QString kind) {
     using namespace workshop;
     if (kind == QStringLiteral("collection")) {
-        auto result = co_await catalog.collection(item_id);
+        auto result = co_await catalog.collection(itemId);
         if (!result) co_return std::unexpected(result.error());
         if (!*result) co_return std::unexpected(CatalogError{QStringLiteral("This collection is no longer available."), 404});
         auto& value = **result;
@@ -24,7 +24,7 @@ QCoro::Task<workshop::CatalogResult<Detail>> fetch_detail(
         if (!value.unavailable_ids.empty()) warning += QStringLiteral(" Unavailable: ") + joined(value.unavailable_ids);
         co_return Detail{std::move(value.collection), std::move(value.members), warning.toStdString(), value.is_complete};
     }
-    auto result = co_await catalog.mod(item_id);
+    auto result = co_await catalog.mod(itemId);
     if (!result) co_return std::unexpected(result.error());
     if (!*result) co_return std::unexpected(CatalogError{QStringLiteral("This mod is no longer available."), 404});
     auto mod = std::move(**result);
@@ -44,14 +44,14 @@ QCoro::Task<workshop::CatalogResult<Detail>> fetch_detail(
     co_return Detail{std::move(mod), std::move(members), warning.toStdString(), missing.isEmpty()};
 }
 
-QString incomplete_plan_notice(const workshop::DownloadPlan& plan) {
+QString incompletePlanNotice(const workshop::DownloadPlan& plan) {
     QStringList parts{QStringLiteral("The download plan is incomplete.")};
     if (!plan.unavailable_ids.isEmpty()) parts.append(QStringLiteral("Unavailable: ") + plan.unavailable_ids.join(QStringLiteral(", ")));
     if (!plan.incomplete_collection_ids.isEmpty()) parts.append(QStringLiteral("Incomplete collections: ") + plan.incomplete_collection_ids.join(QStringLiteral(", ")));
     return parts.join(QLatin1Char(' '));
 }
 
-QString queued_notice(qsizetype count) {
+QString queuedNotice(qsizetype count) {
     return QStringLiteral("Queued %1 mod%2. Progress is shown in the header and results in Downloads. Mods are not activated.")
         .arg(count).arg(count == 1 ? QString{} : QStringLiteral("s"));
 }

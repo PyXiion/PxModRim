@@ -2,169 +2,169 @@
 
 namespace px::modrim {
 namespace {
-bool is_active(const QString& state) {
+bool isActive(const QString& state) {
     return state == QLatin1String("queued") || state == QLatin1String("checking") || state == QLatin1String("downloading");
 }
-QString final_state(qint64 total) {
+QString finalState(qint64 total) {
     return total > 0 ? QStringLiteral("updated") : QStringLiteral("unchanged");
 }
 }
 
 DownloadsModel::DownloadsModel(QObject* parent)
-    : QAbstractListModel(parent), timer_(this), speed_timer_(this) {
-    timer_.setSingleShot(true);
-    timer_.setInterval(150);
-    connect(&timer_, &QTimer::timeout, this, &DownloadsModel::flush);
-    speed_timer_.setInterval(1000);
-    connect(&speed_timer_, &QTimer::timeout, this, &DownloadsModel::sample_speed);
+    : QAbstractListModel(parent), m_timer(this), m_speedTimer(this) {
+    m_timer.setSingleShot(true);
+    m_timer.setInterval(150);
+    connect(&m_timer, &QTimer::timeout, this, &DownloadsModel::flush);
+    m_speedTimer.setInterval(1000);
+    connect(&m_speedTimer, &QTimer::timeout, this, &DownloadsModel::sampleSpeed);
 }
 
 void DownloadsModel::begin(const QStringList& ids, const QHash<QString, QString>& titles) {
-    timer_.stop();
-    dirty_.clear();
-    bytes_ = sampled_bytes_ = 0;
-    speed_ = 0;
-    history_.clear();
-    emit speed_changed();
-    set_phase({});
+    m_timer.stop();
+    m_dirty.clear();
+    m_bytes = m_sampledBytes = 0;
+    m_speed = 0;
+    m_history.clear();
+    emit speedChanged();
+    setPhase({});
     beginResetModel();
-    rows_.clear();
-    by_id_.clear();
-    rows_.reserve(ids.size());
+    m_rows.clear();
+    m_byId.clear();
+    m_rows.reserve(ids.size());
     for (const auto& id : ids) {
-        by_id_.insert(id, rows_.size());
-        rows_.append(Row{id, titles.value(id, id)});
+        m_byId.insert(id, m_rows.size());
+        m_rows.append(Row{id, titles.value(id, id)});
     }
     recount();
     select();
     endResetModel();
-    emit summary_changed();
+    emit summaryChanged();
 }
 
 void DownloadsModel::apply(const DownloadItemStatus& status) {
-    const auto found = by_id_.constFind(status.mod_id);
-    if (found == by_id_.cend()) return;
-    auto& row = rows_[*found];
-    const auto done = status.status == QLatin1String("error") ? row.bytes_done : status.bytes_done;
-    bytes_ += done - row.bytes_done;
-    row.bytes_done = done;
+    const auto found = m_byId.constFind(status.modId);
+    if (found == m_byId.cend()) return;
+    auto& row = m_rows[*found];
+    const auto done = status.status == QLatin1String("error") ? row.bytesDone : status.bytesDone;
+    m_bytes += done - row.bytesDone;
+    row.bytesDone = done;
     if (status.status == QLatin1String("error")) {
         row.state = QStringLiteral("failed");
         row.error = status.error;
         row.progress = 0;
     } else if (status.status == QLatin1String("success")) {
-        row.state = final_state(status.bytes_total);
+        row.state = finalState(status.bytesTotal);
         row.progress = 1;
-    } else if (status.bytes_total > 0 && status.bytes_done < status.bytes_total) {
+    } else if (status.bytesTotal > 0 && status.bytesDone < status.bytesTotal) {
         row.state = QStringLiteral("downloading");
-        row.progress = static_cast<double>(status.bytes_done) / status.bytes_total;
+        row.progress = static_cast<double>(status.bytesDone) / status.bytesTotal;
     } else {
-        row.state = final_state(status.bytes_total);
+        row.state = finalState(status.bytesTotal);
         row.progress = 1;
     }
     mark(row);
 }
 
-void DownloadsModel::set_title(const DownloadItemTitle& item) {
-    const auto found = by_id_.constFind(item.mod_id);
-    if (found == by_id_.cend()) return;
-    auto& row = rows_[*found];
+void DownloadsModel::setTitle(const DownloadItemTitle& item) {
+    const auto found = m_byId.constFind(item.modId);
+    if (found == m_byId.cend()) return;
+    auto& row = m_rows[*found];
     if (row.title == row.id) row.title = item.title;
     if (row.state == QLatin1String("queued")) row.state = QStringLiteral("checking");
     mark(row);
 }
 
-void DownloadsModel::set_phase(const QString& phase) {
-    if (phase_ == phase) return;
-    phase_ = phase;
-    emit phase_changed();
+void DownloadsModel::setPhase(const QString& phase) {
+    if (m_phase == phase) return;
+    m_phase = phase;
+    emit phaseChanged();
 }
 
 void DownloadsModel::finish(const DownloadResult&) {
-    for (auto& row : rows_) {
-        if (is_active(row.state)) {
+    for (auto& row : m_rows) {
+        if (isActive(row.state)) {
             row.state = QStringLiteral("cancelled");
             row.progress = 0;
-            dirty_.insert(row.id);
+            m_dirty.insert(row.id);
         }
     }
-    timer_.stop();
+    m_timer.stop();
     flush();
 }
 
-void DownloadsModel::set_busy(bool busy) {
-    if (busy_ == busy) return;
-    busy_ = busy;
+void DownloadsModel::setBusy(bool busy) {
+    if (m_busy == busy) return;
+    m_busy = busy;
     if (busy) {
-        sampled_bytes_ = bytes_;
-        speed_timer_.start();
+        m_sampledBytes = m_bytes;
+        m_speedTimer.start();
     } else {
-        speed_timer_.stop();
-        speed_ = 0;
-        emit speed_changed();
+        m_speedTimer.stop();
+        m_speed = 0;
+        emit speedChanged();
     }
-    emit summary_changed();
+    emit summaryChanged();
 }
 
-QStringList DownloadsModel::failed_ids() const {
+QStringList DownloadsModel::failedIds() const {
     QStringList ids;
-    for (const auto& row : rows_) {
+    for (const auto& row : m_rows) {
         if (row.state == QLatin1String("failed") || row.state == QLatin1String("cancelled")) ids.append(row.id);
     }
     return ids;
 }
 
 void DownloadsModel::clear() {
-    if (!busy_) begin({}, {});
+    if (!m_busy) begin({}, {});
 }
 
 void DownloadsModel::setFilter(const QString& name) {
-    if (filter_ == name) return;
-    filter_ = name;
+    if (m_filter == name) return;
+    m_filter = name;
     beginResetModel();
     select();
     endResetModel();
-    emit summary_changed();
+    emit summaryChanged();
 }
 
-void DownloadsModel::sample_speed() {
-    speed_ = static_cast<double>(bytes_ - sampled_bytes_);
-    sampled_bytes_ = bytes_;
-    if (history_.size() == HistoryLength) history_.removeFirst();
-    history_.append(speed_);
-    emit speed_changed();
+void DownloadsModel::sampleSpeed() {
+    m_speed = static_cast<double>(m_bytes - m_sampledBytes);
+    m_sampledBytes = m_bytes;
+    if (m_history.size() == kHistoryLength) m_history.removeFirst();
+    m_history.append(m_speed);
+    emit speedChanged();
 }
 
 void DownloadsModel::mark(const Row& row) {
-    dirty_.insert(row.id);
-    if (!timer_.isActive()) timer_.start();
+    m_dirty.insert(row.id);
+    if (!m_timer.isActive()) m_timer.start();
 }
 
 bool DownloadsModel::matches(const Row& row) const {
-    if (filter_ == QLatin1String("active")) return is_active(row.state);
-    if (filter_ == QLatin1String("updated")) return row.state == QLatin1String("updated");
-    if (filter_ == QLatin1String("failed")) return row.state == QLatin1String("failed") || row.state == QLatin1String("cancelled");
+    if (m_filter == QLatin1String("active")) return isActive(row.state);
+    if (m_filter == QLatin1String("updated")) return row.state == QLatin1String("updated");
+    if (m_filter == QLatin1String("failed")) return row.state == QLatin1String("failed") || row.state == QLatin1String("cancelled");
     return true;
 }
 
 void DownloadsModel::select() {
-    visible_.clear();
-    for (qsizetype pos = 0; pos < rows_.size(); ++pos) {
-        if (matches(rows_[pos])) visible_.append(pos);
+    m_visible.clear();
+    for (qsizetype pos = 0; pos < m_rows.size(); ++pos) {
+        if (matches(m_rows[pos])) m_visible.append(pos);
     }
 }
 
 void DownloadsModel::recount() {
-    counts_.clear();
-    for (const auto& row : rows_) ++counts_[row.state];
+    m_counts.clear();
+    for (const auto& row : m_rows) ++m_counts[row.state];
 }
 
 void DownloadsModel::flush() {
-    if (dirty_.isEmpty()) return;
+    if (m_dirty.isEmpty()) return;
     recount();
-    if (filter_ == QLatin1String("all")) {
-        for (qsizetype pos = 0; pos < visible_.size(); ++pos) {
-            if (dirty_.contains(rows_[visible_[pos]].id)) {
+    if (m_filter == QLatin1String("all")) {
+        for (qsizetype pos = 0; pos < m_visible.size(); ++pos) {
+            if (m_dirty.contains(m_rows[m_visible[pos]].id)) {
                 const auto idx = index(static_cast<int>(pos));
                 emit dataChanged(idx, idx);
             }
@@ -174,29 +174,29 @@ void DownloadsModel::flush() {
         select();
         endResetModel();
     }
-    dirty_.clear();
-    emit summary_changed();
+    m_dirty.clear();
+    emit summaryChanged();
 }
 
 int DownloadsModel::rowCount(const QModelIndex& parent) const {
-    return parent.isValid() ? 0 : static_cast<int>(visible_.size());
+    return parent.isValid() ? 0 : static_cast<int>(m_visible.size());
 }
 
 QVariant DownloadsModel::data(const QModelIndex& index, int role) const {
-    if (!index.isValid() || index.row() < 0 || index.row() >= visible_.size()) return {};
-    const auto& row = rows_[visible_[index.row()]];
+    if (!index.isValid() || index.row() < 0 || index.row() >= m_visible.size()) return {};
+    const auto& row = m_rows[m_visible[index.row()]];
     switch (role) {
-    case IdRole: return row.id;
-    case TitleRole: return row.title;
-    case StateRole: return row.state;
-    case ProgressRole: return row.progress;
-    case ErrorRole: return row.error;
+    case kIdRole: return row.id;
+    case kTitleRole: return row.title;
+    case kStateRole: return row.state;
+    case kProgressRole: return row.progress;
+    case kErrorRole: return row.error;
     default: return {};
     }
 }
 
 QHash<int, QByteArray> DownloadsModel::roleNames() const {
-    return {{IdRole, "id"}, {TitleRole, "title"}, {StateRole, "state"}, {ProgressRole, "progress"}, {ErrorRole, "error"}};
+    return {{kIdRole, "id"}, {kTitleRole, "title"}, {kStateRole, "state"}, {kProgressRole, "progress"}, {kErrorRole, "error"}};
 }
 
 }  // namespace px::modrim

@@ -10,12 +10,12 @@ namespace px::modrim::sort {
 
 // Load-order rule from the community database for one package id.
 struct CommunityRule {
-    PackageId package_id;
-    CaseInsensitiveSet load_after;
-    CaseInsensitiveSet load_before;
-    bool load_first = false;
-    bool load_last = false;
-    CaseInsensitiveSet incompatible_with;
+    PackageId packageId;
+    CaseInsensitiveSet loadAfter;
+    CaseInsensitiveSet loadBefore;
+    bool loadFirst = false;
+    bool loadLast = false;
+    CaseInsensitiveSet incompatibleWith;
 
     bool operator==(const CommunityRule&) const = default;
 };

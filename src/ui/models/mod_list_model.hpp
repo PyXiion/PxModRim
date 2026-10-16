@@ -10,31 +10,31 @@
 
 namespace px::modrim { class DiagnosticsService; }
 namespace px::modrim {
-QString provider_label(const QString& provider_id, const QString& package_id = {});
-QString section_name(bool checked, int active_count, int inactive_count);
+QString providerLabel(const QString& providerId, const QString& packageId = {});
+QString sectionName(bool checked, int activeCount, int inactiveCount);
 
 struct ModItem {
     ListedModPtr mod;
     QString uuid;
     bool checked = false;
-    QString provider_color;
-    double startup_impact_s = 0;
-    int load_index = -1;
-    QString provider_label;
+    QString providerColor;
+    double startupImpactS = 0;
+    int loadIndex = -1;
+    QString providerLabel;
 };
 
 class ModListModel : public QAbstractListModel {
     Q_OBJECT
-    Q_PROPERTY(int activeCount READ active_count NOTIFY active_count_changed)
+    Q_PROPERTY(int activeCount READ activeCount NOTIFY activeCountChanged)
 public:
     enum Role {
-        CheckStateRole = Qt::UserRole + 1, PackageIdRole, ModVersionRole, ProviderColorRole,
-        UuidRole, HasErrorRole, HasWarningRole, ErrorTooltipRole, WarningTooltipRole,
-        StartupImpactRole, LoadIndexRole, IsActiveRole, SectionNameRole, ProviderLabelRole,
-        StartupImpactColorRole, StartupImpactTextRole
+        kCheckStateRole = Qt::UserRole + 1, kPackageIdRole, kModVersionRole, kProviderColorRole,
+        kUuidRole, kHasErrorRole, kHasWarningRole, kErrorTooltipRole, kWarningTooltipRole,
+        kStartupImpactRole, kLoadIndexRole, kIsActiveRole, kSectionNameRole, kProviderLabelRole,
+        kStartupImpactColorRole, kStartupImpactTextRole
     };
     Q_ENUM(Role)
-    explicit ModListModel(QHash<QString, QString> provider_colors = {},
+    explicit ModListModel(QHash<QString, QString> providerColors = {},
                           DiagnosticsService* diagnostics = nullptr, QObject* parent = nullptr);
     ~ModListModel() override;
     int rowCount(const QModelIndex& parent = {}) const override;
@@ -42,29 +42,29 @@ public:
     bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
     QHash<int, QByteArray> roleNames() const override;
-    void update_provider_colors(QHash<QString, QString> colors);
-    void load_mods(const QHash<QString, ListedModPtr>& mods, const QStringList& active_uuids);
-    QStringList active_uuids() const;
-    int active_count() const { return active_count_; }
-    const ModItem* get_item(int row) const;
-    const ModItem* get_item_by_uuid(const QString& uuid) const;
-    bool move_row(int source_row, int target_row);
+    void updateProviderColors(QHash<QString, QString> colors);
+    void loadMods(const QHash<QString, ListedModPtr>& mods, const QStringList& activeUuids);
+    QStringList activeUuids() const;
+    int activeCount() const { return m_activeCount; }
+    const ModItem* getItem(int row) const;
+    const ModItem* getItemByUuid(const QString& uuid) const;
+    bool moveRow(int sourceRow, int targetRow);
     void commitOrder(const QStringList& uuids);
-    void set_checkable(const QSet<QString>& uuids, bool checked);
-    void set_check_states(const QList<int>& rows, bool checked);
-    void set_startup_impact(const QHash<QString, double>& impacts = {});
+    void setCheckable(const QSet<QString>& uuids, bool checked);
+    void setCheckStates(const QList<int>& rows, bool checked);
+    void setStartupImpact(const QHash<QString, double>& impacts = {});
 signals:
-    void active_mods_changed();
-    void active_count_changed();
+    void activeModsChanged();
+    void activeCountChanged();
 private:
-    QList<int> update_load_indices();
-    ModItem make_item(const QString& uuid, ListedModPtr mod, bool checked) const;
-    void diagnostics_changed(const QHash<QString, view::ModDiagnosticsView>& summaries);
-    QHash<QString, QString> provider_colors_;
-    QList<ModItem> items_;
-    int active_count_ = 0;
-    DiagnosticsService* diagnostics_;
-    std::uint64_t diagnostics_connection_ = 0;
-    QHash<QString, view::ModDiagnosticsView> last_diagnostics_;
+    QList<int> updateLoadIndices();
+    ModItem makeItem(const QString& uuid, ListedModPtr mod, bool checked) const;
+    void diagnosticsChanged(const QHash<QString, view::ModDiagnosticsView>& summaries);
+    QHash<QString, QString> m_providerColors;
+    QList<ModItem> m_items;
+    int m_activeCount = 0;
+    DiagnosticsService* m_diagnostics;
+    std::uint64_t m_diagnosticsConnection = 0;
+    QHash<QString, view::ModDiagnosticsView> m_lastDiagnostics;
 };
 }

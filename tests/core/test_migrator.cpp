@@ -16,38 +16,38 @@
 
 namespace {
 
-using px::modrim::ensure_schema;
+using px::modrim::ensureSchema;
 using px::modrim::MigrationSteps;
 using px::modrim::Result;
-using test_support::read_bytes;
+using test_support::readBytes;
 
 // Owns one named SQLite connection and closes it when it goes out of scope.
 class Database {
 public:
-    Database(const QString& path, QString name) : name_(std::move(name)) {
-        db_ = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name_);
-        db_.setDatabaseName(path);
-        REQUIRE(db_.open());
+    Database(const QString& path, QString name) : m_name(std::move(name)) {
+        m_db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_name);
+        m_db.setDatabaseName(path);
+        REQUIRE(m_db.open());
     }
 
     ~Database() {
-        db_.close();
-        db_ = QSqlDatabase();
-        QSqlDatabase::removeDatabase(name_);
+        m_db.close();
+        m_db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(m_name);
     }
 
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
 
-    QSqlDatabase& get() { return db_; }
+    QSqlDatabase& get() { return m_db; }
 
     void exec(const QString& sql) {
-        QSqlQuery query(db_);
+        QSqlQuery query(m_db);
         REQUIRE(query.exec(sql));
     }
 
     QStringList column(const QString& sql) {
-        QSqlQuery query(db_);
+        QSqlQuery query(m_db);
         REQUIRE(query.exec(sql));
         QStringList result;
         while (query.next()) {
@@ -56,20 +56,20 @@ public:
         return result;
     }
 
-    int user_version() {
-        QSqlQuery query(db_);
+    int userVersion() {
+        QSqlQuery query(m_db);
         REQUIRE(query.exec(QStringLiteral("PRAGMA user_version")));
         REQUIRE(query.next());
         return query.value(0).toInt();
     }
 
 private:
-    QSqlDatabase db_;
-    QString name_;
+    QSqlDatabase m_db;
+    QString m_name;
 };
 
-QStringList backups_of(const QString& dir, const QString& db_name) {
-    return QDir(dir).entryList({db_name + QStringLiteral(".bak.*")}, QDir::Files);
+QStringList backupsOf(const QString& dir, const QString& dbName) {
+    return QDir(dir).entryList({dbName + QStringLiteral(".bak.*")}, QDir::Files);
 }
 
 Result<void> noop() { return {}; }
@@ -91,19 +91,19 @@ TEST_CASE("fresh database is initialised and stamped without running steps") {
     };
     {
         Database db(path, QStringLiteral("fresh"));
-        REQUIRE(ensure_schema(db.get(),
+        REQUIRE(ensureSchema(db.get(),
                               QStringLiteral("CREATE TABLE state (value TEXT DEFAULT 'a;b'); -- note; ignored\n"
                                              "CREATE TABLE other (x INTEGER);"),
                               2, steps, path)
                     .has_value());
-        REQUIRE(db.user_version() == 2);
+        REQUIRE(db.userVersion() == 2);
         REQUIRE(db.column(QStringLiteral("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'state'")) ==
                 QStringList{"state"});
         REQUIRE(db.column(QStringLiteral("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'other'")) ==
                 QStringList{"other"});
     }
     REQUIRE_FALSE(stepped);
-    REQUIRE(backups_of(dir.path(), QStringLiteral("cache.db")).isEmpty());
+    REQUIRE(backupsOf(dir.path(), QStringLiteral("cache.db")).isEmpty());
 }
 
 TEST_CASE("migrations checkpoint the WAL before backing up") {
@@ -133,24 +133,24 @@ TEST_CASE("migrations checkpoint the WAL before backing up") {
                  return {};
              }},
         };
-        REQUIRE(ensure_schema(db.get(), QStringLiteral("CREATE TABLE IF NOT EXISTS state (value TEXT);"), 3, steps,
+        REQUIRE(ensureSchema(db.get(), QStringLiteral("CREATE TABLE IF NOT EXISTS state (value TEXT);"), 3, steps,
                               path)
                     .has_value());
-        REQUIRE(db.user_version() == 3);
+        REQUIRE(db.userVersion() == 3);
         REQUIRE(db.column(QStringLiteral("SELECT name FROM pragma_table_info('state')")) ==
                 QStringList{"value", "second", "third"});
         REQUIRE(events == QStringList{"two", "three"});
     }
 
-    const auto found = backups_of(dir.path(), QStringLiteral("cache.db"));
+    const auto found = backupsOf(dir.path(), QStringLiteral("cache.db"));
     REQUIRE(found.size() == 1);
     const QString backup = dir.filePath(found.first());
     {
-        Database backup_db(backup, QStringLiteral("wal-backup"));
-        REQUIRE(backup_db.user_version() == 1);
-        REQUIRE(backup_db.column(QStringLiteral("SELECT name FROM pragma_table_info('state')")) ==
+        Database backupDb(backup, QStringLiteral("wal-backup"));
+        REQUIRE(backupDb.userVersion() == 1);
+        REQUIRE(backupDb.column(QStringLiteral("SELECT name FROM pragma_table_info('state')")) ==
                 QStringList{"value"});
-        REQUIRE(backup_db.column(QStringLiteral("SELECT value FROM state")) == QStringList{"before"});
+        REQUIRE(backupDb.column(QStringLiteral("SELECT value FROM state")) == QStringList{"before"});
     }
     for (const char* suffix : {"-wal", "-shm"}) {
         QFile::remove(backup + QString::fromLatin1(suffix));
@@ -167,19 +167,19 @@ TEST_CASE("missing migration step fails without advancing the version") {
         Database db(path, QStringLiteral("missing"));
         db.exec(QStringLiteral("CREATE TABLE state (value TEXT)"));
         db.exec(QStringLiteral("PRAGMA user_version = 1"));
-        before = read_bytes(path);
-        const auto result = ensure_schema(db.get(),
+        before = readBytes(path);
+        const auto result = ensureSchema(db.get(),
                                           QStringLiteral("CREATE TABLE IF NOT EXISTS state (value TEXT);"), 3,
                                           MigrationSteps{{2, noop}}, path);
         REQUIRE_FALSE(result.has_value());
         REQUIRE(result.error().message.contains("Missing migration step"));
-        REQUIRE(db.user_version() == 1);
+        REQUIRE(db.userVersion() == 1);
     }
 
-    REQUIRE(read_bytes(path) == before);
-    const auto found = backups_of(dir.path(), QStringLiteral("cache.db"));
+    REQUIRE(readBytes(path) == before);
+    const auto found = backupsOf(dir.path(), QStringLiteral("cache.db"));
     REQUIRE(found.size() == 1);
-    REQUIRE(read_bytes(dir.filePath(found.first())) == before);
+    REQUIRE(readBytes(dir.filePath(found.first())) == before);
 }
 
 TEST_CASE("current schema is a no-op") {
@@ -193,19 +193,19 @@ TEST_CASE("current schema is a no-op") {
         Database db(path, QStringLiteral("current"));
         db.exec(QStringLiteral("CREATE TABLE state (value TEXT)"));
         db.exec(QStringLiteral("PRAGMA user_version = 1"));
-        before = read_bytes(path);
+        before = readBytes(path);
         const MigrationSteps steps{{1, [&]() -> Result<void> {
                                         called = true;
                                         return {};
                                     }}};
-        REQUIRE(ensure_schema(db.get(), QStringLiteral("CREATE TABLE should_not_be_created (value TEXT);"), 1,
+        REQUIRE(ensureSchema(db.get(), QStringLiteral("CREATE TABLE should_not_be_created (value TEXT);"), 1,
                               steps, path)
                     .has_value());
-        REQUIRE(db.user_version() == 1);
+        REQUIRE(db.userVersion() == 1);
     }
     REQUIRE_FALSE(called);
-    REQUIRE(read_bytes(path) == before);
-    REQUIRE(backups_of(dir.path(), QStringLiteral("cache.db")).isEmpty());
+    REQUIRE(readBytes(path) == before);
+    REQUIRE(backupsOf(dir.path(), QStringLiteral("cache.db")).isEmpty());
 }
 
 TEST_CASE("newer schema is a no-op") {
@@ -219,17 +219,17 @@ TEST_CASE("newer schema is a no-op") {
         Database db(path, QStringLiteral("newer"));
         db.exec(QStringLiteral("CREATE TABLE state (value TEXT)"));
         db.exec(QStringLiteral("PRAGMA user_version = 2"));
-        before = read_bytes(path);
+        before = readBytes(path);
         const MigrationSteps steps{{1, [&]() -> Result<void> {
                                         called = true;
                                         return {};
                                     }}};
-        REQUIRE(ensure_schema(db.get(), QStringLiteral("CREATE TABLE should_not_be_created (value TEXT);"), 1,
+        REQUIRE(ensureSchema(db.get(), QStringLiteral("CREATE TABLE should_not_be_created (value TEXT);"), 1,
                               steps, path)
                     .has_value());
-        REQUIRE(db.user_version() == 2);
+        REQUIRE(db.userVersion() == 2);
     }
     REQUIRE_FALSE(called);
-    REQUIRE(read_bytes(path) == before);
-    REQUIRE(backups_of(dir.path(), QStringLiteral("cache.db")).isEmpty());
+    REQUIRE(readBytes(path) == before);
+    REQUIRE(backupsOf(dir.path(), QStringLiteral("cache.db")).isEmpty());
 }

@@ -32,10 +32,10 @@ QStringList loadLogoVariants() {
 
 }  // namespace
 
-Theme::Theme(QObject* parent) : QObject(parent), logo_variants_(loadLogoVariants()) {
-    if (!logo_variants_.isEmpty()) {
-        const int pick = QRandomGenerator::global()->bounded(static_cast<int>(logo_variants_.size()));
-        logo_data_uri_ = logo_variants_.at(pick);
+Theme::Theme(QObject* parent) : QObject(parent), m_logoVariants(loadLogoVariants()) {
+    if (!m_logoVariants.isEmpty()) {
+        const int pick = QRandomGenerator::global()->bounded(static_cast<int>(m_logoVariants.size()));
+        m_logoDataUri = m_logoVariants.at(pick);
     }
 }
 
@@ -77,15 +77,15 @@ int Theme::radiusMd() const { return 6; }
 int Theme::radiusLg() const { return 8; }
 int Theme::radiusPill() const { return 999; }
 int Theme::scrollbarWidth() const { return 6; }
-int Theme::tooltipDelay() const { return TOOLTIP_DELAY_MS; }
+int Theme::tooltipDelay() const { return kTooltipDelayMs; }
 double Theme::disabledOpacity() const { return 0.45; }
 QString Theme::overlay() const { return QStringLiteral("#8c000000"); }
-int Theme::railMinWidth() const { return RAIL_MIN_WIDTH; }
-int Theme::railMaxWidth() const { return RAIL_MAX_WIDTH; }
-int Theme::railCollapseWidth() const { return RAIL_COLLAPSE_WIDTH; }
-int Theme::sidebarWidth() const { return SIDEBAR_WIDTH; }
+int Theme::railMinWidth() const { return kRailMinWidth; }
+int Theme::railMaxWidth() const { return kRailMaxWidth; }
+int Theme::railCollapseWidth() const { return kRailCollapseWidth; }
+int Theme::sidebarWidth() const { return kSidebarWidth; }
 
-QStringList Theme::logoVariants() const { return logo_variants_; }
-QString Theme::logoFileDataUri() const { return logo_data_uri_; }
+QStringList Theme::logoVariants() const { return m_logoVariants; }
+QString Theme::logoFileDataUri() const { return m_logoDataUri; }
 
 }  // namespace px::modrim

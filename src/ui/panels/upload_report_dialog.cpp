@@ -43,7 +43,7 @@ UploadConfirmDialog::UploadConfirmDialog(QWidget* parent) : QDialog(parent) {
     buttons->setSpacing(10);
     auto* save = new QPushButton(tr("Save to file instead…"), this);
     save->setObjectName(QStringLiteral("appBtn"));
-    connect(save, &QPushButton::clicked, this, [this] { done(static_cast<int>(UploadChoice::SAVE_TO_FILE)); });
+    connect(save, &QPushButton::clicked, this, [this] { done(static_cast<int>(UploadChoice::kSaveToFile)); });
     buttons->addWidget(save);
     buttons->addStretch();
     auto* cancel = new QPushButton(tr("Cancel"), this);
@@ -115,24 +115,24 @@ QCoro::Task<void> saveReport(QWidget* parent, QString report, Notifier& toast) {
 }
 }  // namespace
 
-QCoro::Task<std::optional<QString>> handle_upload_report(QWidget* parent, CoreContext& ctx,
+QCoro::Task<std::optional<QString>> handleUploadReport(QWidget* parent, CoreContext& ctx,
                                                         Notifier& toast) {
     QPointer<QWidget> owner(parent);
     auto [choice, dialog] = co_await awaitDialog<UploadConfirmDialog>(parent);
     Q_UNUSED(dialog);
-    if (choice == static_cast<int>(UploadChoice::CANCEL)) co_return std::nullopt;
+    if (choice == static_cast<int>(UploadChoice::kCancel)) co_return std::nullopt;
     support::ReportSource source{ctx.gameVersion(), ctx.config().paths,
                                        ctx.allMods(), ctx.activeUuids()};
     const QString report = co_await providers::runOnPool<QString>(nullptr,
-        [source = std::move(source)] { return support::build_report(source); });
+        [source = std::move(source)] { return support::buildReport(source); });
     if (parent && !owner) co_return std::nullopt;
-    if (choice == static_cast<int>(UploadChoice::SAVE_TO_FILE)) {
+    if (choice == static_cast<int>(UploadChoice::kSaveToFile)) {
         co_await saveReport(owner, report, toast);
         co_return std::nullopt;
     }
     toast.info(QObject::tr("Uploading log & system info…"), 2000);
     QString endpoint = QString::fromStdString(ctx.config().log_upload_endpoint);
-    if (endpoint.isEmpty()) endpoint = QString(support::DEFAULT_UPLOAD_ENDPOINT);
+    if (endpoint.isEmpty()) endpoint = QString(support::kDefaultUploadEndpoint);
     support::PasteUploader uploader(ctx.network(), std::move(endpoint));
     auto uploaded = co_await uploader.upload(report);
     if (parent && !owner) co_return std::nullopt;

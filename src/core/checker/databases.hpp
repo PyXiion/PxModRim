@@ -20,7 +20,7 @@ namespace checker {
 
 // Identity of a cache file: changes whenever the file is rewritten.
 struct FileStamp {
-    qint64 modified_ms = 0;
+    qint64 modifiedMs = 0;
     qint64 size = 0;
 
     bool operator==(const FileStamp&) const = default;
@@ -30,52 +30,52 @@ struct FileStamp {
 // GitHub when the cache is missing or a refresh is forced.
 class NoVersionWarningService {
 public:
-    NoVersionWarningService(const ConfigService& config_service, QNetworkAccessManager& network);
+    NoVersionWarningService(const ConfigService& configService, QNetworkAccessManager& network);
 
     // Cached ids, reloaded when the file changed on disk. Downloads when the cache is missing
     // or `force` is set. A failed download yields an empty set and keeps the previous ids.
     QCoro::Task<QSet<PackageId>> ensure(bool force = false);
 
     // Seconds since the cache file was written, or nullopt when there is no cache.
-    std::optional<double> cache_age_s() const;
+    std::optional<double> cacheAgeS() const;
 
     // Loads the cache synchronously when it exists; otherwise returns the current ids.
-    QSet<PackageId> load_if_exists();
+    QSet<PackageId> loadIfExists();
 
 private:
     QCoro::Task<QSet<PackageId>> download();
 
-    QNetworkAccessManager& network_;
-    QString cache_dir_;
-    QString xml_path_;
-    QSet<PackageId> pids_;
+    QNetworkAccessManager& m_network;
+    QString m_cacheDir;
+    QString m_xmlPath;
+    QSet<PackageId> m_pids;
     // Stamp of the file the current `pids_` were parsed from.
-    std::optional<FileStamp> loaded_stamp_;
+    std::optional<FileStamp> m_loadedStamp;
 };
 
 // Caches the UseThisInstead replacement database (gzipped JSON) under the config directory and
 // refreshes it from GitHub when the cache is missing or a refresh is forced.
 class UseThisInsteadService {
 public:
-    UseThisInsteadService(const ConfigService& config_service, QNetworkAccessManager& network);
+    UseThisInsteadService(const ConfigService& configService, QNetworkAccessManager& network);
 
     // Cached entries, reloaded when the file changed on disk. Downloads when the cache is
     // missing or `force` is set. A failed download yields an empty map and keeps the previous
     // entries.
     QCoro::Task<QHash<QString, ReplacementInfo>> ensure(bool force = false);
 
-    std::optional<double> cache_age_s() const;
+    std::optional<double> cacheAgeS() const;
 
-    QHash<QString, ReplacementInfo> load_if_exists();
+    QHash<QString, ReplacementInfo> loadIfExists();
 
 private:
     QCoro::Task<QHash<QString, ReplacementInfo>> download();
 
-    QNetworkAccessManager& network_;
-    QString cache_dir_;
-    QString json_path_;
-    QHash<QString, ReplacementInfo> entries_;
-    std::optional<FileStamp> loaded_stamp_;
+    QNetworkAccessManager& m_network;
+    QString m_cacheDir;
+    QString m_jsonPath;
+    QHash<QString, ReplacementInfo> m_entries;
+    std::optional<FileStamp> m_loadedStamp;
 };
 
 }  // namespace checker

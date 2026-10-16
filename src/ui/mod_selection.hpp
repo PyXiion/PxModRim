@@ -38,9 +38,9 @@ public:
 private:
     QStringList resolveActivePackageIds() const;
 
-    CoreContext& ctx_;
-    ModInfoSink& sink_;
-    std::uint64_t generation_ = 0;
+    CoreContext& m_ctx;
+    ModInfoSink& m_sink;
+    std::uint64_t m_generation = 0;
 };
 
 }  // namespace px::modrim

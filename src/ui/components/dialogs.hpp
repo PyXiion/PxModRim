@@ -22,24 +22,26 @@ namespace px::modrim {
 class DialogFinished {
 public:
     explicit DialogFinished(QDialog* dialog)
-        : connection_(QObject::connect(dialog, &QDialog::finished, dialog, [this](int code) {
-              code_ = code;
-              finished_ = true;
-              if (waiter_) std::exchange(waiter_, nullptr).resume();
+        : m_connection(QObject::connect(dialog, &QDialog::finished, dialog, [this](int code) {
+              m_code = code;
+              m_finished = true;
+              if (m_waiter) std::exchange(m_waiter, nullptr).resume();
           })) {}
     DialogFinished(const DialogFinished&) = delete;
     DialogFinished& operator=(const DialogFinished&) = delete;
-    ~DialogFinished() { QObject::disconnect(connection_); }
+    ~DialogFinished() { QObject::disconnect(m_connection); }
 
-    bool await_ready() const noexcept { return finished_; }
-    void await_suspend(std::coroutine_handle<> waiting) noexcept { waiter_ = waiting; }
-    int await_resume() const noexcept { return code_; }
+    // NOLINTBEGIN(readability-identifier-naming): coroutine awaiter protocol
+    bool await_ready() const noexcept { return m_finished;  }
+    void await_suspend(std::coroutine_handle<> waiting) noexcept { m_waiter = waiting;  }
+    int await_resume() const noexcept { return m_code;  }
+    // NOLINTEND(readability-identifier-naming)
 
 private:
-    QMetaObject::Connection connection_;
-    std::coroutine_handle<> waiter_;
-    int code_ = QDialog::Rejected;
-    bool finished_ = false;
+    QMetaObject::Connection m_connection;
+    std::coroutine_handle<> m_waiter;
+    int m_code = QDialog::Rejected;
+    bool m_finished = false;
 };
 
 template <std::derived_from<QDialog> T, class... Args>

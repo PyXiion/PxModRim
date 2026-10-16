@@ -19,7 +19,7 @@
 
 namespace {
 // The embedded browser exists only in WebEngine builds; without it there is no "workshopWeb" object.
-QObject* web_of(const px::modrim::SteamWorkshopViewPanel& view) {
+QObject* webOf(const px::modrim::SteamWorkshopViewPanel& view) {
     for (auto* quick : view.findChildren<QQuickWidget*>()) {
         if (auto* root = quick->rootObject()) {
             if (auto* web = root->findChild<QObject*>(QStringLiteral("workshopWeb"))) return web;
@@ -46,6 +46,6 @@ TEST_CASE("steam workshop view has no web view before initialization") {
     auto core = px::ui_test::makeCore();
     px::modrim::AppContext app(*core);
     px::modrim::SteamWorkshopViewPanel view(*core, engine, &host, app);
-    CHECK(web_of(view) == nullptr);
+    CHECK(webOf(view) == nullptr);
 }
 #endif

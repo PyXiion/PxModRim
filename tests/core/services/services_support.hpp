@@ -20,19 +20,19 @@ class EventLoop {
 public:
     EventLoop() {
         if (!QCoreApplication::instance()) {
-            app_.emplace(argc_, nullptr);
+            m_app.emplace(m_argc, nullptr);
         }
     }
 
 private:
-    int argc_ = 0;
-    std::optional<QCoreApplication> app_;
+    int m_argc = 0;
+    std::optional<QCoreApplication> m_app;
 };
 
 // Runs a coroutine to completion on the event loop. Coroutines that never suspend finish
 // before the loop starts.
 template <class T>
-T run_async(QCoro::Task<T> task) {
+T runAsync(QCoro::Task<T> task) {
     // std::optional<void> is ill-formed, so a void result is carried as std::monostate.
     using Outcome = std::conditional_t<std::is_void_v<T>, std::monostate, T>;
     std::optional<Outcome> result;
@@ -57,7 +57,7 @@ T run_async(QCoro::Task<T> task) {
     }
 }
 
-inline bool write_text(const QString& path, const QByteArray& bytes) {
+inline bool writeText(const QString& path, const QByteArray& bytes) {
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         return false;

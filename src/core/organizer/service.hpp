@@ -37,7 +37,7 @@ public:
     using ActiveUuidsFn = std::function<const QStringList&()>;
 
     OrganizerService(CoreContext& ctx, OrganizerDb& db);
-    OrganizerService(AllModsFn all_mods, ActiveUuidsFn active_uuids, OrganizerDb& db);
+    OrganizerService(AllModsFn allMods, ActiveUuidsFn activeUuids, OrganizerDb& db);
 
     Event<std::monostate> changed;
 
@@ -51,68 +51,68 @@ public:
     const OrganizerState& state() const;
 
     // ── Folders ──────────────────────────────────────────────────────────────
-    QCoro::Task<Result<Folder>> create_folder(QString name, qint64 parent_id = ROOT_ID);
-    QCoro::Task<Result<Folder>> create_folder_from(QString name, QStringList package_ids,
-                                                   qint64 parent_id = ROOT_ID);
-    QCoro::Task<Result<void>> rename_folder(qint64 folder_id, QString name);
-    QCoro::Task<Result<void>> move_folder(qint64 folder_id, qint64 parent_id);
-    QCoro::Task<Result<void>> set_collapsed(qint64 folder_id, bool collapsed);
-    QCoro::Task<Result<void>> set_all_collapsed(bool collapsed);
-    QCoro::Task<Result<void>> delete_folder(qint64 folder_id);
+    QCoro::Task<Result<Folder>> createFolder(QString name, qint64 parentId = kRootId);
+    QCoro::Task<Result<Folder>> createFolderFrom(QString name, QStringList packageIds,
+                                                   qint64 parentId = kRootId);
+    QCoro::Task<Result<void>> renameFolder(qint64 folderId, QString name);
+    QCoro::Task<Result<void>> moveFolder(qint64 folderId, qint64 parentId);
+    QCoro::Task<Result<void>> setCollapsed(qint64 folderId, bool collapsed);
+    QCoro::Task<Result<void>> setAllCollapsed(bool collapsed);
+    QCoro::Task<Result<void>> deleteFolder(qint64 folderId);
 
     // ── Placement ────────────────────────────────────────────────────────────
-    QCoro::Task<Result<void>> place(QStringList package_ids, qint64 folder_id);
-    QCoro::Task<Result<void>> ungroup(QStringList package_ids);
-    QCoro::Task<Result<void>> reset_to_rules(QStringList package_ids);
+    QCoro::Task<Result<void>> place(QStringList packageIds, qint64 folderId);
+    QCoro::Task<Result<void>> ungroup(QStringList packageIds);
+    QCoro::Task<Result<void>> resetToRules(QStringList packageIds);
 
     // ── Tags ─────────────────────────────────────────────────────────────────
-    QCoro::Task<Result<Tag>> create_tag(QString name, QString color);
-    QCoro::Task<Result<void>> update_tag(qint64 tag_id, QString name, QString color);
-    QCoro::Task<Result<void>> delete_tag(qint64 tag_id);
-    QCoro::Task<Result<void>> set_mod_tags(QStringList package_ids, QSet<qint64> add, QSet<qint64> remove);
+    QCoro::Task<Result<Tag>> createTag(QString name, QString color);
+    QCoro::Task<Result<void>> updateTag(qint64 tagId, QString name, QString color);
+    QCoro::Task<Result<void>> deleteTag(qint64 tagId);
+    QCoro::Task<Result<void>> setModTags(QStringList packageIds, QSet<qint64> add, QSet<qint64> remove);
 
     // ── Rules ────────────────────────────────────────────────────────────────
-    QCoro::Task<Result<void>> set_rules(QList<RuleSpec> specs);
+    QCoro::Task<Result<void>> setRules(QList<RuleSpec> specs);
     // Appends the built-in rules not yet present. Returns how many were added.
-    QCoro::Task<Result<int>> add_standard_rules();
+    QCoro::Task<Result<int>> addStandardRules();
 
     // ── Read helpers ─────────────────────────────────────────────────────────
     FolderNode tree(const std::optional<TreeQuery>& query = std::nullopt) const;
     // Mods under `folder_id`; `recursive = false` keeps only its direct mods.
-    Result<QStringList> folder_mod_uuids(qint64 folder_id, bool recursive = true) const;
+    Result<QStringList> folderModUuids(qint64 folderId, bool recursive = true) const;
     // (enable, disable) for a folder checkbox click: a fully enabled folder disables
     // everything; partial or off enables all.
-    Result<FolderToggle> folder_toggle(qint64 folder_id, bool recursive = true) const;
+    Result<FolderToggle> folderToggle(qint64 folderId, bool recursive = true) const;
     // Legal destinations, excluding the folder's current parent.
-    Result<QSet<qint64>> folder_move_targets(qint64 folder_id) const;
-    QList<TreeFilter> tree_filters() const;
+    Result<QSet<qint64>> folderMoveTargets(qint64 folderId) const;
+    QList<TreeFilter> treeFilters() const;
 
 private:
     QCoro::Task<Result<void>> commit();
 
-    Result<QString> validate_new_folder(const QString& name, qint64 parent_id) const;
-    Result<Folder> find_folder(qint64 folder_id) const;
-    Result<Folder> find_non_root(qint64 folder_id) const;
-    Result<Tag> find_tag(qint64 tag_id) const;
-    Result<QString> check_tag(const QString& name, const QString& color,
+    Result<QString> validateNewFolder(const QString& name, qint64 parentId) const;
+    Result<Folder> findFolder(qint64 folderId) const;
+    Result<Folder> findNonRoot(qint64 folderId) const;
+    Result<Tag> findTag(qint64 tagId) const;
+    Result<QString> checkTag(const QString& name, const QString& color,
                               std::optional<qint64> exclude = std::nullopt) const;
-    Result<void> check_unique_folder_name(qint64 parent_id, const QString& name,
+    Result<void> checkUniqueFolderName(qint64 parentId, const QString& name,
                                           std::optional<qint64> exclude = std::nullopt) const;
-    Result<void> check_depth(qint64 parent_id, int height) const;
-    int depth(qint64 folder_id) const;
-    int height(qint64 folder_id) const;
-    QList<Folder> children(qint64 folder_id) const;
-    QSet<qint64> subtree_ids(qint64 folder_id) const;
+    Result<void> checkDepth(qint64 parentId, int height) const;
+    int depth(qint64 folderId) const;
+    int height(qint64 folderId) const;
+    QList<Folder> children(qint64 folderId) const;
+    QSet<qint64> subtreeIds(qint64 folderId) const;
 
-    const QHash<QString, ListedModPtr>& all_mods() const;
-    const QStringList& active_uuids() const;
-    QSet<QString> active_set() const;
+    const QHash<QString, ListedModPtr>& allMods() const;
+    const QStringList& activeUuids() const;
+    QSet<QString> activeSet() const;
 
-    CoreContext* ctx_ = nullptr;
-    AllModsFn all_mods_fn_;
-    ActiveUuidsFn active_uuids_fn_;
-    OrganizerDb& db_;
-    std::optional<OrganizerState> state_;
+    CoreContext* m_ctx = nullptr;
+    AllModsFn m_allModsFn;
+    ActiveUuidsFn m_activeUuidsFn;
+    OrganizerDb& m_db;
+    std::optional<OrganizerState> m_state;
 };
 
 }  // namespace px::modrim::organizer

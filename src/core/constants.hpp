@@ -9,20 +9,20 @@
 
 namespace px::modrim {
 
-inline constexpr QLatin1StringView RIMWORLD_STEAM_APP_ID{"294100"};
+inline constexpr QLatin1StringView kRimworldSteamAppId{"294100"};
 
 enum class LaunchStrategy : int {
-    Direct = 0,
-    Steam = 1,
+    kDirect = 0,
+    kSteam = 1,
 };
 
 enum class AfterLaunch : int {
-    Stay = 0,
-    Minimize = 1,
-    Close = 2,
+    kStay = 0,
+    kMinimize = 1,
+    kClose = 2,
 };
 
-inline constexpr QLatin1StringView DEFAULT_MISSING_PACKAGEID{"missing.packageid"};
+inline constexpr QLatin1StringView kDefaultMissingPackageid{"missing.packageid"};
 
 struct RimWorldDlc {
     QLatin1StringView appId;
@@ -33,7 +33,7 @@ struct RimWorldDlc {
 };
 
 // Ordered by Steam app id, matching the legacy dict's iteration order.
-inline constexpr std::array<RimWorldDlc, 6> RIMWORLD_DLC_METADATA{{
+inline constexpr std::array<RimWorldDlc, 6> kRimworldDlcMetadata{{
     {QLatin1StringView{"294100"}, QLatin1StringView{"ludeon.rimworld"},
      QLatin1StringView{"RimWorld"},
      QLatin1StringView{"https://store.steampowered.com/app/294100/RimWorld"},
@@ -61,9 +61,9 @@ inline constexpr std::array<RimWorldDlc, 6> RIMWORLD_DLC_METADATA{{
 }};
 
 // Ordered package ids of RIMWORLD_DLC_METADATA.
-inline const QStringList RIMWORLD_PACKAGE_IDS = [] {
+inline const QStringList kRimworldPackageIds = [] {
     QStringList ids;
-    for (const RimWorldDlc& dlc : RIMWORLD_DLC_METADATA) {
+    for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
         ids.append(QString(dlc.packageId));
     }
     return ids;
@@ -71,7 +71,7 @@ inline const QStringList RIMWORLD_PACKAGE_IDS = [] {
 
 // Exact (case-sensitive) lookup; callers pass lowercase ids as produced by CaseInsensitiveStr.
 inline const RimWorldDlc* findRimWorldDlcByPackageId(QStringView packageId) {
-    for (const RimWorldDlc& dlc : RIMWORLD_DLC_METADATA) {
+    for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
         if (packageId == QLatin1StringView(dlc.packageId)) {
             return &dlc;
         }

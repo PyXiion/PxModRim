@@ -8,10 +8,10 @@
 
 using px::modrim::workshop::CatalogMod;
 using px::modrim::workshop::InstalledList;
-using px::modrim::workshop::PAGE;
+using px::modrim::workshop::kPage;
 
 namespace {
-CatalogMod installed_mod(std::string id, std::string title, std::string author = "Someone",
+CatalogMod installedMod(std::string id, std::string title, std::string author = "Someone",
                          std::vector<std::string> tags = {}) {
     CatalogMod mod;
     mod.id = std::move(id);
@@ -33,10 +33,10 @@ TEST_CASE("workshop installed search matches title author id and tags case insen
     REQUIRE_FALSE(installed.loaded());
     REQUIRE(installed.total() == 0);
     REQUIRE(installed.visible().empty());
-    REQUIRE(installed.next_page().empty());
+    REQUIRE(installed.nextPage().empty());
     installed.search("");
-    installed.replace({installed_mod("11", "Harmony", "Brrainz"), installed_mod("12", "HugsLib", "Someone", {"Library"}),
-                       installed_mod("999", "Other")});
+    installed.replace({installedMod("11", "Harmony", "Brrainz"), installedMod("12", "HugsLib", "Someone", {"Library"}),
+                       installedMod("999", "Other")});
     REQUIRE(installed.loaded());
     REQUIRE(installed.mods().size() == 3);
     const std::vector<std::pair<QString, QStringList>> cases{{"harm", {"11"}}, {"BRRAINZ", {"11"}},
@@ -52,39 +52,39 @@ TEST_CASE("workshop installed search matches title author id and tags case insen
 TEST_CASE("workshop installed paging reveals one page and search restarts it") {
     InstalledList installed;
     std::vector<CatalogMod> mods;
-    for (int i = 0; i < PAGE * 2 + 5; ++i) mods.push_back(installed_mod(std::to_string(i), "Mod"));
+    for (int i = 0; i < kPage * 2 + 5; ++i) mods.push_back(installedMod(std::to_string(i), "Mod"));
     installed.replace(mods);
-    REQUIRE(installed.visible().size() == PAGE);
-    REQUIRE(installed.has_more());
-    const auto second = installed.next_page();
-    REQUIRE(second.size() == PAGE);
-    REQUIRE(second.front().id == std::to_string(PAGE));
-    REQUIRE(installed.next_page().size() == 5);
-    REQUIRE_FALSE(installed.has_more());
-    REQUIRE(installed.next_page().empty());
+    REQUIRE(installed.visible().size() == kPage);
+    REQUIRE(installed.hasMore());
+    const auto second = installed.nextPage();
+    REQUIRE(second.size() == kPage);
+    REQUIRE(second.front().id == std::to_string(kPage));
+    REQUIRE(installed.nextPage().size() == 5);
+    REQUIRE_FALSE(installed.hasMore());
+    REQUIRE(installed.nextPage().empty());
     installed.search("");
-    REQUIRE(installed.visible().size() == PAGE);
-    REQUIRE(installed.total() == PAGE * 2 + 5);
-    installed.next_page();
-    installed.reset_paging();
-    REQUIRE(installed.visible().size() == PAGE);
-    REQUIRE(installed.has_more());
+    REQUIRE(installed.visible().size() == kPage);
+    REQUIRE(installed.total() == kPage * 2 + 5);
+    installed.nextPage();
+    installed.resetPaging();
+    REQUIRE(installed.visible().size() == kPage);
+    REQUIRE(installed.hasMore());
 }
 
 TEST_CASE("workshop replacing installed mods preserves query and current paging") {
     InstalledList installed;
     installed.search("mod");
     std::vector<CatalogMod> mods;
-    for (int i = 0; i < PAGE * 3; ++i) mods.push_back(installed_mod(std::to_string(i), "Mod"));
+    for (int i = 0; i < kPage * 3; ++i) mods.push_back(installedMod(std::to_string(i), "Mod"));
     installed.replace(mods);
-    installed.next_page();
+    installed.nextPage();
     installed.replace(mods);
-    REQUIRE(installed.visible().size() == PAGE * 2);
-    installed.replace({installed_mod("match", "Mod"), installed_mod("other", "Other")});
+    REQUIRE(installed.visible().size() == kPage * 2);
+    installed.replace({installedMod("match", "Mod"), installedMod("other", "Other")});
     REQUIRE(ids(installed.visible()) == QStringList{"match"});
     REQUIRE(installed.total() == 1);
-    REQUIRE_FALSE(installed.has_more());
-    REQUIRE(installed.next_page().empty());
+    REQUIRE_FALSE(installed.hasMore());
+    REQUIRE(installed.nextPage().empty());
     installed.replace({});
     REQUIRE_FALSE(installed.loaded());
     REQUIRE(installed.visible().empty());

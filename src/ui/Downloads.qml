@@ -130,7 +130,7 @@ Rectangle {
                 }
                 Connections {
                     target: downloadsModel
-                    function onSpeed_changed() { graph.requestPaint() }
+                    function onSpeedChanged() { graph.requestPaint() }
                 }
             }
 

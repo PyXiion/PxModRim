@@ -18,7 +18,7 @@ public:
 protected:
     void setClearColor(const QString& color);
 
-    QVBoxLayout* root_ = nullptr;
+    QVBoxLayout* m_root = nullptr;
 };
 
 }  // namespace px::modrim

@@ -34,39 +34,39 @@ QStringList ids(std::initializer_list<const char*> items) {
 }
 
 // About.xml mod with the given rules. Each dependency is a bare package id.
-ListedModPtr make_mod(const char* name,
+ListedModPtr makeMod(const char* name,
                       const char* pid,
                       std::initializer_list<const char*> deps = {},
-                      std::initializer_list<const char*> load_after = {},
-                      std::initializer_list<const char*> load_before = {}) {
+                      std::initializer_list<const char*> loadAfter = {},
+                      std::initializer_list<const char*> loadBefore = {}) {
     auto mod = std::make_shared<AboutXmlMod>();
     mod->name = QString::fromLatin1(name);
-    mod->package_id = CaseInsensitiveStr(QString::fromLatin1(pid));
-    mod->provider_id = QStringLiteral("stub");
+    mod->packageId = CaseInsensitiveStr(QString::fromLatin1(pid));
+    mod->providerId = QStringLiteral("stub");
     mod->valid = true;
-    mod->about_rules.load_after = CaseInsensitiveSet(ids(load_after));
-    mod->about_rules.load_before = CaseInsensitiveSet(ids(load_before));
+    mod->aboutRules.loadAfter = CaseInsensitiveSet(ids(loadAfter));
+    mod->aboutRules.loadBefore = CaseInsensitiveSet(ids(loadBefore));
     for (const char* dep : deps) {
         DependencyMod dependency;
         dependency.name = QString::fromLatin1(dep);
-        dependency.package_id = CaseInsensitiveStr(QString::fromLatin1(dep));
-        mod->about_rules.set_dependency(dependency);
+        dependency.packageId = CaseInsensitiveStr(QString::fromLatin1(dep));
+        mod->aboutRules.setDependency(dependency);
     }
     return mod;
 }
 
-Mods base_mods() {
+Mods baseMods() {
     Mods mods;
-    mods.insert("uuid-a", make_mod("Mod A", "mod.a"));
-    mods.insert("uuid-b", make_mod("Mod B", "mod.b", {"mod.a"}));
-    mods.insert("uuid-c", make_mod("Mod C", "mod.c", {"mod.b"}));
-    mods.insert("uuid-d", make_mod("Mod D", "mod.d"));
-    mods.insert("uuid-e", make_mod("Mod E", "mod.e", {"mod.a"}));
-    mods.insert("uuid-f", make_mod("Mod F", "mod.f"));
-    mods.insert("uuid-g", make_mod("Mod G", "mod.g", {"mod.f"}));
-    mods.insert("uuid-h", make_mod("Mod H", "mod.h", {}, {"mod.b"}, {"mod.a"}));
-    mods.insert("uuid-i", make_mod("Mod I", "mod.i", {}, {"mod.d"}));
-    mods.insert("uuid-j", make_mod("Mod J", "mod.j", {}, {}, {"mod.a"}));
+    mods.insert("uuid-a", makeMod("Mod A", "mod.a"));
+    mods.insert("uuid-b", makeMod("Mod B", "mod.b", {"mod.a"}));
+    mods.insert("uuid-c", makeMod("Mod C", "mod.c", {"mod.b"}));
+    mods.insert("uuid-d", makeMod("Mod D", "mod.d"));
+    mods.insert("uuid-e", makeMod("Mod E", "mod.e", {"mod.a"}));
+    mods.insert("uuid-f", makeMod("Mod F", "mod.f"));
+    mods.insert("uuid-g", makeMod("Mod G", "mod.g", {"mod.f"}));
+    mods.insert("uuid-h", makeMod("Mod H", "mod.h", {}, {"mod.b"}, {"mod.a"}));
+    mods.insert("uuid-i", makeMod("Mod I", "mod.i", {}, {"mod.d"}));
+    mods.insert("uuid-j", makeMod("Mod J", "mod.j", {}, {}, {"mod.a"}));
     return mods;
 }
 
@@ -75,11 +75,11 @@ Mods base_mods() {
 struct Fixture {
     services_test::EventLoop loop;
     QTemporaryDir dir;
-    ConfigService config_service{dir.path()};
-    std::unique_ptr<CoreContext> ctx = CoreContext::create(AppConfig{}, &config_service);
+    ConfigService configService{dir.path()};
+    std::unique_ptr<CoreContext> ctx = CoreContext::create(AppConfig{}, &configService);
 
     Fixture() {
-        ctx->load(base_mods(), ids({"uuid-c", "uuid-d", "uuid-a", "uuid-b"}));
+        ctx->load(baseMods(), ids({"uuid-c", "uuid-d", "uuid-a", "uuid-b"}));
         ctx->diagnosticsService().rebuild();
     }
 
@@ -132,7 +132,7 @@ TEST_CASE("enabling mod with load-before rule inserts before target") {
 
 TEST_CASE("enabling dependency before active dependent") {
     Fixture f;
-    f.reload(base_mods(), {"uuid-b", "uuid-c", "uuid-d"});
+    f.reload(baseMods(), {"uuid-b", "uuid-c", "uuid-d"});
 
     REQUIRE(f.ctx->activation().apply(ids({"uuid-a"})));
 
@@ -244,9 +244,9 @@ TEST_CASE("no-op returns false without emitting") {
 TEST_CASE("edges through an uninstalled mod add no constraint") {
     Fixture f;
     Mods mods;
-    mods.insert("uuid-a", make_mod("Mod A", "mod.a"));
-    mods.insert("uuid-w", make_mod("Mod W", "mod.w", {}, {"ce.absent"}));
-    mods.insert("uuid-y", make_mod("Mod Y", "mod.y", {}, {}, {"ce.absent"}));
+    mods.insert("uuid-a", makeMod("Mod A", "mod.a"));
+    mods.insert("uuid-w", makeMod("Mod W", "mod.w", {}, {"ce.absent"}));
+    mods.insert("uuid-y", makeMod("Mod Y", "mod.y", {}, {}, {"ce.absent"}));
     f.reload(mods, {"uuid-a", "uuid-w"});
 
     REQUIRE(f.ctx->activation().apply(ids({"uuid-y"})));
@@ -256,9 +256,9 @@ TEST_CASE("edges through an uninstalled mod add no constraint") {
 
 TEST_CASE("bounds ignore an inconsistent active order") {
     Fixture f;
-    Mods mods = base_mods();
+    Mods mods = baseMods();
     // Active c depends on b but sits before it; X must still land in d..b.
-    mods.insert("uuid-x", make_mod("Mod X", "mod.x", {"mod.d"}, {}, {"mod.b"}));
+    mods.insert("uuid-x", makeMod("Mod X", "mod.x", {"mod.d"}, {}, {"mod.b"}));
     f.reload(mods, {"uuid-c", "uuid-d", "uuid-a", "uuid-b"});
 
     REQUIRE(f.ctx->activation().apply(ids({"uuid-x"})));
@@ -268,11 +268,11 @@ TEST_CASE("bounds ignore an inconsistent active order") {
 
 TEST_CASE("batch cycle does not unplace downstream mods") {
     Fixture f;
-    Mods mods = base_mods();
-    mods.insert("uuid-p", make_mod("Mod P", "mod.p", {"mod.q"}));
-    mods.insert("uuid-q", make_mod("Mod Q", "mod.q", {"mod.p"}));
-    mods.insert("uuid-z", make_mod("Mod Z", "mod.z", {"mod.p"}));
-    mods.insert("uuid-k", make_mod("Mod K", "mod.k", {"mod.d"}, {}, {"mod.a"}));
+    Mods mods = baseMods();
+    mods.insert("uuid-p", makeMod("Mod P", "mod.p", {"mod.q"}));
+    mods.insert("uuid-q", makeMod("Mod Q", "mod.q", {"mod.p"}));
+    mods.insert("uuid-z", makeMod("Mod Z", "mod.z", {"mod.p"}));
+    mods.insert("uuid-k", makeMod("Mod K", "mod.k", {"mod.d"}, {}, {"mod.a"}));
     f.reload(mods, {"uuid-c", "uuid-d", "uuid-a", "uuid-b"});
 
     REQUIRE(f.ctx->activation().apply(ids({"uuid-z", "uuid-k", "uuid-q", "uuid-p"})));
@@ -284,54 +284,54 @@ TEST_CASE("batch cycle does not unplace downstream mods") {
 TEST_CASE("dependents_of lists transitive dependents in active order") {
     Fixture f;
 
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-a"})) == ids({"uuid-c", "uuid-b"}));
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-a"})) == ids({"uuid-c", "uuid-b"}));
 }
 
 TEST_CASE("dependents_of excludes its inputs") {
     Fixture f;
 
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-a", "uuid-b"})) == ids({"uuid-c"}));
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-a", "uuid-b"})) == ids({"uuid-c"}));
 }
 
 TEST_CASE("dependents_of excludes inactive dependents") {
     Fixture f;
 
     CHECK_FALSE(f.ctx->activeUuids().contains(QStringLiteral("uuid-e")));
-    CHECK_FALSE(f.ctx->activation().dependents_of(ids({"uuid-a"})).contains(QStringLiteral("uuid-e")));
+    CHECK_FALSE(f.ctx->activation().dependentsOf(ids({"uuid-a"})).contains(QStringLiteral("uuid-e")));
 }
 
 TEST_CASE("dependents_of reflects the graph after a state change") {
     Fixture f;
     REQUIRE(f.ctx->activation().apply(ids({"uuid-e"})));
 
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-a"})) == ids({"uuid-c", "uuid-e", "uuid-b"}));
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-a"})) == ids({"uuid-c", "uuid-e", "uuid-b"}));
 }
 
 TEST_CASE("dependents_of is empty for a mod without dependents") {
     Fixture f;
 
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-d", "uuid-missing"})).isEmpty());
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-d", "uuid-missing"})).isEmpty());
 }
 
 TEST_CASE("removing a duplicate copy keeps dependents") {
     Fixture f;
-    Mods mods = base_mods();
-    mods.insert("uuid-a-copy", make_mod("Copy A", "mod.a"));
+    Mods mods = baseMods();
+    mods.insert("uuid-a-copy", makeMod("Copy A", "mod.a"));
     f.reload(mods, {"uuid-a", "uuid-a-copy", "uuid-b", "uuid-c"});
 
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-a-copy"})).isEmpty());
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-a-copy"})).isEmpty());
     REQUIRE(f.ctx->activation().apply({}, ids({"uuid-a-copy"})));
     CHECK(f.ctx->activeUuids() == ids({"uuid-a", "uuid-b", "uuid-c"}));
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-a"})) == ids({"uuid-b", "uuid-c"}));
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-a"})) == ids({"uuid-b", "uuid-c"}));
 }
 
 TEST_CASE("enabling a replacement copy keeps dependents") {
     Fixture f;
-    Mods mods = base_mods();
-    mods.insert("uuid-a-copy", make_mod("Copy A", "mod.a"));
+    Mods mods = baseMods();
+    mods.insert("uuid-a-copy", makeMod("Copy A", "mod.a"));
     f.reload(mods, {"uuid-a", "uuid-b", "uuid-c"});
 
-    CHECK(f.ctx->activation().dependents_of(ids({"uuid-a"}), ids({"uuid-a-copy"})).isEmpty());
+    CHECK(f.ctx->activation().dependentsOf(ids({"uuid-a"}), ids({"uuid-a-copy"})).isEmpty());
     REQUIRE(f.ctx->activation().apply(ids({"uuid-a-copy"}), ids({"uuid-a"})));
     CHECK(f.ctx->activeUuids() == ids({"uuid-a-copy", "uuid-b", "uuid-c"}));
 }
@@ -341,25 +341,25 @@ TEST_CASE("sidebar entries are published before the summary") {
     Fixture f;
     DiagnosticsService& diagnostics = f.ctx->diagnosticsService();
     QSet<QString> inactive;
-    std::vector<QSet<QString>> seen_at_summary;
+    std::vector<QSet<QString>> seenAtSummary;
 
-    diagnostics.sidebar_entries_changed.connect([&inactive](const QList<view::SidebarEntry>& entries) {
+    diagnostics.sidebarEntriesChanged.connect([&inactive](const QList<view::SidebarEntry>& entries) {
         inactive.clear();
         for (const view::SidebarEntry& entry : entries) {
             if (entry.label == QStringLiteral("Inactive")) {
-                inactive = entry.visible_uuids;
+                inactive = entry.visibleUuids;
             }
         }
     });
-    diagnostics.diagnostics_summary_changed.connect(
-        [&inactive, &seen_at_summary](const QHash<QString, view::ModDiagnosticsView>&) {
-            seen_at_summary.push_back(inactive);
+    diagnostics.diagnosticsSummaryChanged.connect(
+        [&inactive, &seenAtSummary](const QHash<QString, view::ModDiagnosticsView>&) {
+            seenAtSummary.push_back(inactive);
         });
 
     diagnostics.rebuild(f.ctx->activeUuids());
-    seen_at_summary.clear();
+    seenAtSummary.clear();
     REQUIRE(f.ctx->activation().apply(ids({"uuid-f"})));
 
-    REQUIRE_FALSE(seen_at_summary.empty());
-    CHECK_FALSE(seen_at_summary.back().contains(QStringLiteral("uuid-f")));
+    REQUIRE_FALSE(seenAtSummary.empty());
+    CHECK_FALSE(seenAtSummary.back().contains(QStringLiteral("uuid-f")));
 }

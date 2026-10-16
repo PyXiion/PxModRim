@@ -13,7 +13,7 @@ FilterSidebar::FilterSidebar(QQmlEngine* engine, QAbstractItemModel* model, QWid
     setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/FilterSidebar.qml")));
     if (auto* root = rootObject()) connect(root, SIGNAL(activated(int)), this, SIGNAL(activated(int)));
 }
-int FilterSidebar::current_index() const {
+int FilterSidebar::currentIndex() const {
     const auto* root = rootObject();
     const auto* view = root ? root->findChild<QObject*>(QStringLiteral("listView")) : nullptr;
     return view ? view->property("currentIndex").toInt() : -1;

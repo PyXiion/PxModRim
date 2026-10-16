@@ -79,9 +79,9 @@ public:
     virtual ~MetadataCacheStore() = default;
 
     // Returns the entries that are still valid for `target_version`; everything else is missing.
-    virtual QCoro::Task<CacheLookup> get_mods(QList<ModCandidate> candidates,
-                                              QString target_version) = 0;
-    virtual QCoro::Task<void> put_mods(QList<CachedMod> entries, QString target_version) = 0;
+    virtual QCoro::Task<CacheLookup> getMods(QList<ModCandidate> candidates,
+                                              QString targetVersion) = 0;
+    virtual QCoro::Task<void> putMods(QList<CachedMod> entries, QString targetVersion) = 0;
 };
 
 // Discovered mods keyed by uuid (the mod path for mods on disk).
@@ -94,37 +94,37 @@ class BaseModProvider {
 public:
     // `path` is the root this provider scans. `pool` and `metadata_cache` are optional and not
     // owned; they must outlive the provider.
-    BaseModProvider(QString provider_id, QString color, QString path,
-                    QThreadPool* pool = nullptr, MetadataCacheStore* metadata_cache = nullptr);
+    BaseModProvider(QString providerId, QString color, QString path,
+                    QThreadPool* pool = nullptr, MetadataCacheStore* metadataCache = nullptr);
     BaseModProvider(const BaseModProvider&) = delete;
     BaseModProvider& operator=(const BaseModProvider&) = delete;
     virtual ~BaseModProvider() = default;
 
-    const QString& provider_id() const noexcept { return provider_id_; }
-    const QString& color() const noexcept { return color_; }
-    const QString& path() const noexcept { return path_; }
+    const QString& providerId() const noexcept { return m_providerId; }
+    const QString& color() const noexcept { return m_color; }
+    const QString& path() const noexcept { return m_path; }
 
     // `metadata_cache` overrides the cache given at construction for this call only.
-    virtual QCoro::Task<Result<ModMap>> discover(QString target_version,
+    virtual QCoro::Task<Result<ModMap>> discover(QString targetVersion,
                                                  Profiler* timer = nullptr,
-                                                 MetadataCacheStore* metadata_cache = nullptr,
-                                                 bool force_reparse = false) = 0;
+                                                 MetadataCacheStore* metadataCache = nullptr,
+                                                 bool forceReparse = false) = 0;
 
 protected:
     // Loads metadata for `dirs`, using the cache where entries are still valid.
-    QCoro::Task<Result<ModMap>> load_mods(QList<ModDirectory> dirs, QString target_version,
-                                          Profiler& timer, MetadataCacheStore* metadata_cache,
-                                          bool force_reparse);
+    QCoro::Task<Result<ModMap>> loadMods(QList<ModDirectory> dirs, QString targetVersion,
+                                          Profiler& timer, MetadataCacheStore* metadataCache,
+                                          bool forceReparse);
 
 private:
-    QCoro::Task<Result<QList<ParsedMod>>> parse_candidates(QList<ModCandidate> missing,
-                                                           QString target_version);
+    QCoro::Task<Result<QList<ParsedMod>>> parseCandidates(QList<ModCandidate> missing,
+                                                           QString targetVersion);
 
-    QString provider_id_;
-    QString color_;
-    QString path_;
-    QThreadPool* pool_;
-    MetadataCacheStore* metadata_cache_;
+    QString m_providerId;
+    QString m_color;
+    QString m_path;
+    QThreadPool* m_pool;
+    MetadataCacheStore* m_metadataCache;
 };
 
 }  // namespace px::modrim::providers

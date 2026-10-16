@@ -10,12 +10,12 @@ StartupImpactReport report() {
         {"Small", QStringLiteral("a.small"), 1, {{"LoadingProgress.StartupImpact.ApplyPatches", 1}}},
         {"Big", QStringLiteral("b.big"), 4, {{"LoadingProgress.StartupImpact.ModContentPackReloadContentInt.Textures", 3},
                                             {"LoadingProgress.StartupImpact.ApplyPatches", 1}}, {}, 0.5},
-        {QString(BASE_GAME_PID), QString(BASE_GAME_PID), 10,
+        {QString(kBaseGamePid), QString(kBaseGamePid), 10,
             {{"LoadingProgress.StartupImpact.GlobalTextureAtlasManagerBakeStaticAtlases", 10}}}};
     return result;
 }
 QVariantMap build(QStringList active = {}, std::optional<QString> selected = {}, double estimate = 0) {
-    return build_startup_impact(report(), active, selected, estimate);
+    return buildStartupImpact(report(), active, selected, estimate);
 }
 }
 TEST_CASE("Startup impact excludes base and ranks mods") {
@@ -82,16 +82,16 @@ TEST_CASE("Startup impact phases toggle base contribution") {
         for (const auto& mod : phase.toMap().value("mods").toList()) CHECK_FALSE(mod.toMap().value("base").toBool());
 }
 TEST_CASE("Startup impact duration formatting") {
-    CHECK(format_duration(0.0004) == "0 ms");
-    CHECK(format_duration(0.25) == "250 ms");
-    CHECK(format_duration(59.5) == "59.50 s");
-    CHECK(format_duration(60) == "1m 00s");
-    CHECK(format_duration(268.7) == "4m 29s");
+    CHECK(formatDuration(0.0004) == "0 ms");
+    CHECK(formatDuration(0.25) == "250 ms");
+    CHECK(formatDuration(59.5) == "59.50 s");
+    CHECK(formatDuration(60) == "1m 00s");
+    CHECK(formatDuration(268.7) == "4m 29s");
 }
 TEST_CASE("Startup impact tooltip combines metrics sharing labels") {
     auto data = report();
     data.mods[0].metrics = {{"ApplyPatches|Foo -> a", 1}, {"ApplyPatches|Foo -> b", 2}};
-    const auto rows = build_startup_impact(data, {}, {}, 0).value("mods").toList();
+    const auto rows = buildStartupImpact(data, {}, {}, 0).value("mods").toList();
     const auto tooltip = rows[1].toMap().value("phases").toList()[0].toMap().value("tooltip").toString();
     CHECK(tooltip.count('\n') == 0);
     CHECK(tooltip.endsWith("3.00 s"));

@@ -6,11 +6,11 @@ namespace px::modrim {
 
 const std::array<MenuSpec, 4>& menuLayout() {
     static const std::array<MenuSpec, 4> layout{{
-        {"&File", {ActionId::Save, ActionId::Restore, ActionId::Settings, std::nullopt, ActionId::Quit}},
-        {"&Mods", {ActionId::Refresh, ActionId::FullRescan, ActionId::AutoSort, std::nullopt, ActionId::UpdateMods}},
-        {"&View", {ActionId::FocusSearch, ActionId::NextView, ActionId::PrevView, std::nullopt, ActionId::Fullscreen}},
-        {"&Help", {ActionId::ReportIssue, ActionId::UploadLogs, ActionId::OpenLogs, ActionId::Shortcuts,
-                   ActionId::CheckUpdates, std::nullopt, ActionId::About}},
+        {"&File", {ActionId::kSave, ActionId::kRestore, ActionId::kSettings, std::nullopt, ActionId::kQuit}},
+        {"&Mods", {ActionId::kRefresh, ActionId::kFullRescan, ActionId::kAutoSort, std::nullopt, ActionId::kUpdateMods}},
+        {"&View", {ActionId::kFocusSearch, ActionId::kNextView, ActionId::kPrevView, std::nullopt, ActionId::kFullscreen}},
+        {"&Help", {ActionId::kReportIssue, ActionId::kUploadLogs, ActionId::kOpenLogs, ActionId::kShortcuts,
+                   ActionId::kCheckUpdates, std::nullopt, ActionId::kAbout}},
     }};
     return layout;
 }

@@ -18,47 +18,49 @@ using test_support::TestApplication;
 using workshop_test::FakeCatalog;
 using workshop_test::HttpRequest;
 using workshop_test::HttpResponse;
-using workshop_test::decode_collection;
-using workshop_test::decode_mod;
+using workshop_test::decodeCollection;
+using workshop_test::decodeMod;
 using workshop_test::run;
-using workshop_test::unreachable_url;
+using workshop_test::unreachableUrl;
 using workshop_test::wire;
 
 namespace {
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct ResolveRequest {
     std::vector<std::string> ids;
     std::vector<std::string> collection_ids;
 };
+// NOLINTEND(readability-identifier-naming)
 
 struct IdsRequest {
     std::vector<std::string> ids;
 };
 
 // The `{"items":[...],"total":N,"next_cursor":...}` page shape.
-std::string page(const std::string& items, int total, const std::string& cursor_json) {
-    return R"({"items":[)" + items + R"(],"total":)" + std::to_string(total) + R"(,"next_cursor":)" + cursor_json + "}";
+std::string page(const std::string& items, int total, const std::string& cursorJson) {
+    return R"({"items":[)" + items + R"(],"total":)" + std::to_string(total) + R"(,"next_cursor":)" + cursorJson + "}";
 }
 
-std::string error_body(const std::string& message) {
+std::string errorBody(const std::string& message) {
     return R"({"error":{"message":")" + message + R"("}})";
 }
 
-QString query_value(const HttpRequest& request, const char* key) {
+QString queryValue(const HttpRequest& request, const char* key) {
     return request.query().queryItemValue(QString::fromLatin1(key));
 }
 
-CatalogMod with_id(std::string id) {
-    CatalogMod mod = decode_mod(workshop_test::kModJson);
+CatalogMod withId(std::string id) {
+    CatalogMod mod = decodeMod(workshop_test::kModJson);
     mod.id = std::move(id);
     return mod;
 }
 
-CatalogCollection steam_collection(std::string id, std::string steam_id, std::vector<std::string> members) {
-    CatalogCollection collection = decode_collection(workshop_test::kCollectionJson);
+CatalogCollection steamCollection(std::string id, std::string steamId, std::vector<std::string> members) {
+    CatalogCollection collection = decodeCollection(workshop_test::kCollectionJson);
     collection.id = std::move(id);
-    collection.source = CollectionSource::steam;
-    collection.steam_id = std::move(steam_id);
+    collection.source = CollectionSource::kSteam;
+    collection.steam_id = std::move(steamId);
     collection.workshop_url = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + *collection.steam_id;
     collection.member_count = static_cast<std::int64_t>(members.size());
     collection.member_ids = std::move(members);
@@ -71,12 +73,12 @@ TEST_CASE("workshop client decodes every endpoint and sends the query") {
     TestApplication app;
     const std::string mod = std::string(workshop_test::kModJson);
     const std::string collection = std::string(workshop_test::kCollectionJson);
-    const std::string nested = wire(steam_collection("steam:456", "456", {"2009463077"}));
-    const std::string steam = wire(steam_collection("steam:123", "123", {"2009463077", "steam:456", "99"}));
+    const std::string nested = wire(steamCollection("steam:456", "456", {"2009463077"}));
+    const std::string steam = wire(steamCollection("steam:123", "123", {"2009463077", "steam:456", "99"}));
 
-    const std::string detail_picked = R"({"collection":)" + collection + R"(,"members":[)" + mod +
+    const std::string detailPicked = R"({"collection":)" + collection + R"(,"members":[)" + mod +
                                       R"(],"unavailable_ids":["99"],"is_complete":false})";
-    const std::string detail_steam = R"({"collection":)" + steam + R"(,"members":[)" + mod + "," + nested +
+    const std::string detailSteam = R"({"collection":)" + steam + R"(,"members":[)" + mod + "," + nested +
                                      R"(],"unavailable_ids":["99"],"is_complete":false})";
     const std::string resolution = R"({"roots":["picked:starter"],"items":{"2009463077":)" + mod +
                                    R"(,"picked:starter":)" + collection +
@@ -99,15 +101,15 @@ TEST_CASE("workshop client decodes every endpoint and sends the query") {
             return {200, mod};
         }
         if (path == "/catalog/collections/picked/starter") {
-            return {200, detail_picked};
+            return {200, detailPicked};
         }
         if (path == "/catalog/collections/steam/123") {
-            return {200, detail_steam};
+            return {200, detailSteam};
         }
         if (path == "/catalog/resolve") {
             return {200, resolution};
         }
-        return {404, error_body("unknown")};
+        return {404, errorBody("unknown")};
     });
 
     CatalogClient client(server.url());
@@ -115,8 +117,8 @@ TEST_CASE("workshop client decodes every endpoint and sends the query") {
     REQUIRE(discover.has_value());
     CHECK(discover->mods.items[0].file_size == std::string("18446744073709551615"));
     CHECK(discover->mods.items[0].votes->positive_percent == 90.0);
-    CHECK(discover->mods.items[0].previews[1].type == PreviewType::video);
-    CHECK(discover->collections.items[0].description_format == CollectionDescriptionFormat::text);
+    CHECK(discover->mods.items[0].previews[1].type == PreviewType::kVideo);
+    CHECK(discover->collections.items[0].description_format == CollectionDescriptionFormat::kText);
 
     CatalogQuery query;
     query.query = QStringLiteral("quality");
@@ -130,13 +132,13 @@ TEST_CASE("workshop client decodes every endpoint and sends the query") {
     REQUIRE(mods.has_value());
     CHECK(mods->next_cursor == std::optional<std::string>("next-page"));
     const HttpRequest& sent = server.requests.back();
-    CHECK(query_value(sent, "q") == QStringLiteral("quality"));
-    CHECK(query_value(sent, "tag") == QStringLiteral("Libraries"));
-    CHECK(query_value(sent, "version") == QStringLiteral("1.6"));
-    CHECK(query_value(sent, "sort") == QStringLiteral("updated"));
-    CHECK(query_value(sent, "limit") == QStringLiteral("50"));
-    CHECK(query_value(sent, "cursor") == QStringLiteral("next"));
-    CHECK(query_value(sent, "source") == QStringLiteral("picked"));
+    CHECK(queryValue(sent, "q") == QStringLiteral("quality"));
+    CHECK(queryValue(sent, "tag") == QStringLiteral("Libraries"));
+    CHECK(queryValue(sent, "version") == QStringLiteral("1.6"));
+    CHECK(queryValue(sent, "sort") == QStringLiteral("updated"));
+    CHECK(queryValue(sent, "limit") == QStringLiteral("50"));
+    CHECK(queryValue(sent, "cursor") == QStringLiteral("next"));
+    CHECK(queryValue(sent, "source") == QStringLiteral("picked"));
     CHECK(sent.query().queryItems().size() == 7);
 
     const auto collections = run(client.collections(query));
@@ -146,20 +148,20 @@ TEST_CASE("workshop client decodes every endpoint and sends the query") {
     const auto single = run(client.mod("2009463077"));
     REQUIRE(single.has_value());
     REQUIRE(single->has_value());
-    CHECK((*single)->description == decode_mod(mod).description);
-    CHECK((*single)->kind == ModKind::mod);
+    CHECK((*single)->description == decodeMod(mod).description);
+    CHECK((*single)->kind == ModKind::kMod);
 
     for (const char* id : {"picked:starter", "steam:123"}) {
         const auto detail = run(client.collection(id));
         REQUIRE(detail.has_value());
         REQUIRE(detail->has_value());
         const CollectionDetail& value = **detail;
-        const bool is_steam = std::string(id) == "steam:123";
-        REQUIRE(value.members.size() == (is_steam ? 2 : 1));
+        const bool isSteam = std::string(id) == "steam:123";
+        REQUIRE(value.members.size() == (isSteam ? 2 : 1));
         CHECK(std::holds_alternative<CatalogMod>(value.members[0]));
         CHECK(value.unavailable_ids == std::vector<std::string>{"99"});
         CHECK_FALSE(value.is_complete);
-        if (is_steam) {
+        if (isSteam) {
             CHECK(std::holds_alternative<CatalogCollection>(value.members[1]));
         }
     }
@@ -180,16 +182,16 @@ TEST_CASE("workshop client decodes every endpoint and sends the query") {
 TEST_CASE("workshop client reports error statuses as errors, never as empty results") {
     TestApplication app;
     for (int status : {400, 401, 500, 502, 503}) {
-        for (bool json_body : {true, false}) {
+        for (bool jsonBody : {true, false}) {
             FakeCatalog server([&](const HttpRequest&) -> HttpResponse {
-                return json_body ? HttpResponse{status, error_body("Catalog unavailable")}
+                return jsonBody ? HttpResponse{status, errorBody("Catalog unavailable")}
                                  : HttpResponse{status, "<html>Upstream failure</html>"};
             });
             CatalogClient client(server.url());
             const auto result = run(client.mod("123"));
             REQUIRE_FALSE(result.has_value());
             CHECK(result.error().status == status);
-            if (json_body) {
+            if (jsonBody) {
                 CHECK(result.error().message == QStringLiteral("Catalog unavailable"));
             } else {
                 CHECK(result.error().message.contains(QStringLiteral("HTTP %1").arg(status)));
@@ -201,9 +203,9 @@ TEST_CASE("workshop client reports error statuses as errors, never as empty resu
 
 TEST_CASE("workshop optional details return nothing only for a 404") {
     TestApplication app;
-    for (bool json_body : {true, false}) {
+    for (bool jsonBody : {true, false}) {
         FakeCatalog server([&](const HttpRequest&) -> HttpResponse {
-            return json_body ? HttpResponse{404, error_body("Item unavailable")} : HttpResponse{404, "Not found"};
+            return jsonBody ? HttpResponse{404, errorBody("Item unavailable")} : HttpResponse{404, "Not found"};
         });
         CatalogClient client(server.url());
         const auto mod = run(client.mod("123"));
@@ -218,22 +220,22 @@ TEST_CASE("workshop optional details return nothing only for a 404") {
 TEST_CASE("workshop optional details keep server, network and decoding failures") {
     TestApplication app;
     FakeCatalog failing([](const HttpRequest&) -> HttpResponse { return {500, "Server error"}; });
-    CatalogClient failing_client(failing.url());
-    const auto server_error = run(failing_client.mod("123"));
-    REQUIRE_FALSE(server_error.has_value());
-    CHECK(server_error.error().status == 500);
-    const auto collection_error = run(failing_client.collection("steam:123"));
-    REQUIRE_FALSE(collection_error.has_value());
-    CHECK(collection_error.error().status == 500);
+    CatalogClient failingClient(failing.url());
+    const auto serverError = run(failingClient.mod("123"));
+    REQUIRE_FALSE(serverError.has_value());
+    CHECK(serverError.error().status == 500);
+    const auto collectionError = run(failingClient.collection("steam:123"));
+    REQUIRE_FALSE(collectionError.has_value());
+    CHECK(collectionError.error().status == 500);
 
-    CatalogClient offline(unreachable_url());
+    CatalogClient offline(unreachableUrl());
     const auto network = run(offline.mod("123"));
     REQUIRE_FALSE(network.has_value());
     CHECK_FALSE(network.error().status.has_value());
 
     FakeCatalog garbage([](const HttpRequest&) -> HttpResponse { return {200, "not-json"}; });
-    CatalogClient garbage_client(garbage.url());
-    const auto decoding = run(garbage_client.collection("steam:123"));
+    CatalogClient garbageClient(garbage.url());
+    const auto decoding = run(garbageClient.collection("steam:123"));
     REQUIRE_FALSE(decoding.has_value());
     CHECK(decoding.error().status == 200);
 }
@@ -250,7 +252,7 @@ TEST_CASE("workshop non-optional endpoints keep 404 errors") {
     const auto collections = run(client.collections(query));
     REQUIRE_FALSE(collections.has_value());
     CHECK(collections.error().status == 404);
-    const auto batch = run(client.mods_batch({"123"}));
+    const auto batch = run(client.modsBatch({"123"}));
     REQUIRE_FALSE(batch.has_value());
     CHECK(batch.error().status == 404);
     const auto resolved = run(client.resolve({"123"}, {}));
@@ -272,15 +274,15 @@ TEST_CASE("workshop client rejects invalid collection ids before sending") {
 
 TEST_CASE("workshop client treats responses that violate the wire contract as invalid") {
     TestApplication app;
-    const std::string valid_mod(workshop_test::kModJson);
-    std::string numeric_id = valid_mod;
-    numeric_id.replace(numeric_id.find("\"2009463077\""), 12, "123");
-    std::string bad_kind = valid_mod;
-    bad_kind.replace(bad_kind.find("\"mod\""), 5, "\"collection\"");
-    std::string missing_title = valid_mod;
-    missing_title.replace(missing_title.find("\"title\": \"Harmony\","), 21, "");
+    const std::string validMod(workshop_test::kModJson);
+    std::string numericId = validMod;
+    numericId.replace(numericId.find("\"2009463077\""), 12, "123");
+    std::string badKind = validMod;
+    badKind.replace(badKind.find("\"mod\""), 5, "\"collection\"");
+    std::string missingTitle = validMod;
+    missingTitle.replace(missingTitle.find("\"title\": \"Harmony\","), 21, "");
 
-    for (const std::string& body : {numeric_id, bad_kind, missing_title, std::string("not-json")}) {
+    for (const std::string& body : {numericId, badKind, missingTitle, std::string("not-json")}) {
         FakeCatalog server([&](const HttpRequest&) -> HttpResponse { return {200, body}; });
         CatalogClient client(server.url());
         const auto result = run(client.mod("123"));
@@ -302,13 +304,13 @@ TEST_CASE("workshop batch requests split ids into chunks of 100") {
                 unavailable.push_back(id);
                 continue;
             }
-            items += (items.empty() ? "" : ",") + wire(with_id(id));
+            items += (items.empty() ? "" : ",") + wire(withId(id));
         }
-        std::string unavailable_json = "[";
+        std::string unavailableJson = "[";
         for (const std::string& id : unavailable) {
-            unavailable_json += "\"" + id + "\"";
+            unavailableJson += "\"" + id + "\"";
         }
-        return {200, R"({"items":[)" + items + R"(],"unavailable_ids":)" + unavailable_json + "]}"};
+        return {200, R"({"items":[)" + items + R"(],"unavailable_ids":)" + unavailableJson + "]}"};
     });
 
     CatalogClient client(server.url());
@@ -320,7 +322,7 @@ TEST_CASE("workshop batch requests split ids into chunks of 100") {
     for (const std::string& id : ids) {
         qids.append(QString::fromStdString(id));
     }
-    const auto result = run(client.mods_batch(qids));
+    const auto result = run(client.modsBatch(qids));
     REQUIRE(result.has_value());
 
     REQUIRE(server.requests.size() == 3);
@@ -329,18 +331,18 @@ TEST_CASE("workshop batch requests split ids into chunks of 100") {
     CHECK(glz::read_json<IdsRequest>(server.requests[2].body)->ids.size() == 5);
     CHECK(result->items.size() == 204);
     CHECK(result->items.front().id == "1");
-    CHECK(result->unavailable_ids == std::vector<std::string>{"105"});
+    CHECK(result->unavailableIds == std::vector<std::string>{"105"});
 
-    const auto empty = run(client.mods_batch({}));
+    const auto empty = run(client.modsBatch({}));
     REQUIRE(empty.has_value());
     CHECK(empty->items.empty());
-    CHECK(empty->unavailable_ids.empty());
+    CHECK(empty->unavailableIds.empty());
     CHECK(server.requests.size() == 3);
 }
 
 TEST_CASE("workshop transport failures are catalog errors without a status") {
     TestApplication app;
-    CatalogClient client(unreachable_url());
+    CatalogClient client(unreachableUrl());
     const auto result = run(client.discover());
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().message.startsWith(QStringLiteral("Cannot reach the Workshop catalog")));
@@ -366,29 +368,29 @@ TEST_CASE("workshop resolve splits requests and merges their answers") {
         const bool second = sent.size() == 2;
 
         // Every answer repeats the dependency 999, which must be reported once.
-        std::vector<std::string> mod_ids{"999"};
-        mod_ids.insert(mod_ids.end(), body->ids.begin(), body->ids.end());
+        std::vector<std::string> modIds{"999"};
+        modIds.insert(modIds.end(), body->ids.begin(), body->ids.end());
         std::string items = "{";
-        for (const std::string& id : mod_ids) {
-            items += "\"" + id + "\":" + wire(with_id(id));
-            items += id == mod_ids.back() ? "" : ",";
+        for (const std::string& id : modIds) {
+            items += "\"" + id + "\":" + wire(withId(id));
+            items += id == modIds.back() ? "" : ",";
         }
         items += "}";
-        std::string mods_json = "[";
-        for (const std::string& id : mod_ids) {
-            mods_json += "\"" + id + "\",";
+        std::string modsJson = "[";
+        for (const std::string& id : modIds) {
+            modsJson += "\"" + id + "\",";
         }
-        mods_json.back() = ']';
-        std::string roots_json = "[";
+        modsJson.back() = ']';
+        std::string rootsJson = "[";
         for (const std::string& id : body->ids) {
-            roots_json += "\"" + id + "\",";
+            rootsJson += "\"" + id + "\",";
         }
         for (const std::string& id : body->collection_ids) {
-            roots_json += "\"" + id + "\",";
+            rootsJson += "\"" + id + "\",";
         }
-        roots_json.back() = ']';
+        rootsJson.back() = ']';
 
-        return {200, R"({"roots":)" + roots_json + R"(,"items":)" + items + R"(,"mod_ids":)" + mods_json +
+        return {200, R"({"roots":)" + rootsJson + R"(,"items":)" + items + R"(,"mod_ids":)" + modsJson +
                          R"(,"unavailable_ids":)" + (second ? R"(["404"])" : "[]") +
                          R"(,"incomplete_collection_ids":)" + (second ? R"(["picked:pack-10"])" : "[]") +
                          R"(,"is_complete":)" + (second ? "false" : "true") + "}"};

@@ -18,7 +18,7 @@ struct Case {
 void checkCases(std::initializer_list<Case> cases) {
     for (const Case& c : cases) {
         INFO("input: " << c.input);
-        CHECK(px::modrim::unity_rich_text_to_html(QString::fromUtf8(c.input)) == QString::fromUtf8(c.expected));
+        CHECK(px::modrim::unityRichTextToHtml(QString::fromUtf8(c.input)) == QString::fromUtf8(c.expected));
     }
 }
 
@@ -98,21 +98,21 @@ TEST_CASE("unity rich text drops links with unsafe urls and keeps their text") {
          }) {
         INFO("url: " << url);
         const QString input = QStringLiteral("<link=\"%1\">link</link>").arg(QString::fromUtf8(url));
-        CHECK(px::modrim::unity_rich_text_to_html(input) == QStringLiteral("link"));
+        CHECK(px::modrim::unityRichTextToHtml(input) == QStringLiteral("link"));
     }
 }
 
 TEST_CASE("unity rich text uses the default size for a non-finite size") {
     // 10**400 as a decimal literal: a 1 followed by 400 zeros, which parses to infinity.
     const QString huge = QStringLiteral("1") + QString(400, QLatin1Char('0'));
-    const QString html = px::modrim::unity_rich_text_to_html(QStringLiteral("<size=%1>large</size>").arg(huge));
+    const QString html = px::modrim::unityRichTextToHtml(QStringLiteral("<size=%1>large</size>").arg(huge));
     CHECK(html == QStringLiteral("<span style=\"font-size: 13pt;\">large</span>"));
 }
 
 TEST_CASE("unity rich text uses the default indent for a non-finite indent") {
     // 10**400 as a decimal literal: a 1 followed by 400 zeros, which parses to infinity.
     const QString huge = QStringLiteral("1") + QString(400, QLatin1Char('0'));
-    const QString html = px::modrim::unity_rich_text_to_html(QStringLiteral("<indent=%1>wide</indent>").arg(huge));
+    const QString html = px::modrim::unityRichTextToHtml(QStringLiteral("<indent=%1>wide</indent>").arg(huge));
     CHECK(html == QStringLiteral("<div style=\"margin-left: 20px;\">wide</div>"));
 }
 

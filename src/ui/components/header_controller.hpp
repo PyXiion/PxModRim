@@ -34,23 +34,23 @@ public:
     HeaderController(bool isFrameless, int initialStrategy, QString appVersion, QVariantMap tooltips,
                      bool downloadsAvailable, QObject* parent = nullptr);
 
-    bool isFrameless() const { return is_frameless_; }
-    const QString& appVersion() const { return app_version_; }
-    const QVariantMap& tooltips() const { return tooltips_; }
-    bool downloadsAvailable() const { return downloads_available_; }
+    bool isFrameless() const { return m_isFrameless; }
+    const QString& appVersion() const { return m_appVersion; }
+    const QVariantMap& tooltips() const { return m_tooltips; }
+    bool downloadsAvailable() const { return m_downloadsAvailable; }
     // [{index, label}] for each launch strategy, in enum order.
     QVariantList strategies() const;
 
-    bool maximized() const { return maximized_; }
-    int strategyIndex() const { return strategy_index_; }
-    bool unsavedChanges() const { return unsaved_changes_; }
-    const QString& launchState() const { return launch_state_; }
-    const QString& taskText() const { return task_text_; }
-    bool downloadsBusy() const { return downloads_busy_; }
-    bool downloadsProgressShown() const { return downloads_progress_shown_; }
-    const QString& downloadsText() const { return downloads_text_; }
-    int downloadsValue() const { return downloads_value_; }
-    int downloadsTotal() const { return downloads_total_; }
+    bool maximized() const { return m_maximized; }
+    int strategyIndex() const { return m_strategyIndex; }
+    bool unsavedChanges() const { return m_unsavedChanges; }
+    const QString& launchState() const { return m_launchState; }
+    const QString& taskText() const { return m_taskText; }
+    bool downloadsBusy() const { return m_downloadsBusy; }
+    bool downloadsProgressShown() const { return m_downloadsProgressShown; }
+    const QString& downloadsText() const { return m_downloadsText; }
+    int downloadsValue() const { return m_downloadsValue; }
+    int downloadsTotal() const { return m_downloadsTotal; }
 
     void setMaximized(bool value);
     void setUnsavedChanges(bool value);
@@ -95,21 +95,21 @@ signals:
     void downloadsProgressChanged();
 
 private:
-    bool is_frameless_;
-    QString app_version_;
-    QVariantMap tooltips_;
-    bool downloads_available_;
+    bool m_isFrameless;
+    QString m_appVersion;
+    QVariantMap m_tooltips;
+    bool m_downloadsAvailable;
 
-    bool maximized_ = false;
-    int strategy_index_;
-    bool unsaved_changes_ = false;
-    QString launch_state_ = QStringLiteral("idle");
-    QString task_text_;
-    bool downloads_busy_ = false;
-    bool downloads_progress_shown_ = true;
-    QString downloads_text_;
-    int downloads_value_ = 0;
-    int downloads_total_ = 0;
+    bool m_maximized = false;
+    int m_strategyIndex;
+    bool m_unsavedChanges = false;
+    QString m_launchState = QStringLiteral("idle");
+    QString m_taskText;
+    bool m_downloadsBusy = false;
+    bool m_downloadsProgressShown = true;
+    QString m_downloadsText;
+    int m_downloadsValue = 0;
+    int m_downloadsTotal = 0;
 };
 
 }  // namespace px::modrim

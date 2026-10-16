@@ -19,40 +19,40 @@ void renderNode(const Profiler::Node& node, int depth, QString& out) {
 }  // namespace
 
 Profiler::Scope::Scope(Profiler& owner, QAnyStringView name)
-    : owner_(owner), parent_(owner.current_), start_(std::chrono::steady_clock::now()) {
+    : m_owner(owner), m_parent(owner.m_current), m_start(std::chrono::steady_clock::now()) {
     auto node = std::make_unique<Node>(name.toString());
-    node_ = node.get();
-    parent_->children.push_back(std::move(node));
-    owner_.current_ = node_;
+    m_node = node.get();
+    m_parent->children.push_back(std::move(node));
+    m_owner.m_current = m_node;
 }
 
 Profiler::Scope::~Scope() {
-    node_->elapsed = std::chrono::steady_clock::now() - start_;
-    owner_.current_ = parent_;
+    m_node->elapsed = std::chrono::steady_clock::now() - m_start;
+    m_owner.m_current = m_parent;
 }
 
 void Profiler::adopt(Profiler& child) {
-    for (auto& node : child.root_.children) {
-        current_->children.push_back(std::move(node));
+    for (auto& node : child.m_root.children) {
+        m_current->children.push_back(std::move(node));
     }
-    child.root_.children.clear();
+    child.m_root.children.clear();
 }
 
 QString Profiler::render() const {
     QString out;
-    for (const auto& child : root_.children) {
+    for (const auto& child : m_root.children) {
         renderNode(*child, 0, out);
     }
     return out;
 }
 
 ProfileSession::ProfileSession(QAnyStringView label)
-    : scope_(std::make_unique<Profiler::Scope>(timer_, label)) {}
+    : m_scope(std::make_unique<Profiler::Scope>(m_timer, label)) {}
 
 ProfileSession::~ProfileSession() {
     // Close the top-level scope before rendering so its elapsed time is included.
-    scope_.reset();
-    spdlog::debug("Profile report:\n{}", timer_.render().toStdString());
+    m_scope.reset();
+    spdlog::debug("Profile report:\n{}", m_timer.render().toStdString());
 }
 
 }  // namespace px::modrim

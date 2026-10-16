@@ -33,52 +33,52 @@ QIcon requireIcon(QStringView name, int size, QStringView color) {
 
 ProgressDialog::ProgressDialog(LoadingState& loading, QWidget* parent)
     : QDialog(parent, Qt::WindowStaysOnTopHint | Qt::CustomizeWindowHint | Qt::WindowTitleHint),
-      loading_(loading) {
+      m_loading(loading) {
     setWindowTitle(QStringLiteral("Loading"));
     setMinimumWidth(420);
     setModal(true);
 
-    crumbs_ = new QWidget(this);
-    crumbs_layout_ = new QHBoxLayout(crumbs_);
-    crumbs_layout_->setContentsMargins(0, 0, 0, 8);
-    crumbs_layout_->setSpacing(4);
+    m_crumbs = new QWidget(this);
+    m_crumbsLayout = new QHBoxLayout(m_crumbs);
+    m_crumbsLayout->setContentsMargins(0, 0, 0, 8);
+    m_crumbsLayout->setSpacing(4);
 
-    progress_ = new QProgressBar(this);
-    progress_->setTextVisible(false);
-    progress_->setRange(0, 100);
+    m_progress = new QProgressBar(this);
+    m_progress->setTextVisible(false);
+    m_progress->setRange(0, 100);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(0);
-    layout->addWidget(crumbs_);
-    layout->addWidget(progress_);
+    layout->addWidget(m_crumbs);
+    layout->addWidget(m_progress);
     installDialogChrome(this, false);
 
-    hide_timer_ = new QTimer(this);
-    hide_timer_->setSingleShot(true);
-    hide_timer_->setInterval(kHideDelayMs);
-    connect(hide_timer_, &QTimer::timeout, this, &ProgressDialog::beginHide);
+    m_hideTimer = new QTimer(this);
+    m_hideTimer->setSingleShot(true);
+    m_hideTimer->setInterval(kHideDelayMs);
+    connect(m_hideTimer, &QTimer::timeout, this, &ProgressDialog::beginHide);
 
-    fade_ = new QPropertyAnimation(this, QByteArrayLiteral("windowOpacity"), this);
-    connect(fade_, &QPropertyAnimation::finished, this, &ProgressDialog::onFadeFinished);
+    m_fade = new QPropertyAnimation(this, QByteArrayLiteral("windowOpacity"), this);
+    connect(m_fade, &QPropertyAnimation::finished, this, &ProgressDialog::onFadeFinished);
 
-    connections_.push_back(QObject::connect(
-        &loading_, &LoadingState::changed, this,
+    m_connections.push_back(QObject::connect(
+        &m_loading, &LoadingState::changed, this,
         [this](const QString&, int pct, int, int) { onChanged(pct); }));
-    connections_.push_back(
-        QObject::connect(&loading_, &LoadingState::finished, this, &ProgressDialog::onFinished));
+    m_connections.push_back(
+        QObject::connect(&m_loading, &LoadingState::finished, this, &ProgressDialog::onFinished));
 }
 
 ProgressDialog::~ProgressDialog() {
-    for (const auto& connection : connections_) {
+    for (const auto& connection : m_connections) {
         QObject::disconnect(connection);
     }
 }
 
 void ProgressDialog::onChanged(int pct) {
-    hide_timer_->stop();
-    if (!shown_) {
-        shown_ = true;
+    m_hideTimer->stop();
+    if (!m_shown) {
+        m_shown = true;
         if (!isVisible()) {
             setWindowOpacity(0.0);
             show();
@@ -86,20 +86,20 @@ void ProgressDialog::onChanged(int pct) {
         fadeTo(1.0, kFadeInMs);
     }
 
-    const QStringList statuses = loading_.statuses();
+    const QStringList statuses = m_loading.statuses();
     if (!statuses.isEmpty()) {
         setWindowTitle(statuses.first());
     }
     updateBreadcrumbs(statuses);
-    progress_->setValue(pct);
+    m_progress->setValue(pct);
 }
 
 void ProgressDialog::onFinished() {
-    hide_timer_->start();
+    m_hideTimer->start();
 }
 
 void ProgressDialog::updateBreadcrumbs(const QStringList& statuses) {
-    while (QLayoutItem* item = crumbs_layout_->takeAt(0)) {
+    while (QLayoutItem* item = m_crumbsLayout->takeAt(0)) {
         if (QWidget* widget = item->widget()) {
             widget->hide();
             widget->deleteLater();
@@ -109,38 +109,38 @@ void ProgressDialog::updateBreadcrumbs(const QStringList& statuses) {
 
     const qsizetype last = statuses.size() - 1;
     for (qsizetype i = 0; i < statuses.size(); ++i) {
-        auto* label = new QLabel(statuses[i], crumbs_);
+        auto* label = new QLabel(statuses[i], m_crumbs);
         if (i == last) {
             QFont font = label->font();
             font.setBold(true);
             label->setFont(font);
         }
-        crumbs_layout_->addWidget(label);
+        m_crumbsLayout->addWidget(label);
 
         if (i < last) {
-            auto* separator = new QLabel(crumbs_);
+            auto* separator = new QLabel(m_crumbs);
             separator->setPixmap(requireIcon(u"chevron", 12, paletteValue(u"TEXT_DIM")).pixmap(12, 12));
-            crumbs_layout_->addWidget(separator);
+            m_crumbsLayout->addWidget(separator);
         }
     }
-    crumbs_layout_->addStretch();
+    m_crumbsLayout->addStretch();
 }
 
 void ProgressDialog::beginHide() {
-    shown_ = false;
+    m_shown = false;
     fadeTo(0.0, kFadeOutMs);
 }
 
 void ProgressDialog::fadeTo(qreal end, int durationMs) {
-    fade_->stop();
-    fade_->setDuration(durationMs);
-    fade_->setStartValue(windowOpacity());
-    fade_->setEndValue(end);
-    fade_->start();
+    m_fade->stop();
+    m_fade->setDuration(durationMs);
+    m_fade->setStartValue(windowOpacity());
+    m_fade->setEndValue(end);
+    m_fade->start();
 }
 
 void ProgressDialog::onFadeFinished() {
-    if (!shown_) {
+    if (!m_shown) {
         hide();
     }
 }

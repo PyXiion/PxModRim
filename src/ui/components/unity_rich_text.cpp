@@ -7,7 +7,7 @@
 #include <cmath>
 
 namespace px::modrim {
-QString escape_html(const QString& text) {
+QString escapeHtml(const QString& text) {
     QString out = text.toHtmlEscaped();
     return out.replace('\'', QStringLiteral("&#x27;"));
 }
@@ -34,7 +34,7 @@ QString color(QString value) {
         {"gray", "#808080"}, {"grey", "#808080"}, {"orange", "#ffa500"}, {"purple", "#800080"}};
     return names.value(value.toLower(), "#ffffff");
 }
-QString close_tag(const QString& tag) {
+QString closeTag(const QString& tag) {
     if (tag == "b" || tag == "bold") return "</b>";
     if (tag == "i" || tag == "italic") return "</i>";
     if (tag == "u" || tag == "underline" || tag == "size") return "</span>";
@@ -45,7 +45,7 @@ QString close_tag(const QString& tag) {
     if (tag == "mark" || tag == "sub" || tag == "sup") return "</" + tag + ">";
     return {};
 }
-QString open_tag(const QString& tag, QString attr) {
+QString openTag(const QString& tag, QString attr) {
     attr = unquote(attr);
     if (tag == "b" || tag == "bold") return "<b>";
     if (tag == "i" || tag == "italic") return "<i>";
@@ -98,12 +98,12 @@ QString open_tag(const QString& tag, QString attr) {
         const QUrl url(attr);
         const QString scheme = url.scheme().toLower();
         if ((scheme == "http" || scheme == "https") && !url.authority().isEmpty())
-            return "<a href=\"" + escape_html(attr) + "\">";
+            return "<a href=\"" + escapeHtml(attr) + "\">";
     }
     return {};
 }
 }
-QString unity_rich_text_to_html(const QString& text) {
+QString unityRichTextToHtml(const QString& text) {
     static const QRegularExpression tags("</?([a-zA-Z]+)(?:=([^>\\s]+))?\\s*>");
     QString result;
     result.reserve(text.size());
@@ -112,24 +112,24 @@ QString unity_rich_text_to_html(const QString& text) {
     auto matches = tags.globalMatch(text);
     while (matches.hasNext()) {
         const auto match = matches.next();
-        result += escape_html(text.mid(end, match.capturedStart() - end));
+        result += escapeHtml(text.mid(end, match.capturedStart() - end));
         const QString tag = match.captured(1).toLower();
         if (match.captured().startsWith("</")) {
             const auto index = stack.lastIndexOf(tag);
             if (index >= 0) {
                 while (stack.size() > index) stack.removeLast();
-                result += close_tag(tag);
+                result += closeTag(tag);
             }
         } else {
-            const QString html = open_tag(tag, match.captured(2));
+            const QString html = openTag(tag, match.captured(2));
             if (!html.isEmpty()) { stack.append(tag); result += html; }
         }
         end = match.capturedEnd();
     }
-    result += escape_html(text.mid(end));
+    result += escapeHtml(text.mid(end));
     result.replace('\n', "<br>");
     result.replace("\\n", "<br>");
-    for (auto it = stack.crbegin(); it != stack.crend(); ++it) result += close_tag(*it);
+    for (auto it = stack.crbegin(); it != stack.crend(); ++it) result += closeTag(*it);
     return result;
 }
 }

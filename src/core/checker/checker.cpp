@@ -8,11 +8,11 @@
 namespace px::modrim::checker {
 namespace {
 
-ModDiagnostics compose(const std::vector<QList<ModIssue>>& per_checker) {
+ModDiagnostics compose(const std::vector<QList<ModIssue>>& perChecker) {
     ModDiagnostics diagnostics;
-    for (const auto& issues : per_checker) {
+    for (const auto& issues : perChecker) {
         for (const ModIssue& issue : issues) {
-            if (issue.severity == IssueSeverity::Error) {
+            if (issue.severity == IssueSeverity::kError) {
                 diagnostics.errors.append(issue);
             } else {
                 diagnostics.warnings.append(issue);
@@ -23,7 +23,7 @@ ModDiagnostics compose(const std::vector<QList<ModIssue>>& per_checker) {
 }
 
 // Same key set, and every entry is the same mod object (identity, not equality).
-bool same_mods(const QHash<PackageId, AboutXmlModPtr>& a,
+bool sameMods(const QHash<PackageId, AboutXmlModPtr>& a,
                const QHash<PackageId, AboutXmlModPtr>& b) {
     if (a.size() != b.size()) {
         return false;
@@ -41,122 +41,122 @@ bool same_mods(const QHash<PackageId, AboutXmlModPtr>& a,
 
 ModChecker::ModChecker(std::vector<std::unique_ptr<ModIssueChecker>> checkers,
                        sort::SortSettings settings,
-                       QString target_version,
-                       DiagnosticsCallback on_diagnostics_changed)
-    : checkers_(std::move(checkers)),
-      settings_(std::move(settings)),
-      target_version_(std::move(target_version)),
-      on_diagnostics_changed_(std::move(on_diagnostics_changed)) {}
+                       QString targetVersion,
+                       DiagnosticsCallback onDiagnosticsChanged)
+    : m_checkers(std::move(checkers)),
+      m_settings(std::move(settings)),
+      m_targetVersion(std::move(targetVersion)),
+      m_onDiagnosticsChanged(std::move(onDiagnosticsChanged)) {}
 
-void ModChecker::set_no_version_warning(QSet<PackageId> pids) {
-    no_version_warning_ = std::move(pids);
-    checker_results_.reset();
+void ModChecker::setNoVersionWarning(QSet<PackageId> pids) {
+    m_noVersionWarning = std::move(pids);
+    m_checkerResults.reset();
 }
 
-void ModChecker::set_use_this_instead(QHash<QString, ReplacementInfo> db) {
-    use_this_instead_ = std::move(db);
-    checker_results_.reset();
+void ModChecker::setUseThisInstead(QHash<QString, ReplacementInfo> db) {
+    m_useThisInstead = std::move(db);
+    m_checkerResults.reset();
 }
 
-void ModChecker::set_community_rules(sort::CommunityRules rules) {
-    community_rules_ = std::move(rules);
+void ModChecker::setCommunityRules(sort::CommunityRules rules) {
+    m_communityRules = std::move(rules);
 }
 
 void ModChecker::rebuild(const QHash<QString, ListedModPtr>& mods,
-                         const QStringList& ordered_uuids,
+                         const QStringList& orderedUuids,
                          Profiler* timer) {
     Profiler local;
     Profiler& t = timer != nullptr ? *timer : local;
 
     {
         auto scope = t("collect_active");
-        collect_active(mods, ordered_uuids);
+        collectActive(mods, orderedUuids);
     }
     {
         auto scope = t("graph.build");
-        graph_.build(active_mods_, ordered_pids_, settings_, &community_rules_);
+        m_graph.build(m_activeMods, m_orderedPids, m_settings, &m_communityRules);
     }
     {
         auto scope = t("find_cycles");
-        cached_cycles_ = graph_.find_cycles();
+        m_cachedCycles = m_graph.findCycles();
     }
-    const CheckContext ctx = build_context(cached_cycles_);
+    const CheckContext ctx = buildContext(m_cachedCycles);
     {
         auto scope = t("check_mod");
-        check_all(ctx);
+        checkAll(ctx);
     }
 
-    emit_diagnostics();
+    emitDiagnostics();
 }
 
-void ModChecker::toggle_mod(const ListedMod& mod, const QStringList& ordered_uuids) {
+void ModChecker::toggleMod(const ListedMod& mod, const QStringList& orderedUuids) {
     if (dynamic_cast<const AboutXmlMod*>(&mod) == nullptr) {
-        emit_diagnostics();
+        emitDiagnostics();
         return;
     }
-    rebuild(all_mods_, ordered_uuids);
+    rebuild(m_allMods, orderedUuids);
 }
 
-void ModChecker::move_mod(const QString& uuid, int old_index, int new_index) {
-    if (ordered_pids_.isEmpty()) {
+void ModChecker::moveMod(const QString& uuid, int oldIndex, int newIndex) {
+    if (m_orderedPids.isEmpty()) {
         return;
     }
-    const auto uuid_it = uuid_to_pid_.constFind(uuid);
-    if (uuid_it == uuid_to_pid_.cend()) {
+    const auto uuidIt = m_uuidToPid.constFind(uuid);
+    if (uuidIt == m_uuidToPid.cend()) {
         return;
     }
-    const PackageId pid = uuid_it.value();
+    const PackageId pid = uuidIt.value();
 
-    ordered_pids_.insert(new_index, ordered_pids_.takeAt(old_index));
-    graph_.update_order(ordered_pids_);
+    m_orderedPids.insert(newIndex, m_orderedPids.takeAt(oldIndex));
+    m_graph.updateOrder(m_orderedPids);
 
-    const CheckContext ctx = build_context(cached_cycles_);
+    const CheckContext ctx = buildContext(m_cachedCycles);
     // Only neighbours are rechecked, so cached results no longer match the order.
-    checker_results_.reset();
+    m_checkerResults.reset();
 
     QSet<PackageId> affected{pid};
-    affected.unite(graph_.neighbors(pid));
-    for (const PackageId& current_pid : affected) {
-        if (const auto mod = active_mods_.constFind(current_pid); mod != active_mods_.cend()) {
-            diagnostics_.insert(current_pid, check_mod(*mod.value(), ctx));
+    affected.unite(m_graph.neighbors(pid));
+    for (const PackageId& currentPid : affected) {
+        if (const auto mod = m_activeMods.constFind(currentPid); mod != m_activeMods.cend()) {
+            m_diagnostics.insert(currentPid, checkMod(*mod.value(), ctx));
         }
     }
 
-    emit_diagnostics();
+    emitDiagnostics();
 }
 
-void ModChecker::reorder(const QStringList& ordered_uuids) {
-    const QHash<PackageId, AboutXmlModPtr> previous = active_mods_;
-    const QHash<PackageId, int> previous_index = graph_.pid_to_index();
-    collect_active(all_mods_, ordered_uuids);
-    graph_.update_order(ordered_pids_);
+void ModChecker::reorder(const QStringList& orderedUuids) {
+    const QHash<PackageId, AboutXmlModPtr> previous = m_activeMods;
+    const QHash<PackageId, int> previousIndex = m_graph.pidToIndex();
+    collectActive(m_allMods, orderedUuids);
+    m_graph.updateOrder(m_orderedPids);
 
-    const QList<QList<PackageId>> cycles = graph_.find_cycles();
-    const CheckContext ctx = build_context(cycles);
+    const QList<QList<PackageId>> cycles = m_graph.findCycles();
+    const CheckContext ctx = buildContext(cycles);
 
-    if (!checker_results_.has_value() || !same_mods(previous, active_mods_)) {
-        check_all(ctx);
+    if (!m_checkerResults.has_value() || !sameMods(previous, m_activeMods)) {
+        checkAll(ctx);
     } else {
         QSet<PackageId> moved;
-        for (auto it = ctx.pid_to_index.cbegin(); it != ctx.pid_to_index.cend(); ++it) {
-            if (previous_index.value(it.key(), -1) != it.value()) {
+        for (auto it = ctx.pidToIndex.cbegin(); it != ctx.pidToIndex.cend(); ++it) {
+            if (previousIndex.value(it.key(), -1) != it.value()) {
                 moved.insert(it.key());
             }
         }
 
-        CheckerResults& results = *checker_results_;
+        CheckerResults& results = *m_checkerResults;
         QSet<PackageId> changed;
-        for (std::size_t i = 0; i < checkers_.size(); ++i) {
-            const ModIssueChecker& checker = *checkers_[i];
-            if (!checker.order_dependent()) {
+        for (std::size_t i = 0; i < m_checkers.size(); ++i) {
+            const ModIssueChecker& checker = *m_checkers[i];
+            if (!checker.orderDependent()) {
                 continue;
             }
-            const auto affected = checker.affected_by_moves(ctx, moved);
-            for (auto it = active_mods_.cbegin(); it != active_mods_.cend(); ++it) {
+            const auto affected = checker.affectedByMoves(ctx, moved);
+            for (auto it = m_activeMods.cbegin(); it != m_activeMods.cend(); ++it) {
                 if (affected && !affected->contains(it.key())) {
                     continue;
                 }
-                QList<ModIssue> issues = run_checker(checker, *it.value(), ctx);
+                QList<ModIssue> issues = runChecker(checker, *it.value(), ctx);
                 auto& stored = results[it.key()][i];
                 if (issues != stored) {
                     stored = std::move(issues);
@@ -165,100 +165,100 @@ void ModChecker::reorder(const QStringList& ordered_uuids) {
             }
         }
         for (const PackageId& pid : changed) {
-            diagnostics_.insert(pid, compose(results[pid]));
+            m_diagnostics.insert(pid, compose(results[pid]));
         }
     }
 
-    emit_diagnostics();
+    emitDiagnostics();
 }
 
-const ModDiagnostics* ModChecker::diagnostics_for(const QString& uuid) const {
-    const auto pid = uuid_to_pid_.constFind(uuid);
-    if (pid == uuid_to_pid_.cend()) {
+const ModDiagnostics* ModChecker::diagnosticsFor(const QString& uuid) const {
+    const auto pid = m_uuidToPid.constFind(uuid);
+    if (pid == m_uuidToPid.cend()) {
         return nullptr;
     }
-    const auto diagnostics = diagnostics_.constFind(pid.value());
-    return diagnostics == diagnostics_.cend() ? nullptr : &diagnostics.value();
+    const auto diagnostics = m_diagnostics.constFind(pid.value());
+    return diagnostics == m_diagnostics.cend() ? nullptr : &diagnostics.value();
 }
 
-DiagnosticsByUuid ModChecker::active_mod_diagnostics() const {
+DiagnosticsByUuid ModChecker::activeModDiagnostics() const {
     DiagnosticsByUuid result;
-    for (auto it = uuid_to_pid_.cbegin(); it != uuid_to_pid_.cend(); ++it) {
-        if (const auto diagnostics = diagnostics_.constFind(it.value());
-            diagnostics != diagnostics_.cend()) {
+    for (auto it = m_uuidToPid.cbegin(); it != m_uuidToPid.cend(); ++it) {
+        if (const auto diagnostics = m_diagnostics.constFind(it.value());
+            diagnostics != m_diagnostics.cend()) {
             result.insert(it.key(), diagnostics.value());
         }
     }
     return result;
 }
 
-void ModChecker::collect_active(const QHash<QString, ListedModPtr>& mods,
-                                const QStringList& ordered_uuids) {
+void ModChecker::collectActive(const QHash<QString, ListedModPtr>& mods,
+                                const QStringList& orderedUuids) {
     // `mods` may alias all_mods_ (toggle_mod and reorder pass it back in), so copy first.
-    all_mods_ = mods;
-    active_mods_.clear();
-    uuid_to_pid_.clear();
-    ordered_pids_.clear();
+    m_allMods = mods;
+    m_activeMods.clear();
+    m_uuidToPid.clear();
+    m_orderedPids.clear();
 
-    for (const QString& uuid : ordered_uuids) {
-        const auto listed = all_mods_.constFind(uuid);
-        if (listed == all_mods_.cend()) {
+    for (const QString& uuid : orderedUuids) {
+        const auto listed = m_allMods.constFind(uuid);
+        if (listed == m_allMods.cend()) {
             continue;
         }
         auto about = std::dynamic_pointer_cast<AboutXmlMod>(listed.value());
         if (!about) {
             continue;
         }
-        const PackageId pid = about->package_id;
-        active_mods_.insert(pid, about);
-        uuid_to_pid_.insert(uuid, pid);
-        ordered_pids_.append(pid);
+        const PackageId pid = about->packageId;
+        m_activeMods.insert(pid, about);
+        m_uuidToPid.insert(uuid, pid);
+        m_orderedPids.append(pid);
     }
 }
 
-CheckContext ModChecker::build_context(const QList<QList<PackageId>>& cycles) const {
+CheckContext ModChecker::buildContext(const QList<QList<PackageId>>& cycles) const {
     return CheckContext{
-        .active_mods = active_mods_,
-        .ordered_pids = ordered_pids_,
-        .pid_to_index = graph_.pid_to_index(),
-        .graph = graph_,
-        .settings = settings_,
-        .target_version = target_version_,
-        .no_version_warning = no_version_warning_,
-        .use_this_instead = use_this_instead_,
+        .activeMods = m_activeMods,
+        .orderedPids = m_orderedPids,
+        .pidToIndex = m_graph.pidToIndex(),
+        .graph = m_graph,
+        .settings = m_settings,
+        .targetVersion = m_targetVersion,
+        .noVersionWarning = m_noVersionWarning,
+        .useThisInstead = m_useThisInstead,
         .cycles = cycles,
     };
 }
 
-void ModChecker::check_all(const CheckContext& ctx) {
+void ModChecker::checkAll(const CheckContext& ctx) {
     CheckerResults results;
     QHash<PackageId, ModDiagnostics> diagnostics;
-    for (auto it = active_mods_.cbegin(); it != active_mods_.cend(); ++it) {
-        std::vector<QList<ModIssue>> per_checker;
-        per_checker.reserve(checkers_.size());
-        for (const auto& checker : checkers_) {
-            per_checker.push_back(run_checker(*checker, *it.value(), ctx));
+    for (auto it = m_activeMods.cbegin(); it != m_activeMods.cend(); ++it) {
+        std::vector<QList<ModIssue>> perChecker;
+        perChecker.reserve(m_checkers.size());
+        for (const auto& checker : m_checkers) {
+            perChecker.push_back(runChecker(*checker, *it.value(), ctx));
         }
-        diagnostics.insert(it.key(), compose(per_checker));
-        results.insert(it.key(), std::move(per_checker));
+        diagnostics.insert(it.key(), compose(perChecker));
+        results.insert(it.key(), std::move(perChecker));
     }
-    checker_results_ = std::move(results);
-    diagnostics_ = std::move(diagnostics);
+    m_checkerResults = std::move(results);
+    m_diagnostics = std::move(diagnostics);
 }
 
-ModDiagnostics ModChecker::check_mod(const AboutXmlMod& mod, const CheckContext& ctx) const {
-    std::vector<QList<ModIssue>> per_checker;
-    per_checker.reserve(checkers_.size());
-    for (const auto& checker : checkers_) {
-        per_checker.push_back(run_checker(*checker, mod, ctx));
+ModDiagnostics ModChecker::checkMod(const AboutXmlMod& mod, const CheckContext& ctx) const {
+    std::vector<QList<ModIssue>> perChecker;
+    perChecker.reserve(m_checkers.size());
+    for (const auto& checker : m_checkers) {
+        perChecker.push_back(runChecker(*checker, mod, ctx));
     }
-    return compose(per_checker);
+    return compose(perChecker);
 }
 
-QList<ModIssue> ModChecker::run_checker(const ModIssueChecker& checker,
+QList<ModIssue> ModChecker::runChecker(const ModIssueChecker& checker,
                                         const AboutXmlMod& mod,
                                         const CheckContext& ctx) const {
-    if (!checker.should_check(mod, ctx)) {
+    if (!checker.shouldCheck(mod, ctx)) {
         return {};
     }
     // One checker must not abort diagnostics for every other mod and checker.
@@ -266,25 +266,25 @@ QList<ModIssue> ModChecker::run_checker(const ModIssueChecker& checker,
         return checker.check(mod, ctx);
     } catch (const std::exception& error) {
         spdlog::error("Checker failed on {}: {}",
-                      mod.package_id.str().toStdString(),
+                      mod.packageId.str().toStdString(),
                       error.what());
         return {};
     }
 }
 
-void ModChecker::emit_diagnostics() const {
-    if (!on_diagnostics_changed_) {
+void ModChecker::emitDiagnostics() const {
+    if (!m_onDiagnosticsChanged) {
         return;
     }
-    DiagnosticsByUuid by_uuid;
-    for (auto it = uuid_to_pid_.cbegin(); it != uuid_to_pid_.cend(); ++it) {
-        const auto diagnostics = diagnostics_.constFind(it.value());
-        if (diagnostics != diagnostics_.cend() &&
-            (diagnostics->has_errors() || diagnostics->has_warnings())) {
-            by_uuid.insert(it.key(), diagnostics.value());
+    DiagnosticsByUuid byUuid;
+    for (auto it = m_uuidToPid.cbegin(); it != m_uuidToPid.cend(); ++it) {
+        const auto diagnostics = m_diagnostics.constFind(it.value());
+        if (diagnostics != m_diagnostics.cend() &&
+            (diagnostics->hasErrors() || diagnostics->hasWarnings())) {
+            byUuid.insert(it.key(), diagnostics.value());
         }
     }
-    on_diagnostics_changed_(by_uuid);
+    m_onDiagnosticsChanged(byUuid);
 }
 
 }  // namespace px::modrim::checker

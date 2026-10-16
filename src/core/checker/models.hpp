@@ -18,15 +18,15 @@ using AboutXmlModPtr = std::shared_ptr<AboutXmlMod>;
 
 class ConstraintGraph;
 
-enum class IssueSeverity : std::uint8_t { Error, Warning };
+enum class IssueSeverity : std::uint8_t { kError, kWarning };
 
 struct ModIssue {
     QString category;
     IssueSeverity severity;
-    QString short_message;
-    QString category_display_name;
-    QString detail_message;
-    QList<PackageId> related_package_ids;
+    QString shortMessage;
+    QString categoryDisplayName;
+    QString detailMessage;
+    QList<PackageId> relatedPackageIds;
 
     bool operator==(const ModIssue&) const = default;
 };
@@ -35,11 +35,11 @@ struct ModDiagnostics {
     QList<ModIssue> errors;
     QList<ModIssue> warnings;
 
-    bool has_errors() const noexcept { return !errors.isEmpty(); }
-    bool has_warnings() const noexcept { return !warnings.isEmpty(); }
+    bool hasErrors() const noexcept { return !errors.isEmpty(); }
+    bool hasWarnings() const noexcept { return !warnings.isEmpty(); }
     // The single issue's message, or a count once there is more than one.
-    QString error_tooltip() const;
-    QString warning_tooltip() const;
+    QString errorTooltip() const;
+    QString warningTooltip() const;
 
     bool operator==(const ModDiagnostics&) const = default;
 };
@@ -47,14 +47,14 @@ struct ModDiagnostics {
 // Everything a checker may read while checking one mod. Callers own the referenced data and
 // keep it alive for the duration of the check.
 struct CheckContext {
-    const QHash<PackageId, AboutXmlModPtr>& active_mods;
-    const QList<PackageId>& ordered_pids;
-    const QHash<PackageId, int>& pid_to_index;
+    const QHash<PackageId, AboutXmlModPtr>& activeMods;
+    const QList<PackageId>& orderedPids;
+    const QHash<PackageId, int>& pidToIndex;
     const ConstraintGraph& graph;
     const sort::SortSettings& settings;
-    QString target_version = QStringLiteral("1.5");
-    const QSet<PackageId>& no_version_warning;
-    const QHash<QString, ReplacementInfo>& use_this_instead;
+    QString targetVersion = QStringLiteral("1.5");
+    const QSet<PackageId>& noVersionWarning;
+    const QHash<QString, ReplacementInfo>& useThisInstead;
     const QList<QList<PackageId>>& cycles;
 };
 

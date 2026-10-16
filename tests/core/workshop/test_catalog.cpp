@@ -33,19 +33,21 @@
 using namespace px::modrim;
 using namespace px::modrim::workshop;
 using test_support::TestApplication;
-using test_support::write_bytes;
+using test_support::writeBytes;
 using workshop_test::FakeCatalog;
 using workshop_test::HttpRequest;
 using workshop_test::HttpResponse;
-using workshop_test::decode_mod;
+using workshop_test::decodeMod;
 using workshop_test::run;
 using workshop_test::wire;
 
 namespace {
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct BatchWire {
     std::vector<CatalogMod> items;
     std::vector<std::string> unavailable_ids;
 };
+// NOLINTEND(readability-identifier-naming)
 
 struct IdsBatchPayload {
     std::vector<std::string> ids;
@@ -53,43 +55,43 @@ struct IdsBatchPayload {
 
 struct FakeDownloader : public Downloader {
     FakeDownloader(DownloadManager& manager, std::map<QString, double> synced)
-        : Downloader(QStringLiteral("fake_steam"), QStringLiteral("Steam"), manager), synced_(std::move(synced)) {}
+        : Downloader(QStringLiteral("fake_steam"), QStringLiteral("Steam"), manager), synced(std::move(synced)) {}
 
-    bool is_downloading() const override { return is_busy_; }
-    QSet<QString> active_ids() const override { return active_; }
+    bool isDownloading() const override { return isBusy; }
+    QSet<QString> activeIds() const override { return active; }
     bool accepts(const QString&) const override { return true; }
-    std::optional<QString> updatable_id(const ListedMod& mod) const override { return mod.published_file_id(); }
-    std::optional<double> last_synced(const ListedMod& mod) const override {
-        const auto id = mod.published_file_id();
+    std::optional<QString> updatableId(const ListedMod& mod) const override { return mod.publishedFileId(); }
+    std::optional<double> lastSynced(const ListedMod& mod) const override {
+        const auto id = mod.publishedFileId();
         if (!id) {
             return std::nullopt;
         }
-        const auto found = synced_.find(*id);
-        return found == synced_.end() ? std::nullopt : std::optional<double>(found->second);
+        const auto found = synced.find(*id);
+        return found == synced.end() ? std::nullopt : std::optional<double>(found->second);
     }
 
-    QCoro::Task<Result<DownloadResult>> download_mods(QStringList ids) override {
-        recorded_calls.push_back(ids);
+    QCoro::Task<Result<DownloadResult>> downloadMods(QStringList ids) override {
+        recordedCalls.push_back(ids);
         co_return DownloadResult{.succeeded = ids, .failed = {}, .changed = {}};
     }
 
     void cancel() override {}
 
-    std::map<QString, double> synced_;
-    bool is_busy_ = false;
-    QSet<QString> active_;
-    std::vector<QStringList> recorded_calls;
+    std::map<QString, double> synced;
+    bool isBusy = false;
+    QSet<QString> active;
+    std::vector<QStringList> recordedCalls;
 };
 
-ListedModPtr make_mod(const QString& path, const QString& provider = QStringLiteral("local")) {
+ListedModPtr makeMod(const QString& path, const QString& provider = QStringLiteral("local")) {
     auto mod = std::make_shared<ListedMod>();
-    REQUIRE(mod->set_mod_path(path).has_value());
-    mod->provider_id = provider;
+    REQUIRE(mod->setModPath(path).has_value());
+    mod->providerId = provider;
     return mod;
 }
 
-CatalogMod mod_with(std::string id, std::optional<std::int64_t> updated) {
-    CatalogMod mod = decode_mod(workshop_test::kModJson);
+CatalogMod modWith(std::string id, std::optional<std::int64_t> updated) {
+    CatalogMod mod = decodeMod(workshop_test::kModJson);
     mod.id = std::move(id);
     mod.updated_at = updated;
     return mod;
@@ -109,21 +111,23 @@ struct ContextFixture {
             {QStringLiteral("1"), 200.0},
             {QStringLiteral("2"), 50.0},
         });
-        downloads.register_downloader(*downloader);
+        downloads.registerDownloader(*downloader);
 
         // Mods 1, 2, 4 are local; 3 is workshop; NotWorkshop has no numeric folder name.
-        mods.append(make_mod(dir.filePath(QStringLiteral("Mods/1"))));
-        mods.append(make_mod(dir.filePath(QStringLiteral("Mods/2"))));
-        mods.append(make_mod(dir.filePath(QStringLiteral("Workshop/3")), QStringLiteral("workshop")));
-        mods.append(make_mod(dir.filePath(QStringLiteral("Mods/4"))));
-        mods.append(make_mod(dir.filePath(QStringLiteral("Mods/NotWorkshop"))));
+        mods.append(makeMod(dir.filePath(QStringLiteral("Mods/1"))));
+        mods.append(makeMod(dir.filePath(QStringLiteral("Mods/2"))));
+        mods.append(makeMod(dir.filePath(QStringLiteral("Workshop/3")), QStringLiteral("workshop")));
+        mods.append(makeMod(dir.filePath(QStringLiteral("Mods/4"))));
+        mods.append(makeMod(dir.filePath(QStringLiteral("Mods/NotWorkshop"))));
     }
 };
 
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct ResolvePayload {
     std::vector<std::string> ids;
     std::vector<std::string> collection_ids;
 };
+// NOLINTEND(readability-identifier-naming)
 
 }  // namespace
 
@@ -131,16 +135,16 @@ TEST_CASE("workshop install state uses sync timestamp, not directory mtime") {
     ContextFixture fixture;
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
 
-    CHECK(catalog.install_state(mod_with("1", 100)) == InstallState::installed);
-    CHECK(catalog.install_state(mod_with("2", 100)) == InstallState::outdated);
+    CHECK(catalog.installState(modWith("1", 100)) == InstallState::kInstalled);
+    CHECK(catalog.installState(modWith("2", 100)) == InstallState::kOutdated);
     // 3 has no sync record, so it cannot be outdated.
-    CHECK(catalog.install_state(mod_with("3", 100)) == InstallState::installed);
-    CHECK(catalog.install_state(mod_with("4", 100)) == InstallState::installed);
+    CHECK(catalog.installState(modWith("3", 100)) == InstallState::kInstalled);
+    CHECK(catalog.installState(modWith("4", 100)) == InstallState::kInstalled);
     // 5 is not installed at all.
-    CHECK(catalog.install_state(mod_with("5", 100)) == InstallState::missing);
+    CHECK(catalog.installState(modWith("5", 100)) == InstallState::kMissing);
     // When updated_at is null or equal to sync, the mod is installed.
-    CHECK(catalog.install_state(mod_with("2", std::nullopt)) == InstallState::installed);
-    CHECK(catalog.install_state(mod_with("2", 50)) == InstallState::installed);
+    CHECK(catalog.installState(modWith("2", std::nullopt)) == InstallState::kInstalled);
+    CHECK(catalog.installState(modWith("2", 50)) == InstallState::kInstalled);
 }
 
 TEST_CASE("workshop plan keeps dependency order and incomplete flags") {
@@ -151,11 +155,11 @@ TEST_CASE("workshop plan keeps dependency order and incomplete flags") {
         ResolvedDownload answer;
         answer.roots = {"5", "picked:starter"};
         for (const char* id : {"1", "2", "3", "4", "5"}) {
-            CatalogMod m = mod_with(id, 100);
+            CatalogMod m = modWith(id, 100);
             m.title = std::string("Title ") + id;
             answer.items.emplace(id, std::move(m));
         }
-        answer.items.emplace("picked:starter", workshop_test::decode_collection(workshop_test::kCollectionJson));
+        answer.items.emplace("picked:starter", workshop_test::decodeCollection(workshop_test::kCollectionJson));
         answer.mod_ids = {"1", "2", "3", "4", "5"};
         answer.unavailable_ids = {"99"};
         answer.incomplete_collection_ids = {"picked:starter"};
@@ -164,7 +168,7 @@ TEST_CASE("workshop plan keeps dependency order and incomplete flags") {
     });
 
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
-    catalog.set_base_url(server.url());
+    catalog.setBaseUrl(server.url());
 
     const auto plan = run(catalog.plan({QStringLiteral("5")}, {QStringLiteral("picked:starter")}));
     REQUIRE(plan.has_value());
@@ -185,26 +189,26 @@ TEST_CASE("workshop installed metadata uses batch") {
     TestApplication app;
     ContextFixture fixture;
 
-    std::vector<std::string> requested_ids;
+    std::vector<std::string> requestedIds;
     FakeCatalog server([&](const HttpRequest& request) -> HttpResponse {
         const auto body = glz::read_json<IdsBatchPayload>(request.body);
         REQUIRE(body.has_value());
-        requested_ids = body->ids;
+        requestedIds = body->ids;
         BatchWire answer{
-            .items = {mod_with("2", 100)},
+            .items = {modWith("2", 100)},
             .unavailable_ids = {"1", "3", "4"},
         };
         return {200, wire(answer)};
     });
 
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
-    catalog.set_base_url(server.url());
+    catalog.setBaseUrl(server.url());
 
-    const auto installed = run(catalog.installed_with_updates());
+    const auto installed = run(catalog.installedWithUpdates());
     REQUIRE(installed.has_value());
-    CHECK(requested_ids == std::vector<std::string>{"1", "2", "3", "4"});
+    CHECK(requestedIds == std::vector<std::string>{"1", "2", "3", "4"});
     REQUIRE(installed->size() == 1);
-    CHECK(catalog.install_state(installed->front()) == InstallState::outdated);
+    CHECK(catalog.installState(installed->front()) == InstallState::kOutdated);
 }
 
 TEST_CASE("workshop download delegates without side effects") {
@@ -221,22 +225,22 @@ TEST_CASE("workshop download delegates without side effects") {
     const auto result = run(catalog.download(plan));
     REQUIRE(result.has_value());
     CHECK(result->succeeded == QStringList{QStringLiteral("2")});
-    REQUIRE(fixture.downloader->recorded_calls.size() == 1);
-    CHECK(fixture.downloader->recorded_calls[0] == QStringList{QStringLiteral("2")});
+    REQUIRE(fixture.downloader->recordedCalls.size() == 1);
+    CHECK(fixture.downloader->recordedCalls[0] == QStringList{QStringLiteral("2")});
 }
 
 TEST_CASE("workshop empty URL is disabled without creating a client") {
     TestApplication app;
     ContextFixture fixture;
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
-    catalog.set_base_url(QString());
+    catalog.setBaseUrl(QString());
     CHECK_FALSE(catalog.configured());
 
     const auto discover = run(catalog.discover());
     REQUIRE_FALSE(discover.has_value());
     CHECK(discover.error().message.contains(QStringLiteral("disabled")));
 
-    const auto installed = run(catalog.installed_with_updates());
+    const auto installed = run(catalog.installedWithUpdates());
     REQUIRE_FALSE(installed.has_value());
     CHECK(installed.error().message.contains(QStringLiteral("disabled")));
 
@@ -250,26 +254,26 @@ TEST_CASE("workshop configuration and installed events") {
     ContextFixture fixture;
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
 
-    std::vector<QString> url_changes;
-    int installed_invalidated = 0;
-    catalog.catalog_url_changed.connect([&](const QString& url) { url_changes.push_back(url); });
-    catalog.installed_changed.connect([&](std::monostate) { ++installed_invalidated; });
+    std::vector<QString> urlChanges;
+    int installedInvalidated = 0;
+    catalog.catalogUrlChanged.connect([&](const QString& url) { urlChanges.push_back(url); });
+    catalog.installedChanged.connect([&](std::monostate) { ++installedInvalidated; });
 
-    catalog.set_base_url(QStringLiteral(" https://other.example/ "));
+    catalog.setBaseUrl(QStringLiteral(" https://other.example/ "));
     CHECK(catalog.settings().url == "https://other.example");
-    const auto stored = fixture.config->load_existing<CatalogSettings>(QStringLiteral("plugins/workshop_catalog.json"));
+    const auto stored = fixture.config->loadExisting<CatalogSettings>(QStringLiteral("plugins/workshop_catalog.json"));
     REQUIRE(stored.has_value());
     REQUIRE(stored->has_value());
     CHECK((*stored)->url == "https://other.example");
 
-    catalog.set_base_url(QString());
+    catalog.setBaseUrl(QString());
     CHECK_FALSE(catalog.configured());
 
     // Firing download_finished and manual invalidation both emit installed_changed.
-    catalog.invalidate_installed();
-    fixture.downloads.download_finished.notify(DownloadResult{});
-    CHECK(installed_invalidated == 2);
-    CHECK(url_changes == std::vector<QString>{QStringLiteral("https://other.example"), QString()});
+    catalog.invalidateInstalled();
+    fixture.downloads.downloadFinished.notify(DownloadResult{});
+    CHECK(installedInvalidated == 2);
+    CHECK(urlChanges == std::vector<QString>{QStringLiteral("https://other.example"), QString()});
 }
 
 TEST_CASE("workshop cached serves remembered value before refreshing") {
@@ -278,18 +282,18 @@ TEST_CASE("workshop cached serves remembered value before refreshing") {
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
 
     std::vector<std::string> sequence{"first", "second", "second"};
-    std::size_t next_idx = 0;
+    std::size_t nextIdx = 0;
     int calls = 0;
 
     auto produce = [&]() -> QCoro::Task<CatalogResult<std::string>> {
         ++calls;
-        co_return sequence.at(next_idx++);
+        co_return sequence.at(nextIdx++);
     };
 
-    auto seen = [&](double fresh_for) {
+    auto seen = [&](double freshFor) {
         std::vector<std::string> out;
         const auto done = run(catalog.cached<std::string>(
-            QStringLiteral("k"), produce, [&](const std::string& v) { out.push_back(v); }, fresh_for));
+            QStringLiteral("k"), produce, [&](const std::string& v) { out.push_back(v); }, freshFor));
         REQUIRE(done.has_value());
         return out;
     };
@@ -308,23 +312,23 @@ TEST_CASE("workshop enqueue runs batches in order after the running download") {
     ContextFixture fixture;
     WorkshopCatalog catalog(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
 
-    fixture.downloader->is_busy_ = true;
+    fixture.downloader->isBusy = true;
     DownloadPlan first{.to_download = {QStringLiteral("5"), QStringLiteral("6")}};
     DownloadPlan second{.to_download = {QStringLiteral("6"), QStringLiteral("7")}};
     catalog.enqueue(first);
     catalog.enqueue(second);
 
-    CHECK(catalog.queued_ids() == QSet<QString>{QStringLiteral("5"), QStringLiteral("6"), QStringLiteral("7")});
-    CHECK(fixture.downloader->recorded_calls.empty());
+    CHECK(catalog.queuedIds() == QSet<QString>{QStringLiteral("5"), QStringLiteral("6"), QStringLiteral("7")});
+    CHECK(fixture.downloader->recordedCalls.empty());
 
     // Once the downloads report idle, the queue drains both batches in order.
-    fixture.downloader->is_busy_ = false;
-    fixture.downloads.busy_changed.notify(false);
+    fixture.downloader->isBusy = false;
+    fixture.downloads.busyChanged.notify(false);
 
-    CHECK(fixture.downloader->recorded_calls.size() == 2);
-    CHECK(fixture.downloader->recorded_calls[0] == QStringList{QStringLiteral("5"), QStringLiteral("6")});
-    CHECK(fixture.downloader->recorded_calls[1] == QStringList{QStringLiteral("7")});
-    CHECK(catalog.queued_ids().isEmpty());
+    CHECK(fixture.downloader->recordedCalls.size() == 2);
+    CHECK(fixture.downloader->recordedCalls[0] == QStringList{QStringLiteral("5"), QStringLiteral("6")});
+    CHECK(fixture.downloader->recordedCalls[1] == QStringList{QStringLiteral("7")});
+    CHECK(catalog.queuedIds().isEmpty());
 }
 
 TEST_CASE("workshop cached values survive a restart and corrupt files are ignored") {
@@ -334,7 +338,7 @@ TEST_CASE("workshop cached values survive a restart and corrupt files are ignore
     auto produce = []() -> QCoro::Task<CatalogResult<std::vector<int>>> {
         co_return std::vector<int>{1, 2};
     };
-    auto must_not_run = []() -> QCoro::Task<CatalogResult<std::vector<int>>> {
+    auto mustNotRun = []() -> QCoro::Task<CatalogResult<std::vector<int>>> {
         FAIL("A fresh value on disk must not hit the catalog");
         co_return std::vector<int>{};
     };
@@ -354,15 +358,15 @@ TEST_CASE("workshop cached values survive a restart and corrupt files are ignore
         WorkshopCatalog second(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
         std::vector<int> out;
         const auto done = run(second.cached<std::vector<int>>(
-            QStringLiteral("k"), must_not_run, [&](const auto& v) { out = v; }, 300.0, /*persist=*/true));
+            QStringLiteral("k"), mustNotRun, [&](const auto& v) { out = v; }, 300.0, /*persist=*/true));
         REQUIRE(done.has_value());
         CHECK(out == std::vector<int>{1, 2});
     }
 
     // Corrupting the file causes a miss: produce is invoked again.
-    const QString cache_dir = fixture.dir.filePath(QStringLiteral("workshop-cache"));
-    for (const QFileInfo& file : QDir(cache_dir).entryInfoList({QStringLiteral("*.json")}, QDir::Files)) {
-        REQUIRE(write_bytes(file.absoluteFilePath(), "{not json"));
+    const QString cacheDir = fixture.dir.filePath(QStringLiteral("workshop-cache"));
+    for (const QFileInfo& file : QDir(cacheDir).entryInfoList({QStringLiteral("*.json")}, QDir::Files)) {
+        REQUIRE(writeBytes(file.absoluteFilePath(), "{not json"));
     }
     {
         WorkshopCatalog third(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
@@ -382,7 +386,7 @@ TEST_CASE("workshop equal cache refresh keeps the displayed mods and refreshes a
     int calls = 0;
     auto produce = [&]() -> QCoro::Task<CatalogResult<std::vector<CatalogMod>>> {
         ++calls;
-        co_return std::vector<CatalogMod>{mod_with("1", 100)};
+        co_return std::vector<CatalogMod>{modWith("1", 100)};
     };
 
     std::vector<std::vector<CatalogMod>> initial;
@@ -416,9 +420,9 @@ TEST_CASE("workshop disk cache is reused in memory after first load") {
     ContextFixture fixture;
 
     auto produce = []() -> QCoro::Task<CatalogResult<std::vector<CatalogMod>>> {
-        co_return std::vector<CatalogMod>{mod_with("1", 100)};
+        co_return std::vector<CatalogMod>{modWith("1", 100)};
     };
-    auto must_not_run = []() -> QCoro::Task<CatalogResult<std::vector<CatalogMod>>> {
+    auto mustNotRun = []() -> QCoro::Task<CatalogResult<std::vector<CatalogMod>>> {
         FAIL("A fresh cached response must not hit the catalog");
         co_return std::vector<CatalogMod>{};
     };
@@ -432,28 +436,28 @@ TEST_CASE("workshop disk cache is reused in memory after first load") {
 
     WorkshopCatalog second(fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
     std::vector<CatalogMod> loaded;
-    REQUIRE(run(second.cached<std::vector<CatalogMod>>(QStringLiteral("installed"), must_not_run,
+    REQUIRE(run(second.cached<std::vector<CatalogMod>>(QStringLiteral("installed"), mustNotRun,
                                                       [&](const auto& v) { loaded = v; }, 300.0, /*persist=*/true))
                 .has_value());
     REQUIRE(loaded.size() == 1);
 
     // Corrupt the disk file now: second catalog must still serve its in-memory copy.
-    const QString cache_dir = fixture.dir.filePath(QStringLiteral("workshop-cache"));
-    for (const QFileInfo& file : QDir(cache_dir).entryInfoList({QStringLiteral("*.json")}, QDir::Files)) {
-        REQUIRE(write_bytes(file.absoluteFilePath(), "{not json"));
+    const QString cacheDir = fixture.dir.filePath(QStringLiteral("workshop-cache"));
+    for (const QFileInfo& file : QDir(cacheDir).entryInfoList({QStringLiteral("*.json")}, QDir::Files)) {
+        REQUIRE(writeBytes(file.absoluteFilePath(), "{not json"));
     }
 
-    std::vector<CatalogMod> from_memory;
-    REQUIRE(run(second.cached<std::vector<CatalogMod>>(QStringLiteral("installed"), must_not_run,
-                                                      [&](const auto& v) { from_memory = v; }, 300.0, /*persist=*/true))
+    std::vector<CatalogMod> fromMemory;
+    REQUIRE(run(second.cached<std::vector<CatalogMod>>(QStringLiteral("installed"), mustNotRun,
+                                                      [&](const auto& v) { fromMemory = v; }, 300.0, /*persist=*/true))
                 .has_value());
-    CHECK(from_memory == loaded);
+    CHECK(fromMemory == loaded);
 }
 
 TEST_CASE("workshop catalog URL moves out of the old shared config") {
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
-    REQUIRE(write_bytes(dir.filePath(QStringLiteral("config.json")),
+    REQUIRE(writeBytes(dir.filePath(QStringLiteral("config.json")),
                         R"({"schema_version":1,"workshop_catalog_url":"http://localhost:8787"})"));
 
     ConfigService service(dir.path());
@@ -461,7 +465,7 @@ TEST_CASE("workshop catalog URL moves out of the old shared config") {
     WorkshopCatalog catalog(&service, downloads, [] { return QList<ListedModPtr>{}; });
     CHECK(catalog.settings().url == "http://localhost:8787");
 
-    const auto stored = service.load_existing<CatalogSettings>(QStringLiteral("plugins/workshop_catalog.json"));
+    const auto stored = service.loadExisting<CatalogSettings>(QStringLiteral("plugins/workshop_catalog.json"));
     REQUIRE(stored.has_value());
     REQUIRE(stored->has_value());
     CHECK((*stored)->url == "http://localhost:8787");

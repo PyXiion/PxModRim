@@ -48,14 +48,14 @@ public:
     explicit MainWindow(AppContext& app, QWidget* parent = nullptr);
     ~MainWindow() override;
 
-    QQmlEngine* qmlEngine() const noexcept { return engine_; }
+    QQmlEngine* qmlEngine() const noexcept { return m_engine; }
     void setAppQuitCallback(std::function<void()> callback);
     void startStartupUpdateCheck();
     void openRoute(const QString& url);
     void selectView(int index);
     void cycleView(int direction);
     void refreshUnsavedState();
-    bool hasUnsavedChanges() const noexcept { return unsaved_; }
+    bool hasUnsavedChanges() const noexcept { return m_unsaved; }
     QCoro::Task<bool> saveActiveMods();
 
 protected:
@@ -91,39 +91,39 @@ private:
     QCoro::Task<void> selectMod(QString uuid);
     QCoro::Task<void> requestMod(QString uuid);
 
-    AppContext& app_;
-    CoreContext& ctx_;
-    QQmlEngine* engine_;
-    HeaderController* header_controller_ = nullptr;
-    HeaderPanel* header_ = nullptr;
-    MenuBar* menu_ = nullptr;
-    ViewRailPanel* rail_ = nullptr;
-    QStackedWidget* stack_ = nullptr;
-    QSplitter* splitter_ = nullptr;
-    ToastManager* toasts_ = nullptr;
-    ModsViewPanel* mods_view_ = nullptr;
-    std::vector<RailView*> views_;
-    std::unique_ptr<ModSelectionPresenter> selection_;
-    QString selected_uuid_;
-    QStringList saved_active_;
-    ActionMap actions_;
-    std::function<void()> quit_;
-    services::UpdateService updates_;
-    bool unsaved_ = false;
-    bool close_prompt_open_ = false;
-    bool close_confirmed_ = false;
-    bool closing_ = false;
-    bool settings_open_ = false;
-    bool checking_updates_ = false;
-    std::uint64_t active_connection_ = 0;
-    std::uint64_t mods_connection_ = 0;
-    std::uint64_t diagnostics_connection_ = 0;
-    std::uint64_t status_connection_ = 0;
-    std::uint64_t task_connection_ = 0;
-    std::uint64_t download_busy_connection_ = 0;
-    std::uint64_t download_progress_connection_ = 0;
-    std::uint64_t download_finished_connection_ = 0;
-    std::uint64_t download_status_connection_ = 0;
+    AppContext& m_app;
+    CoreContext& m_ctx;
+    QQmlEngine* m_engine;
+    HeaderController* m_headerController = nullptr;
+    HeaderPanel* m_header = nullptr;
+    MenuBar* m_menu = nullptr;
+    ViewRailPanel* m_rail = nullptr;
+    QStackedWidget* m_stack = nullptr;
+    QSplitter* m_splitter = nullptr;
+    ToastManager* m_toasts = nullptr;
+    ModsViewPanel* m_modsView = nullptr;
+    std::vector<RailView*> m_views;
+    std::unique_ptr<ModSelectionPresenter> m_selection;
+    QString m_selectedUuid;
+    QStringList m_savedActive;
+    ActionMap m_actions;
+    std::function<void()> m_quit;
+    services::UpdateService m_updates;
+    bool m_unsaved = false;
+    bool m_closePromptOpen = false;
+    bool m_closeConfirmed = false;
+    bool m_closing = false;
+    bool m_settingsOpen = false;
+    bool m_checkingUpdates = false;
+    std::uint64_t m_activeConnection = 0;
+    std::uint64_t m_modsConnection = 0;
+    std::uint64_t m_diagnosticsConnection = 0;
+    std::uint64_t m_statusConnection = 0;
+    std::uint64_t m_taskConnection = 0;
+    std::uint64_t m_downloadBusyConnection = 0;
+    std::uint64_t m_downloadProgressConnection = 0;
+    std::uint64_t m_downloadFinishedConnection = 0;
+    std::uint64_t m_downloadStatusConnection = 0;
 };
 
 }  // namespace px::modrim

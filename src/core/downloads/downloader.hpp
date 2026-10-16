@@ -33,36 +33,36 @@ public:
     void setup(CoreContext& ctx) override;
 
     // Whether a batch is currently downloading.
-    virtual bool is_downloading() const = 0;
+    virtual bool isDownloading() const = 0;
     // Ids of the batch currently downloading.
-    virtual QSet<QString> active_ids() const = 0;
+    virtual QSet<QString> activeIds() const = 0;
     // Whether `mod_id` belongs to this source.
-    virtual bool accepts(const QString& mod_id) const = 0;
+    virtual bool accepts(const QString& modId) const = 0;
     // Id of `mod` in this source if PxModRim downloaded it from here.
-    virtual std::optional<QString> updatable_id(const ListedMod& mod) const = 0;
+    virtual std::optional<QString> updatableId(const ListedMod& mod) const = 0;
     // Unix time of the last successful sync of `mod`, if known.
-    virtual std::optional<double> last_synced(const ListedMod& mod) const = 0;
+    virtual std::optional<double> lastSynced(const ListedMod& mod) const = 0;
     // Downloads or updates `mod_ids`. Per-item failures are reported in the result;
     // an error means the whole batch was refused.
-    virtual QCoro::Task<Result<DownloadResult>> download_mods(QStringList mod_ids) = 0;
+    virtual QCoro::Task<Result<DownloadResult>> downloadMods(QStringList modIds) = 0;
     virtual void cancel() = 0;
 
     // Distinct updatable ids among `mods`, in first-seen order.
-    QStringList updatable_ids(const QList<ListedModPtr>& mods) const;
+    QStringList updatableIds(const QList<ListedModPtr>& mods) const;
 
-    Event<QString> status_message_changed;
-    Event<DownloadProgress> download_progress;
-    Event<DownloadItemStatus> download_item_status_changed;
-    Event<DownloadItemTitle> download_item_titled;
+    Event<QString> statusMessageChanged;
+    Event<DownloadProgress> downloadProgress;
+    Event<DownloadItemStatus> downloadItemStatusChanged;
+    Event<DownloadItemTitle> downloadItemTitled;
     // "login" -> "query" (item details) -> "run" (all items resolved).
-    Event<QString> download_phase_changed;
-    Event<DownloadResult> download_finished;
-    Event<bool> busy_changed;
-    Event<QStringList> batch_started;
+    Event<QString> downloadPhaseChanged;
+    Event<DownloadResult> downloadFinished;
+    Event<bool> busyChanged;
+    Event<QStringList> batchStarted;
 
 private:
-    QString label_;
-    DownloadManager& manager_;
+    QString m_label;
+    DownloadManager& m_manager;
 };
 
 }  // namespace px::modrim

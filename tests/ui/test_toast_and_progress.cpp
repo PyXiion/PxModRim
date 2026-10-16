@@ -44,7 +44,7 @@ TEST_CASE("close button removes a persistent toast") {
     application();
     QWidget parent;
     ToastManager manager(&parent);
-    manager.showToast(QStringLiteral("stays"), ToastLevel::Info, 0);
+    manager.showToast(QStringLiteral("stays"), ToastLevel::kInfo, 0);
 
     auto* toast = manager.findChild<Toast*>();
     REQUIRE(toast != nullptr);

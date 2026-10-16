@@ -19,27 +19,27 @@ using px::modrim::sort::PackageId;
 
 namespace {
 
-std::shared_ptr<AboutXmlMod> about(const QString& name, const QString& package_id) {
+std::shared_ptr<AboutXmlMod> about(const QString& name, const QString& packageId) {
     auto mod = std::make_shared<AboutXmlMod>();
     mod->name = name;
-    mod->package_id = CaseInsensitiveStr(package_id);
-    mod->provider_id = QStringLiteral("stub");
+    mod->packageId = CaseInsensitiveStr(packageId);
+    mod->providerId = QStringLiteral("stub");
     mod->valid = true;
     return mod;
 }
 
 // `deps` maps a dependency package id to its alternative package ids.
-std::shared_ptr<AboutXmlMod> about_with_deps(const QString& name, const QString& package_id,
+std::shared_ptr<AboutXmlMod> aboutWithDeps(const QString& name, const QString& packageId,
                                              const QHash<QString, QStringList>& deps) {
-    auto mod = about(name, package_id);
+    auto mod = about(name, packageId);
     for (auto it = deps.cbegin(); it != deps.cend(); ++it) {
         DependencyMod dep;
         dep.name = QStringLiteral("Dep of %1").arg(name);
-        dep.package_id = CaseInsensitiveStr(it.key());
+        dep.packageId = CaseInsensitiveStr(it.key());
         for (const auto& alt : it.value()) {
-            dep.alternative_package_ids.add(alt);
+            dep.alternativePackageIds.add(alt);
         }
-        mod->about_rules.dependencies.append(std::move(dep));
+        mod->aboutRules.dependencies.append(std::move(dep));
     }
     return mod;
 }
@@ -47,7 +47,7 @@ std::shared_ptr<AboutXmlMod> about_with_deps(const QString& name, const QString&
 ListedModPtr listed(const QString& name) {
     auto mod = std::make_shared<ListedMod>();
     mod->name = name;
-    mod->provider_id = QStringLiteral("stub");
+    mod->providerId = QStringLiteral("stub");
     return mod;
 }
 
@@ -67,7 +67,7 @@ TEST_CASE("duplicate inactive copy does not replace the active uuid") {
         {QStringLiteral("uuid-inactive"), about("Inactive Copy", "shared.package")},
     });
 
-    const auto ordered = SortService::order_uuids({PackageId(QStringLiteral("shared.package"))}, all,
+    const auto ordered = SortService::orderUuids({PackageId(QStringLiteral("shared.package"))}, all,
                                                   {QStringLiteral("uuid-active")});
 
     CHECK(ordered == QStringList{QStringLiteral("uuid-active")});
@@ -79,7 +79,7 @@ TEST_CASE("order_uuids follows the sorted package ids and drops unknown ones") {
         {QStringLiteral("uuid-b"), about("Mod B", "mod.b")},
     });
 
-    const auto ordered = SortService::order_uuids(
+    const auto ordered = SortService::orderUuids(
         {PackageId(QStringLiteral("mod.b")), PackageId(QStringLiteral("ghost")),
          PackageId(QStringLiteral("mod.a"))},
         all, {QStringLiteral("uuid-a"), QStringLiteral("uuid-b")});
@@ -93,7 +93,7 @@ TEST_CASE("order_uuids skips active mods that are not about.xml mods") {
         {QStringLiteral("uuid-a"), about("Mod A", "mod.a")},
     });
 
-    const auto ordered = SortService::order_uuids(
+    const auto ordered = SortService::orderUuids(
         {PackageId(QStringLiteral("mod.a"))}, all,
         {QStringLiteral("uuid-folder"), QStringLiteral("uuid-a")});
 
@@ -106,36 +106,36 @@ TEST_CASE("missing dependencies: no dependencies yields nothing") {
         {QStringLiteral("uuid-b"), about("Mod B", "mod.b")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(
+    CHECK(SortService::missingDependencyUuids(
               all, {QStringLiteral("uuid-a"), QStringLiteral("uuid-b")})
               .isEmpty());
 }
 
 TEST_CASE("missing dependency that exists as an inactive mod is enabled") {
     const auto all = mods({
-        {QStringLiteral("uuid-a"), about_with_deps("Mod A", "mod.a", {{"mod.b", {}}})},
+        {QStringLiteral("uuid-a"), aboutWithDeps("Mod A", "mod.a", {{"mod.b", {}}})},
         {QStringLiteral("uuid-b"), about("Mod B", "mod.b")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(all, {QStringLiteral("uuid-a")}) ==
+    CHECK(SortService::missingDependencyUuids(all, {QStringLiteral("uuid-a")}) ==
           QStringList{QStringLiteral("uuid-b")});
 }
 
 TEST_CASE("missing dependency that is not among the known mods is ignored") {
     const auto all = mods({
-        {QStringLiteral("uuid-a"), about_with_deps("Mod A", "mod.a", {{"mod.b", {}}})},
+        {QStringLiteral("uuid-a"), aboutWithDeps("Mod A", "mod.a", {{"mod.b", {}}})},
     });
 
-    CHECK(SortService::missing_dependency_uuids(all, {QStringLiteral("uuid-a")}).isEmpty());
+    CHECK(SortService::missingDependencyUuids(all, {QStringLiteral("uuid-a")}).isEmpty());
 }
 
 TEST_CASE("missing dependency that is already active is not enabled again") {
     const auto all = mods({
-        {QStringLiteral("uuid-a"), about_with_deps("Mod A", "mod.a", {{"mod.b", {}}})},
+        {QStringLiteral("uuid-a"), aboutWithDeps("Mod A", "mod.a", {{"mod.b", {}}})},
         {QStringLiteral("uuid-b"), about("Mod B", "mod.b")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(
+    CHECK(SortService::missingDependencyUuids(
               all, {QStringLiteral("uuid-a"), QStringLiteral("uuid-b")})
               .isEmpty());
 }
@@ -143,11 +143,11 @@ TEST_CASE("missing dependency that is already active is not enabled again") {
 TEST_CASE("dependency satisfied by an active alternative package id is not missing") {
     const auto all = mods({
         {QStringLiteral("uuid-a"),
-         about_with_deps("Mod A", "mod.a", {{"mod.b", {QStringLiteral("mod.c")}}})},
+         aboutWithDeps("Mod A", "mod.a", {{"mod.b", {QStringLiteral("mod.c")}}})},
         {QStringLiteral("uuid-c"), about("Mod C", "mod.c")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(
+    CHECK(SortService::missingDependencyUuids(
               all, {QStringLiteral("uuid-a"), QStringLiteral("uuid-c")})
               .isEmpty());
 }
@@ -158,39 +158,39 @@ TEST_CASE("non about.xml mods in the active set contribute no dependencies") {
         {QStringLiteral("uuid-a"), about("Mod A", "mod.a")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(
+    CHECK(SortService::missingDependencyUuids(
               all, {QStringLiteral("uuid-folder"), QStringLiteral("uuid-a")})
               .isEmpty());
 }
 
 TEST_CASE("a dependency shared by two active mods is listed once") {
     const auto all = mods({
-        {QStringLiteral("uuid-a"), about_with_deps("Mod A", "mod.a", {{"mod.c", {}}})},
-        {QStringLiteral("uuid-b"), about_with_deps("Mod B", "mod.b", {{"mod.c", {}}})},
+        {QStringLiteral("uuid-a"), aboutWithDeps("Mod A", "mod.a", {{"mod.c", {}}})},
+        {QStringLiteral("uuid-b"), aboutWithDeps("Mod B", "mod.b", {{"mod.c", {}}})},
         {QStringLiteral("uuid-c"), about("Mod C", "mod.c")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(
+    CHECK(SortService::missingDependencyUuids(
               all, {QStringLiteral("uuid-a"), QStringLiteral("uuid-b")}) ==
           QStringList{QStringLiteral("uuid-c")});
 }
 
 TEST_CASE("an empty active set needs nothing") {
     const auto all = mods({
-        {QStringLiteral("uuid-a"), about_with_deps("Mod A", "mod.a", {{"mod.b", {}}})},
+        {QStringLiteral("uuid-a"), aboutWithDeps("Mod A", "mod.a", {{"mod.b", {}}})},
         {QStringLiteral("uuid-b"), about("Mod B", "mod.b")},
     });
 
-    CHECK(SortService::missing_dependency_uuids(all, {}).isEmpty());
+    CHECK(SortService::missingDependencyUuids(all, {}).isEmpty());
 }
 
 TEST_CASE("a mod without dependencies adds nothing to the result") {
     const auto all = mods({
         {QStringLiteral("uuid-a"), about("Mod A", "mod.a")},
-        {QStringLiteral("uuid-b"), about_with_deps("Mod B", "mod.b", {{"mod.a", {}}})},
+        {QStringLiteral("uuid-b"), aboutWithDeps("Mod B", "mod.b", {{"mod.a", {}}})},
     });
 
-    CHECK(SortService::missing_dependency_uuids(
+    CHECK(SortService::missingDependencyUuids(
               all, {QStringLiteral("uuid-a"), QStringLiteral("uuid-b")})
               .isEmpty());
 }

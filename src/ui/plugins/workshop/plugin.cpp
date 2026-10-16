@@ -5,11 +5,11 @@
 namespace px::modrim::workshop {
 
 CatalogSettingsSection::CatalogSettingsSection(workshop::WorkshopCatalog& catalog, QObject* parent)
-    : PluginConfigSectionBase({{QStringLiteral("url"), QString::fromStdString(catalog.settings().url)}}, parent), catalog_(catalog) {}
+    : PluginConfigSectionBase({{QStringLiteral("url"), QString::fromStdString(catalog.settings().url)}}, parent), m_catalog(catalog) {}
 QString CatalogSettingsSection::title() const { return QStringLiteral("Workshop catalog"); }
 QUrl CatalogSettingsSection::source() const { return QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/CatalogSettings.qml")); }
 Result<void> CatalogSettingsSection::commit(const QJsonObject& merged) {
-    catalog_.set_base_url(merged.value(QStringLiteral("url")).toString());
+    m_catalog.setBaseUrl(merged.value(QStringLiteral("url")).toString());
     return {};
 }
 

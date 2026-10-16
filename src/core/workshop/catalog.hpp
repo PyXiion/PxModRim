@@ -42,29 +42,33 @@ inline constexpr std::string_view kDefaultCatalogUrl = "https://api.modrim.pyxii
 inline constexpr double kFreshSeconds = 300.0;
 
 // Stored as plugins/workshop_catalog.json.
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 struct CatalogSettings {
     std::string url = std::string(kDefaultCatalogUrl);
 
     bool operator==(const CatalogSettings&) const = default;
 };
+// NOLINTEND(readability-identifier-naming)
 
 // The installed mods the catalog compares against. The composition root supplies it, so the catalog
 // does not reach for global state.
 using InstalledModsProvider = std::function<QList<ListedModPtr>()>;
 
 // A cached value with the time it was fetched (seconds since the epoch).
+// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or on the wire
 template <class T>
 struct Remembered {
     double at = 0;
     T value{};
 };
+// NOLINTEND(readability-identifier-naming)
 
 namespace detail {
 
 // A missing, unreadable or undecodable cache file is treated as a miss.
 template <class T>
-std::optional<Remembered<T>> read_cached(const QString& path) {
-    auto bytes = read_file_bytes(path);
+std::optional<Remembered<T>> readCached(const QString& path) {
+    auto bytes = readFileBytes(path);
     if (!bytes) {
         return std::nullopt;
     }
@@ -76,7 +80,7 @@ std::optional<Remembered<T>> read_cached(const QString& path) {
 }
 
 // Writes one cache file, then drops the oldest files beyond the disk limit.
-Result<void> write_cached(const QString& directory, const QString& path, const std::string& text);
+Result<void> writeCached(const QString& directory, const QString& path, const std::string& text);
 
 }  // namespace detail
 
@@ -87,7 +91,7 @@ public:
     WorkshopCatalog();
     void setup(CoreContext& ctx) override;
     // `config` may be null: settings, favourites and the response cache then stay in memory.
-    WorkshopCatalog(ConfigService* config, DownloadManager& downloads, InstalledModsProvider installed_mods);
+    WorkshopCatalog(ConfigService* config, DownloadManager& downloads, InstalledModsProvider installedMods);
     ~WorkshopCatalog();
 
     WorkshopCatalog(const WorkshopCatalog&) = delete;
@@ -96,15 +100,15 @@ public:
     // Stops the queue and aborts requests in flight.
     QCoro::Task<void> shutdown() override;
 
-    Event<QString> catalog_url_changed;
-    Event<std::monostate> installed_changed;
-    Event<std::monostate> queue_changed;
+    Event<QString> catalogUrlChanged;
+    Event<std::monostate> installedChanged;
+    Event<std::monostate> queueChanged;
 
-    const CatalogSettings& settings() const noexcept { return settings_.value(); }
-    void set_base_url(const QString& url);
-    bool configured() const noexcept { return !base_url_.isEmpty(); }
+    const CatalogSettings& settings() const noexcept { return m_settings.value(); }
+    void setBaseUrl(const QString& url);
+    bool configured() const noexcept { return !m_baseUrl.isEmpty(); }
 
-    FavouriteCollections& favourites() noexcept { return favourites_; }
+    FavouriteCollections& favourites() noexcept { return m_favourites; }
 
     QCoro::Task<CatalogResult<Discover>> discover();
     QCoro::Task<CatalogResult<CatalogPage<CatalogMod>>> mods(CatalogQuery query);
@@ -117,25 +121,25 @@ public:
     // value also survives a restart. `T` must be serialisable with glaze and comparable.
     template <class T>
     QCoro::Task<CatalogResult<void>> cached(QString key, std::function<QCoro::Task<CatalogResult<T>>()> produce,
-                                            std::function<void(const T&)> show, double fresh_for = kFreshSeconds,
+                                            std::function<void(const T&)> show, double freshFor = kFreshSeconds,
                                             bool persist = false);
 
     // Installed state is cached until invalidate_installed().
-    InstallState install_state(const CatalogMod& mod);
-    QCoro::Task<CatalogResult<std::vector<CatalogMod>>> installed_with_updates();
+    InstallState installState(const CatalogMod& mod);
+    QCoro::Task<CatalogResult<std::vector<CatalogMod>>> installedWithUpdates();
 
     // Resolves ids into the mods to fetch, skipping those already current.
-    QCoro::Task<CatalogResult<DownloadPlan>> plan(QStringList mod_ids, QStringList collection_ids);
-    QCoro::Task<Result<DownloadResult>> download(DownloadPlan download_plan);
+    QCoro::Task<CatalogResult<DownloadPlan>> plan(QStringList modIds, QStringList collectionIds);
+    QCoro::Task<Result<DownloadResult>> download(DownloadPlan downloadPlan);
 
     // Ids waiting in the queue or downloading.
-    QSet<QString> queued_ids() const { return queued_; }
+    QSet<QString> queuedIds() const { return m_queued; }
     // Queues `plan` behind any running download without waiting for it.
-    void enqueue(const DownloadPlan& download_plan);
-    void cancel_queue();
+    void enqueue(const DownloadPlan& downloadPlan);
+    void cancelQueue();
 
     // Call when the installed mods changed (mods changed, config changed).
-    void invalidate_installed();
+    void invalidateInstalled();
 
 private:
     using InstalledIndex = QHash<QString, QList<ListedModPtr>>;
@@ -144,59 +148,61 @@ private:
     struct IdleWait {
         WorkshopCatalog& catalog;
 
-        bool await_ready() const noexcept { return false; }
-        void await_suspend(std::coroutine_handle<> handle) const { catalog.idle_waiters_.push_back(handle); }
+        // NOLINTBEGIN(readability-identifier-naming): coroutine awaiter protocol
+        bool await_ready() const noexcept { return false;  }
+        void await_suspend(std::coroutine_handle<> handle) const { catalog.m_idleWaiters.push_back(handle);  }
         void await_resume() const noexcept {}
+        // NOLINTEND(readability-identifier-naming)
     };
 
     CatalogClient& client();
     const InstalledIndex& installed();
-    void bind_downloads(DownloadManager& downloads);
-    void disconnect_events();
-    InstallState install_state_of(const CatalogMod& mod, const InstalledIndex& installed) const;
-    void change_url(const QString& url);
-    void on_busy_changed(bool busy);
+    void bindDownloads(DownloadManager& downloads);
+    void disconnectEvents();
+    InstallState installStateOf(const CatalogMod& mod, const InstalledIndex& installed) const;
+    void changeUrl(const QString& url);
+    void onBusyChanged(bool busy);
     QCoro::Task<void> drain();
 
     template <class T>
     std::optional<Remembered<T>> recall(const QString& key) const;
     // Keeps the memory cache within its limit. `move_to_end` marks the entry as the newest.
-    void remember(const QString& key, std::any value, bool move_to_end);
-    QString cache_file(const QString& key) const;
+    void remember(const QString& key, std::any value, bool moveToEnd);
+    QString cacheFile(const QString& key) const;
 
-    PluginConfig<CatalogSettings> settings_;
-    QString base_url_;
-    std::optional<QString> cache_dir_;
-    FavouriteCollections favourites_;
-    DownloadManager* downloads_ = nullptr;
-    InstalledModsProvider installed_mods_;
-    Event<DownloadResult>::Id download_finished_id_ = 0;
-    Event<bool>::Id busy_changed_id_ = 0;
-    CoreContext* context_ = nullptr;
-    Event<std::monostate>::Id mods_changed_id_ = 0;
-    Event<AppConfig>::Id config_changed_id_ = 0;
+    PluginConfig<CatalogSettings> m_settings;
+    QString m_baseUrl;
+    std::optional<QString> m_cacheDir;
+    FavouriteCollections m_favourites;
+    DownloadManager* m_downloads = nullptr;
+    InstalledModsProvider m_installedMods;
+    Event<DownloadResult>::Id m_downloadFinishedId = 0;
+    Event<bool>::Id m_busyChangedId = 0;
+    CoreContext* m_context = nullptr;
+    Event<std::monostate>::Id m_modsChangedId = 0;
+    Event<AppConfig>::Id m_configChangedId = 0;
 
-    std::optional<InstalledIndex> installed_index_;
+    std::optional<InstalledIndex> m_installedIndex;
     // Insertion-ordered: the oldest entries are evicted first.
-    QList<QString> response_order_;
+    QList<QString> m_responseOrder;
     // Each value is a Remembered<T> for the T it was stored with.
-    QHash<QString, std::any> responses_;
+    QHash<QString, std::any> m_responses;
 
     // Every client made so far stays alive until shutdown, so requests in flight on a replaced client finish.
-    std::vector<std::unique_ptr<CatalogClient>> clients_;
-    CatalogClient* client_ = nullptr;
+    std::vector<std::unique_ptr<CatalogClient>> m_clients;
+    CatalogClient* m_client = nullptr;
 
-    QList<QStringList> queue_;
-    QSet<QString> queued_;
-    bool draining_ = false;
-    std::optional<QCoro::Task<void>> runner_;
-    std::vector<std::coroutine_handle<>> idle_waiters_;
+    QList<QStringList> m_queue;
+    QSet<QString> m_queued;
+    bool m_draining = false;
+    std::optional<QCoro::Task<void>> m_runner;
+    std::vector<std::coroutine_handle<>> m_idleWaiters;
 };
 
 template <class T>
 std::optional<Remembered<T>> WorkshopCatalog::recall(const QString& key) const {
-    const auto found = responses_.constFind(key);
-    if (found == responses_.constEnd()) {
+    const auto found = m_responses.constFind(key);
+    if (found == m_responses.constEnd()) {
         return std::nullopt;
     }
     const auto* typed = std::any_cast<Remembered<T>>(&found.value());
@@ -209,25 +215,25 @@ std::optional<Remembered<T>> WorkshopCatalog::recall(const QString& key) const {
 template <class T>
 QCoro::Task<CatalogResult<void>> WorkshopCatalog::cached(QString key,
                                                          std::function<QCoro::Task<CatalogResult<T>>()> produce,
-                                                         std::function<void(const T&)> show, double fresh_for,
+                                                         std::function<void(const T&)> show, double freshFor,
                                                          bool persist) {
-    const QString full_key = base_url_ + QLatin1Char('|') + key;
+    const QString fullKey = m_baseUrl + QLatin1Char('|') + key;
     std::optional<QString> path;
-    if (persist && cache_dir_) {
-        path = cache_file(full_key);
+    if (persist && m_cacheDir) {
+        path = cacheFile(fullKey);
     }
 
-    std::optional<Remembered<T>> entry = recall<T>(full_key);
+    std::optional<Remembered<T>> entry = recall<T>(fullKey);
     if (!entry && path) {
-        entry = co_await QtConcurrent::run([path = *path] { return detail::read_cached<T>(path); });
+        entry = co_await QtConcurrent::run([path = *path] { return detail::readCached<T>(path); });
         if (entry) {
-            remember(full_key, *entry, false);
+            remember(fullKey, *entry, false);
         }
     }
     if (entry) {
         show(entry->value);
         const double age = QDateTime::currentMSecsSinceEpoch() / 1000.0 - entry->at;
-        if (age < fresh_for) {
+        if (age < freshFor) {
             co_return {};
         }
     }
@@ -243,14 +249,14 @@ QCoro::Task<CatalogResult<void>> WorkshopCatalog::cached(QString key,
         value = entry->value;
     }
     const Remembered<T> remembered{QDateTime::currentMSecsSinceEpoch() / 1000.0, value};
-    remember(full_key, remembered, true);
+    remember(fullKey, remembered, true);
 
     if (path) {
         auto encoded = glz::write<kWireOpts>(remembered);
         if (encoded) {
             auto saved = co_await QtConcurrent::run(
-                [directory = *cache_dir_, file = *path, bytes = std::move(*encoded)] {
-                    return detail::write_cached(directory, file, bytes);
+                [directory = *m_cacheDir, file = *path, bytes = std::move(*encoded)] {
+                    return detail::writeCached(directory, file, bytes);
                 });
             if (!saved) {
                 spdlog::warn("[workshop] cannot write cache: {}", saved.error().message.toStdString());

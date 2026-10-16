@@ -12,12 +12,12 @@
 
 using namespace px::modrim;
 using namespace px::modrim::workshop;
-using workshop_test::decode_collection;
+using workshop_test::decodeCollection;
 
 namespace {
 
-CatalogCollection make_collection(std::string id, std::string title = "Pack") {
-    CatalogCollection collection = decode_collection(workshop_test::kCollectionJson);
+CatalogCollection makeCollection(std::string id, std::string title = "Pack") {
+    CatalogCollection collection = decodeCollection(workshop_test::kCollectionJson);
     collection.id = std::move(id);
     collection.title = std::move(title);
     return collection;
@@ -31,8 +31,8 @@ TEST_CASE("workshop favourites persist newest first and survive a restart") {
     ConfigService service(dir.path());
 
     FavouriteCollections favourites(&service);
-    const CatalogCollection first = make_collection("steam:1");
-    const CatalogCollection second = make_collection("steam:2");
+    const CatalogCollection first = makeCollection("steam:1");
+    const CatalogCollection second = makeCollection("steam:2");
     favourites.set(first, true);
     favourites.set(second, true);
     // Setting an already-starred collection again is a no-op: it does not jump to the front.
@@ -45,10 +45,10 @@ TEST_CASE("workshop favourites persist newest first and survive a restart") {
     CHECK(reloaded.contains("steam:1"));
 
     reloaded.set(first, false);
-    FavouriteCollections after_removal(&service);
-    REQUIRE(after_removal.items().size() == 1);
-    CHECK(after_removal.items()[0].id == "steam:2");
-    CHECK_FALSE(after_removal.contains("steam:1"));
+    FavouriteCollections afterRemoval(&service);
+    REQUIRE(afterRemoval.items().size() == 1);
+    CHECK(afterRemoval.items()[0].id == "steam:2");
+    CHECK_FALSE(afterRemoval.contains("steam:1"));
 }
 
 TEST_CASE("workshop favourites remember refreshes only starred snapshots") {
@@ -57,18 +57,18 @@ TEST_CASE("workshop favourites remember refreshes only starred snapshots") {
     ConfigService service(dir.path());
 
     FavouriteCollections favourites(&service);
-    favourites.set(make_collection("steam:1", "Old title"), true);
+    favourites.set(makeCollection("steam:1", "Old title"), true);
 
     int saves = 0;
     favourites.changed().connect([&](const FavouritesState&) { ++saves; });
 
     // An equal collection does not save.
-    favourites.remember(make_collection("steam:1", "Old title"));
+    favourites.remember(makeCollection("steam:1", "Old title"));
     // A collection that was never starred does not save.
-    favourites.remember(make_collection("steam:2", "Not starred"));
+    favourites.remember(makeCollection("steam:2", "Not starred"));
     CHECK(saves == 0);
 
-    favourites.remember(make_collection("steam:1", "New title"));
+    favourites.remember(makeCollection("steam:1", "New title"));
     CHECK(saves == 1);
 
     FavouriteCollections reloaded(&service);

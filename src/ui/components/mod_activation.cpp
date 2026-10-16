@@ -17,17 +17,17 @@ DependentModsDialog::DependentModsDialog(const QStringList& dependents, QWidget*
     button(QMessageBox::No)->setText(QStringLiteral("Disable selected only"));
     button(QMessageBox::Yes)->setObjectName(QStringLiteral("primaryAction"));
 }
-QCoro::Task<bool> apply_activation(CoreContext& ctx, QWidget* parent, const QStringList& enable, const QStringList& disable) {
+QCoro::Task<bool> applyActivation(CoreContext& ctx, QWidget* parent, const QStringList& enable, const QStringList& disable) {
     // Copy before suspension: callers often pass temporary batches.
     const QStringList enabling = enable;
     QStringList disabling = disable;
-    const auto dependents = ctx.activation().dependents_of(disabling, enabling);
+    const auto dependents = ctx.activation().dependentsOf(disabling, enabling);
     if (!dependents.isEmpty()) {
         QStringList details;
         for (const auto& uuid : dependents) {
             const auto& mod = ctx.allMods().value(uuid);
             const auto* about = dynamic_cast<const AboutXmlMod*>(mod.get());
-            details.append(about ? QStringLiteral("%1 (%2)").arg(mod->name, about->package_id.str()) : mod->name);
+            details.append(about ? QStringLiteral("%1 (%2)").arg(mod->name, about->packageId.str()) : mod->name);
         }
         const auto [result, dialog] = co_await awaitDialog<DependentModsDialog>(details, parent);
         if (result == QMessageBox::Cancel) co_return false;
@@ -35,9 +35,9 @@ QCoro::Task<bool> apply_activation(CoreContext& ctx, QWidget* parent, const QStr
     }
     co_return ctx.activation().apply(enabling, disabling);
 }
-QCoro::Task<bool> toggle_mods(CoreContext& ctx, QWidget* parent, const QStringList& uuids) {
+QCoro::Task<bool> toggleMods(CoreContext& ctx, QWidget* parent, const QStringList& uuids) {
     QStringList enable, disable;
     for (const auto& uuid : uuids) (ctx.activeUuids().contains(uuid) ? disable : enable).append(uuid);
-    co_return co_await apply_activation(ctx, parent, enable, disable);
+    co_return co_await applyActivation(ctx, parent, enable, disable);
 }
 }

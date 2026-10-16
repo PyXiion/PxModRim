@@ -17,7 +17,7 @@ class AspectRatioBanner : public QWidget {
     Q_OBJECT
 
 public:
-    explicit AspectRatioBanner(QWidget* parent = nullptr, int maxHeight = BANNER_MAX_HEIGHT);
+    explicit AspectRatioBanner(QWidget* parent = nullptr, int maxHeight = kBannerMaxHeight);
 
     void setPixmap(const QPixmap& pixmap);
     void setTitle(const QString& title);
@@ -35,12 +35,12 @@ protected:
 private:
     void recomputeScaledPixmap();
 
-    QPixmap pixmap_;
-    QPixmap scaled_pixmap_;
-    QString title_;
-    QString subtitle_;
-    int max_height_;
-    bool show_overlay_ = true;
+    QPixmap m_pixmap;
+    QPixmap m_scaledPixmap;
+    QString m_title;
+    QString m_subtitle;
+    int m_maxHeight;
+    bool m_showOverlay = true;
 };
 
 }  // namespace px::modrim

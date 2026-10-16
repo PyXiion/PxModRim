@@ -16,7 +16,7 @@
 using namespace px::modrim;
 using namespace px::modrim::services;
 using services_test::EventLoop;
-using services_test::run_async;
+using services_test::runAsync;
 
 namespace {
 
@@ -24,43 +24,43 @@ namespace {
 class CannedHttpServer : public QObject {
 public:
     CannedHttpServer(int statusCode, QByteArray body, QByteArray contentType = "application/json")
-        : statusCode_(statusCode), body_(std::move(body)), contentType_(std::move(contentType)) {
-        connect(&server_, &QTcpServer::newConnection, this, &CannedHttpServer::onNewConnection);
-        REQUIRE(server_.listen(QHostAddress::LocalHost, 0));
+        : m_statusCode(statusCode), m_body(std::move(body)), m_contentType(std::move(contentType)) {
+        connect(&m_server, &QTcpServer::newConnection, this, &CannedHttpServer::onNewConnection);
+        REQUIRE(m_server.listen(QHostAddress::LocalHost, 0));
     }
 
     QString url() const {
-        return QStringLiteral("http://127.0.0.1:%1/latest").arg(server_.serverPort());
+        return QStringLiteral("http://127.0.0.1:%1/latest").arg(m_server.serverPort());
     }
 
 private:
     void onNewConnection() {
-        while (QTcpSocket* socket = server_.nextPendingConnection()) {
+        while (QTcpSocket* socket = m_server.nextPendingConnection()) {
             connect(socket, &QTcpSocket::readyRead, this, [this, socket] {
                 if (socket->canReadLine()) {
                     // Drain the headers.
                     while (!socket->readLine().trimmed().isEmpty()) {
                     }
                     const QByteArray header =
-                        QByteArray("HTTP/1.1 ") + QByteArray::number(statusCode_) + " OK\r\n" +
-                        "Content-Type: " + contentType_ + "\r\n" +
-                        "Content-Length: " + QByteArray::number(body_.size()) + "\r\n" +
+                        QByteArray("HTTP/1.1 ") + QByteArray::number(m_statusCode) + " OK\r\n" +
+                        "Content-Type: " + m_contentType + "\r\n" +
+                        "Content-Length: " + QByteArray::number(m_body.size()) + "\r\n" +
                         "Connection: close\r\n\r\n";
-                    socket->write(header + body_);
+                    socket->write(header + m_body);
                     socket->disconnectFromHost();
                 }
             });
         }
     }
 
-    QTcpServer server_;
-    int statusCode_;
-    QByteArray body_;
-    QByteArray contentType_;
+    QTcpServer m_server;
+    int m_statusCode;
+    QByteArray m_body;
+    QByteArray m_contentType;
 };
 
 // Returns a port on localhost that is not currently listening.
-quint16 closed_port() {
+quint16 closedPort() {
     QTcpServer server;
     REQUIRE(server.listen(QHostAddress::LocalHost, 0));
     const quint16 port = server.serverPort();
@@ -75,13 +75,13 @@ constexpr auto kReleaseJson = R"({
     "body": "notes"
 })";
 
-Result<std::optional<ReleaseInfo>> check_payload(const QByteArray& payload, int status = 200,
+Result<std::optional<ReleaseInfo>> checkPayload(const QByteArray& payload, int status = 200,
                                                  const QString& current = QStringLiteral("0.1.0")) {
     EventLoop loop;
     QNetworkAccessManager network;
     CannedHttpServer server(status, payload);
     UpdateService service(current, network, server.url());
-    return run_async(service.check());
+    return runAsync(service.check());
 }
 
 }  // namespace
@@ -112,19 +112,19 @@ TEST_CASE("is_newer compares versions with padding, pre-release suffixes and dev
     };
     for (const auto& [tag, current, expected] : cases) {
         CAPTURE(tag, current);
-        CHECK(is_newer(QString::fromLatin1(tag), QString::fromLatin1(current)) == expected);
+        CHECK(isNewer(QString::fromLatin1(tag), QString::fromLatin1(current)) == expected);
     }
 }
 
 TEST_CASE("parse_version extracts leading numeric parts and rejects non-numeric tags") {
-    CHECK(parse_version(QStringLiteral("latest")) == std::nullopt);
-    const auto parsed = parse_version(QStringLiteral(" v1.2.3 "));
+    CHECK(parseVersion(QStringLiteral("latest")) == std::nullopt);
+    const auto parsed = parseVersion(QStringLiteral(" v1.2.3 "));
     REQUIRE(parsed.has_value());
     CHECK(*parsed == std::vector<qint64>{1, 2, 3});
 }
 
 TEST_CASE("UpdateService returns a newer release") {
-    const auto result = check_payload(kReleaseJson);
+    const auto result = checkPayload(kReleaseJson);
     REQUIRE(result.has_value());
     REQUIRE(result->has_value());
     const ReleaseInfo& release = **result;
@@ -135,34 +135,34 @@ TEST_CASE("UpdateService returns a newer release") {
 }
 
 TEST_CASE("UpdateService returns nullopt when the latest release is not newer") {
-    const auto result = check_payload(kReleaseJson, 200, QStringLiteral("0.2.0"));
+    const auto result = checkPayload(kReleaseJson, 200, QStringLiteral("0.2.0"));
     REQUIRE(result.has_value());
     CHECK(!result->has_value());
 }
 
 TEST_CASE("UpdateService offers a plain release over its own rc") {
-    const auto result = check_payload(kReleaseJson, 200, QStringLiteral("0.2.0-rc1"));
+    const auto result = checkPayload(kReleaseJson, 200, QStringLiteral("0.2.0-rc1"));
     REQUIRE(result.has_value());
     REQUIRE(result->has_value());
     CHECK((**result).tag == QStringLiteral("v0.2.0"));
 }
 
 TEST_CASE("UpdateService wraps HTTP status errors") {
-    const auto result = check_payload("{}", 500);
+    const auto result = checkPayload("{}", 500);
     CHECK(!result.has_value());
 }
 
 TEST_CASE("UpdateService wraps transport failures") {
     EventLoop loop;
     QNetworkAccessManager network;
-    const QString deadUrl = QStringLiteral("http://127.0.0.1:%1/latest").arg(closed_port());
+    const QString deadUrl = QStringLiteral("http://127.0.0.1:%1/latest").arg(closedPort());
     UpdateService service(QStringLiteral("0.1.0"), network, deadUrl);
-    const auto result = run_async(service.check());
+    const auto result = runAsync(service.check());
     CHECK(!result.has_value());
 }
 
 TEST_CASE("UpdateService wraps non-JSON bodies") {
-    const auto result = check_payload("<html>", 200);
+    const auto result = checkPayload("<html>", 200);
     CHECK(!result.has_value());
 }
 
@@ -170,7 +170,7 @@ TEST_CASE("UpdateService rejects non-object JSON payloads") {
     const std::initializer_list<QByteArray> payloads{"[]", "null", "\"tag\"", "3"};
     for (const QByteArray& payload : payloads) {
         CAPTURE(payload);
-        const auto result = check_payload(payload);
+        const auto result = checkPayload(payload);
         CHECK(!result.has_value());
     }
 }
@@ -183,7 +183,7 @@ TEST_CASE("UpdateService rejects responses lacking tag_name or html_url") {
              QByteArray(R"({"tag_name": "", "html_url": "https://example.test/r"})"),
          }) {
         CAPTURE(payload);
-        const auto result = check_payload(payload);
+        const auto result = checkPayload(payload);
         CHECK(!result.has_value());
     }
 }

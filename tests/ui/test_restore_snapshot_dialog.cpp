@@ -27,7 +27,7 @@ using px::modrim::ConfirmRestoreDialog;
 using px::modrim::RestoreSnapshotDialog;
 
 // Widgets need a QApplication for the whole run; the first test that asks for it creates it.
-QApplication& ensure_app() {
+QApplication& ensureApp() {
     if (auto* existing = qobject_cast<QApplication*>(QCoreApplication::instance())) return *existing;
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) qputenv("QT_QPA_PLATFORM", "offscreen");
     static int argc = 1;
@@ -37,26 +37,26 @@ QApplication& ensure_app() {
     return app;
 }
 
-void write_text(const QString& path, const QByteArray& bytes) {
+void writeText(const QString& path, const QByteArray& bytes) {
     QFile file(path);
     REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
     REQUIRE(file.write(bytes) == bytes.size());
 }
 
-void write_snapshot(const QString& path, const QStringList& package_ids) {
+void writeSnapshot(const QString& path, const QStringList& packageIds) {
     ModsConfig config;
     config.version = QStringLiteral("1.5");
-    for (const QString& id : package_ids) {
+    for (const QString& id : packageIds) {
         config.activeMods.append(CaseInsensitiveStr(id));
     }
-    REQUIRE(px::modrim::write_mods_config(path, config, QFileInfo(path).absolutePath()).has_value());
+    REQUIRE(px::modrim::writeModsConfig(path, config, QFileInfo(path).absolutePath()).has_value());
 }
 
-QListWidget* list_of(RestoreSnapshotDialog& dialog) {
+QListWidget* listOf(RestoreSnapshotDialog& dialog) {
     return dialog.findChild<QListWidget*>();
 }
 
-QPushButton* button_labelled(RestoreSnapshotDialog& dialog, const QString& text) {
+QPushButton* buttonLabelled(RestoreSnapshotDialog& dialog, const QString& text) {
     for (QPushButton* button : dialog.findChildren<QPushButton*>()) {
         if (button->text() == text) {
             return button;
@@ -66,7 +66,7 @@ QPushButton* button_labelled(RestoreSnapshotDialog& dialog, const QString& text)
 }
 
 // The details label is the only label carrying markup; the instruction line has none.
-QString details_text(RestoreSnapshotDialog& dialog) {
+QString detailsText(RestoreSnapshotDialog& dialog) {
     for (QLabel* label : dialog.findChildren<QLabel*>()) {
         if (label->text().contains(QStringLiteral("<b>"))) {
             return label->text();
@@ -79,74 +79,74 @@ QString details_text(RestoreSnapshotDialog& dialog) {
 
 TEST_CASE("Restore dialog selects readable snapshots and disables Restore for unreadable ones",
           "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
 
-    const QString valid_snap = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
-    write_snapshot(valid_snap, {QStringLiteral("mod.foo"), QStringLiteral("mod.bar")});
-    const QString corrupt_snap = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
-    write_text(corrupt_snap, "<<<INVALID XML>>>");
+    const QString validSnap = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
+    writeSnapshot(validSnap, {QStringLiteral("mod.foo"), QStringLiteral("mod.bar")});
+    const QString corruptSnap = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
+    writeText(corruptSnap, "<<<INVALID XML>>>");
 
-    RestoreSnapshotDialog dialog(QStringList{valid_snap, corrupt_snap});
-    QListWidget* list = list_of(dialog);
+    RestoreSnapshotDialog dialog(QStringList{validSnap, corruptSnap});
+    QListWidget* list = listOf(dialog);
     REQUIRE(list != nullptr);
     REQUIRE(list->count() == 2);
 
     // The first readable snapshot is selected initially.
-    REQUIRE(dialog.selectedSnapshot() == valid_snap);
-    QPushButton* restore_btn = button_labelled(dialog, QStringLiteral("Restore"));
-    QPushButton* cancel_btn = button_labelled(dialog, QStringLiteral("Cancel"));
-    REQUIRE(restore_btn != nullptr);
-    REQUIRE(cancel_btn != nullptr);
-    REQUIRE(restore_btn->isEnabled());
-    REQUIRE(restore_btn->parentWidget() == &dialog);
+    REQUIRE(dialog.selectedSnapshot() == validSnap);
+    QPushButton* restoreBtn = buttonLabelled(dialog, QStringLiteral("Restore"));
+    QPushButton* cancelBtn = buttonLabelled(dialog, QStringLiteral("Cancel"));
+    REQUIRE(restoreBtn != nullptr);
+    REQUIRE(cancelBtn != nullptr);
+    REQUIRE(restoreBtn->isEnabled());
+    REQUIRE(restoreBtn->parentWidget() == &dialog);
 
     list->setCurrentRow(1);
     REQUIRE_FALSE(dialog.selectedSnapshot().has_value());
-    REQUIRE_FALSE(restore_btn->isEnabled());
+    REQUIRE_FALSE(restoreBtn->isEnabled());
 
     list->setCurrentRow(0);
-    REQUIRE(dialog.selectedSnapshot() == valid_snap);
-    REQUIRE(restore_btn->isEnabled());
+    REQUIRE(dialog.selectedSnapshot() == validSnap);
+    REQUIRE(restoreBtn->isEnabled());
 
-    cancel_btn->click();
+    cancelBtn->click();
     REQUIRE(dialog.result() == QDialog::Rejected);
 
-    RestoreSnapshotDialog accept_dialog(QStringList{valid_snap});
-    QListWidget* accept_list = list_of(accept_dialog);
-    REQUIRE(accept_list != nullptr);
-    emit accept_list->itemDoubleClicked(accept_list->item(0));
-    REQUIRE(accept_dialog.result() == QDialog::Accepted);
-    REQUIRE(accept_dialog.selectedSnapshot() == valid_snap);
+    RestoreSnapshotDialog acceptDialog(QStringList{validSnap});
+    QListWidget* acceptList = listOf(acceptDialog);
+    REQUIRE(acceptList != nullptr);
+    emit acceptList->itemDoubleClicked(acceptList->item(0));
+    REQUIRE(acceptDialog.result() == QDialog::Accepted);
+    REQUIRE(acceptDialog.selectedSnapshot() == validSnap);
 }
 
 TEST_CASE("Restore dialog Restore button accepts the selected snapshot", "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
 
-    const QString valid_snap = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
-    write_snapshot(valid_snap, {QStringLiteral("mod.foo")});
+    const QString validSnap = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
+    writeSnapshot(validSnap, {QStringLiteral("mod.foo")});
 
-    RestoreSnapshotDialog dialog(QStringList{valid_snap});
-    QPushButton* restore_btn = button_labelled(dialog, QStringLiteral("Restore"));
-    REQUIRE(restore_btn != nullptr);
-    restore_btn->click();
+    RestoreSnapshotDialog dialog(QStringList{validSnap});
+    QPushButton* restoreBtn = buttonLabelled(dialog, QStringLiteral("Restore"));
+    REQUIRE(restoreBtn != nullptr);
+    restoreBtn->click();
     REQUIRE(dialog.result() == QDialog::Accepted);
-    REQUIRE(dialog.selectedSnapshot() == valid_snap);
+    REQUIRE(dialog.selectedSnapshot() == validSnap);
 }
 
 TEST_CASE("Restore dialog double-click on an unreadable snapshot does not accept", "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
 
-    const QString corrupt_snap = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
-    write_text(corrupt_snap, "<<<INVALID XML>>>");
+    const QString corruptSnap = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
+    writeText(corruptSnap, "<<<INVALID XML>>>");
 
-    RestoreSnapshotDialog dialog(QStringList{corrupt_snap});
-    QListWidget* list = list_of(dialog);
+    RestoreSnapshotDialog dialog(QStringList{corruptSnap});
+    QListWidget* list = listOf(dialog);
     REQUIRE(list != nullptr);
     emit list->itemDoubleClicked(list->item(0));
     REQUIRE(dialog.result() == QDialog::Rejected);
@@ -154,21 +154,21 @@ TEST_CASE("Restore dialog double-click on an unreadable snapshot does not accept
 }
 
 TEST_CASE("Restore dialog lists snapshot timestamps and mod counts in given order", "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
 
-    const QString two_mods = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
-    write_snapshot(two_mods, {QStringLiteral("mod.foo"), QStringLiteral("mod.bar")});
-    const QString one_mod = dir.filePath(QStringLiteral("ModsConfig_20260922_140000.xml"));
-    write_snapshot(one_mod, {QStringLiteral("mod.foo")});
-    const QString no_mods = dir.filePath(QStringLiteral("ModsConfig_20260922_150000_123456.xml"));
-    write_snapshot(no_mods, {});
+    const QString twoMods = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
+    writeSnapshot(twoMods, {QStringLiteral("mod.foo"), QStringLiteral("mod.bar")});
+    const QString oneMod = dir.filePath(QStringLiteral("ModsConfig_20260922_140000.xml"));
+    writeSnapshot(oneMod, {QStringLiteral("mod.foo")});
+    const QString noMods = dir.filePath(QStringLiteral("ModsConfig_20260922_150000_123456.xml"));
+    writeSnapshot(noMods, {});
     const QString corrupt = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
-    write_text(corrupt, "<<<INVALID XML>>>");
+    writeText(corrupt, "<<<INVALID XML>>>");
 
-    RestoreSnapshotDialog dialog(QStringList{two_mods, one_mod, no_mods, corrupt});
-    QListWidget* list = list_of(dialog);
+    RestoreSnapshotDialog dialog(QStringList{twoMods, oneMod, noMods, corrupt});
+    QListWidget* list = listOf(dialog);
     REQUIRE(list != nullptr);
     REQUIRE(list->count() == 4);
 
@@ -186,17 +186,17 @@ TEST_CASE("Restore dialog lists snapshot timestamps and mod counts in given orde
 
 TEST_CASE("Restore dialog falls back to file modification time for unnamed or invalid snapshot names",
           "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
 
     const QString unnamed = dir.filePath(QStringLiteral("custom.xml"));
-    write_snapshot(unnamed, {QStringLiteral("mod.foo")});
-    const QString bad_date = dir.filePath(QStringLiteral("ModsConfig_20261322_120000.xml"));
-    write_snapshot(bad_date, {QStringLiteral("mod.foo")});
+    writeSnapshot(unnamed, {QStringLiteral("mod.foo")});
+    const QString badDate = dir.filePath(QStringLiteral("ModsConfig_20261322_120000.xml"));
+    writeSnapshot(badDate, {QStringLiteral("mod.foo")});
 
-    RestoreSnapshotDialog dialog(QStringList{unnamed, bad_date});
-    QListWidget* list = list_of(dialog);
+    RestoreSnapshotDialog dialog(QStringList{unnamed, badDate});
+    QListWidget* list = listOf(dialog);
     REQUIRE(list != nullptr);
     REQUIRE(list->count() == 2);
 
@@ -207,48 +207,48 @@ TEST_CASE("Restore dialog falls back to file modification time for unnamed or in
 }
 
 TEST_CASE("Restore dialog details describe the selected snapshot", "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
     QTemporaryDir dir;
     REQUIRE(dir.isValid());
 
-    const QString valid_snap = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
-    write_snapshot(valid_snap, {QStringLiteral("mod.foo"), QStringLiteral("mod.bar")});
-    const QString corrupt_snap = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
-    write_text(corrupt_snap, "<<<INVALID XML>>>");
+    const QString validSnap = dir.filePath(QStringLiteral("ModsConfig_20260922_120000.xml"));
+    writeSnapshot(validSnap, {QStringLiteral("mod.foo"), QStringLiteral("mod.bar")});
+    const QString corruptSnap = dir.filePath(QStringLiteral("ModsConfig_20260922_130000.xml"));
+    writeText(corruptSnap, "<<<INVALID XML>>>");
 
-    RestoreSnapshotDialog dialog(QStringList{valid_snap, corrupt_snap});
-    QListWidget* list = list_of(dialog);
+    RestoreSnapshotDialog dialog(QStringList{validSnap, corruptSnap});
+    QListWidget* list = listOf(dialog);
     REQUIRE(list != nullptr);
 
-    REQUIRE(details_text(dialog) ==
+    REQUIRE(detailsText(dialog) ==
             QStringLiteral("<b>File:</b> ModsConfig_20260922_120000.xml<br><b>Active mods:</b> 2 | "
                            "<b>Game version:</b> 1.5"));
 
     list->setCurrentRow(1);
-    REQUIRE(details_text(dialog) ==
+    REQUIRE(detailsText(dialog) ==
             QStringLiteral("<b>This saved mod list cannot be read.</b> ModsConfig_20260922_130000.xml "
                            "will not be restored."));
 
     list->setCurrentItem(nullptr);
     REQUIRE_FALSE(dialog.selectedSnapshot().has_value());
-    REQUIRE(details_text(dialog).isEmpty());
+    REQUIRE(detailsText(dialog).isEmpty());
 }
 
 TEST_CASE("Restore dialog with no snapshots has nothing to select", "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
 
     RestoreSnapshotDialog dialog(QStringList{});
-    QListWidget* list = list_of(dialog);
+    QListWidget* list = listOf(dialog);
     REQUIRE(list != nullptr);
     REQUIRE(list->count() == 0);
     REQUIRE_FALSE(dialog.selectedSnapshot().has_value());
-    QPushButton* restore_btn = button_labelled(dialog, QStringLiteral("Restore"));
-    REQUIRE(restore_btn != nullptr);
-    REQUIRE_FALSE(restore_btn->isEnabled());
+    QPushButton* restoreBtn = buttonLabelled(dialog, QStringLiteral("Restore"));
+    REQUIRE(restoreBtn != nullptr);
+    REQUIRE_FALSE(restoreBtn->isEnabled());
 }
 
 TEST_CASE("Confirm restore dialog names the snapshot and defaults to Cancel", "[ui][restore_snapshot]") {
-    [[maybe_unused]] auto& app = ensure_app();
+    [[maybe_unused]] auto& app = ensureApp();
 
     ConfirmRestoreDialog confirm(QStringLiteral("ModsConfig_20260922_120000.xml"));
     REQUIRE(confirm.windowTitle() == QStringLiteral("Restore Mod List"));
@@ -257,11 +257,11 @@ TEST_CASE("Confirm restore dialog names the snapshot and defaults to Cancel", "[
     REQUIRE(confirm.icon() == QMessageBox::Question);
     REQUIRE(confirm.defaultButton() == confirm.button(QMessageBox::Cancel));
 
-    auto* restore_btn = qobject_cast<QPushButton*>(confirm.button(QMessageBox::Yes));
-    REQUIRE(restore_btn != nullptr);
-    REQUIRE(restore_btn->text() == QStringLiteral("Restore"));
-    REQUIRE(restore_btn->objectName() == QStringLiteral("primaryAction"));
-    auto* cancel_btn = qobject_cast<QPushButton*>(confirm.button(QMessageBox::Cancel));
-    REQUIRE(cancel_btn != nullptr);
-    REQUIRE(cancel_btn->text() == QStringLiteral("Cancel"));
+    auto* restoreBtn = qobject_cast<QPushButton*>(confirm.button(QMessageBox::Yes));
+    REQUIRE(restoreBtn != nullptr);
+    REQUIRE(restoreBtn->text() == QStringLiteral("Restore"));
+    REQUIRE(restoreBtn->objectName() == QStringLiteral("primaryAction"));
+    auto* cancelBtn = qobject_cast<QPushButton*>(confirm.button(QMessageBox::Cancel));
+    REQUIRE(cancelBtn != nullptr);
+    REQUIRE(cancelBtn->text() == QStringLiteral("Cancel"));
 }

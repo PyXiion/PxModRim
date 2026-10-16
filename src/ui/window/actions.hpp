@@ -15,9 +15,9 @@ class QWidget;
 namespace px::modrim {
 
 enum class ActionId {
-    Save, Restore, Settings, Quit, Refresh, FullRescan, AutoSort, UpdateMods,
-    FocusSearch, NextView, PrevView, Fullscreen, ReportIssue, UploadLogs,
-    OpenLogs, Shortcuts, CheckUpdates, About,
+    kSave, kRestore, kSettings, kQuit, kRefresh, kFullRescan, kAutoSort, kUpdateMods,
+    kFocusSearch, kNextView, kPrevView, kFullscreen, kReportIssue, kUploadLogs,
+    kOpenLogs, kShortcuts, kCheckUpdates, kAbout,
 };
 
 struct ActionSpec {

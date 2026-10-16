@@ -8,6 +8,6 @@ class DependentModsDialog : public QMessageBox {
 public:
     DependentModsDialog(const QStringList& dependents, QWidget* parent);
 };
-QCoro::Task<bool> apply_activation(CoreContext& ctx, QWidget* parent, const QStringList& enable = {}, const QStringList& disable = {});
-QCoro::Task<bool> toggle_mods(CoreContext& ctx, QWidget* parent, const QStringList& uuids);
+QCoro::Task<bool> applyActivation(CoreContext& ctx, QWidget* parent, const QStringList& enable = {}, const QStringList& disable = {});
+QCoro::Task<bool> toggleMods(CoreContext& ctx, QWidget* parent, const QStringList& uuids);
 }

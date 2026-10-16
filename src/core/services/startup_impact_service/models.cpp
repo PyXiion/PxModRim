@@ -7,7 +7,7 @@ namespace px::modrim::startup_impact {
 namespace {
 
 template <class Map>
-double sum_values(const Map& map) {
+double sumValues(const Map& map) {
     double total = 0.0;
     for (const double value : map) {
         total += value;
@@ -15,46 +15,46 @@ double sum_values(const Map& map) {
     return total;
 }
 
-bool is_set(const std::optional<QString>& value) { return value && !value->isEmpty(); }
+bool isSet(const std::optional<QString>& value) { return value && !value->isEmpty(); }
 
 }  // namespace
 
-double StartupImpactReport::total_time() const {
+double StartupImpactReport::totalTime() const {
     double total = 0.0;
     for (const StartupImpactMod& mod : mods) {
-        total += mod.total_impact_s;
+        total += mod.totalImpactS;
     }
     return total;
 }
 
-double StartupImpactReport::off_thread_total_time() const {
+double StartupImpactReport::offThreadTotalTime() const {
     double total = 0.0;
     for (const StartupImpactMod& mod : mods) {
-        total += mod.off_thread_total_impact_s;
+        total += mod.offThreadTotalImpactS;
     }
     return total;
 }
 
-double StartupImpactReport::mods_total_time() const {
-    return total_time() + off_thread_total_time();
+double StartupImpactReport::modsTotalTime() const {
+    return totalTime() + offThreadTotalTime();
 }
 
-double StartupImpactReport::base_game_time() const { return sum_values(metrics); }
+double StartupImpactReport::baseGameTime() const { return sumValues(metrics); }
 
-const StartupImpactMod* StartupImpactReport::find(const std::optional<QString>& package_id,
-                                                  const std::optional<QString>& mod_name) const {
-    if (is_set(package_id)) {
-        const QString normalized = normalize_package_id(*package_id);
+const StartupImpactMod* StartupImpactReport::find(const std::optional<QString>& packageId,
+                                                  const std::optional<QString>& modName) const {
+    if (isSet(packageId)) {
+        const QString normalized = normalizePackageId(*packageId);
         for (const StartupImpactMod& mod : mods) {
-            if (mod.package_id == normalized) {
+            if (mod.packageId == normalized) {
                 return &mod;
             }
         }
     }
-    if (is_set(mod_name)) {
-        const QString name_lower = mod_name->toLower();
+    if (isSet(modName)) {
+        const QString nameLower = modName->toLower();
         for (const StartupImpactMod& mod : mods) {
-            if (mod.mod_name.toLower() == name_lower) {
+            if (mod.modName.toLower() == nameLower) {
                 return &mod;
             }
         }
@@ -62,16 +62,16 @@ const StartupImpactMod* StartupImpactReport::find(const std::optional<QString>& 
     return nullptr;
 }
 
-QString normalize_package_id(QStringView package_id) {
-    QString normalized = package_id.toString().toLower();
-    constexpr QLatin1StringView steam_suffix{"_steam"};
-    if (normalized.endsWith(steam_suffix)) {
-        normalized.chop(steam_suffix.size());
+QString normalizePackageId(QStringView packageId) {
+    QString normalized = packageId.toString().toLower();
+    constexpr QLatin1StringView kSteamSuffix{"_steam"};
+    if (normalized.endsWith(kSteamSuffix)) {
+        normalized.chop(kSteamSuffix.size());
     }
     return normalized;
 }
 
-QString format_impact(double seconds) {
+QString formatImpact(double seconds) {
     const auto ms = static_cast<long long>(std::nearbyint(seconds * 1000.0));
     return QStringLiteral("%1ms").arg(ms);
 }

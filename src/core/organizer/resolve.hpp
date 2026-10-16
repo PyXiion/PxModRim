@@ -17,22 +17,22 @@ namespace px::modrim::organizer {
 using ModsByUuid = QHash<QString, ListedModPtr>;
 
 // Where a mod's folder came from: a manual placement, an auto-folder rule, or nowhere (root).
-enum class Placement { Manual, Rule, None };
-enum class CheckState { On, Off, Partial };
-enum class StatusFilter { All, Active, Inactive };
+enum class Placement { kManual, kRule, kNone };
+enum class CheckState { kOn, kOff, kPartial };
+enum class StatusFilter { kAll, kActive, kInactive };
 
 struct Resolution {
-    qint64 folder_id = ROOT_ID;
-    Placement placement = Placement::None;
+    qint64 folderId = kRootId;
+    Placement placement = Placement::kNone;
 };
 
 struct TreeQuery {
     QString text;
-    QSet<qint64> tag_ids;
-    StatusFilter status = StatusFilter::All;
-    QSet<QString> provider_ids;
+    QSet<qint64> tagIds;
+    StatusFilter status = StatusFilter::kAll;
+    QSet<QString> providerIds;
 
-    bool is_empty() const;
+    bool isEmpty() const;
 };
 
 // A sidebar preset (status, provider, or tag) and the mods it selects.
@@ -40,21 +40,21 @@ struct TreeFilter {
     QString key;
     QString label;
     int count = 0;
-    StatusFilter status = StatusFilter::All;
-    std::optional<QString> provider_id;
-    std::optional<qint64> tag_id;
+    StatusFilter status = StatusFilter::kAll;
+    std::optional<QString> providerId;
+    std::optional<qint64> tagId;
 
     TreeQuery query(const QString& text = {}) const;
 };
 
 struct ModLeaf {
     QString uuid;
-    std::optional<QString> package_id;
+    std::optional<QString> packageId;
     QString name;
     QString author;
     bool enabled = false;
-    QSet<qint64> tag_ids;
-    Placement placement = Placement::None;
+    QSet<qint64> tagIds;
+    Placement placement = Placement::kNone;
 };
 
 struct FolderNode {
@@ -65,17 +65,17 @@ struct FolderNode {
     QList<ModLeaf> mods;
     int total = 0;
     int enabled = 0;
-    CheckState check = CheckState::Off;
-    int visible_total = 0;
-    int own_total = 0;
-    int own_enabled = 0;
-    bool has_rules = false;
+    CheckState check = CheckState::kOff;
+    int visibleTotal = 0;
+    int ownTotal = 0;
+    int ownEnabled = 0;
+    bool hasRules = false;
 
     // Check state of the folder's direct mods only (the root's Ungrouped).
-    CheckState own_check() const;
+    CheckState ownCheck() const;
     // This node followed by all descendants, in pre-order.
     QList<const FolderNode*> walk() const;
-    QList<ModLeaf> all_mods() const;
+    QList<ModLeaf> allMods() const;
 };
 
 // First-match counts for a draft rule list, and the ungrouped mods it would assign.
@@ -85,20 +85,20 @@ struct RulePreview {
 };
 
 // Lowercased package id for About.xml mods; nullopt for mods without one.
-std::optional<QString> mod_package_id(const ListedMod& mod);
-QString mod_author(const ListedMod& mod);
+std::optional<QString> modPackageId(const ListedMod& mod);
+QString modAuthor(const ListedMod& mod);
 
-Resolution folder_for(const OrganizerState& state, const std::optional<QString>& package_id,
+Resolution folderFor(const OrganizerState& state, const std::optional<QString>& packageId,
                       const QString& name, const QString& author);
 
-RulePreview preview_rule_matches(const OrganizerState& state, const ModsByUuid& mods,
+RulePreview previewRuleMatches(const OrganizerState& state, const ModsByUuid& mods,
                                  const QList<RuleSpec>& specs);
 
 // `state` may be null, in which case no tag filters are produced.
-QList<TreeFilter> tree_filters(const ModsByUuid& mods, const QSet<QString>& active,
+QList<TreeFilter> treeFilters(const ModsByUuid& mods, const QSet<QString>& active,
                                const OrganizerState* state);
 
-FolderNode build_tree(const OrganizerState& state, const ModsByUuid& mods, const QSet<QString>& active,
+FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods, const QSet<QString>& active,
                       const std::optional<TreeQuery>& query = std::nullopt);
 
 }  // namespace px::modrim::organizer

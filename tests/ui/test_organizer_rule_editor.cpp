@@ -33,14 +33,14 @@ using organizer_test::wait;
 class Application {
 public:
     Application() {
-        if (!QCoreApplication::instance()) app_ = std::make_unique<QApplication>(argc_, argv_);
+        if (!QCoreApplication::instance()) m_app = std::make_unique<QApplication>(m_argc, m_argv);
         REQUIRE(qobject_cast<QApplication*>(QCoreApplication::instance()));
     }
 private:
-    int argc_ = 1;
-    char name_[16] = "organizer-test";
-    char* argv_[2] = {name_, nullptr};
-    std::unique_ptr<QApplication> app_;
+    int m_argc = 1;
+    char m_name[16] = "organizer-test";
+    char* m_argv[2] = {m_name, nullptr};
+    std::unique_ptr<QApplication> m_app;
 };
 
 template<class Predicate>
@@ -75,8 +75,8 @@ struct Harness {
         REQUIRE(dir.isValid());
         auto mod = std::make_shared<AboutXmlMod>();
         mod->name = QStringLiteral("Example");
-        mod->provider_id = QStringLiteral("local");
-        mod->package_id = CaseInsensitiveStr(QStringView(u"example.mod"));
+        mod->providerId = QStringLiteral("local");
+        mod->packageId = CaseInsensitiveStr(QStringView(u"example.mod"));
         ctx->load({{QStringLiteral("example"), mod}}, {});
         auto plugin = std::make_unique<OrganizerService>(*ctx, db);
         service = plugin.get();
@@ -149,17 +149,17 @@ struct Harness {
 };
 
 void checkRule(const Rule& rule, RuleOp op, const QString& pattern, qint64 folder) {
-    CHECK(rule.field == RuleField::PackageId);
+    CHECK(rule.field == RuleField::kPackageId);
     CHECK(rule.op == op);
     CHECK(rule.pattern == pattern);
-    CHECK(rule.folder_id == folder);
+    CHECK(rule.folderId == folder);
 }
 } // namespace
 
 TEST_CASE("organizer rule editor preserves order and retains an invalid draft", "[ui][organizer]") {
     Harness h;
-    const auto first = expect(wait(h.service->create_folder(QStringLiteral("First"))));
-    const auto second = expect(wait(h.service->create_folder(QStringLiteral("Second"))));
+    const auto first = expect(wait(h.service->createFolder(QStringLiteral("First"))));
+    const auto second = expect(wait(h.service->createFolder(QStringLiteral("Second"))));
     h.view->rebuild();
     h.open(0);
     h.call(QStringLiteral("addRule()"));
@@ -167,8 +167,8 @@ TEST_CASE("organizer rule editor preserves order and retains an invalid draft", 
     h.save();
     auto state = expect(wait(h.db.load()));
     REQUIRE(state.rules.size() == 1);
-    checkRule(state.rules[0], RuleOp::Prefix, QStringLiteral("example"), first.id);
-    CHECK(expect(h.service->folder_mod_uuids(first.id)) == QStringList{QStringLiteral("example")});
+    checkRule(state.rules[0], RuleOp::kPrefix, QStringLiteral("example"), first.id);
+    CHECK(expect(h.service->folderModUuids(first.id)) == QStringList{QStringLiteral("example")});
 
     h.open(1);
     h.call(QStringLiteral("addRule()"));
@@ -185,9 +185,9 @@ TEST_CASE("organizer rule editor preserves order and retains an invalid draft", 
     h.save();
     state = expect(wait(h.db.load()));
     REQUIRE(state.rules.size() == 2);
-    checkRule(state.rules[0], RuleOp::Equals, QStringLiteral("example.mod"), second.id);
-    checkRule(state.rules[1], RuleOp::Prefix, QStringLiteral("example"), first.id);
-    CHECK(expect(h.service->folder_mod_uuids(second.id)) == QStringList{QStringLiteral("example")});
+    checkRule(state.rules[0], RuleOp::kEquals, QStringLiteral("example.mod"), second.id);
+    checkRule(state.rules[1], RuleOp::kPrefix, QStringLiteral("example"), first.id);
+    CHECK(expect(h.service->folderModUuids(second.id)) == QStringList{QStringLiteral("example")});
 
     const auto saved = state.rules;
     h.open(2);
@@ -202,29 +202,29 @@ TEST_CASE("organizer rule editor preserves order and retains an invalid draft", 
     h.save();
     state = expect(wait(h.db.load()));
     REQUIRE(state.rules.size() == 1);
-    checkRule(state.rules[0], RuleOp::Prefix, QStringLiteral("example"), first.id);
-    CHECK(expect(h.service->folder_mod_uuids(first.id)) == QStringList{QStringLiteral("example")});
+    checkRule(state.rules[0], RuleOp::kPrefix, QStringLiteral("example"), first.id);
+    CHECK(expect(h.service->folderModUuids(first.id)) == QStringList{QStringLiteral("example")});
 }
 
 TEST_CASE("organizer standard rules refresh only a clean editor draft", "[ui][organizer]") {
     Harness h;
-    expect(wait(h.service->create_folder(QStringLiteral("Mine"))));
+    expect(wait(h.service->createFolder(QStringLiteral("Mine"))));
     h.view->rebuild();
     h.open(0);
     auto* standard = item(h.editor, QStringLiteral("organizerAddStandardRules"));
     REQUIRE(standard);
     REQUIRE(standard->property("enabled").toBool());
     REQUIRE(QMetaObject::invokeMethod(standard, "clicked"));
-    until([&] { return h.draft().size() == standard_rules().size(); });
+    until([&] { return h.draft().size() == standardRules().size(); });
     CHECK(h.editor->property("opened").toBool());
     CHECK(h.editor->property("errorMessage").toString().isEmpty());
     CHECK_FALSE(h.editor->property("draftDirty").toBool());
     const auto state = expect(wait(h.db.load()));
-    REQUIRE(state.rules.size() == standard_rules().size());
+    REQUIRE(state.rules.size() == standardRules().size());
     for (qsizetype i = 0; i < state.rules.size(); ++i) {
         const auto& actual = state.rules[i];
-        const auto& expected = standard_rules()[i];
-        CHECK(state.folders.value(actual.folder_id).name == expected.folder);
+        const auto& expected = standardRules()[i];
+        CHECK(state.folders.value(actual.folderId).name == expected.folder);
         CHECK(actual.field == expected.field);
         CHECK(actual.op == expected.op);
         CHECK(actual.pattern == expected.pattern);
@@ -241,8 +241,8 @@ TEST_CASE("organizer tag actions persist assignments and validated edits", "[ui]
     Harness h;
     auto second = std::make_shared<AboutXmlMod>();
     second->name = QStringLiteral("Second");
-    second->provider_id = QStringLiteral("local");
-    second->package_id = CaseInsensitiveStr(QStringView(u"second.mod"));
+    second->providerId = QStringLiteral("local");
+    second->packageId = CaseInsensitiveStr(QStringView(u"second.mod"));
     auto mods = h.ctx->allMods();
     mods.insert(QStringLiteral("second"), second);
     h.ctx->load(std::move(mods), {});
@@ -250,11 +250,11 @@ TEST_CASE("organizer tag actions persist assignments and validated edits", "[ui]
     auto* model = h.view->findChild<ModTreeModel*>();
     REQUIRE(model);
     const auto select = [&](bool both) {
-        const auto first = model->index_for_uuid(QStringLiteral("example"));
+        const auto first = model->indexForUuid(QStringLiteral("example"));
         REQUIRE(first.isValid());
         h.view->selectSingle(first);
         if (both) {
-            const auto other = model->index_for_uuid(QStringLiteral("second"));
+            const auto other = model->indexForUuid(QStringLiteral("second"));
             REQUIRE(other.isValid());
             h.view->selectRow(other, static_cast<int>(Qt::ControlModifier), {});
         }
@@ -286,20 +286,20 @@ TEST_CASE("organizer tag actions persist assignments and validated edits", "[ui]
     };
     CHECK(checkState() == 0);
     assign(true);
-    until([&] { return h.service->state().mod_tags.value(QStringLiteral("example.mod")).contains(id); });
+    until([&] { return h.service->state().modTags.value(QStringLiteral("example.mod")).contains(id); });
     CHECK(checkState() == 1);
     select(true);
     CHECK(checkState() == 2);
     assign(true);
-    until([&] { return h.service->state().mod_tags.value(QStringLiteral("second.mod")).contains(id); });
+    until([&] { return h.service->state().modTags.value(QStringLiteral("second.mod")).contains(id); });
     CHECK(checkState() == 1);
     auto persisted = expect(wait(h.db.load()));
-    CHECK(persisted.mod_tags.value(QStringLiteral("example.mod")) == QSet<qint64>{id});
-    CHECK(persisted.mod_tags.value(QStringLiteral("second.mod")) == QSet<qint64>{id});
+    CHECK(persisted.modTags.value(QStringLiteral("example.mod")) == QSet<qint64>{id});
+    CHECK(persisted.modTags.value(QStringLiteral("second.mod")) == QSet<qint64>{id});
     assign(false);
     until([&] {
-        return h.service->state().mod_tags.value(QStringLiteral("example.mod")).isEmpty()
-            && h.service->state().mod_tags.value(QStringLiteral("second.mod")).isEmpty();
+        return h.service->state().modTags.value(QStringLiteral("example.mod")).isEmpty()
+            && h.service->state().modTags.value(QStringLiteral("second.mod")).isEmpty();
     });
     CHECK(checkState() == 0);
     action(QStringLiteral("updateTag(%1, 'Best', 'bad')").arg(id));
@@ -312,8 +312,8 @@ TEST_CASE("organizer tag actions persist assignments and validated edits", "[ui]
     persisted = expect(wait(h.db.load()));
     CHECK(persisted.tags.value(id).name == QStringLiteral("Best"));
     CHECK(persisted.tags.value(id).color == QStringLiteral("#123456"));
-    CHECK(persisted.mod_tags.value(QStringLiteral("example.mod")).isEmpty());
-    CHECK(persisted.mod_tags.value(QStringLiteral("second.mod")).isEmpty());
+    CHECK(persisted.modTags.value(QStringLiteral("example.mod")).isEmpty());
+    CHECK(persisted.modTags.value(QStringLiteral("second.mod")).isEmpty());
     action(QStringLiteral("deleteTag(%1)").arg(id));
     until([&] { return h.service->state().tags.isEmpty(); });
     CHECK(expect(wait(h.db.load())).tags.isEmpty());
@@ -323,13 +323,13 @@ TEST_CASE("organizer folder checkbox toggles descendants with one active-state c
     Harness h;
     auto second = std::make_shared<AboutXmlMod>();
     second->name = QStringLiteral("Second");
-    second->provider_id = QStringLiteral("local");
-    second->package_id = CaseInsensitiveStr(QStringView(u"second.mod"));
+    second->providerId = QStringLiteral("local");
+    second->packageId = CaseInsensitiveStr(QStringView(u"second.mod"));
     auto mods = h.ctx->allMods();
     mods.insert(QStringLiteral("second"), second);
     h.ctx->load(std::move(mods), {});
-    const auto parent = expect(wait(h.service->create_folder(QStringLiteral("Parent"))));
-    const auto child = expect(wait(h.service->create_folder(QStringLiteral("Child"), parent.id)));
+    const auto parent = expect(wait(h.service->createFolder(QStringLiteral("Parent"))));
+    const auto child = expect(wait(h.service->createFolder(QStringLiteral("Child"), parent.id)));
     expect(wait(h.service->place({QStringLiteral("example.mod")}, child.id)));
     expect(wait(h.service->place({QStringLiteral("second.mod")}, parent.id)));
     h.view->rebuild();
@@ -338,7 +338,7 @@ TEST_CASE("organizer folder checkbox toggles descendants with one active-state c
     int changes = 0;
     const auto connection = h.ctx->activeStateChanged().connect([&](const QStringList&) { ++changes; });
     const auto toggle = [&] {
-        const auto index = model->index_for_key(QStringLiteral("f:%1").arg(parent.id));
+        const auto index = model->indexForKey(QStringLiteral("f:%1").arg(parent.id));
         REQUIRE(index.isValid());
         h.view->toggleCheck(index);
     };

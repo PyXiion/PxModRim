@@ -56,11 +56,11 @@ TEST_CASE("Hidden menu actions retain their window shortcuts", "[ui][window]") {
     px::modrim::MenuBar menu(actions, &window);
     menu.hide();
     bool triggered = false;
-    QObject::connect(actions.at(px::modrim::ActionId::Save), &QAction::triggered, &window, [&] { triggered = true; });
+    QObject::connect(actions.at(px::modrim::ActionId::kSave), &QAction::triggered, &window, [&] { triggered = true; });
     QMenu* file = nullptr;
     for (auto* item : menu.findChildren<QMenu*>()) if (item->title() == QStringLiteral("&File")) file = item;
     REQUIRE(file != nullptr);
-    auto* save = actions.at(px::modrim::ActionId::Save);
+    auto* save = actions.at(px::modrim::ActionId::kSave);
     CHECK(file->actions().contains(save));
     CHECK(save->shortcut() == QKeySequence(QStringLiteral("Ctrl+S")));
     CHECK(window.actions().contains(save));

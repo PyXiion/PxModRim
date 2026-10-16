@@ -13,7 +13,7 @@ inline constexpr QLatin1StringView kRouteScheme{"modrim"};
 inline constexpr QLatin1StringView kSettingsViewId{"settings"};
 
 struct Route {
-    QString view_id;
+    QString viewId;
     QStringList path;
 
     QString url() const;

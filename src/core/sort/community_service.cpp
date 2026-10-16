@@ -32,13 +32,13 @@ constexpr int kHeadTransferTimeoutMs = 10'000;
 constexpr int kGetTransferTimeoutMs = 30'000;
 constexpr int kExtractChunkBytes = 64 * 1024;
 
-Error network_error(const QNetworkReply& reply) {
+Error networkError(const QNetworkReply& reply) {
     return Error{reply.errorString()};
 }
 
 // Writes one archive entry under `dest`. Entries whose names would escape `dest` are skipped,
 // as the Python zipfile sanitiser also refuses to write outside the target directory.
-Result<void> extract_entry(zip_t* archive, zip_uint64_t index, const QDir& dest) {
+Result<void> extractEntry(zip_t* archive, zip_uint64_t index, const QDir& dest) {
     zip_stat_t stat;
     zip_stat_init(&stat);
     if (zip_stat_index(archive, index, 0, &stat) != 0 || !(stat.valid & ZIP_STAT_NAME)) {
@@ -67,7 +67,7 @@ Result<void> extract_entry(zip_t* archive, zip_uint64_t index, const QDir& dest)
     if (!entry) {
         return std::unexpected(Error{QStringLiteral("Cannot read %1 from archive").arg(name)});
     }
-    auto close_entry = qScopeGuard([entry] { zip_fclose(entry); });
+    auto closeEntry = qScopeGuard([entry] { zip_fclose(entry); });
 
     const QString target = dest.filePath(relative);
     QFile out(target);
@@ -91,22 +91,22 @@ Result<void> extract_entry(zip_t* archive, zip_uint64_t index, const QDir& dest)
     return {};
 }
 
-Result<void> extract_zip(const QString& zip_path, const QString& dest_dir) {
-    int error_code = 0;
-    zip_t* archive = zip_open(QFile::encodeName(zip_path).constData(), ZIP_RDONLY, &error_code);
+Result<void> extractZip(const QString& zipPath, const QString& destDir) {
+    int errorCode = 0;
+    zip_t* archive = zip_open(QFile::encodeName(zipPath).constData(), ZIP_RDONLY, &errorCode);
     if (!archive) {
         return std::unexpected(
-            Error{QStringLiteral("Cannot open %1 (libzip error %2)").arg(zip_path).arg(error_code)});
+            Error{QStringLiteral("Cannot open %1 (libzip error %2)").arg(zipPath).arg(errorCode)});
     }
-    auto close_archive = qScopeGuard([archive] { zip_close(archive); });
+    auto closeArchive = qScopeGuard([archive] { zip_close(archive); });
 
-    if (!QDir().mkpath(dest_dir)) {
-        return std::unexpected(Error{QStringLiteral("Cannot create %1").arg(dest_dir)});
+    if (!QDir().mkpath(destDir)) {
+        return std::unexpected(Error{QStringLiteral("Cannot create %1").arg(destDir)});
     }
-    const QDir dest(dest_dir);
+    const QDir dest(destDir);
     const zip_int64_t count = zip_get_num_entries(archive, 0);
     for (zip_int64_t i = 0; i < count; ++i) {
-        if (auto extracted = extract_entry(archive, static_cast<zip_uint64_t>(i), dest); !extracted) {
+        if (auto extracted = extractEntry(archive, static_cast<zip_uint64_t>(i), dest); !extracted) {
             return extracted;
         }
     }
@@ -115,19 +115,19 @@ Result<void> extract_zip(const QString& zip_path, const QString& dest_dir) {
 
 }  // namespace
 
-CommunityRulesService::CommunityRulesService(const ConfigService& config_service,
+CommunityRulesService::CommunityRulesService(const ConfigService& configService,
                                              QNetworkAccessManager& network)
-    : cache_dir_(config_service.directory()),
-      json_path_(QDir(cache_dir_).filePath(kRulesFilename)),
-      network_(network) {}
+    : m_cacheDir(configService.directory()),
+      m_jsonPath(QDir(m_cacheDir).filePath(kRulesFilename)),
+      m_network(network) {}
 
-QCoro::Task<std::optional<QString>> CommunityRulesService::ensure_rules(LoadingState& loading,
+QCoro::Task<std::optional<QString>> CommunityRulesService::ensureRules(LoadingState& loading,
                                                                         bool force) {
-    if (QFileInfo::exists(json_path_) && !force) {
-        co_return json_path_;
+    if (QFileInfo::exists(m_jsonPath) && !force) {
+        co_return m_jsonPath;
     }
 
-    auto result = co_await download_rules(loading);
+    auto result = co_await downloadRules(loading);
     if (!result) {
         spdlog::warn("Failed to download community rules: {}", result.error().message.toStdString());
         co_return std::nullopt;
@@ -135,13 +135,13 @@ QCoro::Task<std::optional<QString>> CommunityRulesService::ensure_rules(LoadingS
     co_return *result;
 }
 
-QCoro::Task<Result<std::optional<QString>>> CommunityRulesService::download_rules(LoadingState& loading) {
-    if (!QDir().mkpath(cache_dir_)) {
-        co_return std::unexpected(Error{QStringLiteral("Cannot create %1").arg(cache_dir_)});
+QCoro::Task<Result<std::optional<QString>>> CommunityRulesService::downloadRules(LoadingState& loading) {
+    if (!QDir().mkpath(m_cacheDir)) {
+        co_return std::unexpected(Error{QStringLiteral("Cannot create %1").arg(m_cacheDir)});
     }
-    const QDir cache(cache_dir_);
-    const QString zip_path = cache.filePath(QStringLiteral("community_rules.zip"));
-    const QString extract_dir = cache.filePath(QStringLiteral("community_rules_extracted"));
+    const QDir cache(m_cacheDir);
+    const QString zipPath = cache.filePath(QStringLiteral("community_rules.zip"));
+    const QString extractDir = cache.filePath(QStringLiteral("community_rules_extracted"));
 
     QNetworkRequest request{QUrl(kRulesUrl)};
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -149,66 +149,66 @@ QCoro::Task<Result<std::optional<QString>>> CommunityRulesService::download_rule
     // The HEAD request only sizes the progress bar; a missing Content-Length falls back to 100
     // steps, which is what the original did.
     request.setTransferTimeout(kHeadTransferTimeoutMs);
-    QNetworkReply* head = network_.head(request);
-    auto release_head = qScopeGuard([head] { head->deleteLater(); });
+    QNetworkReply* head = m_network.head(request);
+    auto releaseHead = qScopeGuard([head] { head->deleteLater(); });
     co_await qCoro(head).waitForFinished();
     if (head->error() != QNetworkReply::NoError) {
-        co_return std::unexpected(network_error(*head));
+        co_return std::unexpected(networkError(*head));
     }
-    const qint64 content_length = head->header(QNetworkRequest::ContentLengthHeader).toLongLong();
-    const int total_size = content_length > 0
-                               ? static_cast<int>(std::min<qint64>(content_length,
+    const qint64 contentLength = head->header(QNetworkRequest::ContentLengthHeader).toLongLong();
+    const int totalSize = contentLength > 0
+                               ? static_cast<int>(std::min<qint64>(contentLength,
                                                                    std::numeric_limits<int>::max()))
                                : 100;
 
     request.setTransferTimeout(kGetTransferTimeoutMs);
-    QNetworkReply* get = network_.get(request);
-    auto release_get = qScopeGuard([get] { get->deleteLater(); });
+    QNetworkReply* get = m_network.get(request);
+    auto releaseGet = qScopeGuard([get] { get->deleteLater(); });
 
-    QFile zip_file(zip_path);
-    if (!zip_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        co_return std::unexpected(Error{QStringLiteral("Cannot write %1").arg(zip_path)});
+    QFile zipFile(zipPath);
+    if (!zipFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        co_return std::unexpected(Error{QStringLiteral("Cannot write %1").arg(zipPath)});
     }
     {
-        auto download = loading.task(QStringLiteral("Downloading community rules..."), total_size);
-        QObject::connect(get, &QNetworkReply::readyRead, get, [get, &zip_file, &loading] {
+        auto download = loading.task(QStringLiteral("Downloading community rules..."), totalSize);
+        QObject::connect(get, &QNetworkReply::readyRead, get, [get, &zipFile, &loading] {
             const QByteArray chunk = get->readAll();
-            zip_file.write(chunk);
+            zipFile.write(chunk);
             loading.step(static_cast<int>(chunk.size()));
         });
         co_await qCoro(get).waitForFinished();
         if (get->error() != QNetworkReply::NoError) {
-            co_return std::unexpected(network_error(*get));
+            co_return std::unexpected(networkError(*get));
         }
-        zip_file.write(get->readAll());
-        if (zip_file.error() != QFileDevice::NoError) {
-            co_return std::unexpected(Error{zip_file.errorString()});
+        zipFile.write(get->readAll());
+        if (zipFile.error() != QFileDevice::NoError) {
+            co_return std::unexpected(Error{zipFile.errorString()});
         }
-        zip_file.close();
+        zipFile.close();
     }
 
     {
         auto extract = loading.task(QStringLiteral("Extracting..."), 100);
-        if (auto extracted = extract_zip(zip_path, extract_dir); !extracted) {
+        if (auto extracted = extractZip(zipPath, extractDir); !extracted) {
             co_return std::unexpected(extracted.error());
         }
         loading.step(50);
 
-        QDirIterator rules(extract_dir, {kRulesFilename}, QDir::Files, QDirIterator::Subdirectories);
+        QDirIterator rules(extractDir, {kRulesFilename}, QDir::Files, QDirIterator::Subdirectories);
         if (!rules.hasNext()) {
             // An archive without the rules file is not an error: there is simply nothing to cache.
             co_return std::optional<QString>{};
         }
-        if (auto copied = copy_file_replacing(rules.next(), json_path_); !copied) {
+        if (auto copied = copyFileReplacing(rules.next(), m_jsonPath); !copied) {
             co_return std::unexpected(copied.error());
         }
         loading.step(50);
     }
-    co_return std::optional<QString>(json_path_);
+    co_return std::optional<QString>(m_jsonPath);
 }
 
-Result<CommunityRules> CommunityRulesService::load_rules() const {
-    return load_community_rules(json_path_);
+Result<CommunityRules> CommunityRulesService::loadRules() const {
+    return loadCommunityRules(m_jsonPath);
 }
 
 }  // namespace px::modrim::sort
