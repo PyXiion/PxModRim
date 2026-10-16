@@ -15,7 +15,8 @@ QString paletteValue(QStringView name);
 // Same as paletteValue, parsed into a QColor.
 QColor paletteColor(QStringView name);
 
-// Pre-constructed QColors matching legacy panel_bg_q, text_main_q, text_muted_q.
+// Pre-constructed QColors matching legacy panel_bg_q, text_main_q,
+// text_muted_q.
 const QColor& panelBgQ();
 const QColor& textMainQ();
 const QColor& textMutedQ();

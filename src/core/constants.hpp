@@ -1,35 +1,35 @@
 #pragma once
 
-#include <array>
-
 #include <QLatin1StringView>
 #include <QString>
 #include <QStringList>
 #include <QStringView>
+#include <array>
 
 namespace px::modrim {
 
 inline constexpr QLatin1StringView kRimworldSteamAppId{"294100"};
 
 enum class LaunchStrategy : int {
-    kDirect = 0,
-    kSteam = 1,
+  kDirect = 0,
+  kSteam = 1,
 };
 
 enum class AfterLaunch : int {
-    kStay = 0,
-    kMinimize = 1,
-    kClose = 2,
+  kStay = 0,
+  kMinimize = 1,
+  kClose = 2,
 };
 
-inline constexpr QLatin1StringView kDefaultMissingPackageid{"missing.packageid"};
+inline constexpr QLatin1StringView kDefaultMissingPackageid{
+    "missing.packageid"};
 
 struct RimWorldDlc {
-    QLatin1StringView appId;
-    QLatin1StringView packageId;
-    QLatin1StringView name;
-    QLatin1StringView steamUrl;
-    QLatin1StringView description;
+  QLatin1StringView appId;
+  QLatin1StringView packageId;
+  QLatin1StringView name;
+  QLatin1StringView steamUrl;
+  QLatin1StringView description;
 };
 
 // Ordered by Steam app id, matching the legacy dict's iteration order.
@@ -40,43 +40,50 @@ inline constexpr std::array<RimWorldDlc, 6> kRimworldDlcMetadata{{
      QLatin1StringView{"Base game"}},
     {QLatin1StringView{"1149640"}, QLatin1StringView{"ludeon.rimworld.royalty"},
      QLatin1StringView{"RimWorld - Royalty"},
-     QLatin1StringView{"https://store.steampowered.com/app/1149640/RimWorld__Royalty"},
+     QLatin1StringView{
+         "https://store.steampowered.com/app/1149640/RimWorld__Royalty"},
      QLatin1StringView{"DLC #1"}},
-    {QLatin1StringView{"1392840"}, QLatin1StringView{"ludeon.rimworld.ideology"},
+    {QLatin1StringView{"1392840"},
+     QLatin1StringView{"ludeon.rimworld.ideology"},
      QLatin1StringView{"RimWorld - Ideology"},
-     QLatin1StringView{"https://store.steampowered.com/app/1392840/RimWorld__Ideology"},
+     QLatin1StringView{
+         "https://store.steampowered.com/app/1392840/RimWorld__Ideology"},
      QLatin1StringView{"DLC #2"}},
     {QLatin1StringView{"1826140"}, QLatin1StringView{"ludeon.rimworld.biotech"},
      QLatin1StringView{"RimWorld - Biotech"},
-     QLatin1StringView{"https://store.steampowered.com/app/1826140/RimWorld__Biotech"},
+     QLatin1StringView{
+         "https://store.steampowered.com/app/1826140/RimWorld__Biotech"},
      QLatin1StringView{"DLC #3"}},
     {QLatin1StringView{"2380740"}, QLatin1StringView{"ludeon.rimworld.anomaly"},
      QLatin1StringView{"RimWorld - Anomaly"},
-     QLatin1StringView{"https://store.steampowered.com/app/2380740/RimWorld__Anomaly/"},
+     QLatin1StringView{
+         "https://store.steampowered.com/app/2380740/RimWorld__Anomaly/"},
      QLatin1StringView{"DLC #4"}},
     {QLatin1StringView{"3022790"}, QLatin1StringView{"ludeon.rimworld.odyssey"},
      QLatin1StringView{"RimWorld - Odyssey"},
-     QLatin1StringView{"https://store.steampowered.com/app/3022790/RimWorld__Odyssey/"},
+     QLatin1StringView{
+         "https://store.steampowered.com/app/3022790/RimWorld__Odyssey/"},
      QLatin1StringView{"DLC #5"}},
 }};
 
 // Ordered package ids of RIMWORLD_DLC_METADATA.
 inline const QStringList kRimworldPackageIds = [] {
-    QStringList ids;
-    for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
-        ids.append(QString(dlc.packageId));
-    }
-    return ids;
+  QStringList ids;
+  for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
+    ids.append(QString(dlc.packageId));
+  }
+  return ids;
 }();
 
-// Exact (case-sensitive) lookup; callers pass lowercase ids as produced by CaseInsensitiveStr.
+// Exact (case-sensitive) lookup; callers pass lowercase ids as produced by
+// CaseInsensitiveStr.
 inline const RimWorldDlc* findRimWorldDlcByPackageId(QStringView packageId) {
-    for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
-        if (packageId == QLatin1StringView(dlc.packageId)) {
-            return &dlc;
-        }
+  for (const RimWorldDlc& dlc : kRimworldDlcMetadata) {
+    if (packageId == QLatin1StringView(dlc.packageId)) {
+      return &dlc;
     }
-    return nullptr;
+  }
+  return nullptr;
 }
 
 }  // namespace px::modrim

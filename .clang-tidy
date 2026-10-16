@@ -2,6 +2,7 @@
 # Naming only. The formatter handles layout; this check enforces (and, with --fix, applies)
 # the identifier style.
 Checks: '-*,readability-identifier-naming'
+WarningsAsErrors: 'readability-identifier-naming'
 HeaderFilterRegex: '.*/(src|tests)/.*'
 CheckOptions:
   readability-identifier-naming.NamespaceCase: lower_case

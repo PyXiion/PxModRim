@@ -1,10 +1,10 @@
 #pragma once
 
+#include <QString>
 #include <chrono>
 #include <optional>
 
 #include <QCoro/QCoroTask>
-#include <QString>
 
 #include "core/constants.hpp"
 #include "core/error.hpp"
@@ -16,32 +16,36 @@ class CoreContext;
 
 namespace px::modrim::services {
 
-// Starts RimWorld directly or through Steam, and tracks the game until it exits.
+// Starts RimWorld directly or through Steam, and tracks the game until it
+// exits.
 class GameLauncher {
-public:
-    // `ctx` is not owned and must outlive the launcher.
-    GameLauncher(CoreContext& ctx, ProcessLister lister = hostProcessLister,
-                 MonitorTiming timing = {});
+ public:
+  // `ctx` is not owned and must outlive the launcher.
+  GameLauncher(CoreContext& ctx, ProcessLister lister = hostProcessLister,
+               MonitorTiming timing = {});
 
-    // Resolves to a status message when the launch was started, or to the reason it was not.
-    QCoro::Task<Result<QString>> launch(LaunchStrategy strategy);
+  // Resolves to a status message when the launch was started, or to the reason
+  // it was not.
+  QCoro::Task<Result<QString>> launch(LaunchStrategy strategy);
 
-    // Whether a game process is running right now. Blocks while listing processes.
-    bool isRunning() const;
+  // Whether a game process is running right now. Blocks while listing
+  // processes.
+  bool isRunning() const;
 
-    QCoro::Task<bool> waitForStart(std::chrono::milliseconds timeout = std::chrono::milliseconds(60'000));
+  QCoro::Task<bool> waitForStart(
+      std::chrono::milliseconds timeout = std::chrono::milliseconds(60'000));
 
-    // Resolves to the spawned process's exit code, or nullopt when it was not spawned here or
-    // has not exited.
-    QCoro::Task<std::optional<int>> waitForExit();
+  // Resolves to the spawned process's exit code, or nullopt when it was not
+  // spawned here or has not exited.
+  QCoro::Task<std::optional<int>> waitForExit();
 
-private:
-    QCoro::Task<Result<QString>> launchDirect();
-    QCoro::Task<Result<QString>> launchSteam();
+ private:
+  QCoro::Task<Result<QString>> launchDirect();
+  QCoro::Task<Result<QString>> launchSteam();
 
-    CoreContext& m_ctx;
-    ProcessLister m_lister;
-    GameProcessMonitor m_monitor;
+  CoreContext& m_ctx;
+  ProcessLister m_lister;
+  GameProcessMonitor m_monitor;
 };
 
 }  // namespace px::modrim::services

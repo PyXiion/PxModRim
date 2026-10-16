@@ -16,19 +16,19 @@ Result<void> saveUiPrefs(const UiPrefs& prefs, const ConfigService& svc);
 // Owns the UiPrefs lifecycle: loaded once in setup(), saved on request. The
 // ConfigService must outlive this object.
 class UiPrefsService {
-public:
-    explicit UiPrefsService(ConfigService& svc);
+ public:
+  explicit UiPrefsService(ConfigService& svc);
 
-    QCoro::Task<Result<void>> setup();
+  QCoro::Task<Result<void>> setup();
 
-    // Valid only after a successful setup().
-    const UiPrefs& prefs() const;
+  // Valid only after a successful setup().
+  const UiPrefs& prefs() const;
 
-    Result<void> savePrefs() const;
+  Result<void> savePrefs() const;
 
-private:
-    ConfigService& m_svc;
-    std::optional<UiPrefs> m_prefs;
+ private:
+  ConfigService& m_svc;
+  std::optional<UiPrefs> m_prefs;
 };
 
 }  // namespace px::modrim

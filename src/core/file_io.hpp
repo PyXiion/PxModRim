@@ -1,9 +1,8 @@
 #pragma once
 
+#include <QString>
 #include <string>
 #include <string_view>
-
-#include <QString>
 
 #include "core/error.hpp"
 

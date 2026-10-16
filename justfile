@@ -31,7 +31,15 @@ format:
 format-check:
     find src tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format --dry-run --Werror
 
-check: format-check build build-js
+lint:
+    [ -f build/default/compile_commands.json ] || cmake --preset default
+    run-clang-tidy -p build/default -quiet -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
+
+lint-fix:
+    [ -f build/default/compile_commands.json ] || cmake --preset default
+    run-clang-tidy -p build/default -quiet -fix -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
+
+check: format-check lint build
 
 ci: check test
 

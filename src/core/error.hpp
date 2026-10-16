@@ -1,13 +1,12 @@
 #pragma once
 
-#include <expected>
-
 #include <QString>
+#include <expected>
 
 namespace px::modrim {
 
 struct Error {
-    QString message;
+  QString message;
 };
 
 template <class T>

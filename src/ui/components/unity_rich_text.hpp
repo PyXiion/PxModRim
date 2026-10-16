@@ -3,4 +3,4 @@
 namespace px::modrim {
 QString escapeHtml(const QString& text);
 QString unityRichTextToHtml(const QString& text);
-}
+}  // namespace px::modrim

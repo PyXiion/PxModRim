@@ -7,54 +7,55 @@ namespace px::modrim::workshop {
 
 FavouriteCollections::FavouriteCollections(ConfigService* service)
     : m_config(service, QStringLiteral("workshop_favourites")) {
-    for (const CatalogCollection& collection : m_config.value().collections) {
-        m_ids.insert(collection.id);
-    }
+  for (const CatalogCollection& collection : m_config.value().collections) {
+    m_ids.insert(collection.id);
+  }
 }
 
 bool FavouriteCollections::contains(const std::string& collectionId) const {
-    return m_ids.contains(collectionId);
+  return m_ids.contains(collectionId);
 }
 
-void FavouriteCollections::set(const CatalogCollection& collection, bool favourite) {
-    if (contains(collection.id) == favourite) {
-        return;
+void FavouriteCollections::set(const CatalogCollection& collection,
+                               bool favourite) {
+  if (contains(collection.id) == favourite) {
+    return;
+  }
+  std::vector<CatalogCollection> rest;
+  for (const CatalogCollection& stored : m_config.value().collections) {
+    if (stored.id != collection.id) {
+      rest.push_back(stored);
     }
-    std::vector<CatalogCollection> rest;
-    for (const CatalogCollection& stored : m_config.value().collections) {
-        if (stored.id != collection.id) {
-            rest.push_back(stored);
-        }
-    }
-    if (favourite) {
-        rest.insert(rest.begin(), collection);
-    }
-    save(std::move(rest));
+  }
+  if (favourite) {
+    rest.insert(rest.begin(), collection);
+  }
+  save(std::move(rest));
 }
 
 void FavouriteCollections::remember(const CatalogCollection& collection) {
-    if (!contains(collection.id)) {
-        return;
+  if (!contains(collection.id)) {
+    return;
+  }
+  const auto& stored = m_config.value().collections;
+  if (std::ranges::find(stored, collection) != stored.end()) {
+    return;
+  }
+  std::vector<CatalogCollection> updated = stored;
+  for (CatalogCollection& entry : updated) {
+    if (entry.id == collection.id) {
+      entry = collection;
     }
-    const auto& stored = m_config.value().collections;
-    if (std::ranges::find(stored, collection) != stored.end()) {
-        return;
-    }
-    std::vector<CatalogCollection> updated = stored;
-    for (CatalogCollection& entry : updated) {
-        if (entry.id == collection.id) {
-            entry = collection;
-        }
-    }
-    save(std::move(updated));
+  }
+  save(std::move(updated));
 }
 
 void FavouriteCollections::save(std::vector<CatalogCollection> collections) {
-    m_ids.clear();
-    for (const CatalogCollection& collection : collections) {
-        m_ids.insert(collection.id);
-    }
-    m_config.update(FavouritesState{std::move(collections)});
+  m_ids.clear();
+  for (const CatalogCollection& collection : collections) {
+    m_ids.insert(collection.id);
+  }
+  m_config.update(FavouritesState{std::move(collections)});
 }
 
 }  // namespace px::modrim::workshop

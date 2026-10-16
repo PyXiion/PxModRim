@@ -6,7 +6,8 @@ namespace px::modrim {
 
 // Animation
 inline constexpr int kAccordionAnimationDurationMs = 200;
-inline constexpr QEasingCurve::Type kAccordionEasing = QEasingCurve::Type::OutCubic;
+inline constexpr QEasingCurve::Type kAccordionEasing =
+    QEasingCurve::Type::OutCubic;
 
 // Banner
 inline constexpr int kBannerMaxHeight = 260;

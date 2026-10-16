@@ -16,16 +16,16 @@ const QString& Downloader::label() const noexcept { return m_label; }
 void Downloader::setup(CoreContext&) { m_manager.registerDownloader(*this); }
 
 QStringList Downloader::updatableIds(const QList<ListedModPtr>& mods) const {
-    QStringList ids;
-    QSet<QString> seen;
-    for (const auto& mod : mods) {
-        auto id = updatableId(*mod);
-        if (id && !seen.contains(*id)) {
-            seen.insert(*id);
-            ids.append(std::move(*id));
-        }
+  QStringList ids;
+  QSet<QString> seen;
+  for (const auto& mod : mods) {
+    auto id = updatableId(*mod);
+    if (id && !seen.contains(*id)) {
+      seen.insert(*id);
+      ids.append(std::move(*id));
     }
-    return ids;
+  }
+  return ids;
 }
 
 }  // namespace px::modrim

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+
 #include <QCoro/QCoroTask>
 
 namespace px::modrim {

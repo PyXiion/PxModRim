@@ -1,12 +1,11 @@
 #pragma once
 
-#include <optional>
-#include <vector>
-
 #include <QDialog>
 #include <QMessageBox>
 #include <QString>
 #include <QStringList>
+#include <optional>
+#include <vector>
 
 #include "core/models/metadata/structures.hpp"
 
@@ -17,41 +16,44 @@ class QPushButton;
 
 namespace px::modrim {
 
-// Lists saved mod lists (ModsConfig snapshots, in the order given, newest first) and
-// lets the user pick one to restore. Snapshots that cannot be parsed are listed but
-// cannot be selected.
+// Lists saved mod lists (ModsConfig snapshots, in the order given, newest
+// first) and lets the user pick one to restore. Snapshots that cannot be parsed
+// are listed but cannot be selected.
 class RestoreSnapshotDialog : public QDialog {
-    Q_OBJECT
+  Q_OBJECT
 
-public:
-    explicit RestoreSnapshotDialog(const QStringList& snapshots, QWidget* parent = nullptr);
+ public:
+  explicit RestoreSnapshotDialog(const QStringList& snapshots,
+                                 QWidget* parent = nullptr);
 
-    // The selected snapshot path, or nullopt while the selection is unreadable or absent.
-    std::optional<QString> selectedSnapshot() const;
+  // The selected snapshot path, or nullopt while the selection is unreadable or
+  // absent.
+  std::optional<QString> selectedSnapshot() const;
 
-private slots:
-    void onCurrentItemChanged(QListWidgetItem* current);
-    void onRestoreClicked();
+ private slots:
+  void onCurrentItemChanged(QListWidgetItem* current);
+  void onRestoreClicked();
 
-private:
-    struct Snapshot {
-        QString path;
-        std::optional<ModsConfig> parsed;
-    };
+ private:
+  struct Snapshot {
+    QString path;
+    std::optional<ModsConfig> parsed;
+  };
 
-    void populateList();
+  void populateList();
 
-    std::vector<Snapshot> m_snapshots;
-    std::optional<QString> m_selected;
-    QListWidget* m_list = nullptr;
-    QLabel* m_details = nullptr;
-    QPushButton* m_restore = nullptr;
+  std::vector<Snapshot> m_snapshots;
+  std::optional<QString> m_selected;
+  QListWidget* m_list = nullptr;
+  QLabel* m_details = nullptr;
+  QPushButton* m_restore = nullptr;
 };
 
 // Asks before the current mod list is replaced by a snapshot.
 class ConfirmRestoreDialog : public QMessageBox {
-public:
-    explicit ConfirmRestoreDialog(const QString& snapshotName, QWidget* parent = nullptr);
+ public:
+  explicit ConfirmRestoreDialog(const QString& snapshotName,
+                                QWidget* parent = nullptr);
 };
 
 }  // namespace px::modrim

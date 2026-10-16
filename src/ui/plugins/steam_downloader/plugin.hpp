@@ -9,16 +9,16 @@
 namespace px::modrim {
 
 class SteamSettingsSection final : public PluginConfigSection<SteamSettings> {
-public:
-    SteamSettingsSection(PluginConfig<SteamSettings>& settings, QObject* parent);
-    QString title() const override;
-    QUrl source() const override;
+ public:
+  SteamSettingsSection(PluginConfig<SteamSettings>& settings, QObject* parent);
+  QString title() const override;
+  QUrl source() const override;
 };
 
 class SteamDownloaderUiPlugin final : public UiPlugin {
-public:
-    SteamDownloaderUiPlugin();
-    void setup(AppContext& ctx) override;
+ public:
+  SteamDownloaderUiPlugin();
+  void setup(AppContext& ctx) override;
 };
 
 }  // namespace px::modrim

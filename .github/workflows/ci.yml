@@ -100,6 +100,18 @@ jobs:
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR;$RUNNER_TEMP/qcoro" \
             "${extra[@]}"
 
+      - name: Install clang tools (Linux SteamWorkshop)
+        if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
+        run: sudo apt-get install -y clang-format clang-tidy
+
+      - name: Check formatting (Linux SteamWorkshop)
+        if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
+        run: just format-check
+
+      - name: Lint (Linux SteamWorkshop)
+        if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
+        run: just lint
+
       - name: Build
         run: cmake --build --preset default
 

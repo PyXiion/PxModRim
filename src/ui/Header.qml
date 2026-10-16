@@ -231,7 +231,7 @@ Rectangle {
             Row {
                 Layout.alignment: Qt.AlignRight
                 spacing: 6
-                visible: root.controller.is_frameless
+                visible: root.controller.isFrameless
 
                 PxButton {
                     variant: "ghost"
@@ -363,6 +363,6 @@ Rectangle {
         onPressed: root.controller.dragStarted()
         onDoubleClicked: root.controller.maximize()
 
-        cursorShape: root.controller.is_frameless ? Qt.OpenHandCursor : Qt.ArrowCursor
+        cursorShape: root.controller.isFrameless ? Qt.OpenHandCursor : Qt.ArrowCursor
     }
 }

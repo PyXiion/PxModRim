@@ -3,17 +3,26 @@
 #ifdef PX_HAS_STEAM
 namespace px::modrim {
 
-SteamSettingsSection::SteamSettingsSection(PluginConfig<SteamSettings>& settings, QObject* parent)
+SteamSettingsSection::SteamSettingsSection(
+    PluginConfig<SteamSettings>& settings, QObject* parent)
     : PluginConfigSection(settings, parent) {}
-QString SteamSettingsSection::title() const { return QStringLiteral("Steam Workshop"); }
-QUrl SteamSettingsSection::source() const { return QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/SteamSettings.qml")); }
+QString SteamSettingsSection::title() const {
+  return QStringLiteral("Steam Workshop");
+}
+QUrl SteamSettingsSection::source() const {
+  return QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/SteamSettings.qml"));
+}
 
 SteamDownloaderUiPlugin::SteamDownloaderUiPlugin()
-    : UiPlugin(QStringLiteral("steam_downloader_ui"), {QStringLiteral("steam_downloader")}) {}
+    : UiPlugin(QStringLiteral("steam_downloader_ui"),
+               {QStringLiteral("steam_downloader")}) {}
 
 void SteamDownloaderUiPlugin::setup(AppContext& ctx) {
-    auto& downloader = *static_cast<SteamDownloader*>(ctx.coreContext().plugins().get(QStringLiteral("steam_downloader")));
-    ctx.addSettingsSection([&downloader](QObject* parent) { return new SteamSettingsSection(downloader.settings(), parent); });
+  auto& downloader = *static_cast<SteamDownloader*>(
+      ctx.coreContext().plugins().get(QStringLiteral("steam_downloader")));
+  ctx.addSettingsSection([&downloader](QObject* parent) {
+    return new SteamSettingsSection(downloader.settings(), parent);
+  });
 }
 
 }  // namespace px::modrim

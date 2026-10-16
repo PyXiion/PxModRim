@@ -11,13 +11,13 @@ namespace px::modrim {
 // combo box lists, tooltips): "Failed to create popup … transientParent".
 // Install on the QApplication, parented to it.
 class QuickPopupParenting : public QObject {
-    Q_OBJECT
+  Q_OBJECT
 
-public:
-    explicit QuickPopupParenting(QObject* parent);
+ public:
+  explicit QuickPopupParenting(QObject* parent);
 
-protected:
-    bool eventFilter(QObject* watched, QEvent* event) override;
+ protected:
+  bool eventFilter(QObject* watched, QEvent* event) override;
 };
 
 }  // namespace px::modrim

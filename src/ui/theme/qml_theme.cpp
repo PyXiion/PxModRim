@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QRandomGenerator>
 #include <QStringView>
+
 #include <spdlog/spdlog.h>
 
 #include "ui/theme/constants.hpp"
@@ -16,27 +17,29 @@ const QString kLogoDir = QStringLiteral(":/qt/qml/PxModRim/assets/");
 
 // Reads the four embedded logo variants and encodes each as an SVG data URI.
 QStringList loadLogoVariants() {
-    QStringList uris;
-    for (int n = 1; n <= 4; ++n) {
-        const QString path = kLogoDir + QStringLiteral("logo_nobg_%1.svg").arg(n);
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly)) {
-            spdlog::error("missing embedded logo resource {}", path.toStdString());
-            continue;
-        }
-        uris.append(QStringLiteral("data:image/svg+xml;base64,") +
-                    QString::fromLatin1(file.readAll().toBase64()));
+  QStringList uris;
+  for (int n = 1; n <= 4; ++n) {
+    const QString path = kLogoDir + QStringLiteral("logo_nobg_%1.svg").arg(n);
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+      spdlog::error("missing embedded logo resource {}", path.toStdString());
+      continue;
     }
-    return uris;
+    uris.append(QStringLiteral("data:image/svg+xml;base64,") +
+                QString::fromLatin1(file.readAll().toBase64()));
+  }
+  return uris;
 }
 
 }  // namespace
 
-Theme::Theme(QObject* parent) : QObject(parent), m_logoVariants(loadLogoVariants()) {
-    if (!m_logoVariants.isEmpty()) {
-        const int pick = QRandomGenerator::global()->bounded(static_cast<int>(m_logoVariants.size()));
-        m_logoDataUri = m_logoVariants.at(pick);
-    }
+Theme::Theme(QObject* parent)
+    : QObject(parent), m_logoVariants(loadLogoVariants()) {
+  if (!m_logoVariants.isEmpty()) {
+    const int pick = QRandomGenerator::global()->bounded(
+        static_cast<int>(m_logoVariants.size()));
+    m_logoDataUri = m_logoVariants.at(pick);
+  }
 }
 
 QString Theme::elevate0() const { return paletteValue(u"ELEVATE_0"); }
@@ -64,8 +67,12 @@ QString Theme::danger() const { return paletteValue(u"DANGER"); }
 QString Theme::dangerHover() const { return paletteValue(u"DANGER_HOVER"); }
 QString Theme::dangerBg() const { return paletteValue(u"DANGER_BG_QML"); }
 
-QString Theme::fontFamily() const { return QStringLiteral("Source Sans 3, Liberation Sans, sans-serif"); }
-QString Theme::fontMono() const { return QStringLiteral("DejaVu Sans Mono, Liberation Mono, monospace"); }
+QString Theme::fontFamily() const {
+  return QStringLiteral("Source Sans 3, Liberation Sans, sans-serif");
+}
+QString Theme::fontMono() const {
+  return QStringLiteral("DejaVu Sans Mono, Liberation Mono, monospace");
+}
 int Theme::fontSizeXs() const { return 10; }
 int Theme::fontSizeSm() const { return 11; }
 int Theme::fontSizeMd() const { return 13; }

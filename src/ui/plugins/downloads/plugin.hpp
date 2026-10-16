@@ -5,9 +5,9 @@
 namespace px::modrim {
 
 class DownloadsUiPlugin final : public UiPlugin {
-public:
-    DownloadsUiPlugin();
-    void setup(AppContext& ctx) override;
+ public:
+  DownloadsUiPlugin();
+  void setup(AppContext& ctx) override;
 };
 
 }  // namespace px::modrim

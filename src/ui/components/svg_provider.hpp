@@ -13,10 +13,11 @@ namespace px::modrim {
 // Serves named SVG icons to QML via image://icons/<name>?color=<hex>.
 // An unknown name renders an empty SVG, so the image is transparent.
 class SvgIconProvider : public QQuickImageProvider {
-public:
-    SvgIconProvider();
+ public:
+  SvgIconProvider();
 
-    QPixmap requestPixmap(const QString& id, QSize* size, const QSize& requestedSize) override;
+  QPixmap requestPixmap(const QString& id, QSize* size,
+                        const QSize& requestedSize) override;
 };
 
 // The one way to build a QML engine: every QML surface shares it, and it always

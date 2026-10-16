@@ -11,14 +11,14 @@ namespace px::modrim {
 QuickPopupParenting::QuickPopupParenting(QObject* parent) : QObject(parent) {}
 
 bool QuickPopupParenting::eventFilter(QObject* watched, QEvent* event) {
-    if (event->type() == QEvent::Show) {
-        if (auto* quick = qobject_cast<QQuickWidget*>(watched)) {
-            if (QWindow* top = quick->window()->windowHandle()) {
-                quick->quickWindow()->setTransientParent(top);
-            }
-        }
+  if (event->type() == QEvent::Show) {
+    if (auto* quick = qobject_cast<QQuickWidget*>(watched)) {
+      if (QWindow* top = quick->window()->windowHandle()) {
+        quick->quickWindow()->setTransientParent(top);
+      }
     }
-    return false;
+  }
+  return false;
 }
 
 }  // namespace px::modrim

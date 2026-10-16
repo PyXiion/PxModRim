@@ -54,7 +54,7 @@ export class PxModRimRPC {
 
   constructor(channel: any) {
     this.bridge = channel.objects.bridge;
-    this.bridge.result_ready.connect((id: string, json: string) => {
+    this.bridge.resultReady.connect((id: string, json: string) => {
       const resolve = this.pending.get(id);
       if (resolve) {
         this.pending.delete(id);

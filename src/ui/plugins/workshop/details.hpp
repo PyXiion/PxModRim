@@ -5,12 +5,12 @@
 namespace px::modrim::workshop {
 
 struct Detail {
-    workshop::CatalogEntry item;
-    std::vector<workshop::CatalogEntry> members;
-    std::string warning;
-    bool complete = false;
+  workshop::CatalogEntry item;
+  std::vector<workshop::CatalogEntry> members;
+  std::string warning;
+  bool complete = false;
 
-    bool operator==(const Detail&) const = default;
+  bool operator==(const Detail&) const = default;
 };
 
 QCoro::Task<workshop::CatalogResult<Detail>> fetchDetail(

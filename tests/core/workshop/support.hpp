@@ -1,5 +1,12 @@
 #pragma once
 
+#include <QByteArray>
+#include <QHostAddress>
+#include <QString>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QUrl>
+#include <QUrlQuery>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -8,25 +15,20 @@
 #include <utility>
 #include <vector>
 
+#include <QCoro/QCoroTask>
+
 #include <catch2/catch_test_macros.hpp>
 #include <glaze/glaze.hpp>
-#include <QByteArray>
-#include <QCoro/QCoroTask>
-#include <QHostAddress>
-#include <QString>
-#include <QTcpServer>
-#include <QTcpSocket>
-#include <QUrl>
-#include <QUrlQuery>
 
 #include "core/workshop/types.hpp"
 
 namespace workshop_test {
 
-// Awaits a coroutine on a local event loop, so network replies and disk work can complete.
+// Awaits a coroutine on a local event loop, so network replies and disk work
+// can complete.
 template <class T>
 T run(QCoro::Task<T> task) {
-    return QCoro::waitFor(std::move(task));
+  return QCoro::waitFor(std::move(task));
 }
 
 // Payloads exactly as the catalog service sends them.
@@ -84,139 +86,164 @@ inline constexpr std::string_view kCollectionJson = R"JSON({
 })JSON";
 
 inline px::modrim::workshop::CatalogMod decodeMod(std::string_view json) {
-    px::modrim::workshop::CatalogMod mod;
-    REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(mod, std::string(json)));
-    return mod;
+  px::modrim::workshop::CatalogMod mod;
+  REQUIRE_FALSE(
+      glz::read<px::modrim::workshop::kWireOpts>(mod, std::string(json)));
+  return mod;
 }
 
-inline px::modrim::workshop::CatalogCollection decodeCollection(std::string_view json) {
-    px::modrim::workshop::CatalogCollection collection;
-    REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(collection, std::string(json)));
-    return collection;
+inline px::modrim::workshop::CatalogCollection decodeCollection(
+    std::string_view json) {
+  px::modrim::workshop::CatalogCollection collection;
+  REQUIRE_FALSE(glz::read<px::modrim::workshop::kWireOpts>(collection,
+                                                           std::string(json)));
+  return collection;
 }
 
 // The wire form of any catalog type, for building responses.
 template <class T>
 std::string wire(const T& value) {
-    auto text = glz::write<px::modrim::workshop::kWireOpts>(value);
-    REQUIRE(text.has_value());
-    return *text;
+  auto text = glz::write<px::modrim::workshop::kWireOpts>(value);
+  REQUIRE(text.has_value());
+  return *text;
 }
 
 struct HttpRequest {
-    std::string method;
-    std::string target;
-    std::string body;
+  std::string method;
+  std::string target;
+  std::string body;
 
-    QUrlQuery query() const {
-        return QUrlQuery(QUrl(QStringLiteral("http://localhost") + QString::fromStdString(target)));
-    }
-    QString path() const { return QUrl(QStringLiteral("http://localhost") + QString::fromStdString(target)).path(); }
+  QUrlQuery query() const {
+    return QUrlQuery(QUrl(QStringLiteral("http://localhost") +
+                          QString::fromStdString(target)));
+  }
+  QString path() const {
+    return QUrl(QStringLiteral("http://localhost") +
+                QString::fromStdString(target))
+        .path();
+  }
 };
 
 struct HttpResponse {
-    int status = 200;
-    std::string body;
+  int status = 200;
+  std::string body;
 };
 
 using Handler = std::function<HttpResponse(const HttpRequest&)>;
 
-// A loopback catalog: answers each request with `handler`, one request per connection.
+// A loopback catalog: answers each request with `handler`, one request per
+// connection.
 class FakeCatalog {
-public:
-    explicit FakeCatalog(Handler handler) : m_handler(std::move(handler)) {
-        REQUIRE(m_server.listen(QHostAddress::LocalHost));
-        QObject::connect(&m_server, &QTcpServer::newConnection, &m_server, [this] { accept(); });
+ public:
+  explicit FakeCatalog(Handler handler) : m_handler(std::move(handler)) {
+    REQUIRE(m_server.listen(QHostAddress::LocalHost));
+    QObject::connect(&m_server, &QTcpServer::newConnection, &m_server,
+                     [this] { accept(); });
+  }
+
+  QString url() const {
+    return QStringLiteral("http://127.0.0.1:%1").arg(m_server.serverPort());
+  }
+
+  std::vector<HttpRequest> requests;
+
+ private:
+  void accept() {
+    QTcpSocket* socket = m_server.nextPendingConnection();
+    socket->setParent(&m_server);
+    QObject::connect(socket, &QTcpSocket::disconnected, socket,
+                     &QObject::deleteLater);
+    auto raw = std::make_shared<QByteArray>();
+    auto answered = std::make_shared<bool>(false);
+    QObject::connect(socket, &QTcpSocket::readyRead, socket,
+                     [this, socket, raw, answered] {
+                       *raw += socket->readAll();
+                       if (*answered || !complete(*raw)) {
+                         return;
+                       }
+                       *answered = true;
+                       HttpRequest request = parse(*raw);
+                       requests.push_back(request);
+                       socket->write(serialize(m_handler(request)));
+                       socket->disconnectFromHost();
+                     });
+  }
+
+  // True once the headers and the Content-Length body have arrived.
+  static bool complete(const QByteArray& raw) {
+    const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
+    if (headersEnd < 0) {
+      return false;
     }
+    return raw.size() - (headersEnd + 4) >= contentLength(raw.left(headersEnd));
+  }
 
-    QString url() const { return QStringLiteral("http://127.0.0.1:%1").arg(m_server.serverPort()); }
-
-    std::vector<HttpRequest> requests;
-
-private:
-    void accept() {
-        QTcpSocket* socket = m_server.nextPendingConnection();
-        socket->setParent(&m_server);
-        QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
-        auto raw = std::make_shared<QByteArray>();
-        auto answered = std::make_shared<bool>(false);
-        QObject::connect(socket, &QTcpSocket::readyRead, socket, [this, socket, raw, answered] {
-            *raw += socket->readAll();
-            if (*answered || !complete(*raw)) {
-                return;
-            }
-            *answered = true;
-            HttpRequest request = parse(*raw);
-            requests.push_back(request);
-            socket->write(serialize(m_handler(request)));
-            socket->disconnectFromHost();
-        });
+  static qint64 contentLength(const QByteArray& headers) {
+    const QByteArray lower = headers.toLower();
+    const qsizetype key = lower.indexOf("content-length:");
+    if (key < 0) {
+      return 0;
     }
-
-    // True once the headers and the Content-Length body have arrived.
-    static bool complete(const QByteArray& raw) {
-        const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
-        if (headersEnd < 0) {
-            return false;
-        }
-        return raw.size() - (headersEnd + 4) >= contentLength(raw.left(headersEnd));
+    qsizetype eol = lower.indexOf("\r\n", key);
+    if (eol < 0) {
+      eol = lower.size();
     }
+    return lower.mid(key + 15, eol - key - 15).trimmed().toLongLong();
+  }
 
-    static qint64 contentLength(const QByteArray& headers) {
-        const QByteArray lower = headers.toLower();
-        const qsizetype key = lower.indexOf("content-length:");
-        if (key < 0) {
-            return 0;
-        }
-        qsizetype eol = lower.indexOf("\r\n", key);
-        if (eol < 0) {
-            eol = lower.size();
-        }
-        return lower.mid(key + 15, eol - key - 15).trimmed().toLongLong();
+  static HttpRequest parse(const QByteArray& raw) {
+    const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
+    const QByteArray requestLine = raw.left(raw.indexOf("\r\n"));
+    const QList<QByteArray> parts = requestLine.split(' ');
+    HttpRequest request;
+    request.method = parts.value(0).toStdString();
+    request.target = parts.value(1).toStdString();
+    request.body = raw.mid(headersEnd + 4, contentLength(raw.left(headersEnd)))
+                       .toStdString();
+    return request;
+  }
+
+  static QByteArray serialize(const HttpResponse& response) {
+    return "HTTP/1.1 " + QByteArray::number(response.status) + " " +
+           reason(response.status) +
+           "\r\nContent-Type: application/json\r\nContent-Length: " +
+           QByteArray::number(static_cast<qint64>(response.body.size())) +
+           "\r\nConnection: close\r\n\r\n" +
+           QByteArray::fromStdString(response.body);
+  }
+
+  static QByteArray reason(int status) {
+    switch (status) {
+      case 200:
+        return "OK";
+      case 400:
+        return "Bad Request";
+      case 401:
+        return "Unauthorized";
+      case 404:
+        return "Not Found";
+      case 500:
+        return "Internal Server Error";
+      case 502:
+        return "Bad Gateway";
+      case 503:
+        return "Service Unavailable";
+      default:
+        return "Status";
     }
+  }
 
-    static HttpRequest parse(const QByteArray& raw) {
-        const qsizetype headersEnd = raw.indexOf("\r\n\r\n");
-        const QByteArray requestLine = raw.left(raw.indexOf("\r\n"));
-        const QList<QByteArray> parts = requestLine.split(' ');
-        HttpRequest request;
-        request.method = parts.value(0).toStdString();
-        request.target = parts.value(1).toStdString();
-        request.body = raw.mid(headersEnd + 4, contentLength(raw.left(headersEnd))).toStdString();
-        return request;
-    }
-
-    static QByteArray serialize(const HttpResponse& response) {
-        return "HTTP/1.1 " + QByteArray::number(response.status) + " " + reason(response.status) +
-               "\r\nContent-Type: application/json\r\nContent-Length: " +
-               QByteArray::number(static_cast<qint64>(response.body.size())) +
-               "\r\nConnection: close\r\n\r\n" + QByteArray::fromStdString(response.body);
-    }
-
-    static QByteArray reason(int status) {
-        switch (status) {
-            case 200: return "OK";
-            case 400: return "Bad Request";
-            case 401: return "Unauthorized";
-            case 404: return "Not Found";
-            case 500: return "Internal Server Error";
-            case 502: return "Bad Gateway";
-            case 503: return "Service Unavailable";
-            default: return "Status";
-        }
-    }
-
-    QTcpServer m_server;
-    Handler m_handler;
+  QTcpServer m_server;
+  Handler m_handler;
 };
 
 // A URL that refuses connections: the port was bound, then released.
 inline QString unreachableUrl() {
-    QTcpServer probe;
-    REQUIRE(probe.listen(QHostAddress::LocalHost));
-    const quint16 port = probe.serverPort();
-    probe.close();
-    return QStringLiteral("http://127.0.0.1:%1").arg(port);
+  QTcpServer probe;
+  REQUIRE(probe.listen(QHostAddress::LocalHost));
+  const quint16 port = probe.serverPort();
+  probe.close();
+  return QStringLiteral("http://127.0.0.1:%1").arg(port);
 }
 
 }  // namespace workshop_test
