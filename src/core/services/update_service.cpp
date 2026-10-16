@@ -57,14 +57,12 @@ std::optional<ParsedVersion> splitVersion(const QString& text) {
 // over pre-release, then the suffix text.
 int compareVersions(const ParsedVersion& a, const ParsedVersion& b) {
   const std::size_t width = std::max(a.numbers.size(), b.numbers.size());
-  auto padded = [width](std::vector<qint64> numbers) {
-    numbers.resize(width, 0);
-    return numbers;
-  };
-  const std::vector<qint64> left = padded(a.numbers);
-  const std::vector<qint64> right = padded(b.numbers);
-  if (left != right) {
-    return left < right ? -1 : 1;
+  for (std::size_t i = 0; i < width; ++i) {
+    const qint64 left = i < a.numbers.size() ? a.numbers[i] : 0;
+    const qint64 right = i < b.numbers.size() ? b.numbers[i] : 0;
+    if (left != right) {
+      return left < right ? -1 : 1;
+    }
   }
   const bool leftRelease = a.suffix.isEmpty();
   const bool rightRelease = b.suffix.isEmpty();

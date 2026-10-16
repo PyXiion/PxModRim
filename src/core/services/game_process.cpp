@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QUrl>
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -426,7 +427,8 @@ void GameProcessMonitor::attachProcess(std::unique_ptr<QProcess> proc) {
 
 bool GameProcessMonitor::launchedAlive() const {
   const QSet<qint64> live = liveGamePids(m_lister);
-  return !(live - m_baseline).isEmpty();
+  return std::ranges::any_of(
+      live, [this](qint64 pid) { return !m_baseline.contains(pid); });
 }
 
 void GameProcessMonitor::dropProcess() {

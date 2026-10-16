@@ -112,13 +112,8 @@ QStringList SortService::missingDependencyUuids(
     }
   }
 
-  QStringList unique;
-  for (const auto& uuid : missing) {
-    if (!unique.contains(uuid)) {
-      unique.append(uuid);
-    }
-  }
-  return unique;
+  missing.removeDuplicates();
+  return missing;
 }
 
 }  // namespace px::modrim

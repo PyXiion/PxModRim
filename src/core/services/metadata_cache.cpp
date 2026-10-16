@@ -124,21 +124,14 @@ QString resolvePath(const QString& path) {
 // ---- Payload (de)serialization
 // ------------------------------------------------------------
 
-QJsonArray sortedArray(const QStringList& values) {
-  QStringList sorted = values;
-  sorted.sort();
-  return QJsonArray::fromStringList(sorted);
-}
-
-template <class Set>
-QStringList sortedStrings(const Set& set) {
+QJsonArray sortedArray(const CaseInsensitiveSet& set) {
   QStringList values;
   values.reserve(set.size());
   for (const auto& item : set) {
     values.append(item.str());
   }
   values.sort();
-  return values;
+  return QJsonArray::fromStringList(values);
 }
 
 QJsonObject serializeMod(const AboutXmlMod& mod) {
@@ -171,16 +164,14 @@ QJsonObject serializeMod(const AboutXmlMod& mod) {
     entry[QStringLiteral("package_id")] = dep.packageId.str();
     entry[QStringLiteral("workshop_url")] = dep.workshopUrl;
     entry[QStringLiteral("alternative_package_ids")] =
-        sortedArray(sortedStrings(dep.alternativePackageIds));
+        sortedArray(dep.alternativePackageIds);
     dependencies.append(entry);
   }
   QJsonObject rules;
-  rules[QStringLiteral("load_before")] =
-      sortedArray(sortedStrings(mod.aboutRules.loadBefore));
-  rules[QStringLiteral("load_after")] =
-      sortedArray(sortedStrings(mod.aboutRules.loadAfter));
+  rules[QStringLiteral("load_before")] = sortedArray(mod.aboutRules.loadBefore);
+  rules[QStringLiteral("load_after")] = sortedArray(mod.aboutRules.loadAfter);
   rules[QStringLiteral("incompatible_with")] =
-      sortedArray(sortedStrings(mod.aboutRules.incompatibleWith));
+      sortedArray(mod.aboutRules.incompatibleWith);
   rules[QStringLiteral("dependencies")] = dependencies;
   object[QStringLiteral("about_rules")] = rules;
   return object;
@@ -629,7 +620,7 @@ void MetadataCache::prune(const QSet<QString>& liveModPaths) {
     return;
   }
 
-  QStringList cached;
+  QStringList disappeared;
   {
     QSqlQuery query(*db);
     if (!query.exec(QStringLiteral("SELECT mod_path FROM mod_metadata"))) {
@@ -638,16 +629,13 @@ void MetadataCache::prune(const QSet<QString>& liveModPaths) {
       return;
     }
     while (query.next()) {
-      cached.append(query.value(0).toString());
+      const QString path = query.value(0).toString();
+      if (!liveModPaths.contains(path)) {
+        disappeared.append(path);
+      }
     }
   }
 
-  QStringList disappeared;
-  for (const QString& path : cached) {
-    if (!liveModPaths.contains(path)) {
-      disappeared.append(path);
-    }
-  }
   if (disappeared.isEmpty()) {
     return;
   }
