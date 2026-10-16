@@ -252,7 +252,8 @@ void ModInfoPanel::updateMod() {
   if (auto id = m_ctx.downloads().updatableId(*m_mod)) performUpdate(*id);
 }
 QCoro::Task<void> ModInfoPanel::performUpdate(QString id) {
-  const auto result = co_await m_ctx.downloads().downloadMods({id});
+  const QStringList ids{id};
+  const auto result = co_await m_ctx.downloads().downloadMods(ids);
   if (!result)
     qWarning().noquote() << "Mod update not started:" << result.error().message;
 }

@@ -577,9 +577,10 @@ QCoro::QmlTask OrganizerViewPanel::toggleCheck(const QModelIndex& index) {
 QCoro::Task<void> OrganizerViewPanel::toggle(QModelIndex index) {
   const auto* node = m_model->nodeAt(index);
   if (!node) co_return;
-  if (node->leaf)
-    co_await toggleMods(m_ctx, this, {node->leaf->uuid});
-  else if (node->isContainer()) {
+  if (node->leaf) {
+    const QStringList uuids{node->leaf->uuid};
+    co_await toggleMods(m_ctx, this, uuids);
+  } else if (node->isContainer()) {
     const auto change = m_service.folderToggle(
         node->folderId(), node->kind != QStringLiteral("ungrouped"));
     if (!change) {
@@ -607,7 +608,7 @@ QCoro::Task<void> OrganizerViewPanel::runSelectionAction(QString action) {
   else if (action == QStringLiteral("enable"))
     co_await applyActivation(m_ctx, this, uuids);
   else if (action == QStringLiteral("disable"))
-    co_await applyActivation(m_ctx, this, {}, uuids);
+    co_await applyActivation(m_ctx, this, QStringList{}, uuids);
 }
 QCoro::QmlTask OrganizerViewPanel::newFolder() {
   return editFolder(QStringLiteral("new"));

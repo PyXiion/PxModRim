@@ -17,14 +17,9 @@
 
 namespace px::modrim::workshop {
 
-namespace {
-
-constexpr int kRequestTimeoutMs = 30000;
-// Per-request limits of the catalog service; larger inputs are split across
-// requests.
-constexpr qsizetype kIdsPerBatch = 100;
-constexpr qsizetype kModIdsPerResolve = 50;
-constexpr qsizetype kCollectionIdsPerResolve = 10;
+// glaze reflection needs these types to have external linkage; clang rejects
+// reflecting types from an anonymous namespace.
+namespace wire {
 
 struct ErrorMessage {
   std::string message;
@@ -51,6 +46,19 @@ struct ResolveBody {
   std::vector<std::string> collection_ids;
 };
 // NOLINTEND(readability-identifier-naming)
+
+}  // namespace wire
+
+using namespace wire;
+
+namespace {
+
+constexpr int kRequestTimeoutMs = 30000;
+// Per-request limits of the catalog service; larger inputs are split across
+// requests.
+constexpr qsizetype kIdsPerBatch = 100;
+constexpr qsizetype kModIdsPerResolve = 50;
+constexpr qsizetype kCollectionIdsPerResolve = 10;
 
 std::vector<std::string> toUtf8(const QStringList& list) {
   std::vector<std::string> out;

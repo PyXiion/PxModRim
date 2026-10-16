@@ -10,7 +10,7 @@
 #include "core/plugin_config.hpp"
 #include "test_support.hpp"
 
-namespace {
+namespace plugin_config_test {
 
 using namespace px::modrim;
 using test_support::readBytes;
@@ -25,7 +25,9 @@ struct DemoSettings {
 };
 // NOLINTEND(readability-identifier-naming)
 
-}  // namespace
+}  // namespace plugin_config_test
+
+using namespace plugin_config_test;
 
 TEST_CASE(
     "plugin config seeds from legacy config.json keys and persists changes") {

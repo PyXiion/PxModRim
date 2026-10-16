@@ -43,7 +43,7 @@ using workshop_test::HttpResponse;
 using workshop_test::run;
 using workshop_test::wire;
 
-namespace {
+namespace catalog_test {
 // NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct BatchWire {
   std::vector<CatalogMod> items;
@@ -165,7 +165,9 @@ struct ResolvePayload {
 };
 // NOLINTEND(readability-identifier-naming)
 
-}  // namespace
+}  // namespace catalog_test
+
+using namespace catalog_test;
 
 TEST_CASE("workshop install state uses sync timestamp, not directory mtime") {
   ContextFixture fixture;

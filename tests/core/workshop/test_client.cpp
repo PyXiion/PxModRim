@@ -23,7 +23,7 @@ using workshop_test::run;
 using workshop_test::unreachableUrl;
 using workshop_test::wire;
 
-namespace {
+namespace client_test {
 
 // NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on the wire
 struct ResolveRequest {
@@ -72,7 +72,9 @@ CatalogCollection steamCollection(std::string id, std::string steamId,
   return collection;
 }
 
-}  // namespace
+}  // namespace client_test
+
+using namespace client_test;
 
 TEST_CASE("workshop client decodes every endpoint and sends the query") {
   TestApplication app;

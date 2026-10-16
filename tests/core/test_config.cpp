@@ -14,7 +14,7 @@
 #include "core/file_io.hpp"
 #include "test_support.hpp"
 
-namespace {
+namespace config_test {
 
 using namespace px::modrim;
 using test_support::readBytes;
@@ -67,7 +67,9 @@ AppConfig legacyExpectedConfig() {
   return cfg;
 }
 
-}  // namespace
+}  // namespace config_test
+
+using namespace config_test;
 
 TEST_CASE("read_game_version reads and trims Version.txt") {
   QTemporaryDir dir;

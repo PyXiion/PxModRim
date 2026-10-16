@@ -5,9 +5,9 @@
 #include <QStringList>
 #include <cstdint>
 #include <expected>
-#include <map>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -166,7 +166,9 @@ struct Discover {
 // on the wire
 struct ResolvedDownload {
   std::vector<std::string> roots;
-  std::map<std::string, CatalogEntry> items;
+  // Not std::map: libc++'s map operator<=> is not SFINAE-friendly, so glaze's
+  // ordered<> probe hard-errors on a variant of unordered alternatives.
+  std::unordered_map<std::string, CatalogEntry> items;
   std::vector<std::string> mod_ids;
   std::vector<std::string> unavailable_ids;
   std::vector<std::string> incomplete_collection_ids;

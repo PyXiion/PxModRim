@@ -20,7 +20,7 @@
 #include "ui/plugins/workshop/view.hpp"
 #include "ui/theme/qml_theme.hpp"
 
-namespace {
+namespace workshop_view_test {
 using namespace px::modrim;
 using namespace px::modrim::workshop;
 using namespace px::modrim;
@@ -192,7 +192,9 @@ struct PanelFixture {
     });
   }
 };
-}  // namespace
+}  // namespace workshop_view_test
+
+using namespace workshop_view_test;
 
 TEST_CASE(
     "workshop view loads discovery and paginates filtered catalog results") {

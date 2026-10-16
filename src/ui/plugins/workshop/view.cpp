@@ -270,7 +270,8 @@ QCoro::Task<void> WorkshopViewPanel::loadPack() {
   if (!m_detailData || m_tornDown) co_return;
   QPointer<WorkshopViewPanel> self(this);
   const int generation = m_generation;
-  auto result = co_await m_catalog.plan({}, {idOf(m_detailData->item)});
+  const QStringList collectionIds{idOf(m_detailData->item)};
+  auto result = co_await m_catalog.plan(QStringList{}, collectionIds);
   if (!self || self->m_tornDown || generation != self->m_generation) co_return;
   if (!result) {
     spdlog::warn("[workshop] cannot resolve collection mods: {}",
@@ -522,10 +523,13 @@ QCoro::Task<void> WorkshopViewPanel::toggleActivationAsync(QString itemId) {
     if (m_ctx.activeUuids().contains(it.key())) active.append(it.key());
   }
   if (copies.isEmpty()) co_return;
-  if (active.isEmpty())
-    co_await applyActivation(m_ctx, this, {copies.front()}, {});
-  else
-    co_await applyActivation(m_ctx, this, {}, active);
+  const QStringList none;
+  if (active.isEmpty()) {
+    const QStringList only{copies.front()};
+    co_await applyActivation(m_ctx, this, only, none);
+  } else {
+    co_await applyActivation(m_ctx, this, none, active);
+  }
 }
 QCoro::Task<void> WorkshopViewPanel::toggleCollectionAsync(bool only) {
   auto copies = packCopies();
@@ -542,24 +546,27 @@ QCoro::Task<void> WorkshopViewPanel::toggleCollectionAsync(bool only) {
                (!only && allActive && m_packIds.contains(*id))))
       disable.append(uuid);
   }
+  const QStringList none;
   if (!only && allActive)
-    co_await applyActivation(m_ctx, this, {}, disable);
+    co_await applyActivation(m_ctx, this, none, disable);
   else
     co_await applyActivation(m_ctx, this, *copies, disable);
 }
 QCoro::Task<void> WorkshopViewPanel::downloadItemAsync(QString itemId,
                                                        QString kind) {
-  co_await download(
-      kind == QStringLiteral("mod") ? QStringList{itemId} : QStringList{},
-      kind == QStringLiteral("collection") ? QStringList{itemId}
-                                           : QStringList{});
+  QStringList mods;
+  QStringList collections;
+  if (kind == QStringLiteral("mod")) mods.append(itemId);
+  if (kind == QStringLiteral("collection")) collections.append(itemId);
+  co_await download(mods, collections);
 }
 QCoro::Task<void> WorkshopViewPanel::updateAllAsync() {
   QStringList ids;
   for (const auto& mod : m_installed.mods())
     if (m_catalog.installState(mod) == InstallState::kOutdated)
       ids.append(QString::fromStdString(mod.id));
-  if (!ids.isEmpty()) co_await download(ids, {});
+  const QStringList noCollections;
+  if (!ids.isEmpty()) co_await download(ids, noCollections);
 }
 void WorkshopViewPanel::queuePlan(const DownloadPlan& plan) {
   m_catalog.enqueue(plan);
