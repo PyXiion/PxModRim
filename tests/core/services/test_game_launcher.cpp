@@ -161,6 +161,9 @@ TEST_CASE(
 }
 
 TEST_CASE("executable lookup prefers the current binary over the legacy one") {
+#ifdef Q_OS_WIN
+  SKIP("Windows decides executability by extension, not permission bits");
+#endif
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
   const QString root = dir.path();
@@ -173,6 +176,9 @@ TEST_CASE("executable lookup prefers the current binary over the legacy one") {
 }
 
 TEST_CASE("executable lookup skips a non-executable binary") {
+#ifdef Q_OS_WIN
+  SKIP("Windows decides executability by extension, not permission bits");
+#endif
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
   const QString root = dir.path();

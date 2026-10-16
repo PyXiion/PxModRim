@@ -329,7 +329,7 @@ TEST_CASE(
 
   QStringList backups;
   for (const auto& snapshot : getSnapshots(snapshotsDir)) {
-    if (snapshot != snapshotPath) {
+    if (QFileInfo(snapshot) != QFileInfo(snapshotPath)) {
       backups.append(snapshot);
     }
   }

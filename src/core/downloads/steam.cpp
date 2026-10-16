@@ -8,14 +8,11 @@
 #include <QMetaObject>
 #include <QPromise>
 #include <QScopeGuard>
-#include <QThreadPool>
 #include <QtConcurrent>
 #include <algorithm>
 #include <charconv>
 #include <cstddef>
-#include <exception>
 #include <memory>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -431,39 +428,26 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
   };
 
   downloadPhaseChanged.notify(QStringLiteral("query"));
-  // The future completes on the main thread, through the queue the item
-  // callbacks above use. A task that finishes before the co_await below would
-  // otherwise resume this coroutine ahead of its still-queued callbacks.
-  auto promise = std::make_shared<QPromise<Outcome>>();
-  promise->start();
-  QFuture<Outcome> call = promise->future();
-  QThreadPool::globalInstance()->start([client, itemIds = std::move(itemIds),
-                                        rootPath, options, promise, target] {
-    std::optional<Outcome> outcome;
-    std::exception_ptr failure;
-    try {
-      outcome = client->download(itemIds, rootPath, options);
-    } catch (const std::runtime_error& e) {
-      const std::string what = e.what();
-      outcome =
-          std::unexpected(what.empty() ? std::string("download failed") : what);
-    } catch (...) {
-      // Anything else propagates to the caller, as in the Python version.
-      failure = std::current_exception();
-    }
-    QMetaObject::invokeMethod(
-        target,
-        [promise, outcome = std::move(outcome), failure]() mutable {
-          if (failure) {
-            promise->setException(failure);
-          } else {
-            promise->addResult(std::move(*outcome));
-          }
-          promise->finish();
-        },
-        Qt::QueuedConnection);
-  });
-  Outcome outcome = co_await call;
+  QFuture<Outcome> call = QtConcurrent::run(
+      [client, itemIds = std::move(itemIds), rootPath, options]() -> Outcome {
+        try {
+          return client->download(itemIds, rootPath, options);
+        } catch (const std::runtime_error& e) {
+          // Anything else propagates to the caller, as in the Python version.
+          const std::string what = e.what();
+          return std::unexpected(what.empty() ? std::string("download failed")
+                                              : what);
+        }
+      });
+  Outcome outcome = co_await QFuture<Outcome>(call);
+
+  // A task that finished before the co_await above resumes this coroutine
+  // ahead of the callbacks it posted. This marker is queued behind them.
+  auto marker = std::make_shared<QPromise<void>>();
+  marker->start();
+  QMetaObject::invokeMethod(
+      target, [marker] { marker->finish(); }, Qt::QueuedConnection);
+  co_await marker->future();
 
   if (!outcome) {
     // A failed call leaves the Steam session suspect; log in again next time.

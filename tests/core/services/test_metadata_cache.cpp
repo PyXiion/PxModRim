@@ -343,6 +343,9 @@ TEST_CASE("providers keep their identity when they share one cache") {
 }
 
 TEST_CASE("normalize_paths matches normalize_path, including symlinks") {
+#ifdef Q_OS_WIN
+  SKIP("QFile::link makes .lnk shortcuts on Windows, not symlinks");
+#endif
   QTemporaryDir root;
   REQUIRE(root.isValid());
   const QString real = QDir(root.path()).filePath(QStringLiteral("real"));

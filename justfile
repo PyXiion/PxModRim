@@ -51,8 +51,8 @@ lint-db:
     mkdir -p build/lint
     sed 's/ -mno-direct-extern-access//g' build/default/compile_commands.json > build/lint/compile_commands.json
 
-lint: lint-db
-    run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
+lint *args: lint-db
+    run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -extra-arg=-Wno-unknown-warning-option {{args}} '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
 
 lint-fix: lint-db
     run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -fix -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'

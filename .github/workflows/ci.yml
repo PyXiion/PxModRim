@@ -116,7 +116,9 @@ jobs:
 
       - name: Lint (Linux SteamWorkshop)
         if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
-        run: CLANG_TIDY="$(pipx environment --value PIPX_BIN_DIR)/clang-tidy" just lint
+        # run-clang-tidy 18 probes the checks with `-list-checks -`, where
+        # clang-tidy 22 finds no .clang-tidy, so the checks are passed explicitly.
+        run: CLANG_TIDY="$(pipx environment --value PIPX_BIN_DIR)/clang-tidy" just lint -checks=-*,readability-identifier-naming
 
       - name: Build
         run: cmake --build --preset default

@@ -84,6 +84,9 @@ TEST_CASE("read_game_version reads and trims Version.txt") {
 TEST_CASE(
     "read_game_version returns nullopt when Version.txt is missing or "
     "unreadable") {
+#ifdef Q_OS_WIN
+  SKIP("Windows has no POSIX read permission to remove");
+#endif
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
   REQUIRE_FALSE(readGameVersion(dir.path()).has_value());
@@ -210,6 +213,9 @@ TEST_CASE("corrupt config returns safe defaults") {
 }
 
 TEST_CASE("unreadable config returns safe defaults") {
+#ifdef Q_OS_WIN
+  SKIP("Windows has no POSIX read permission to remove");
+#endif
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
   const QString path = pathIn(dir, "config.json");
