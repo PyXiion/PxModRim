@@ -523,12 +523,11 @@ QCoro::Task<void> WorkshopViewPanel::toggleActivationAsync(QString itemId) {
     if (m_ctx.activeUuids().contains(it.key())) active.append(it.key());
   }
   if (copies.isEmpty()) co_return;
-  const QStringList none;
   if (active.isEmpty()) {
     const QStringList only{copies.front()};
-    co_await applyActivation(m_ctx, this, only, none);
+    co_await applyActivation(m_ctx, this, only, QStringList{});
   } else {
-    co_await applyActivation(m_ctx, this, none, active);
+    co_await applyActivation(m_ctx, this, QStringList{}, active);
   }
 }
 QCoro::Task<void> WorkshopViewPanel::toggleCollectionAsync(bool only) {
@@ -546,9 +545,8 @@ QCoro::Task<void> WorkshopViewPanel::toggleCollectionAsync(bool only) {
                (!only && allActive && m_packIds.contains(*id))))
       disable.append(uuid);
   }
-  const QStringList none;
   if (!only && allActive)
-    co_await applyActivation(m_ctx, this, none, disable);
+    co_await applyActivation(m_ctx, this, QStringList{}, disable);
   else
     co_await applyActivation(m_ctx, this, *copies, disable);
 }
@@ -565,8 +563,7 @@ QCoro::Task<void> WorkshopViewPanel::updateAllAsync() {
   for (const auto& mod : m_installed.mods())
     if (m_catalog.installState(mod) == InstallState::kOutdated)
       ids.append(QString::fromStdString(mod.id));
-  const QStringList noCollections;
-  if (!ids.isEmpty()) co_await download(ids, noCollections);
+  if (!ids.isEmpty()) co_await download(ids, QStringList{});
 }
 void WorkshopViewPanel::queuePlan(const DownloadPlan& plan) {
   m_catalog.enqueue(plan);
