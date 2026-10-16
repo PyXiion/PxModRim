@@ -104,8 +104,10 @@ jobs:
       - name: Install clang tools (Linux SteamWorkshop)
         if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
         run: |
+          # clang-tidy 18 from apt cannot parse libstdc++ 13's <expected>.
           sudo apt-get install -y clang-tidy clang-tools
           pipx install clang-format==22.1.8
+          pipx install clang-tidy==22.1.8
 
       - name: Check formatting (Linux SteamWorkshop)
         if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
@@ -113,7 +115,7 @@ jobs:
 
       - name: Lint (Linux SteamWorkshop)
         if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
-        run: just lint
+        run: CLANG_TIDY="$HOME/.local/bin/clang-tidy" just lint
 
       - name: Build
         run: cmake --build --preset default

@@ -2,6 +2,7 @@ set windows-shell := ["bash", "-cu"]
 
 python := if os() == "windows" { "python" } else { "python3" }
 app_exe := if os() == "macos" { "pxmodrim.app/Contents/MacOS/pxmodrim" } else { "pxmodrim" }
+clang_tidy := env("CLANG_TIDY", "clang-tidy")
 
 @default:
     just --list
@@ -44,13 +45,17 @@ format:
 format-check:
     find src tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format --dry-run --Werror
 
-lint:
+# Qt adds GCC-only flags that clang rejects, so clang-tidy reads a filtered copy.
+lint-db:
     [ -f build/default/compile_commands.json ] || cmake --preset default
-    run-clang-tidy -p build/default -quiet -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
+    mkdir -p build/lint
+    sed 's/ -mno-direct-extern-access//g' build/default/compile_commands.json > build/lint/compile_commands.json
 
-lint-fix:
-    [ -f build/default/compile_commands.json ] || cmake --preset default
-    run-clang-tidy -p build/default -quiet -fix -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
+lint: lint-db
+    run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
+
+lint-fix: lint-db
+    run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -fix -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
 
 check: format-check lint build
 

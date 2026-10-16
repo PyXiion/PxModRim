@@ -105,8 +105,9 @@ QStackedWidget* stackOf(px::modrim::MainWindow& window) {
 }
 
 QMessageBox* closePrompt(px::modrim::MainWindow& window) {
+  // QMessageBox drops its window title on macOS, so match by type.
   for (auto* dialog : window.findChildren<QMessageBox*>())
-    if (dialog->windowTitle() == QStringLiteral("Unsaved Changes") &&
+    if (dynamic_cast<px::modrim::UnsavedChangesDialog*>(dialog) &&
         dialog->isVisible())
       return dialog;
   return nullptr;

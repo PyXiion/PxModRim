@@ -38,7 +38,10 @@ TEST_CASE(
 
   const auto found = px::modrim::findAboutXml(root.path());
   REQUIRE(found.has_value());
-  CHECK(found->endsWith(QStringLiteral("ABOUT/about.XML")));
+  // Case-insensitive filesystems (macOS, Windows) resolve the canonical
+  // About/About.xml candidate first and keep its spelling.
+  CHECK(
+      found->endsWith(QStringLiteral("ABOUT/about.XML"), Qt::CaseInsensitive));
 }
 
 TEST_CASE("findAboutXml returns nullopt when About has no About.xml") {
