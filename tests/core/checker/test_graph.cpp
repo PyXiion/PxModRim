@@ -119,6 +119,96 @@ TEST_CASE(
         QSet<PackageId>{PackageId(QStringLiteral("mod.dependency"))});
 }
 
+TEST_CASE("ConstraintGraph resolves alternatives per dependency declaration") {
+  ConstraintGraph g;
+  const PackageId aPid(QStringLiteral("a.consumer"));
+  const PackageId bPid(QStringLiteral("b.consumer"));
+  const PackageId primaryPid(QStringLiteral("x"));
+  const PackageId yPid(QStringLiteral("y.alt"));
+  const PackageId zPid(QStringLiteral("z.alt"));
+  auto a = makeMod(aPid.str());
+  auto b = makeMod(bPid.str());
+  DependencyMod aDependency;
+  aDependency.packageId = primaryPid;
+  aDependency.alternativePackageIds.add(yPid.str());
+  a->aboutRules.dependencies.append(aDependency);
+  DependencyMod bDependency;
+  bDependency.packageId = primaryPid;
+  bDependency.alternativePackageIds.add(zPid.str());
+  b->aboutRules.dependencies.append(bDependency);
+  QHash<PackageId, std::shared_ptr<AboutXmlMod>> mods{
+      {aPid, a},
+      {bPid, b},
+      {yPid, makeMod(yPid.str())},
+      {zPid, makeMod(zPid.str())},
+  };
+  PackageId aTarget = yPid;
+  PackageId bTarget = zPid;
+  auto graphSettings = settings(true);
+
+  SECTION("each consumer uses its own accepted alternative") {}
+
+  SECTION("an active primary takes precedence") {
+    mods.insert(primaryPid, makeMod(primaryPid.str()));
+    aTarget = primaryPid;
+    bTarget = primaryPid;
+  }
+
+  SECTION("another consumer's alternative cannot satisfy a declaration") {
+    mods.remove(zPid);
+    bTarget = primaryPid;
+  }
+
+  SECTION("disabled alternative resolution keeps both primary edges") {
+    graphSettings.use_alternative_package_ids = false;
+    aTarget = primaryPid;
+    bTarget = primaryPid;
+  }
+
+  g.build(mods, mods.keys(), graphSettings);
+  const auto aEdges = g.edgesOfType(aPid, EdgeType::kDependency);
+  REQUIRE(aEdges.size() == 1);
+  CHECK(aEdges.cbegin()->target == aTarget);
+  CHECK(aEdges.cbegin()->origin == EdgeOrigin::kAboutXml);
+  const auto bEdges = g.edgesOfType(bPid, EdgeType::kDependency);
+  REQUIRE(bEdges.size() == 1);
+  CHECK(bEdges.cbegin()->target == bTarget);
+  CHECK(bEdges.cbegin()->origin == EdgeOrigin::kAboutXml);
+}
+
+TEST_CASE("ConstraintGraph retains alternative resolution for load rules") {
+  ConstraintGraph g;
+  const PackageId consumerPid(QStringLiteral("mod.consumer"));
+  const PackageId primaryPid(QStringLiteral("mod.primary"));
+  const PackageId alternativePid(QStringLiteral("mod.alternative"));
+  auto consumer = makeMod(consumerPid.str());
+  DependencyMod dependency;
+  dependency.packageId = primaryPid;
+  dependency.alternativePackageIds.add(alternativePid.str());
+  consumer->aboutRules.dependencies.append(dependency);
+  consumer->aboutRules.loadAfter.add(primaryPid.str());
+  sort::CommunityRule rule;
+  rule.packageId = consumerPid;
+  rule.loadBefore.add(primaryPid.str());
+  const sort::CommunityRules communityRules{{consumerPid, rule}};
+  const QHash<PackageId, std::shared_ptr<AboutXmlMod>> mods{
+      {consumerPid, consumer},
+      {alternativePid, makeMod(alternativePid.str())},
+  };
+  auto graphSettings = settings(true);
+  graphSettings.use_community_rules = true;
+
+  g.build(mods, mods.keys(), graphSettings, &communityRules);
+  const auto aboutEdges = g.edgesOfType(consumerPid, EdgeType::kLoadAfter);
+  REQUIRE(aboutEdges.size() == 1);
+  CHECK(aboutEdges.cbegin()->target == alternativePid);
+  CHECK(aboutEdges.cbegin()->origin == EdgeOrigin::kAboutXml);
+  const auto communityEdges = g.edgesOfType(consumerPid, EdgeType::kLoadBefore);
+  REQUIRE(communityEdges.size() == 1);
+  CHECK(communityEdges.cbegin()->target == alternativePid);
+  CHECK(communityEdges.cbegin()->origin == EdgeOrigin::kCommunityRules);
+}
+
 TEST_CASE("ConstraintGraph incompatibility edge") {
   ConstraintGraph g;
   auto a = makeMod(QStringLiteral("mod.a"));

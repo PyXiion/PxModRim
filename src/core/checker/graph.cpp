@@ -119,7 +119,7 @@ void ConstraintGraph::build(const QHash<PackageId, AboutXmlModPtr>& activeMods,
 
   for (auto it = activeMods.cbegin(); it != activeMods.cend(); ++it) {
     addRules(it.key(), it.value()->aboutRules, EdgeOrigin::kAboutXml,
-             alternatives);
+             alternatives, activeMods, settings.use_alternative_package_ids);
   }
 
   if (settings.use_community_rules && communityRules != nullptr &&
@@ -297,12 +297,22 @@ void ConstraintGraph::addEdges(const PackageId& source, const Targets& targets,
   }
 }
 
-void ConstraintGraph::addRules(const PackageId& pid, const BaseRules& rules,
-                               EdgeOrigin origin,
-                               const Alternatives& alternatives) {
+void ConstraintGraph::addRules(
+    const PackageId& pid, const BaseRules& rules, EdgeOrigin origin,
+    const Alternatives& alternatives,
+    const QHash<PackageId, AboutXmlModPtr>& activeMods,
+    bool useAlternativePackageIds) {
   for (const DependencyMod& dep : rules.dependencies) {
-    addEdges(pid, std::array{dep.packageId}, EdgeType::kDependency, origin,
-             alternatives);
+    const PackageId* target = &dep.packageId;
+    if (useAlternativePackageIds && !activeMods.contains(dep.packageId)) {
+      for (const PackageId& alternativePid : dep.alternativePackageIds) {
+        if (activeMods.contains(alternativePid)) {
+          target = &alternativePid;
+          break;
+        }
+      }
+    }
+    addEdges(pid, std::array{*target}, EdgeType::kDependency, origin, {});
     if (!dep.alternativePackageIds.empty()) {
       addEdges(pid, dep.alternativePackageIds, EdgeType::kAlternative, origin,
                {});

@@ -91,7 +91,9 @@ class ConstraintGraph {
   void addEdges(const PackageId& source, const Targets& targets, EdgeType type,
                 EdgeOrigin origin, const Alternatives& alternatives);
   void addRules(const PackageId& pid, const BaseRules& rules, EdgeOrigin origin,
-                const Alternatives& alternatives);
+                const Alternatives& alternatives,
+                const QHash<PackageId, AboutXmlModPtr>& activeMods,
+                bool useAlternativePackageIds);
   void addLoadRules(const PackageId& pid, const CaseInsensitiveSet& loadBefore,
                     const CaseInsensitiveSet& loadAfter,
                     const CaseInsensitiveSet& incompatibleWith,
