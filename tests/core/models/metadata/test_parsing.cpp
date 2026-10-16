@@ -160,6 +160,14 @@ TEST_CASE(
   CHECK(mod->description == QStringLiteral("Text for 1.5"));
 }
 
+TEST_CASE("a parsed mod without a description does not claim to be invalid") {
+  const auto mod = aboutFromXml(
+      "<ModMetaData><packageId>x.y</packageId><name>Valid</name></"
+      "ModMetaData>");
+  CHECK(mod->valid);
+  CHECK(mod->description.isEmpty());
+}
+
 TEST_CASE("explicit steamAppId is read") {
   const auto mod = aboutFromXml(R"(<ModMetaData><packageId>x.y</packageId>
         <steamAppId>1234</steamAppId></ModMetaData>)");

@@ -183,9 +183,9 @@ bool isEnvAssignment(const QString& token) {
 
 Platform currentPlatform() {
 #if defined(Q_OS_MACOS)
-  return Platform::MacOS;
+  return Platform::kMacOs;
 #elif defined(Q_OS_WIN)
-  return Platform::Windows;
+  return Platform::kWindows;
 #else
   return Platform::kLinux;
 #endif

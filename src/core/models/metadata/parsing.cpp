@@ -226,7 +226,7 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(
   }
   if (!versionDescription.isEmpty()) {
     mod->description = std::move(versionDescription);
-  } else if (!description.isEmpty()) {
+  } else {
     mod->description = std::move(description);
   }
   for (size_t index = 0; index < versionRules.size(); ++index) {
