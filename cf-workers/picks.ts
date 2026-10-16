@@ -65,20 +65,18 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
   }
 
   let previewUrl: string | null = null;
-  if (Object.prototype.hasOwnProperty.call(input, 'preview_url')) {
-    if (input.preview_url !== null) {
-      if (typeof input.preview_url !== 'string' || input.preview_url.length > 2048) {
-        throw new HttpError(400, 'preview_url must be null or an HTTPS URL of at most 2048 characters');
-      }
-      let url: URL;
-      try {
-        url = new URL(input.preview_url);
-      } catch {
-        throw new HttpError(400, 'preview_url must be a valid HTTPS URL');
-      }
-      if (url.protocol !== 'https:') throw new HttpError(400, 'preview_url must use HTTPS');
-      previewUrl = input.preview_url;
+  if (Object.prototype.hasOwnProperty.call(input, 'preview_url') && input.preview_url !== null) {
+    if (typeof input.preview_url !== 'string' || input.preview_url.length > 2048) {
+      throw new HttpError(400, 'preview_url must be null or an HTTPS URL of at most 2048 characters');
     }
+    let url: URL;
+    try {
+      url = new URL(input.preview_url);
+    } catch {
+      throw new HttpError(400, 'preview_url must be a valid HTTPS URL');
+    }
+    if (url.protocol !== 'https:') throw new HttpError(400, 'preview_url must use HTTPS');
+    previewUrl = input.preview_url;
   }
   const tags: string[] = [];
   if (Object.prototype.hasOwnProperty.call(input, 'tags')) {
