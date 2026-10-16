@@ -64,7 +64,7 @@ SteamWorkshopViewPanel::SteamWorkshopViewPanel(CoreContext& ctx,
 #ifdef PX_HAS_WEBENGINE
   layout->addWidget(m_qml, 1);
 #else
-  qml_->hide();
+  m_qml->hide();
   auto* unavailable = new QLabel(
       QStringLiteral(
           "This build does not include the Steam Workshop web browser."),

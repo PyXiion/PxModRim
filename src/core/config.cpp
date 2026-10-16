@@ -178,7 +178,7 @@ GamePaths findGamePaths(QString& foundRoot) {
 }
 #elif defined(Q_OS_MACOS)
 QString find_mac_app(const QString& rimworld_dir) {
-  if (!is_dir(rimworld_dir)) {
+  if (!isDir(rimworld_dir)) {
     return {};
   }
   const QStringList apps =
@@ -186,33 +186,31 @@ QString find_mac_app(const QString& rimworld_dir) {
           .entryList({QStringLiteral("*.app")},
                      QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
                      QDir::Name);
-  return apps.isEmpty() ? QString() : join_path(rimworld_dir, {apps.first()});
+  return apps.isEmpty() ? QString() : joinPath(rimworld_dir, {apps.first()});
 }
 
-GamePaths find_game_paths(QString& found_root) {
-  const QString steam_id = steam_app_id();
-  const QString steam_root =
-      join_path(QDir::homePath(), {QStringLiteral("Library"),
-                                   QStringLiteral("Application Support"),
-                                   QStringLiteral("Steam")});
-  found_root = is_dir(steam_root) ? steam_root : QString();
-  if (const QString game = find_rimworld_in_steam_root(steam_root, steam_id);
+GamePaths findGamePaths(QString& foundRoot) {
+  const QString steamId = steamAppId();
+  const QString steamRoot =
+      joinPath(QDir::homePath(), {QStringLiteral("Library"),
+                                  QStringLiteral("Application Support"),
+                                  QStringLiteral("Steam")});
+  foundRoot = isDir(steamRoot) ? steamRoot : QString();
+  if (const QString game = findRimworldInSteamRoot(steamRoot, steamId);
       !game.isEmpty()) {
-    return game_paths_for(game,
-                          workshop_path_from_game(game, steam_root, steam_id));
+    return gamePathsFor(game, workshopPathFromGame(game, steamRoot, steamId));
   }
-  const QString fallback = join_path(
-      steam_root, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                   QStringLiteral("RimWorld")});
+  const QString fallback = joinPath(
+      steamRoot, {QStringLiteral("steamapps"), QStringLiteral("common"),
+                  QStringLiteral("RimWorld")});
   if (const QString app_bundle = find_mac_app(fallback);
       !app_bundle.isEmpty()) {
     return GamePaths{
         .game = app_bundle,
-        .local = join_path(fallback, {QStringLiteral("Mods")}),
-        .workshop =
-            join_path(steam_root,
-                      {QStringLiteral("steamapps"), QStringLiteral("workshop"),
-                       QStringLiteral("content"), steam_id}),
+        .local = joinPath(fallback, {QStringLiteral("Mods")}),
+        .workshop = joinPath(
+            steamRoot, {QStringLiteral("steamapps"), QStringLiteral("workshop"),
+                        QStringLiteral("content"), steamId}),
     };
   }
   return {};
@@ -220,42 +218,41 @@ GamePaths find_game_paths(QString& found_root) {
 #elif defined(Q_OS_WIN)
 // Steam's install location is recorded in the registry; the 32-bit view is
 // checked first, as the legacy detection did.
-GamePaths find_game_paths(QString& found_root) {
-  const QString steam_id = steam_app_id();
+GamePaths findGamePaths(QString& foundRoot) {
+  const QString steamId = steamAppId();
   const QStringList registry_keys = {
       QStringLiteral(R"(HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Valve\Steam)"),
       QStringLiteral(R"(HKEY_LOCAL_MACHINE\SOFTWARE\Valve\Steam)"),
   };
   for (const auto& key : registry_keys) {
-    const QString steam_root = QSettings(key, QSettings::NativeFormat)
-                                   .value(QStringLiteral("InstallPath"))
-                                   .toString();
-    if (steam_root.isEmpty()) {
+    const QString steamRoot = QSettings(key, QSettings::NativeFormat)
+                                  .value(QStringLiteral("InstallPath"))
+                                  .toString();
+    if (steamRoot.isEmpty()) {
       spdlog::debug("Unable to inspect Windows Steam registry key {}",
                     key.toStdString());
       continue;
     }
-    if (const QString game = find_rimworld_in_steam_root(steam_root, steam_id);
+    if (const QString game = findRimworldInSteamRoot(steamRoot, steamId);
         !game.isEmpty()) {
-      return game_paths_for(
-          game, workshop_path_from_game(game, steam_root, steam_id));
+      return gamePathsFor(game, workshopPathFromGame(game, steamRoot, steamId));
     }
   }
 
   const QString fallback = QStringLiteral("C:/Program Files (x86)/Steam");
-  const QString game = join_path(
-      fallback, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                 QStringLiteral("RimWorld")});
-  if (is_dir(game)) {
-    return game_paths_for(
-        game, join_path(fallback, {QStringLiteral("steamapps"),
-                                   QStringLiteral("workshop"),
-                                   QStringLiteral("content"), steam_id}));
+  const QString game =
+      joinPath(fallback, {QStringLiteral("steamapps"), QStringLiteral("common"),
+                          QStringLiteral("RimWorld")});
+  if (isDir(game)) {
+    return gamePathsFor(
+        game, joinPath(fallback,
+                       {QStringLiteral("steamapps"), QStringLiteral("workshop"),
+                        QStringLiteral("content"), steamId}));
   }
   return {};
 }
 #else
-GamePaths find_game_paths(QString&) { return {}; }
+GamePaths findGamePaths(QString&) { return {}; }
 #endif
 
 // Locates the RimWorld Config folder, which the game writes beside its save
@@ -287,21 +284,21 @@ QString detectConfigFolder([[maybe_unused]] const QString& steamRoot) {
     return native;
   }
 #elif defined(Q_OS_MACOS)
-  const QString config = join_path(
+  const QString config = joinPath(
       QDir::homePath(),
       {QStringLiteral("Library"), QStringLiteral("Application Support"),
        QStringLiteral("Rimworld"), QStringLiteral("Config")});
-  if (is_dir(config)) {
+  if (isDir(config)) {
     spdlog::debug("Detected macOS config folder: {}", config.toStdString());
     return config;
   }
 #elif defined(Q_OS_WIN)
-  const QString config = join_path(
+  const QString config = joinPath(
       QDir::homePath(),
       {QStringLiteral("AppData"), QStringLiteral("LocalLow"),
        QStringLiteral("Ludeon Studios"),
        QStringLiteral("RimWorld by Ludeon Studios"), QStringLiteral("Config")});
-  if (is_dir(config)) {
+  if (isDir(config)) {
     spdlog::debug("Detected Windows config folder: {}", config.toStdString());
     return config;
   }
