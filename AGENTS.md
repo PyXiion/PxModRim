@@ -20,7 +20,7 @@ CI runs configure, build and test on every OS (see CI matrix). Only the Linux St
 - Without PxSteamDL the app runs as a plain mod sorter.
 
 ## Entrypoint
-- `just run` (sets `PX_LOG_LEVEL=debug`), or `build/default/src/app/pxmodrim`.
+- `just run` (Steam browser variant, `build/default`), `just run-native` (native Workshop browser, `build/native`) or `just run-none` (sorter only, `build/none`). Each configures its own build directory with the matching `PX_WORKSHOP_VARIANT`, builds, and starts the app with `PX_LOG_LEVEL=debug`; extra arguments are passed to the app.
 - Chain: `src/app/main.cpp` `main()` → `runApp()`, the composition root:
   config services → `CoreContext::create` → `px::modrim::registerCorePlugins` → `px::modrim::AppContext` → `px::modrim::registerUiPlugins` → `setupAll()` → `MainWindow` → `refreshMods()` → `initAll()`.
 - `src/app/plugins.cpp` is the only list of concrete plugins.

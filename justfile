@@ -12,8 +12,20 @@ build *args: build-js
     [ -f build/default/CMakeCache.txt ] || cmake --preset default
     cmake --build --preset default {{args}}
 
-run *args: build
-    PX_LOG_LEVEL=debug build/default/src/app/pxmodrim {{args}}
+# Build and start the app (Steam browser variant); each variant has its own build directory
+run *args: (_run "SteamWorkshop" "default" args)
+
+# Build and start the app with the native Workshop browser
+run-native *args: (_run "NativeWorkshop" "native" args)
+
+# Build and start the app as a plain mod sorter (no Workshop)
+run-none *args: (_run "NoWorkshop" "none" args)
+
+[private]
+_run variant dir *args: build-js
+    cmake -S . -B build/{{dir}} -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPX_WORKSHOP_VARIANT={{variant}}
+    cmake --build build/{{dir}}
+    PX_LOG_LEVEL=debug build/{{dir}}/src/app/pxmodrim {{args}}
 
 test: build
     QT_QPA_PLATFORM=offscreen ctest --preset default
