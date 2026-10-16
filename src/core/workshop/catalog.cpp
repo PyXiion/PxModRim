@@ -113,8 +113,11 @@ void WorkshopCatalog::bindDownloads(DownloadManager& downloads) {
   m_downloads = &downloads;
   m_downloadFinishedId = m_downloads->downloadFinished.connect(
       [this](const DownloadResult&) { invalidateInstalled(); });
-  m_busyChangedId = m_downloads->busyChanged.connect(
-      [this](bool busy) { onBusyChanged(busy); });
+  m_busyChangedId = m_downloads->busyChanged.connect([this](bool busy) {
+    if (!busy) {
+      resumeIdleWaiters();
+    }
+  });
 }
 
 void WorkshopCatalog::disconnectEvents() {
@@ -134,11 +137,7 @@ void WorkshopCatalog::disconnectEvents() {
 WorkshopCatalog::~WorkshopCatalog() {
   *m_alive = false;
   disconnectEvents();
-  auto waiters = std::move(m_idleWaiters);
-  m_idleWaiters.clear();
-  for (std::coroutine_handle<> waiter : waiters) {
-    waiter.resume();
-  }
+  resumeIdleWaiters();
 }
 
 QCoro::Task<void> WorkshopCatalog::shutdown() {
@@ -150,11 +149,7 @@ QCoro::Task<void> WorkshopCatalog::shutdown() {
   if (m_downloading) {
     m_downloads->cancel();
   }
-  auto waiters = std::move(m_idleWaiters);
-  m_idleWaiters.clear();
-  for (std::coroutine_handle<> waiter : waiters) {
-    waiter.resume();
-  }
+  resumeIdleWaiters();
   for (const auto& client : m_clients) {
     client->shutdown();
   }
@@ -401,10 +396,7 @@ QCoro::Task<void> WorkshopCatalog::drain() {
   m_draining = false;
 }
 
-void WorkshopCatalog::onBusyChanged(bool busy) {
-  if (busy) {
-    return;
-  }
+void WorkshopCatalog::resumeIdleWaiters() {
   auto waiters = std::move(m_idleWaiters);
   m_idleWaiters.clear();
   for (std::coroutine_handle<> waiter : waiters) {

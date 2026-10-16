@@ -259,30 +259,23 @@ QCoro::Task<Result<DownloadResult>> SteamDownloader::downloadMods(
         Error{QStringLiteral("A download is already running.")});
   }
 
-  QStringList ids;
-  QSet<QString> seen;
-  for (const auto& id : modIds) {
-    if (!seen.contains(id)) {
-      seen.insert(id);
-      ids.append(id);
-    }
-  }
+  modIds.removeDuplicates();
 
-  auto batch = std::make_shared<SteamBatch>(static_cast<int>(ids.size()));
+  auto batch = std::make_shared<SteamBatch>(static_cast<int>(modIds.size()));
   m_stop.emplace();
   QPromise<void> completion;
   completion.start();
   m_batchFinished = completion.future();
   const auto finish = qScopeGuard([&completion] { completion.finish(); });
-  m_activeIds = QSet<QString>(ids.begin(), ids.end());
+  m_activeIds = QSet<QString>(modIds.begin(), modIds.end());
   busyChanged.notify(true);
-  batchStarted.notify(ids);
+  batchStarted.notify(modIds);
   spdlog::info("[workshop] downloading {} items into {} (first ids: {})",
-               ids.size(), root.toStdString(),
-               ids.mid(0, 5).join(QStringLiteral(", ")).toStdString());
+               modIds.size(), root.toStdString(),
+               modIds.mid(0, 5).join(QStringLiteral(", ")).toStdString());
 
   try {
-    co_await runBatch(ids, root, batch);
+    co_await runBatch(std::move(modIds), root, batch);
   } catch (...) {
     finishBatch(batch);
     throw;
@@ -334,6 +327,8 @@ SteamDownloader::ensureClient() {
     m_client = std::move(*loggedIn);
     m_clientOptions = options;
   }
+  // Returning m_client directly moved it out of the member (the session was
+  // then logged in again), so hand back a copy.
   auto result = m_client;
   co_return result;
 }
@@ -341,6 +336,11 @@ SteamDownloader::ensureClient() {
 QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
                                             std::shared_ptr<SteamBatch> batch) {
   const std::stop_token stop = m_stop->get_token();
+  const auto failItems = [&](const QString& error) {
+    for (const auto& id : ids) {
+      finishItem(*batch, id, error);
+    }
+  };
   const std::filesystem::path rootPath(root.toStdWString());
   const std::error_code mkdirError = co_await QtConcurrent::run([rootPath] {
     std::error_code ec;
@@ -348,9 +348,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
     return ec;
   });
   if (stop.stop_requested()) {
-    for (const auto& id : ids) {
-      finishItem(*batch, id, QStringLiteral("cancelled"));
-    }
+    failItems(QStringLiteral("cancelled"));
     co_return;
   }
   if (mkdirError) {
@@ -359,9 +357,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
             .arg(root, QString::fromStdString(mkdirError.message()));
     spdlog::error("[workshop] {}", message.toStdString());
     statusMessageChanged.notify(message);
-    for (const auto& id : ids) {
-      finishItem(*batch, id, message);
-    }
+    failItems(message);
     co_return;
   }
 
@@ -371,9 +367,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
   const auto loginStarted = std::chrono::steady_clock::now();
   auto login = co_await ensureClient();
   if (stop.stop_requested()) {
-    for (const auto& id : ids) {
-      finishItem(*batch, id, QStringLiteral("cancelled"));
-    }
+    failItems(QStringLiteral("cancelled"));
     co_return;
   }
   if (!login) {
@@ -381,9 +375,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
         QStringLiteral("Steam login failed: %1").arg(login.error().message);
     spdlog::error("[workshop] {}", message.toStdString());
     statusMessageChanged.notify(message);
-    for (const auto& id : ids) {
-      finishItem(*batch, id, message);
-    }
+    failItems(message);
     co_return;
   }
   spdlog::debug("[workshop] steam session ready in {:.1f}s",
@@ -452,9 +444,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
     // A failed call leaves the Steam session suspect; log in again next time.
     m_client.reset();
     const QString message = QString::fromStdString(outcome.error());
-    for (const auto& id : ids) {
-      finishItem(*batch, id, message);
-    }
+    failItems(message);
     co_return;
   }
 

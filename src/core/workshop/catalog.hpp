@@ -180,7 +180,7 @@ class WorkshopCatalog : public Plugin {
   InstallState installStateOf(const CatalogMod& mod,
                               const InstalledIndex& installed) const;
   void changeUrl(const QString& url);
-  void onBusyChanged(bool busy);
+  void resumeIdleWaiters();
   QCoro::Task<void> drain();
 
   template <class T>

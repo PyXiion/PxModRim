@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QScopeGuard>
 #include <QVariant>
 #include <algorithm>
 #include <expected>
@@ -161,16 +162,10 @@ QCoro::Task<CatalogResult<CatalogClient::Reply>> CatalogClient::send(
     reply = m_network.get(request);
   }
   m_pending.insert(reply);
-  // Runs however the coroutine leaves, so a finished reply is never left
-  // registered for abort.
-  struct Release {
-    QSet<QNetworkReply*>& pending;
-    QNetworkReply* reply;
-    ~Release() {
-      pending.remove(reply);
-      reply->deleteLater();
-    }
-  } release{m_pending, reply};
+  const auto release = qScopeGuard([this, reply] {
+    m_pending.remove(reply);
+    reply->deleteLater();
+  });
 
   co_await qCoro(reply).waitForFinished();
 
