@@ -372,10 +372,9 @@ QCoro::Task<void> WorkshopViewPanel::load(bool append) {
 
 void WorkshopViewPanel::showFavourites() {
   std::vector<CatalogCollection> matches;
+  const auto query = m_criteria.query.toCaseFolded();
   for (const auto& item : m_favourites.items())
-    if (QString::fromStdString(item.title)
-            .toCaseFolded()
-            .contains(m_criteria.query.toCaseFolded()))
+    if (QString::fromStdString(item.title).toCaseFolded().contains(query))
       matches.push_back(item);
   collectionsModel->setPage(rows(matches), static_cast<int>(matches.size()),
                             std::nullopt);

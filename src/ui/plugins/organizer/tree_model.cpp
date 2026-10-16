@@ -334,10 +334,7 @@ QModelIndex ModTreeModel::indexForKey(const QString& key) const {
   return find(find, m_root.get());
 }
 QModelIndex ModTreeModel::indexForUuid(const QString& uuid) const {
-  for (const auto* item : m_root->walk())
-    if (item->kind == "mod" && item->leaf && item->leaf->uuid == uuid)
-      return indexOf(item);
-  return {};
+  return indexForKey("m:" + uuid);
 }
 QList<QModelIndex> ModTreeModel::expandedIndexes(
     const QModelIndex& parent) const {

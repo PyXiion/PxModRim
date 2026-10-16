@@ -1,7 +1,6 @@
 import "./qwebchannel.js";
 import { getModState, applyModState } from "./controls";
 import { refreshAllDepsBadges, updateAllModBadges } from "./badges";
-import { log } from "./utils";
 
 // Ensure __pxmodrim exists (modules may initialize before main.ts guard)
 if (!window.__pxmodrim) {
@@ -15,7 +14,6 @@ if (!window.__pxmodrim) {
 
 let _bridgeDataReady = false;
 let _bridgeDataResolve: (() => void) | null = null;
-let _bridgeDataReject: ((reason: Error) => void) | null = null;
 let _bridgeDataPromise: Promise<void> | null = null;
 
 export function isBridgeDataReady(): boolean {
@@ -31,11 +29,9 @@ export function waitForBridgeData(timeoutMs = 15000): Promise<void> {
   if (!_bridgeDataPromise) {
     _bridgeDataPromise = new Promise<void>((resolve, reject) => {
       _bridgeDataResolve = resolve;
-      _bridgeDataReject = reject;
       setTimeout(() => {
         _bridgeDataPromise = null;
         _bridgeDataResolve = null;
-        _bridgeDataReject = null;
         reject(new Error("Bridge data timeout"));
       }, timeoutMs);
     });

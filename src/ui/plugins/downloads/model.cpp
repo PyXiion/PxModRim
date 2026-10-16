@@ -56,10 +56,8 @@ void DownloadsModel::apply(const DownloadItemStatus& status) {
     row.state = QStringLiteral("failed");
     row.error = status.error;
     row.progress = 0;
-  } else if (status.status == QLatin1String("success")) {
-    row.state = finalState(status.bytesTotal);
-    row.progress = 1;
-  } else if (status.bytesTotal > 0 && status.bytesDone < status.bytesTotal) {
+  } else if (status.status != QLatin1String("success") &&
+             status.bytesTotal > 0 && status.bytesDone < status.bytesTotal) {
     row.state = QStringLiteral("downloading");
     row.progress = static_cast<double>(status.bytesDone) / status.bytesTotal;
   } else {

@@ -47,8 +47,7 @@ export function scrapeDepsFromContainer(containerEl: Element): ModToggle[] {
     'a[href*="filedetails/?id="]',
   );
   links.forEach((link) => {
-    const match = link.href.match(/[?&]id=(\d+)/);
-    const modId = match ? match[1] : null;
+    const modId = getModId(link);
     const titleEl = link.querySelector(".requiredItem");
     const title = titleEl
       ? titleEl.textContent?.trim()
