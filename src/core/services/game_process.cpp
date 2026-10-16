@@ -29,8 +29,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <tlhelp32.h>
+// clang-format off
+// tlhelp32.h needs the types windows.h declares, so the order matters.
 #include <windows.h>
+#include <tlhelp32.h>
+// clang-format on
 #elif defined(Q_OS_MACOS)
 #include <libproc.h>
 #include <vector>
