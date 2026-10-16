@@ -22,6 +22,8 @@ jobs:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     env:
       VARIANT: ${{ matrix.workshop }}
+      CC: gcc-13
+      CXX: g++-13
     steps:
       - uses: actions/checkout@v7
 
@@ -44,8 +46,10 @@ jobs:
 
       - name: Install system dependencies
         run: |
+          # GCC 13 provides C++23 <expected> while Jammy preserves glibc 2.35.
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build ccache dpkg patchelf rpm file libfuse2 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev zipcmp zipmerge ziptool libspdlog-dev
+          sudo apt-get install -y gcc-13 g++-13 ninja-build ccache dpkg patchelf rpm file libfuse2 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev zipcmp zipmerge ziptool libspdlog-dev
 
       - name: Build QCoro against Qt
         shell: bash
@@ -119,7 +123,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' build/release/CMakeCache.txt)
+          fi
 
           pkg=dist/deb
           rm -rf "$pkg"
@@ -311,19 +319,24 @@ jobs:
           fi
           rm -f dist/PxModRim/bin/qtwebengine_devtools_resources.pak
 
-      - name: Build NSIS installer
-        shell: bash
+      - name: Build NSIS installer and zip
+        shell: pwsh
         run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          makensis.exe "/DVERSION=$version" "/DDIST_DIR=$PWD/dist/PxModRim/bin" \
-            "/DOUTPUT_FILE=$PWD/dist/PxModRim-Windows-$VARIANT-Setup.exe" packaging/windows/installer.nsi
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            $version = (Select-String '^CMAKE_PROJECT_VERSION:STATIC=' build/release/CMakeCache.txt).Line.Split('=')[1]
+          }
+          makensis.exe "/DVERSION=$version" "/DDIST_DIR=$PWD/dist/PxModRim/bin" `
+            "/DOUTPUT_FILE=$PWD/dist/PxModRim-Windows-$env:VARIANT-Setup.exe" packaging/windows/installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          7z a "dist/PxModRim-Windows-$env:VARIANT.zip" "./dist/PxModRim/bin/*"
 
       - name: Upload artifact (dist)
         uses: actions/upload-artifact@v7
         with:
           name: PxModRim-Windows-${{ matrix.workshop }}
-          path: dist/PxModRim/bin/*
+          path: dist/PxModRim-Windows-${{ matrix.workshop }}.zip
 
       - name: Upload artifact (installer)
         uses: actions/upload-artifact@v7
@@ -507,12 +520,6 @@ jobs:
           path: artifacts
           merge-multiple: false
 
-      - name: Package Windows release
-        run: |
-          for variant in NoWorkshop SteamWorkshop NativeWorkshop; do
-            7z a "PxModRim-Windows-${variant}.zip" "./artifacts/PxModRim-Windows-${variant}/*"
-          done
-
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
@@ -522,7 +529,7 @@ jobs:
             artifacts/PxModRim-Linux-Deb-*/*.deb
             artifacts/PxModRim-Linux-RPM-*/*.rpm
             artifacts/PxModRim-Flatpak-*/*.flatpak
-            PxModRim-Windows-*.zip
+            artifacts/PxModRim-Windows-*/*.zip
             artifacts/PxModRim-Windows-Installer-*/*-Setup.exe
             artifacts/PxModRim-macOS-DMG-*/*.dmg
             artifacts/PxModRim-macOS-ZIP-*/*.zip
