@@ -426,10 +426,15 @@ jobs:
           cmake --install build/release --prefix "$PWD/dist/stage"
           mv dist/stage/pxmodrim.app dist/PxModRim.app
           rm -rf dist/stage
+          # Only SQLite is used; other drivers require external database clients.
+          find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name libqsqlite.dylib -delete
           macdeployqt dist/PxModRim.app -qmldir=src/ui -always-overwrite
           mkdir -p dist/PxModRim.app/Contents/Frameworks
-          dylibbundler -od -b -x dist/PxModRim.app/Contents/MacOS/pxmodrim \
+          # Preserve the Qt frameworks already copied by macdeployqt.
+          dylibbundler -of -b -x dist/PxModRim.app/Contents/MacOS/pxmodrim \
+            -s "$PWD/dist/PxModRim.app/Contents/Frameworks" \
             -d dist/PxModRim.app/Contents/Frameworks/ -p @executable_path/../Frameworks/
+          test -f dist/PxModRim.app/Contents/Frameworks/QtCore.framework/QtCore
 
       - name: Sign and notarize macOS app
         if: env.MACOS_SIGNING_CONFIGURED == 'true'

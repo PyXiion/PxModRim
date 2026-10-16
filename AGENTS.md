@@ -145,8 +145,9 @@ C# RimWorld mod submodules (see `companion-mods/AGENTS.md`):
 Release builds run on `v*` tags or manual dispatch (`build.yml`); only tag runs publish a GitHub release. Each variant runs `cmake --build --preset release` and `cmake --install`, then:
 - **Linux**: Ubuntu 22.04 with GCC 13 from `ubuntu-toolchain-r/test` supplies C++23 while retaining the glibc 2.35 floor. Install into `dist/AppDir/usr`; linuxdeploy + linuxdeploy-plugin-qt write the AppImage and deploy Qt into the same tree; `PxModRim-Linux-<variant>.tar.gz` is `usr/`; `.deb` (`/opt/pxmodrim`, `/usr/bin/pxmodrim` symlink) and `.rpm` (`packaging/linux/pxmodrim.spec`) are built from the same tree. The Flatpak manifest (`packaging/flatpak/`) consumes the tarball.
 - **Windows**: install into `dist/PxModRim/bin`, rename to `PxModRim.exe`, `windeployqt --release --no-translations --qmldir src/ui`, then build the NSIS installer (`packaging/windows/installer.nsi`) and release zip in the Windows job, including on manual dispatch. Invoke NSIS from PowerShell so Git Bash does not convert its `/D` options into paths.
-- **macOS**: install as `pxmodrim.app`, rename to `PxModRim.app`, `macdeployqt -qmldir=src/ui`, `dylibbundler` for Homebrew dylibs. Developer ID signing and notarization run only when the secrets are set; otherwise the app is ad-hoc signed.
+- **macOS**: install as `pxmodrim.app`, rename to `PxModRim.app`, `macdeployqt -qmldir=src/ui`, `dylibbundler -of` for Homebrew dylibs while preserving the deployed Qt frameworks (`-od` would erase them). Developer ID signing and notarization run only when the secrets are set; otherwise the app is ad-hoc signed.
 - Package versions come from the tag on tag runs and `CMAKE_PROJECT_VERSION` on manual dispatch; keep `project(VERSION)` in the root CMakeLists in step with release tags.
+- Linux and macOS deploy only the SQLite SQL driver; other Qt SQL drivers require external database clients that the application does not use.
 
 ## AI PRs
 PR description starts with: "Greetings, PyXiion! The silicon-based contributor is here."
