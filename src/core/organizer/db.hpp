@@ -20,6 +20,8 @@ QString dbPath(const QString& configDir);
 // that owns the connection, so operations are serialized in submission order
 // and each is atomic. The connection opens on first use and closes on close()
 // or destruction.
+// Folder creation and reparenting enforce the depth limit and reject cycles
+// against committed rows inside the mutation transaction.
 class OrganizerDb {
  public:
   explicit OrganizerDb(QString path);

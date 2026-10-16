@@ -1,5 +1,8 @@
 #include <QDir>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
+#include <QUuid>
 #include <memory>
 #include <variant>
 
@@ -63,6 +66,22 @@ struct TestHarness {
 
   ~TestHarness() { wait(svc.shutdown()); }
 };
+
+void checkRootedTree(const OrganizerState& state) {
+  for (const Folder& folder : state.folders) {
+    qint64 current = folder.id;
+    int depth = 0;
+    while (current != kRootId && depth <= kMaxDepth) {
+      const auto it = state.folders.constFind(current);
+      REQUIRE(it != state.folders.cend());
+      REQUIRE(it->parentId.has_value());
+      current = *it->parentId;
+      ++depth;
+    }
+    CHECK(current == kRootId);
+    CHECK(depth <= kMaxDepth);
+  }
+}
 
 }  // namespace
 
@@ -128,9 +147,113 @@ TEST_CASE("moving a folder into its own subtree or moving root is rejected") {
   expectError(wait(h.svc.moveFolder(a.id, b.id)),
               QStringLiteral("into itself"));
   expectError(wait(h.svc.moveFolder(kRootId, a.id)));
+  expectError(wait(h.db.setParent(a.id, a.id)), QStringLiteral("into itself"));
+  expectError(wait(h.db.setParent(a.id, b.id)), QStringLiteral("into itself"));
 
   CHECK(h.changes.count == 2);
   CHECK(h.svc.state().folders.value(a.id).parentId == kRootId);
+}
+
+TEST_CASE("concurrent opposite folder moves cannot create a cycle") {
+  TestHarness h;
+  h.ctx.add(QStringLiteral("u1"), QStringLiteral("One"),
+            QStringLiteral("a.one"));
+  h.ctx.add(QStringLiteral("u2"), QStringLiteral("Two"),
+            QStringLiteral("a.two"));
+  const Folder a = expect(wait(
+      h.svc.createFolderFrom(QStringLiteral("A"), {QStringLiteral("a.one")})));
+  const Folder b = expect(wait(
+      h.svc.createFolderFrom(QStringLiteral("B"), {QStringLiteral("a.two")})));
+
+  auto movingA = h.svc.moveFolder(a.id, b.id);
+  auto movingB = h.svc.moveFolder(b.id, a.id);
+  const auto movedA = wait(std::move(movingA));
+  const auto movedB = wait(std::move(movingB));
+
+  REQUIRE(movedA.has_value() != movedB.has_value());
+  expectError(movedA ? movedB : movedA, QStringLiteral("into itself"));
+  checkRootedTree(expect(wait(h.db.load())));
+  wait(h.svc.init());
+  CHECK(h.svc.tree().total == 2);
+}
+
+TEST_CASE("concurrent folder moves enforce committed depth and height") {
+  TestHarness h;
+  const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+  const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
+  const Folder x = expect(wait(h.svc.createFolder(QStringLiteral("X"))));
+  const Folder y = expect(wait(h.svc.createFolder(QStringLiteral("Y"))));
+
+  bool moveAncestorFirst = false;
+  SECTION("subtree height changes first") {}
+  SECTION("destination depth changes first") { moveAncestorFirst = true; }
+  auto first = moveAncestorFirst ? h.svc.moveFolder(a.id, y.id)
+                                 : h.svc.moveFolder(x.id, b.id);
+  auto second = moveAncestorFirst ? h.svc.moveFolder(x.id, b.id)
+                                  : h.svc.moveFolder(a.id, y.id);
+  const auto movedFirst = wait(std::move(first));
+  const auto movedSecond = wait(std::move(second));
+
+  REQUIRE(movedFirst.has_value() != movedSecond.has_value());
+  expectError(movedFirst ? movedSecond : movedFirst,
+              QStringLiteral("at most %1 levels").arg(kMaxDepth));
+  checkRootedTree(expect(wait(h.db.load())));
+}
+
+TEST_CASE("folder creation rechecks depth after a concurrent parent move") {
+  TestHarness h;
+  const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+  const Folder child =
+      expect(wait(h.svc.createFolder(QStringLiteral("Child"), a.id)));
+  const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"))));
+  QStringList packageIds;
+  SECTION("empty folder") {}
+  SECTION("folder with mods") { packageIds.append(QStringLiteral("a.one")); }
+
+  auto moving = h.svc.moveFolder(a.id, b.id);
+  auto creating = packageIds.isEmpty()
+                      ? h.svc.createFolder(QStringLiteral("Too deep"), child.id)
+                      : h.svc.createFolderFrom(QStringLiteral("Too deep"),
+                                               packageIds, child.id);
+  expect(wait(std::move(moving)));
+  expectError(wait(std::move(creating)),
+              QStringLiteral("at most %1 levels").arg(kMaxDepth));
+  const OrganizerState persisted = expect(wait(h.db.load()));
+  checkRootedTree(persisted);
+  CHECK(persisted.folders.size() == 4);
+  CHECK(persisted.placements.isEmpty());
+}
+
+TEST_CASE("persisted folder cycles do not hang organizer validation") {
+  TestHarness h;
+  const Folder a = expect(wait(h.svc.createFolder(QStringLiteral("A"))));
+  const Folder b = expect(wait(h.svc.createFolder(QStringLiteral("B"), a.id)));
+  const Folder other =
+      expect(wait(h.svc.createFolder(QStringLiteral("Other"))));
+  wait(h.db.close());
+  const QString connection = QUuid::createUuid().toString();
+  {
+    QSqlDatabase raw =
+        QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+    raw.setDatabaseName(h.dir.filePath(QStringLiteral("organizer.db")));
+    REQUIRE(raw.open());
+    QSqlQuery query(raw);
+    REQUIRE(query.prepare(
+        QStringLiteral("UPDATE folders SET parent_id = ? WHERE id = ?")));
+    query.addBindValue(b.id);
+    query.addBindValue(a.id);
+    REQUIRE(query.exec());
+  }
+  QSqlDatabase::removeDatabase(connection);
+  wait(h.svc.init());
+
+  const QString depthError = QStringLiteral("at most %1 levels").arg(kMaxDepth);
+  expectError(wait(h.svc.createFolder(QStringLiteral("Child"), a.id)),
+              depthError);
+  CHECK(expect(h.svc.folderMoveTargets(a.id)).isEmpty());
+  expectError(wait(h.db.createFolder(a.id, QStringLiteral("Child"))),
+              depthError);
+  expectError(wait(h.db.setParent(other.id, a.id)), depthError);
 }
 
 TEST_CASE(

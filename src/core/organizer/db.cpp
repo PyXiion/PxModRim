@@ -182,6 +182,74 @@ QString tagMissing(qint64 tagId) {
   return QStringLiteral("Tag with id %1 does not exist.").arg(tagId);
 }
 
+Error depthLimitError() {
+  return Error{QStringLiteral("Folders can be nested at most %1 levels deep.")
+                   .arg(kMaxDepth)};
+}
+
+Result<int> folderDepth(QSqlDatabase& db, qint64 folderId,
+                        std::optional<qint64> movingFolder = std::nullopt) {
+  QSqlQuery query(db);
+  if (!query.prepare(
+          QStringLiteral("SELECT parent_id FROM folders WHERE id = ?"))) {
+    return std::unexpected(errorOf(query));
+  }
+  for (int depth = 0; depth <= kMaxDepth; ++depth) {
+    if (folderId == movingFolder) {
+      return std::unexpected(
+          Error{QStringLiteral("A folder cannot be moved into itself.")});
+    }
+    query.bindValue(0, folderId);
+    if (!query.exec()) {
+      return std::unexpected(errorOf(query));
+    }
+    if (!query.next()) {
+      if (query.lastError().isValid()) {
+        return std::unexpected(errorOf(query));
+      }
+      return std::unexpected(
+          Error{QStringLiteral("That folder no longer exists.")});
+    }
+    if (query.value(0).isNull()) {
+      return depth;
+    }
+    folderId = query.value(0).toLongLong();
+    query.finish();
+  }
+  return std::unexpected(depthLimitError());
+}
+
+Result<void> checkFolderMove(QSqlDatabase& db, qint64 folderId,
+                             qint64 parentId) {
+  auto parentDepth = folderDepth(db, parentId, folderId);
+  if (!parentDepth) {
+    return std::unexpected(parentDepth.error());
+  }
+  auto height = runStatement(
+      db,
+      QStringLiteral("WITH RECURSIVE subtree(id, height) AS ("
+                     " SELECT id, 1 FROM folders WHERE id = ?"
+                     " UNION ALL"
+                     " SELECT f.id, s.height + 1 FROM folders f"
+                     " JOIN subtree s ON f.parent_id = s.id WHERE s.height <= ?"
+                     ") SELECT MAX(height) FROM subtree"),
+      {folderId, kMaxDepth});
+  if (!height) {
+    return std::unexpected(height.error());
+  }
+  if (!height->next()) {
+    return std::unexpected(errorOf(*height));
+  }
+  if (height->value(0).isNull()) {
+    return std::unexpected(
+        Error{QStringLiteral("That folder no longer exists.")});
+  }
+  if (*parentDepth + height->value(0).toInt() > kMaxDepth) {
+    return std::unexpected(depthLimitError());
+  }
+  return {};
+}
+
 Result<OrganizerState> loadState(QSqlDatabase& db) {
   OrganizerState state;
 
@@ -264,6 +332,13 @@ Result<OrganizerState> loadState(QSqlDatabase& db) {
 
 Result<Folder> insertFolder(QSqlDatabase& db, qint64 parentId,
                             const QString& name) {
+  auto parentDepth = folderDepth(db, parentId);
+  if (!parentDepth) {
+    return std::unexpected(parentDepth.error());
+  }
+  if (*parentDepth + 1 > kMaxDepth) {
+    return std::unexpected(depthLimitError());
+  }
   auto inserted = runStatement(
       db, QStringLiteral("INSERT INTO folders (parent_id, name) VALUES (?, ?)"),
       {parentId, name});
@@ -388,6 +463,15 @@ Result<QList<Rule>> replaceRuleRows(QSqlDatabase& db,
 Result<void> appendNamedRuleRows(QSqlDatabase& db, qint64 parentId,
                                  const QStringList& newFolders,
                                  const QList<StandardRule>& rules) {
+  if (!newFolders.isEmpty()) {
+    auto parentDepth = folderDepth(db, parentId);
+    if (!parentDepth) {
+      return std::unexpected(parentDepth.error());
+    }
+    if (*parentDepth + 1 > kMaxDepth) {
+      return std::unexpected(depthLimitError());
+    }
+  }
   QList<QVariantList> folderRows;
   for (const QString& name : newFolders) {
     folderRows.append({parentId, name});
@@ -581,13 +665,12 @@ QCoro::Task<Result<void>> OrganizerDb::setParent(qint64 folderId,
     co_return std::unexpected(
         Error{QStringLiteral("The root folder cannot be moved.")});
   }
-  if (folderId == parentId) {
-    co_return std::unexpected(
-        Error{QStringLiteral("A folder cannot be its own parent.")});
-  }
   co_return co_await submit([folderId,
                              parentId](QSqlDatabase& db) -> Result<void> {
     return inTransaction(db, [&]() -> Result<void> {
+      if (auto valid = checkFolderMove(db, folderId, parentId); !valid) {
+        return valid;
+      }
       return runExpectingRow(
           db, QStringLiteral("UPDATE folders SET parent_id = ? WHERE id = ?"),
           {parentId, folderId}, folderMissing(folderId));

@@ -109,7 +109,7 @@ class OrganizerService : public Plugin {
       std::optional<qint64> exclude = std::nullopt) const;
   Result<void> checkDepth(qint64 parentId, int height) const;
   int depth(qint64 folderId) const;
-  int height(qint64 folderId) const;
+  int height(qint64 folderId, int limit = kMaxDepth + 1) const;
   QList<Folder> children(qint64 folderId) const;
   QSet<qint64> subtreeIds(qint64 folderId) const;
 

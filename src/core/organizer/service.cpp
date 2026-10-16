@@ -125,7 +125,7 @@ int OrganizerService::depth(qint64 folderId) const {
   const auto& folders = state().folders;
   int count = 0;
   Folder current = folders.value(folderId);
-  while (current.parentId) {
+  while (current.parentId && count <= kMaxDepth) {
     ++count;
     current = folders.value(*current.parentId);
   }
@@ -157,10 +157,13 @@ QSet<qint64> OrganizerService::subtreeIds(qint64 folderId) const {
   return ids;
 }
 
-int OrganizerService::height(qint64 folderId) const {
+int OrganizerService::height(qint64 folderId, int limit) const {
+  if (limit == 1) {
+    return 1;
+  }
   int tallest = 0;
   for (const Folder& child : children(folderId)) {
-    tallest = std::max(tallest, height(child.id));
+    tallest = std::max(tallest, height(child.id, limit - 1));
   }
   return 1 + tallest;
 }
