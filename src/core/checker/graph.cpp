@@ -313,10 +313,8 @@ void ConstraintGraph::addRules(
       }
     }
     addEdges(pid, std::array{*target}, EdgeType::kDependency, origin, {});
-    if (!dep.alternativePackageIds.empty()) {
-      addEdges(pid, dep.alternativePackageIds, EdgeType::kAlternative, origin,
-               {});
-    }
+    addEdges(pid, dep.alternativePackageIds, EdgeType::kAlternative, origin,
+             {});
   }
 
   addLoadRules(pid, rules.loadBefore, rules.loadAfter, rules.incompatibleWith,
@@ -329,16 +327,10 @@ void ConstraintGraph::addLoadRules(const PackageId& pid,
                                    const CaseInsensitiveSet& incompatibleWith,
                                    EdgeOrigin origin,
                                    const Alternatives& alternatives) {
-  if (!loadAfter.empty()) {
-    addEdges(pid, loadAfter, EdgeType::kLoadAfter, origin, alternatives);
-  }
-  if (!loadBefore.empty()) {
-    addEdges(pid, loadBefore, EdgeType::kLoadBefore, origin, alternatives);
-  }
-  if (!incompatibleWith.empty()) {
-    addEdges(pid, incompatibleWith, EdgeType::kIncompatibility, origin,
-             alternatives);
-  }
+  addEdges(pid, loadAfter, EdgeType::kLoadAfter, origin, alternatives);
+  addEdges(pid, loadBefore, EdgeType::kLoadBefore, origin, alternatives);
+  addEdges(pid, incompatibleWith, EdgeType::kIncompatibility, origin,
+           alternatives);
 }
 
 }  // namespace px::modrim::checker

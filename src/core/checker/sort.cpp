@@ -96,22 +96,20 @@ QHash<PackageId, int> buildConfigPriority(const sort::TierConfig& tierConfig) {
 
 struct SortKey {
   int priority;
-  QString name;
   PackageId pid;
 };
 
 SortKey makeKey(const PackageId& pid,
                 const QHash<PackageId, int>& configPriority) {
   return SortKey{
-      configPriority.value(pid, static_cast<int>(configPriority.size())),
-      pid.str(), pid};
+      configPriority.value(pid, static_cast<int>(configPriority.size())), pid};
 }
 
 bool keyLess(const SortKey& a, const SortKey& b) {
   if (a.priority != b.priority) {
     return a.priority < b.priority;
   }
-  return a.name < b.name;
+  return a.pid.str() < b.pid.str();
 }
 
 // Heap order that pops the smallest key first.

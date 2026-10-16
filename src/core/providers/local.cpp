@@ -9,22 +9,20 @@ namespace px::modrim::providers {
 
 namespace {
 
-struct ScannedDirectory {
-  ModDirectory dir;
-  bool hasPublishedFileId = false;
-};
-
 // Runs off the UI thread: one directory listing plus a published-file-id probe
 // per mod.
-QList<ScannedDirectory> scanWithPublishedIds(const QString& root) {
-  QList<ScannedDirectory> scanned;
+QList<ModDirectory> scanWithPublishedIds(const QString& root,
+                                         bool hasPublishedFileId) {
+  QList<ModDirectory> dirs;
   for (const ModDirectory& dir : scanModDirectory(root)) {
     const bool hasId = QFileInfo::exists(
         QDir(dir.modPath)
             .filePath(QStringLiteral("About/PublishedFileId.txt")));
-    scanned.append(ScannedDirectory{dir, hasId});
+    if (hasId == hasPublishedFileId) {
+      dirs.append(dir);
+    }
   }
-  return scanned;
+  return dirs;
 }
 
 }  // namespace
@@ -47,17 +45,11 @@ QCoro::Task<Result<ModMap>> LocalModProvider::discover(
   }
   spdlog::debug("LocalModProvider scanning: {}", path().toStdString());
 
-  QList<ScannedDirectory> scanned;
+  QList<ModDirectory> dirs;
   {
     auto scope = tm("scan_dir");
-    scanned = co_await runOnPool<QList<ScannedDirectory>>(
-        nullptr, [root = path()] { return scanWithPublishedIds(root); });
-  }
-  QList<ModDirectory> dirs;
-  for (const ScannedDirectory& item : scanned) {
-    if (!item.hasPublishedFileId) {
-      dirs.append(item.dir);
-    }
+    dirs = co_await runOnPool<QList<ModDirectory>>(
+        nullptr, [root = path()] { return scanWithPublishedIds(root, false); });
   }
 
   auto discovered = co_await loadMods(std::move(dirs), std::move(targetVersion),
@@ -93,17 +85,11 @@ QCoro::Task<Result<ModMap>> DownloadedModProvider::discover(
   }
   spdlog::debug("DownloadedModProvider scanning: {}", path().toStdString());
 
-  QList<ScannedDirectory> scanned;
+  QList<ModDirectory> dirs;
   {
     auto scope = tm("scan_dir");
-    scanned = co_await runOnPool<QList<ScannedDirectory>>(
-        nullptr, [root = path()] { return scanWithPublishedIds(root); });
-  }
-  QList<ModDirectory> dirs;
-  for (const ScannedDirectory& item : scanned) {
-    if (item.hasPublishedFileId) {
-      dirs.append(item.dir);
-    }
+    dirs = co_await runOnPool<QList<ModDirectory>>(
+        nullptr, [root = path()] { return scanWithPublishedIds(root, true); });
   }
 
   auto discovered = co_await loadMods(std::move(dirs), std::move(targetVersion),

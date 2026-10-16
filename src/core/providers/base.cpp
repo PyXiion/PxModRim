@@ -79,9 +79,7 @@ QCoro::Task<Result<ModMap>> BaseModProvider::loadMods(
 
   ModMap result;
   QList<ModCandidate> missing;
-  if (forceReparse) {
-    missing = candidates;
-  } else if (cache) {
+  if (cache && !forceReparse) {
     auto scope = timer("cache_lookup");
     CacheLookup lookup = co_await cache->getMods(candidates, targetVersion);
     for (ListedModPtr& mod : lookup.cached) {
