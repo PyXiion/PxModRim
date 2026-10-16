@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The embedded Steam browser exposes its native bridge only to `steamcommunity.com`; deactivating a Workshop mod from it disables every installed copy; Organizer keyboard focus and range selection survive folder expansion.
 - Mods with a parsed About.xml but no description no longer show the "invalid mod" text.
 - Workshop backend: queue continuations are acknowledged only after they are re-queued, emptied collections drop their old members, picked collections honour version tags in the version filter, and failed search-index writes are retried by the crawler.
+- Workshop backend validates picked-collection fields with the ES2022 own-property API.
 
 ## [0.3.1] - 2026-10-13
 

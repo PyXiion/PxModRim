@@ -35,7 +35,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     if (!fields.has(field)) throw new HttpError(400, `Unexpected field: ${field}`);
   }
   for (const field of ['title', 'author', 'description', 'member_ids']) {
-    if (!Object.prototype.hasOwnProperty.call(input, field)) {
+    if (!Object.hasOwn(input, field)) {
       throw new HttpError(400, `Missing required field: ${field}`);
     }
   }
@@ -65,7 +65,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
   }
 
   let previewUrl: string | null = null;
-  if (Object.prototype.hasOwnProperty.call(input, 'preview_url') && input.preview_url !== null) {
+  if (Object.hasOwn(input, 'preview_url') && input.preview_url !== null) {
     if (typeof input.preview_url !== 'string' || input.preview_url.length > 2048) {
       throw new HttpError(400, 'preview_url must be null or an HTTPS URL of at most 2048 characters');
     }
@@ -79,7 +79,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     previewUrl = input.preview_url;
   }
   const tags: string[] = [];
-  if (Object.prototype.hasOwnProperty.call(input, 'tags')) {
+  if (Object.hasOwn(input, 'tags')) {
     if (!Array.isArray(input.tags) || input.tags.length > 30) {
       throw new HttpError(400, 'tags must contain at most 30 strings of at most 100 characters');
     }
@@ -91,7 +91,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     }
   }
   const versions: string[] = [];
-  if (Object.prototype.hasOwnProperty.call(input, 'supported_versions')) {
+  if (Object.hasOwn(input, 'supported_versions')) {
     if (!Array.isArray(input.supported_versions) || input.supported_versions.length > 20) {
       throw new HttpError(400, 'supported_versions must contain at most 20 versions in major.minor[.patch] form');
     }
@@ -104,7 +104,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     }
   }
   let featuredRank = 0;
-  if (Object.prototype.hasOwnProperty.call(input, 'featured_rank')) {
+  if (Object.hasOwn(input, 'featured_rank')) {
     if (typeof input.featured_rank !== 'number' || !Number.isInteger(input.featured_rank) ||
         input.featured_rank < 0 || input.featured_rank > 1000000) {
       throw new HttpError(400, 'featured_rank must be an integer from 0 to 1000000');
