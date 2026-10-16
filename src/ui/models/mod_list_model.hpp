@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QStringList>
 #include <cstdint>
+#include <utility>
 
 #include "core/models/metadata/structures.hpp"
 #include "core/models/view/diagnostics.hpp"
@@ -77,7 +78,7 @@ class ModListModel : public QAbstractListModel {
   void activeCountChanged();
 
  private:
-  QList<int> updateLoadIndices();
+  std::pair<int, int> updateLoadIndices();
   ModItem makeItem(const QString& uuid, ListedModPtr mod, bool checked) const;
   void diagnosticsChanged(
       const QHash<QString, view::ModDiagnosticsView>& summaries);

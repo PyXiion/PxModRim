@@ -7,23 +7,18 @@ ModListProxyModel::ModListProxyModel(ModListModel* source, QObject* parent)
     : QAbstractListModel(parent), m_source(source) {
   connect(m_source, &QAbstractItemModel::dataChanged, this,
           &ModListProxyModel::sourceDataChanged);
-  connect(m_source, &QAbstractItemModel::layoutChanged, this, [this] {
+  const auto rebuildLayout = [this] {
     if (!m_inProxyMove) layoutRebuild();
-  });
+  };
+  connect(m_source, &QAbstractItemModel::layoutChanged, this, rebuildLayout);
   connect(m_source, &QAbstractItemModel::modelReset, this, [this] {
     beginResetModel();
     rebuild();
     endResetModel();
   });
-  connect(m_source, &QAbstractItemModel::rowsMoved, this, [this] {
-    if (!m_inProxyMove) layoutRebuild();
-  });
-  connect(m_source, &QAbstractItemModel::rowsInserted, this, [this] {
-    if (!m_inProxyMove) layoutRebuild();
-  });
-  connect(m_source, &QAbstractItemModel::rowsRemoved, this, [this] {
-    if (!m_inProxyMove) layoutRebuild();
-  });
+  connect(m_source, &QAbstractItemModel::rowsMoved, this, rebuildLayout);
+  connect(m_source, &QAbstractItemModel::rowsInserted, this, rebuildLayout);
+  connect(m_source, &QAbstractItemModel::rowsRemoved, this, rebuildLayout);
   rebuild();
 }
 int ModListProxyModel::rowCount(const QModelIndex& parent) const {

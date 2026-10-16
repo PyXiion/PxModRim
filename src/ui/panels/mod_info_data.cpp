@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QStringView>
 #include <algorithm>
 #include <array>
 
@@ -21,11 +22,11 @@ QString substitute(const QString& text, const QRegularExpression& re,
   auto matches = re.globalMatch(text);
   while (matches.hasNext()) {
     const auto match = matches.next();
-    out += text.mid(end, match.capturedStart() - end);
+    out += QStringView(text).sliced(end, match.capturedStart() - end);
     out += replacement(match);
     end = match.capturedEnd();
   }
-  out += text.mid(end);
+  out += QStringView(text).sliced(end);
   return out;
 }
 QRegularExpression insensitive(const QString& pattern) {
@@ -192,16 +193,17 @@ QVariantMap buildModInfo(CoreContext& ctx, const ListedMod& mod,
         conflicts.begin(), conflicts.end(),
         [](const auto& a, const auto& b) { return a.toLower() < b.toLower(); });
     QList<const AboutXmlMod*> dependents;
-    for (const auto& entry : ctx.allMods())
-      if (const auto* other = dynamic_cast<const AboutXmlMod*>(entry.get());
-          other && other->uuid() != mod.uuid()) {
-        for (const auto& dep : other->aboutRules.dependencies)
-          if (dep.packageId == about->packageId ||
-              dep.alternativePackageIds.contains(about->packageId)) {
-            dependents.append(other);
-            break;
-          }
-      }
+    for (const auto& entry : ctx.allMods()) {
+      const auto* other = dynamic_cast<const AboutXmlMod*>(entry.get());
+      if (!other || other->uuid() == mod.uuid()) continue;
+      if (std::any_of(
+              other->aboutRules.dependencies.cbegin(),
+              other->aboutRules.dependencies.cend(), [about](const auto& dep) {
+                return dep.packageId == about->packageId ||
+                       dep.alternativePackageIds.contains(about->packageId);
+              }))
+        dependents.append(other);
+    }
     std::sort(dependents.begin(), dependents.end(), [](auto* a, auto* b) {
       return a->name.toLower() < b->name.toLower();
     });
@@ -217,9 +219,10 @@ QVariantMap buildModInfo(CoreContext& ctx, const ListedMod& mod,
     if (copy) item.insert("copy", true);
     details.append(item);
   };
+  const QString authors = about ? about->authors.join(", ") : QString{};
   QString provider;
   if (about) {
-    if (!about->authors.isEmpty()) row("Author", about->authors.join(", "));
+    if (!about->authors.isEmpty()) row("Author", authors);
     if (!about->modVersion.isEmpty()) row("Version", about->modVersion);
     provider = providerLabel(mod.providerId, about->packageId.str());
     if (!provider.isEmpty()) row("Source", provider);
@@ -232,7 +235,7 @@ QVariantMap buildModInfo(CoreContext& ctx, const ListedMod& mod,
   const QString target = ctx.targetVersion();
   const bool known = !mod.supportedVersions.isEmpty() && target != "Unknown";
   return {{"name", mod.name},
-          {"author", about ? about->authors.join(", ") : QString{}},
+          {"author", authors},
           {"provider", provider},
           {"status", QVariantMap{{"level", level},
                                  {"title", title},

@@ -23,6 +23,7 @@
 #include <QVBoxLayout>
 #include <QVariantMap>
 #include <QWindow>
+#include <ranges>
 
 #include <QCoro/QCoroFuture>
 #include <QtConcurrent/QtConcurrentRun>
@@ -541,7 +542,7 @@ void MainWindow::onDownloadsFinished(const DownloadResult& result) {
   if (failed) {
     const auto names = m_ctx.downloads().namesById(m_ctx.allMods().values());
     QStringList shown;
-    for (const auto& id : result.failed.mid(0, 3))
+    for (const auto& id : result.failed | std::views::take(3))
       shown.append(names.value(id, id));
     m_toasts->warning(QStringLiteral("%1, %2 failed: %3%4")
                           .arg(summary)

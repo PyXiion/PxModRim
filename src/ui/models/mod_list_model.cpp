@@ -175,31 +175,32 @@ QStringList ModListModel::activeUuids() const {
     if (item.checked) result.append(item.uuid);
   return result;
 }
-QList<int> ModListModel::updateLoadIndices() {
-  QList<int> changed;
+std::pair<int, int> ModListModel::updateLoadIndices() {
+  int first = rowCount(), last = -1;
   int count = 0;
   for (int row = 0; row < m_items.size(); ++row) {
     auto& item = m_items[row];
     const int index = item.checked ? ++count : -1;
     if (item.loadIndex != index) {
       item.loadIndex = index;
-      changed.append(row);
+      first = std::min(first, row);
+      last = row;
     }
   }
   if (m_activeCount != count) {
     m_activeCount = count;
     emit activeCountChanged();
   }
-  return changed;
+  return {first, last};
 }
 bool ModListModel::moveRow(int source, int target) {
   if (source == target || !getItem(source) || !getItem(target)) return false;
   beginMoveRows({}, source, source, {}, source < target ? target + 1 : target);
   m_items.move(source, target);
   endMoveRows();
-  const auto changed = updateLoadIndices();
-  if (!changed.isEmpty())
-    emit dataChanged(index(changed.first()), index(changed.last()),
+  const auto [first, last] = updateLoadIndices();
+  if (last >= 0)
+    emit dataChanged(index(first), index(last),
                      {kLoadIndexRole, kSectionNameRole});
   return true;
 }
@@ -211,8 +212,8 @@ void ModListModel::commitOrder(const QStringList& uuids) {
   order.reserve(m_items.size());
   QSet<QString> ordered;
   for (const auto& uuid : uuids)
-    if (oldRows.contains(uuid)) {
-      order.append(oldRows.value(uuid));
+    if (const auto found = oldRows.constFind(uuid); found != oldRows.cend()) {
+      order.append(found.value());
       ordered.insert(uuid);
     }
   QList<int> inactive;
@@ -263,8 +264,7 @@ void ModListModel::setCheckStates(const QList<int>& rows, bool checked) {
       first = std::min(first, row);
     }
   if (first == m_items.size()) return;
-  const auto loadChanged = updateLoadIndices();
-  if (!loadChanged.isEmpty()) first = std::min(first, loadChanged.first());
+  first = std::min(first, updateLoadIndices().first);
   emit dataChanged(
       index(first), index(rowCount() - 1),
       {kCheckStateRole, kLoadIndexRole, kIsActiveRole, kSectionNameRole});
