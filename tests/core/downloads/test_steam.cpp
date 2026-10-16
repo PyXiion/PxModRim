@@ -4,6 +4,8 @@
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QHash>
+#include <QMetaObject>
+#include <QPromise>
 #include <QSet>
 #include <QString>
 #include <QStringList>
@@ -22,6 +24,7 @@
 #include <utility>
 #include <vector>
 
+#include <QCoro/QCoroFuture>
 #include <QCoro/QCoroTask>
 
 #include <catch2/catch_test_macros.hpp>
@@ -244,6 +247,9 @@ struct Service {
   QCoro::Task<Result<std::shared_ptr<WorkshopClient>>> login(
       LoginOptions opts) {
     logins.push_back(opts);
+    if (loginGate.isValid()) {
+      co_await QFuture<void>(loginGate);
+    }
     if (clients.empty()) {
       co_return std::unexpected(
           px::modrim::Error{QStringLiteral("logon denied")});
@@ -261,6 +267,7 @@ struct Service {
 
   std::vector<LoginOptions> logins;
   std::deque<std::shared_ptr<WorkshopClient>> clients;
+  QFuture<void> loginGate;
   std::unique_ptr<SteamDownloader> steam;
 };
 
@@ -478,6 +485,118 @@ TEST_CASE("cancel keeps finished items and returns", "[downloads][steam]") {
   REQUIRE(result->succeeded == QStringList{"111"});
   REQUIRE(result->failed.isEmpty());
   REQUIRE_FALSE(svc.steam->isDownloading());
+}
+
+TEST_CASE("shutdown waits for a batch suspended in login",
+          "[downloads][steam]") {
+  TestApplication app;
+  auto client = std::make_shared<FakeClient>();
+  Service svc({client});
+  SECTION("login succeeds") {}
+  SECTION("login fails") { svc.clients.clear(); }
+
+  QPromise<void> loginGate;
+  loginGate.start();
+  svc.loginGate = loginGate.future();
+
+  bool shutdownDone = false;
+  int eventsAfterShutdown = 0;
+  const auto observe = [&](const auto&) {
+    if (shutdownDone) {
+      ++eventsAfterShutdown;
+    }
+  };
+  svc.steam->busyChanged.connect(observe);
+  svc.steam->batchStarted.connect(observe);
+  svc.steam->statusMessageChanged.connect(observe);
+  svc.steam->downloadPhaseChanged.connect(observe);
+  svc.steam->downloadProgress.connect(observe);
+  svc.steam->downloadItemStatusChanged.connect(observe);
+  svc.steam->downloadItemTitled.connect(observe);
+  svc.steam->downloadFinished.connect(observe);
+
+  std::optional<Result<DownloadResult>> downloadOut;
+  auto download = test_support::awaitInto(
+      svc.steam->downloadMods({"111", "222"}), downloadOut);
+
+  QEventLoop loop;
+  QTimer timeout;
+  timeout.setSingleShot(true);
+  QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+  QTimer poll;
+  QObject::connect(&poll, &QTimer::timeout, &loop, [&] {
+    if (!svc.logins.empty()) {
+      loop.quit();
+    }
+  });
+  timeout.start(10s);
+  poll.start(1ms);
+  if (svc.logins.empty()) {
+    loop.exec();
+  }
+  poll.stop();
+  CHECK(svc.logins.size() == 1);
+  CHECK_FALSE(downloadOut.has_value());
+
+  bool downloadCompletedBeforeShutdown = false;
+  const auto finishShutdown = [&]() -> QCoro::Task<void> {
+    co_await svc.steam->shutdown();
+    downloadCompletedBeforeShutdown = downloadOut.has_value();
+    shutdownDone = true;
+    loop.quit();
+  };
+  auto shutdown = finishShutdown();
+  CHECK_FALSE(shutdownDone);
+
+  loginGate.finish();
+  timeout.start(10s);
+  if (!shutdownDone) {
+    loop.exec();
+  }
+  REQUIRE(shutdownDone);
+  CHECK(downloadCompletedBeforeShutdown);
+  REQUIRE(downloadOut.has_value());
+  REQUIRE(downloadOut->has_value());
+  CHECK((*downloadOut)->succeeded.isEmpty());
+  CHECK((*downloadOut)->failed == QStringList{"111", "222"});
+  CHECK(client->calls.empty());
+  CHECK_FALSE(svc.steam->isDownloading());
+  CHECK_FALSE(runLoop(svc.steam->downloadMods({"333"})).has_value());
+
+  QMetaObject::invokeMethod(&loop, [&] { loop.quit(); }, Qt::QueuedConnection);
+  loop.exec();
+  CHECK(eventsAfterShutdown == 0);
+}
+
+TEST_CASE("cancel during login does not start a workshop download",
+          "[downloads][steam]") {
+  TestApplication app;
+  auto client = std::make_shared<FakeClient>();
+  Service svc({client});
+  QPromise<void> loginGate;
+  loginGate.start();
+  svc.loginGate = loginGate.future();
+
+  QTimer poll;
+  QObject::connect(&poll, &QTimer::timeout, &poll, [&] {
+    if (!svc.logins.empty()) {
+      poll.stop();
+      svc.steam->cancel();
+      loginGate.finish();
+    }
+  });
+  poll.start(1ms);
+
+  auto result = runLoop(svc.steam->downloadMods({"111", "222"}));
+
+  REQUIRE(result.has_value());
+  CHECK(result->succeeded.isEmpty());
+  CHECK(result->failed == QStringList{"111", "222"});
+  CHECK(client->calls.empty());
+  CHECK_FALSE(svc.steam->isDownloading());
+  REQUIRE(runLoop(svc.steam->downloadMods({"333"})).has_value());
+  REQUIRE(client->calls.size() == 1);
+  CHECK(client->calls.front().ids == std::vector<std::uint64_t>{333});
 }
 
 TEST_CASE("second download while running is rejected", "[downloads][steam]") {

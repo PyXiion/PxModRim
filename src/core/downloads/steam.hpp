@@ -207,8 +207,8 @@ class SteamDownloader : public Downloader {
   // Set while a batch is downloading.
   std::optional<std::stop_source> m_stop;
   QSet<QString> m_activeIds;
-  // The PxSteamDL call of the running batch, so shutdown() can wait for it.
-  QFuture<Outcome> m_running;
+  // Includes preparation, login, and all completion notifications.
+  QFuture<void> m_batchFinished;
 
   // Worker-thread callbacks are posted to this object, which lives on the main
   // thread.

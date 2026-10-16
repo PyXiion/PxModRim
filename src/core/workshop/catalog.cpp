@@ -132,23 +132,35 @@ void WorkshopCatalog::disconnectEvents() {
 }
 
 WorkshopCatalog::~WorkshopCatalog() {
+  *m_alive = false;
   disconnectEvents();
-  // Destroying the queue's coroutine must not leave the downloads holding its
-  // handle.
+  auto waiters = std::move(m_idleWaiters);
   m_idleWaiters.clear();
-  m_runner.reset();
+  for (std::coroutine_handle<> waiter : waiters) {
+    waiter.resume();
+  }
 }
 
 QCoro::Task<void> WorkshopCatalog::shutdown() {
+  m_stopping = true;
   disconnectEvents();
   cancelQueue();
-  m_idleWaiters.clear();
+  auto runner = std::move(m_runner);
   m_runner.reset();
-  m_draining = false;
+  if (m_downloading) {
+    m_downloads->cancel();
+  }
+  auto waiters = std::move(m_idleWaiters);
+  m_idleWaiters.clear();
+  for (std::coroutine_handle<> waiter : waiters) {
+    waiter.resume();
+  }
   for (const auto& client : m_clients) {
     client->shutdown();
   }
-  co_return;
+  if (runner) {
+    co_await *runner;
+  }
 }
 
 void WorkshopCatalog::setBaseUrl(const QString& url) {
@@ -319,6 +331,9 @@ QCoro::Task<Result<DownloadResult>> WorkshopCatalog::download(
 }
 
 void WorkshopCatalog::enqueue(const DownloadPlan& downloadPlan) {
+  if (m_stopping) {
+    return;
+  }
   const QSet<QString> active = m_downloads->activeIds();
   QStringList ids;
   for (const QString& id : downloadPlan.to_download) {
@@ -345,6 +360,7 @@ void WorkshopCatalog::cancelQueue() {
 }
 
 QCoro::Task<void> WorkshopCatalog::drain() {
+  const auto alive = m_alive;
   while (!m_queue.isEmpty()) {
     const QStringList ids = m_queue.takeFirst();
     // A batch that waited for the running download stops the queue if that
@@ -352,13 +368,25 @@ QCoro::Task<void> WorkshopCatalog::drain() {
     const bool waited = m_downloads->isDownloading();
     while (m_downloads->isDownloading()) {
       co_await IdleWait{*this};
+      if (!*alive) {
+        co_return;
+      }
+      if (m_stopping) {
+        m_draining = false;
+        co_return;
+      }
     }
     if (waited && m_downloads->cancelled()) {
       cancelQueue();
       break;
     }
 
+    m_downloading = true;
     auto result = co_await m_downloads->downloadMods(ids);
+    if (!*alive) {
+      co_return;
+    }
+    m_downloading = false;
     if (!result) {
       spdlog::warn("[workshop] queued download failed: {}",
                    result.error().message.toStdString());

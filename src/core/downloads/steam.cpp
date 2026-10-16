@@ -6,6 +6,8 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QMetaObject>
+#include <QPromise>
+#include <QScopeGuard>
 #include <QtConcurrent>
 #include <algorithm>
 #include <charconv>
@@ -173,8 +175,8 @@ QCoro::Task<void> SteamDownloader::shutdown() {
   m_stopping = true;
   m_autoTimer.stop();
   cancel();
-  if (m_running.isValid()) {
-    QFuture<Outcome> pending = m_running;
+  if (m_batchFinished.isValid()) {
+    QFuture<void> pending = m_batchFinished;
     co_await pending;
   }
 }
@@ -233,6 +235,10 @@ QStringList SteamDownloader::staleIds(double maxAgeS, double now) const {
 
 QCoro::Task<Result<DownloadResult>> SteamDownloader::downloadMods(
     QStringList modIds) {
+  if (m_stopping) {
+    co_return std::unexpected(
+        Error{QStringLiteral("Steam downloader is shutting down.")});
+  }
   if (modIds.isEmpty()) {
     co_return std::unexpected(
         Error{QStringLiteral("No mods selected for download.")});
@@ -264,6 +270,10 @@ QCoro::Task<Result<DownloadResult>> SteamDownloader::downloadMods(
 
   auto batch = std::make_shared<SteamBatch>(static_cast<int>(ids.size()));
   m_stop.emplace();
+  QPromise<void> completion;
+  completion.start();
+  m_batchFinished = completion.future();
+  const auto finish = qScopeGuard([&completion] { completion.finish(); });
   m_activeIds = QSet<QString>(ids.begin(), ids.end());
   busyChanged.notify(true);
   batchStarted.notify(ids);
@@ -330,12 +340,19 @@ SteamDownloader::ensureClient() {
 
 QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
                                             std::shared_ptr<SteamBatch> batch) {
+  const std::stop_token stop = m_stop->get_token();
   const std::filesystem::path rootPath(root.toStdWString());
   const std::error_code mkdirError = co_await QtConcurrent::run([rootPath] {
     std::error_code ec;
     std::filesystem::create_directories(rootPath, ec);
     return ec;
   });
+  if (stop.stop_requested()) {
+    for (const auto& id : ids) {
+      finishItem(*batch, id, QStringLiteral("cancelled"));
+    }
+    co_return;
+  }
   if (mkdirError) {
     const QString message =
         QStringLiteral("Cannot create %1: %2")
@@ -353,6 +370,12 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
   }
   const auto loginStarted = std::chrono::steady_clock::now();
   auto login = co_await ensureClient();
+  if (stop.stop_requested()) {
+    for (const auto& id : ids) {
+      finishItem(*batch, id, QStringLiteral("cancelled"));
+    }
+    co_return;
+  }
   if (!login) {
     const QString message =
         QStringLiteral("Steam login failed: %1").arg(login.error().message);
@@ -390,7 +413,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
   pxsteamdl::Options options;
   options.parallel_items = static_cast<unsigned>(parallelItems);
   options.threads_per_item = static_cast<unsigned>(threadsPerItem);
-  options.stop = m_stop->get_token();
+  options.stop = stop;
   options.on_resolved = [this, target, batch](const pxsteamdl::ItemInfo& info) {
     QMetaObject::invokeMethod(
         target,
@@ -423,15 +446,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
                                               : what);
         }
       });
-  m_running = call;
-  Outcome outcome;
-  try {
-    outcome = co_await QFuture<Outcome>(call);
-  } catch (...) {
-    m_running = {};
-    throw;
-  }
-  m_running = {};
+  Outcome outcome = co_await QFuture<Outcome>(call);
 
   if (!outcome) {
     // A failed call leaves the Steam session suspect; log in again next time.

@@ -106,7 +106,7 @@ class WorkshopCatalog : public Plugin {
   WorkshopCatalog(const WorkshopCatalog&) = delete;
   WorkshopCatalog& operator=(const WorkshopCatalog&) = delete;
 
-  // Stops the queue and aborts requests in flight.
+  // Stops the queue, aborts requests, and waits for the queue runner to finish.
   QCoro::Task<void> shutdown() override;
 
   Event<QString> catalogUrlChanged;
@@ -215,6 +215,10 @@ class WorkshopCatalog : public Plugin {
 
   QList<QStringList> m_queue;
   QSet<QString> m_queued;
+  // Resetting a QCoro task does not cancel its suspended coroutine.
+  std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
+  bool m_stopping = false;
+  bool m_downloading = false;
   bool m_draining = false;
   std::optional<QCoro::Task<void>> m_runner;
   std::vector<std::coroutine_handle<>> m_idleWaiters;

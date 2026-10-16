@@ -1,12 +1,15 @@
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
 #include <QHash>
 #include <QList>
+#include <QMetaObject>
 #include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QTemporaryDir>
 #include <chrono>
+#include <coroutine>
 #include <map>
 #include <memory>
 #include <optional>
@@ -53,6 +56,20 @@ struct IdsBatchPayload {
 };
 
 struct FakeDownloader : public Downloader {
+  struct DownloadGate {
+    std::coroutine_handle<> waiter;
+
+    // NOLINTBEGIN(readability-identifier-naming): coroutine awaiter protocol
+    bool await_ready() const noexcept { return false; }
+    void await_suspend(std::coroutine_handle<> handle) noexcept {
+      waiter = handle;
+    }
+    void await_resume() const noexcept {}
+    // NOLINTEND(readability-identifier-naming)
+
+    void release() { std::exchange(waiter, {}).resume(); }
+  };
+
   FakeDownloader(DownloadManager& manager, std::map<QString, double> synced)
       : Downloader(QStringLiteral("fake_steam"), QStringLiteral("Steam"),
                    manager),
@@ -76,15 +93,26 @@ struct FakeDownloader : public Downloader {
 
   QCoro::Task<Result<DownloadResult>> downloadMods(QStringList ids) override {
     recordedCalls.push_back(ids);
+    if (gate) {
+      isBusy = true;
+      active = QSet<QString>(ids.begin(), ids.end());
+      busyChanged.notify(true);
+      co_await *gate;
+      isBusy = false;
+      active.clear();
+      busyChanged.notify(false);
+    }
     co_return DownloadResult{.succeeded = ids, .failed = {}, .changed = {}};
   }
 
-  void cancel() override {}
+  void cancel() override { ++cancelCalls; }
 
   std::map<QString, double> synced;
   bool isBusy = false;
   QSet<QString> active;
   std::vector<QStringList> recordedCalls;
+  int cancelCalls = 0;
+  std::optional<DownloadGate> gate;
 };
 
 ListedModPtr makeMod(const QString& path,
@@ -365,6 +393,90 @@ TEST_CASE("workshop enqueue runs batches in order after the running download") {
   CHECK(fixture.downloader->recordedCalls[1] ==
         QStringList{QStringLiteral("7")});
   CHECK(catalog.queuedIds().isEmpty());
+}
+
+TEST_CASE("workshop shutdown waits for its cancelled download to finish") {
+  TestApplication app;
+  ContextFixture fixture;
+  fixture.downloader->gate.emplace();
+  auto catalog = std::make_unique<WorkshopCatalog>(
+      fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
+  catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("5")}});
+  catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("6")}});
+  REQUIRE(fixture.downloader->isBusy);
+  REQUIRE(fixture.downloader->gate->waiter);
+
+  bool finished = false;
+  auto finishShutdown = [&]() -> QCoro::Task<void> {
+    co_await catalog->shutdown();
+    finished = true;
+  };
+  auto shutdown = finishShutdown();
+  CHECK_FALSE(finished);
+  CHECK(fixture.downloader->cancelCalls == 1);
+  CHECK(catalog->queuedIds().isEmpty());
+
+  SECTION("the catalog survives until shutdown completes") {}
+  SECTION("the catalog is destroyed before the download finishes") {
+    catalog.reset();
+  }
+
+  fixture.downloader->gate->release();
+  run(std::move(shutdown));
+  CHECK(finished);
+  CHECK_FALSE(fixture.downloader->isBusy);
+  CHECK(fixture.downloader->recordedCalls ==
+        std::vector<QStringList>{{QStringLiteral("5")}});
+
+  QEventLoop loop;
+  QMetaObject::invokeMethod(&loop, &QEventLoop::quit, Qt::QueuedConnection);
+  loop.exec();
+}
+
+TEST_CASE("workshop destruction leaves a suspended download safe to finish") {
+  TestApplication app;
+  ContextFixture fixture;
+  fixture.downloader->gate.emplace();
+  auto catalog = std::make_unique<WorkshopCatalog>(
+      fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
+  int queueChanges = 0;
+  catalog->queueChanged.connect([&](std::monostate) { ++queueChanges; });
+  catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("5")}});
+  REQUIRE(fixture.downloader->gate->waiter);
+  const int changesBeforeDestruction = queueChanges;
+
+  catalog.reset();
+  fixture.downloader->gate->release();
+
+  QEventLoop loop;
+  QMetaObject::invokeMethod(&loop, &QEventLoop::quit, Qt::QueuedConnection);
+  loop.exec();
+  CHECK_FALSE(fixture.downloader->isBusy);
+  CHECK(queueChanges == changesBeforeDestruction);
+}
+
+TEST_CASE("workshop shutdown releases idle waiters without cancelling others") {
+  TestApplication app;
+  ContextFixture fixture;
+  fixture.downloader->isBusy = true;
+  auto catalog = std::make_unique<WorkshopCatalog>(
+      fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
+  catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("5")}});
+  REQUIRE(fixture.downloader->recordedCalls.empty());
+
+  SECTION("shutdown wakes the idle runner") {
+    run(catalog->shutdown());
+    CHECK(catalog->queuedIds().isEmpty());
+    catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("6")}});
+    CHECK(catalog->queuedIds().isEmpty());
+  }
+  SECTION("destruction wakes the idle runner") {}
+
+  catalog.reset();
+  fixture.downloader->isBusy = false;
+  fixture.downloads.busyChanged.notify(false);
+  CHECK(fixture.downloader->cancelCalls == 0);
+  CHECK(fixture.downloader->recordedCalls.empty());
 }
 
 TEST_CASE(
