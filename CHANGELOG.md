@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
 - Re-implemented the RimSort-derived modules (XML conversion, game constants, About.xml metadata structures and parsing, startup-impact report parsing) independently of the original code, working only from the clean-room rewrite of their behaviour and the existing tests; their public interfaces are unchanged.
 - Ported the Organizer rail view, folder dialogs, tree and filter models, tag editor, and auto-folder rule editor to the C++/Qt UI, retaining the existing QML behavior and adding Catch2 UI regression coverage.
+- Pinned third-party CI and release actions to immutable commits without changing their selected versions.
 
 ### Fixed
 - Windows and macOS builds no longer fail on the renamed `Platform` enumerators; the UI-off configuration no longer builds UI tests; presets work with CMake 3.24; `just run*` launches the macOS app bundle; CI/release QCoro builds no longer require Qt WebSockets.

@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
           version: ${{ env.QT_VERSION }}
           cache: true
@@ -38,7 +38,7 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
         with:
           tool: just
 
@@ -64,7 +64,7 @@ jobs:
           cmake --install "$RUNNER_TEMP/qcoro-build"
 
       - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2
         with:
           key: release-linux-${{ matrix.workshop }}
 
@@ -204,7 +204,7 @@ jobs:
           tar -xzf dist-archive/PxModRim-Linux-${{ matrix.workshop }}.tar.gz -C dist
 
       - name: Build Flatpak bundle
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           manifest-path: packaging/flatpak/com.github.PyXiion.PxModRim.yaml
           bundle: PxModRim-Linux-${{ matrix.workshop }}.flatpak
@@ -224,14 +224,14 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
           version: ${{ env.QT_VERSION }}
           cache: true
           modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtshadertools qtpositioning qtwebchannel qtwebengine' || 'qtshadertools' }}
 
       - name: Setup MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -239,7 +239,7 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
         with:
           tool: just
 
@@ -274,7 +274,7 @@ jobs:
           cmake --install "$RUNNER_TEMP/qcoro-build"
 
       - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2
         with:
           key: release-windows-${{ matrix.workshop }}
 
@@ -350,7 +350,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
           version: ${{ env.QT_VERSION }}
           cache: true
@@ -362,7 +362,7 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
         with:
           tool: just
 
@@ -386,7 +386,7 @@ jobs:
           cmake --install "$RUNNER_TEMP/qcoro-build"
 
       - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2
         with:
           key: release-macos-${{ matrix.workshop }}
 
@@ -514,7 +514,7 @@ jobs:
           done
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: |
             artifacts/PxModRim-Linux-*/*.tar.gz
