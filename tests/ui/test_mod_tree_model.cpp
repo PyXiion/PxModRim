@@ -1,5 +1,9 @@
+#include <QJSValue>
 #include <QPersistentModelIndex>
+#include <QQmlComponent>
+#include <QQmlEngine>
 #include <QSignalSpy>
+#include <memory>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -203,6 +207,86 @@ TEST_CASE(
   CHECK(model.data(expanded[0], ModTreeModel::kKeyRole).toString() == "f:2");
   CHECK(model.data(expanded[1], ModTreeModel::kKeyRole).toString() == "f:3");
   CHECK(model.expandedIndexes(model.indexForKey("f:2")).size() == 1);
+}
+
+TEST_CASE("organizer item keys resolve visible rows after collapse updates") {
+  OrganizerFixture f;
+  f.state.folders.insert(2, {2, kRootId, QStringLiteral("Earlier")});
+  f.state.folders.insert(3, {3, kRootId, QStringLiteral("Later")});
+  f.state.folders[2].collapsed = true;
+  f.state.placements.insert("a.one", 2);
+  f.state.placements.insert("a.two", 3);
+  ModTreeModel model(noDiagnostics);
+  model.setTree(f.tree(), f.mods, {}, false);
+  const auto anchorKey =
+      model.data(model.indexForUuid("u2"), ModTreeModel::kKeyRole).toString();
+  const auto folderKey =
+      model.data(model.index(1, 0), ModTreeModel::kKeyRole).toString();
+
+  QQmlEngine engine;
+  QQmlComponent component(&engine);
+  component.setData(R"(
+    import QtQuick
+    TreeView {
+      required property var treeModel
+      model: treeModel
+      function rowForKey(key) {
+        return rowAtIndex(treeModel.indexForKey(key))
+      }
+      function keyAtRow(row) {
+        return treeModel.data(index(row, 0), Qt.UserRole + 2)
+      }
+    }
+  )",
+                    QUrl{});
+  INFO(component.errorString().toStdString());
+  REQUIRE(component.isReady());
+  std::unique_ptr<QObject> tree(component.createWithInitialProperties(
+      {{QStringLiteral("treeModel"), QVariant::fromValue(&model)}}));
+  REQUIRE(tree);
+  tree->setParent(&engine);
+  engine.globalObject().setProperty(QStringLiteral("tree"),
+                                    engine.newQObject(tree.get()));
+  auto evaluate = [&](const QString& expression) {
+    auto result = engine.evaluate(expression);
+    INFO(result.toString().toStdString());
+    REQUIRE_FALSE(result.isError());
+    return result;
+  };
+  auto rowForKey = [&](const QString& key) {
+    QVariant row;
+    REQUIRE(QMetaObject::invokeMethod(tree.get(), "rowForKey",
+                                      Q_RETURN_ARG(QVariant, row),
+                                      Q_ARG(QVariant, key)));
+    return row.toInt();
+  };
+
+  evaluate(QStringLiteral("tree.expand(1)"));
+  REQUIRE(rowForKey(anchorKey) == 2);
+  REQUIRE(rowForKey(folderKey) == 1);
+  QSignalSpy reset(&model, &QAbstractItemModel::modelReset);
+  evaluate(QStringLiteral("tree.expand(0)"));
+  f.state.folders[2].collapsed = false;
+  model.setTree(f.tree(), f.mods, {}, false);
+  CHECK(reset.isEmpty());
+  CHECK(rowForKey(anchorKey) == 3);
+  CHECK(rowForKey(folderKey) == 2);
+  CHECK(evaluate(QStringLiteral("tree.keyAtRow(3)")).toString() == anchorKey);
+  CHECK(evaluate(QStringLiteral("tree.keyAtRow(2)")).toString() == folderKey);
+
+  evaluate(QStringLiteral("tree.collapse(0)"));
+  f.state.folders[2].collapsed = true;
+  model.setTree(f.tree(), f.mods, {}, false);
+  CHECK(reset.isEmpty());
+  CHECK(rowForKey(anchorKey) == 2);
+  CHECK(rowForKey(folderKey) == 1);
+  evaluate(QStringLiteral("tree.collapse(1)"));
+  CHECK(rowForKey(anchorKey) == -1);
+  CHECK(rowForKey(QStringLiteral("missing")) == -1);
+  f.mods.remove("u2");
+  model.setTree(f.tree(), f.mods, {}, false);
+  CHECK_FALSE(model.indexForKey(anchorKey).isValid());
+  CHECK(rowForKey(anchorKey) == -1);
 }
 
 TEST_CASE("organizer provider metadata tags and rule badges expose QML roles") {

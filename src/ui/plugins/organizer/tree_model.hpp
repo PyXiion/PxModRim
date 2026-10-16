@@ -81,7 +81,7 @@ class ModTreeModel : public QAbstractItemModel {
                const QHash<qint64, organizer::Tag>& tags = {});
   void refreshDiagnostics();
   TreeNode* nodeAt(const QModelIndex& index) const;
-  QModelIndex indexForKey(const QString& key) const;
+  Q_INVOKABLE QModelIndex indexForKey(const QString& key) const;
   QModelIndex indexForUuid(const QString& uuid) const;
   QList<QModelIndex> expandedIndexes(const QModelIndex& parent = {}) const;
   QList<TreeNode*> selectedNodes() const;

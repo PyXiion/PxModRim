@@ -323,9 +323,15 @@ TreeNode* ModTreeModel::nodeAt(const QModelIndex& index) const {
   return index.isValid() ? node(index) : nullptr;
 }
 QModelIndex ModTreeModel::indexForKey(const QString& key) const {
-  for (const auto* item : m_root->walk())
-    if (item->key == key) return indexOf(item);
-  return {};
+  auto find = [&](auto&& self, const TreeNode* parent) -> QModelIndex {
+    for (const auto& child : parent->children) {
+      if (child->key == key) return indexOf(child.get());
+      const auto found = self(self, child.get());
+      if (found.isValid()) return found;
+    }
+    return {};
+  };
+  return find(find, m_root.get());
 }
 QModelIndex ModTreeModel::indexForUuid(const QString& uuid) const {
   for (const auto* item : m_root->walk())

@@ -8,8 +8,8 @@ Rectangle {
     color: Theme.elevate1
     clip: true
 
-    property int anchorRow: -1
-    property int focusedRow: -1
+    property string anchorKey: ""
+    property string focusedKey: ""
     property int dropRow: -1
     property var dropTarget: null
 
@@ -22,8 +22,8 @@ Rectangle {
 
     function collapseAll() {
         tree.collapseRecursively()
-        root.anchorRow = -1
-        root.focusedRow = -1
+        root.anchorKey = ""
+        root.focusedKey = ""
         organizerPanel.persistAllCollapsed(true)
     }
 
@@ -38,15 +38,16 @@ Rectangle {
 
     function clickRow(index, row, modifiers) {
         var range = []
-        if ((modifiers & Qt.ShiftModifier) && root.anchorRow >= 0) {
-            var from = Math.min(root.anchorRow, row)
-            var to = Math.max(root.anchorRow, row)
+        var anchorRow = tree.rowAtIndex(modTreeModel.indexForKey(root.anchorKey))
+        if ((modifiers & Qt.ShiftModifier) && anchorRow >= 0) {
+            var from = Math.min(anchorRow, row)
+            var to = Math.max(anchorRow, row)
             for (var r = from; r <= to; ++r)
                 range.push(tree.index(r, 0))
         } else {
-            root.anchorRow = row
+            root.anchorKey = modTreeModel.data(index, Qt.UserRole + 2)
         }
-        root.focusedRow = row
+        root.focusedKey = modTreeModel.data(index, Qt.UserRole + 2)
         organizerPanel.selectRow(index, modifiers, range)
         tree.forceActiveFocus()
     }
@@ -70,9 +71,10 @@ Rectangle {
     }
 
     function activeRow() {
-        if (root.focusedRow >= 0 && root.focusedRow < tree.rows)
-            return root.focusedRow
-        return -1
+        var row = tree.rowAtIndex(modTreeModel.indexForKey(root.focusedKey))
+        if (row < 0)
+            root.focusedKey = ""
+        return row
     }
 
     property int modelRevision: 0
@@ -93,8 +95,8 @@ Rectangle {
             all.push(tree.index(r, 0))
         organizerPanel.selectRow(all[0], Qt.NoModifier, [])
         organizerPanel.selectRow(all[all.length - 1], Qt.ShiftModifier, all)
-        root.anchorRow = 0
-        root.focusedRow = tree.rows - 1
+        root.anchorKey = modTreeModel.data(all[0], Qt.UserRole + 2)
+        root.focusedKey = modTreeModel.data(all[all.length - 1], Qt.UserRole + 2)
     }
 
     Connections {
@@ -104,9 +106,9 @@ Rectangle {
         function onRowsRemoved() { root.modelRevision++ }
         function onModelReset() {
             root.modelRevision++
-            root.anchorRow = -1
+            root.anchorKey = ""
             Qt.callLater(root.restoreExpansion)
-            root.focusedRow = -1
+            root.focusedKey = ""
         }
     }
 
