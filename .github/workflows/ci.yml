@@ -116,7 +116,7 @@ jobs:
 
       - name: Lint (Linux SteamWorkshop)
         if: runner.os == 'Linux' && matrix.workshop == 'SteamWorkshop'
-        run: CLANG_TIDY="$HOME/.local/bin/clang-tidy" just lint
+        run: CLANG_TIDY="$(pipx environment --value PIPX_BIN_DIR)/clang-tidy" just lint
 
       - name: Build
         run: cmake --build --preset default

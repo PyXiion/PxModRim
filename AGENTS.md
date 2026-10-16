@@ -136,8 +136,9 @@ C# RimWorld mod submodules (see `companion-mods/AGENTS.md`):
 
 ## CI matrix
 - `ci.yml`: ubuntu-latest, windows-latest, macos-latest × NoWorkshop, SteamWorkshop, NativeWorkshop. Each job installs Qt 6.10.3 (`jurplel/install-qt-action`; `qtdeclarative` and `qtsvg` ship in the base package, so `modules` lists only `qtshadertools`, plus the WebEngine addons for SteamWorkshop), builds QCoro v0.13.0 from source against that Qt, runs `just build-js`, then `cmake --preset default` → `cmake --build --preset default` → `ctest --preset default`.
-- Linux CI installs `libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0` plus pugixml, libzip and spdlog dev packages. Windows uses vcpkg triplet `x64-windows-static-md`.
-- The Linux SteamWorkshop job alone runs `just format-check` and `just lint` after configure, installing `clang-format` and `clang-tidy` from apt first.
+- Linux CI installs `libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0` plus pugixml, libzip (with `zipcmp zipmerge ziptool`, which its CMake config references) and spdlog dev packages. Windows uses vcpkg triplet `x64-windows-static-md` and builds Release, because the prebuilt QCoro is `/MD`.
+- The Linux SteamWorkshop job alone runs `just format-check` and `just lint` after configure. Both tools are pinned to 22.1.8 from PyPI (`pipx`): the apt clang-tidy 18 cannot parse libstdc++ 13's `<expected>`, and apt clang-format 18 formats differently. `just lint` reads a copy of `compile_commands.json` without Qt's GCC-only `-mno-direct-extern-access`; `CLANG_TIDY` overrides the binary.
+- The Ubuntu runner's GCC 13 ICEs on braced-list or ternary arguments inside a `co_await` operand (`co_await f({x})`); hoist them into locals. libc++ (macOS) hard-errors on glaze's `<=>` probe of a `std::map` holding a `std::variant`, and clang rejects glaze reflection of types in an anonymous namespace; keep reflected structs in a named namespace.
 - Qt tests need `QT_QPA_PLATFORM=offscreen`; CI sets it for every job.
 
 ## Packaging
