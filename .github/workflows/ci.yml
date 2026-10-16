@@ -9,7 +9,7 @@ on:
 permissions: {}
 
 env:
-  QT_VERSION: '6.11.0'
+  QT_VERSION: '6.10.3'
   QCORO_REF: 'v0.13.0'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           cache: true
-          modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtdeclarative qtshadertools qtsvg qtpositioning qtwebchannel qtwebengine' || 'qtdeclarative qtshadertools qtsvg' }}
+          modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtshadertools qtpositioning qtwebchannel qtwebengine' || 'qtshadertools' }}
 
       - name: Setup MSVC environment
         if: runner.os == 'Windows'

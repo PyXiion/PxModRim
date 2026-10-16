@@ -13,7 +13,7 @@ CI runs configure, build and test on every OS (see CI matrix). Only the Linux St
 - Task runner: **just** (`just` lists the recipes). Node.js 22 for `build-js` (`npx esbuild`).
 - **C++23** compiler: GCC or Clang (CI also builds with MSVC on Windows).
 - **CMake >= 3.24** with **Ninja** (the presets use it). **ccache** is picked up automatically when it is on `PATH`.
-- **Qt 6** (`find_package(Qt6 6.8)` is the minimum; CI and releases use **6.11.0**). Components: Core, Concurrent, Network, Sql, Gui, Quick, QuickControls2, QuickWidgets, Svg, Widgets, Test, Qml. `WebEngineQuick` is needed only by the SteamWorkshop variant.
+- **Qt 6** (`find_package(Qt6 6.8)` is the minimum; CI and releases use **6.10.3**: aqtinstall 3.3.0 cannot read the Windows 6.11 repository layout). Components: Core, Concurrent, Network, Sql, Gui, Quick, QuickControls2, QuickWidgets, Svg, Widgets, Test, Qml. `WebEngineQuick` is needed only by the SteamWorkshop variant.
 - **QCoro 0.13** (`QCoro6`: Core, Network, Qml, Quick), built against the same Qt install. Enable coroutines with `qcoro_enable_coroutines()`, as the root CMakeLists already does.
 - **pugixml**, **libzip**, **spdlog** via `find_package`.
 - **CPM** (`cmake/CPM.cmake`) fetches glaze 5.5.4, Catch2 3.8.1 (tests) and PxSteamDL 0.3.0 (`cmake/Steam.cmake`, skipped by NoWorkshop).
@@ -135,7 +135,7 @@ C# RimWorld mod submodules (see `companion-mods/AGENTS.md`):
 - `cf-workers/` — Cloudflare Workers (Steam Workshop dependency resolver, separate deploy); checked by the `workshop-backend` CI job.
 
 ## CI matrix
-- `ci.yml`: ubuntu-latest, windows-latest, macos-latest × NoWorkshop, SteamWorkshop, NativeWorkshop. Each job installs Qt 6.11.0 (`jurplel/install-qt-action`, WebEngine modules only for SteamWorkshop), builds QCoro v0.13.0 from source against that Qt, runs `just build-js`, then `cmake --preset default` → `cmake --build --preset default` → `ctest --preset default`.
+- `ci.yml`: ubuntu-latest, windows-latest, macos-latest × NoWorkshop, SteamWorkshop, NativeWorkshop. Each job installs Qt 6.10.3 (`jurplel/install-qt-action`; `qtdeclarative` and `qtsvg` ship in the base package, so `modules` lists only `qtshadertools`, plus the WebEngine addons for SteamWorkshop), builds QCoro v0.13.0 from source against that Qt, runs `just build-js`, then `cmake --preset default` → `cmake --build --preset default` → `ctest --preset default`.
 - Linux CI installs `libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0` plus pugixml, libzip and spdlog dev packages. Windows uses vcpkg triplet `x64-windows-static-md`.
 - The Linux SteamWorkshop job alone runs `just format-check` and `just lint` after configure, installing `clang-format` and `clang-tidy` from apt first.
 - Qt tests need `QT_QPA_PLATFORM=offscreen`; CI sets it for every job.
