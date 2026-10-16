@@ -48,10 +48,17 @@ Result<void> AppContext::setupAll() {
 }
 
 QCoro::Task<Result<void>> AppContext::initAll() {
+  if (m_pluginsInitialized) {
+    co_return {};
+  }
   if (auto core = co_await m_core.plugins().initAll(m_core); !core) {
     co_return std::unexpected(core.error());
   }
-  co_return co_await m_plugins.initAll(*this);
+  if (auto ui = co_await m_plugins.initAll(*this); !ui) {
+    co_return std::unexpected(ui.error());
+  }
+  m_pluginsInitialized = true;
+  co_return {};
 }
 
 QCoro::Task<Result<int>> AppContext::refreshMods(bool full) {

@@ -55,6 +55,22 @@ class ThirdView : public px::modrim::RailView {
       QLatin1StringView("Third")};
 };
 
+template <class Ctx>
+class InitCounter final : public px::modrim::BasicPlugin<Ctx> {
+ public:
+  explicit InitCounter(int& calls)
+      : px::modrim::BasicPlugin<Ctx>(QStringLiteral("init-counter")),
+        m_calls(calls) {}
+
+  QCoro::Task<void> init(Ctx&) override {
+    ++m_calls;
+    co_return;
+  }
+
+ private:
+  int& m_calls;
+};
+
 struct Fixture {
   QTemporaryDir directory;
   px::modrim::ConfigService configService{directory.path()};
@@ -140,6 +156,49 @@ TEST_CASE("Settings route leaves the selected view unchanged", "[ui][window]") {
     }
   }
   CHECK(found);
+}
+
+TEST_CASE("Plugin initialization runs once across configuration saves",
+          "[ui][window]") {
+  int coreCalls = 0;
+  int uiCalls = 0;
+  Fixture fixture;
+  fixture.core->registerPlugin(
+      std::make_unique<InitCounter<px::modrim::CoreContext>>(coreCalls));
+  fixture.app->registerPlugin(
+      std::make_unique<InitCounter<px::modrim::AppContext>>(uiCalls));
+  REQUIRE(fixture.app->setupAll());
+  REQUIRE(fixture.core->config().paths.game.empty());
+  CHECK_FALSE(fixture.app->pluginsInitialized());
+
+  auto config = fixture.core->config();
+  config.paths.game = fixture.directory.path().toStdString();
+  REQUIRE(fixture.configService.save(QStringLiteral("config.json"), config));
+  fixture.core->updateConfig(config);
+  REQUIRE(QCoro::waitFor(fixture.app->initAll()));
+  CHECK(fixture.app->pluginsInitialized());
+  CHECK(coreCalls == 1);
+  CHECK(uiCalls == 1);
+
+  config.launch_args = "-logfile second-save.log";
+  REQUIRE(fixture.configService.save(QStringLiteral("config.json"), config));
+  fixture.core->updateConfig(config);
+  REQUIRE(QCoro::waitFor(fixture.app->initAll()));
+  CHECK(fixture.app->pluginsInitialized());
+  CHECK(coreCalls == 1);
+  CHECK(uiCalls == 1);
+}
+
+TEST_CASE("Failed plugin initialization is not marked complete",
+          "[ui][window]") {
+  Fixture fixture;
+  fixture.app->registerPlugin(std::make_unique<px::modrim::UiPlugin>(
+      QStringLiteral("cycle_a"), QStringList{QStringLiteral("cycle_b")}));
+  fixture.app->registerPlugin(std::make_unique<px::modrim::UiPlugin>(
+      QStringLiteral("cycle_b"), QStringList{QStringLiteral("cycle_a")}));
+
+  CHECK_FALSE(QCoro::waitFor(fixture.app->initAll()));
+  CHECK_FALSE(fixture.app->pluginsInitialized());
 }
 
 TEST_CASE("Dirty state tracks active list order and disk reload baseline",

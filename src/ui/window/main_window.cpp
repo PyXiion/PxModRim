@@ -16,6 +16,7 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QResizeEvent>
+#include <QScopeGuard>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QUrl>
@@ -90,6 +91,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
     : QMainWindow(parent),
       m_app(app),
       m_ctx(app.coreContext()),
+      m_startedWithoutGamePath(m_ctx.config().paths.game.empty()),
       m_engine(createQmlEngine(this)),
       m_savedActive(m_ctx.loadedActiveUuids()),
       m_updates(appVersion(), m_ctx.network()) {
@@ -554,9 +556,9 @@ void MainWindow::onDownloadsFinished(const DownloadResult& result) {
 QCoro::Task<void> MainWindow::openSettings() {
   if (m_settingsOpen) co_return;
   m_settingsOpen = true;
+  const auto finish = qScopeGuard([this] { m_settingsOpen = false; });
   const auto [result, dialog] =
       co_await awaitDialog<SettingsPanel>(m_app, m_engine, this);
-  m_settingsOpen = false;
   if (result != QDialog::Accepted) co_return;
   auto config = dialog->getConfig();
   const auto saved =
@@ -571,6 +573,14 @@ QCoro::Task<void> MainWindow::openSettings() {
   if (!reloaded) {
     m_toasts->error(reloaded.error().message);
     co_return;
+  }
+  if (m_startedWithoutGamePath && !m_app.pluginsInitialized() &&
+      !m_ctx.config().paths.game.empty()) {
+    if (auto initialized = co_await m_app.initAll(); !initialized) {
+      m_toasts->error(initialized.error().message);
+      co_return;
+    }
+    startStartupUpdateCheck();
   }
   m_toasts->success(QStringLiteral("Settings saved"));
 }

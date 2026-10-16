@@ -141,6 +141,7 @@ class AppContext {
   // names.
   Result<void> setupAll();
   QCoro::Task<Result<void>> initAll();
+  bool pluginsInitialized() const noexcept { return m_pluginsInitialized; }
   // Reloads mods and resolves to how many are now loaded.
   QCoro::Task<Result<int>> refreshMods(bool full = false);
   // UI plugins shut down before core plugins.
@@ -154,6 +155,7 @@ class AppContext {
   Notifier* m_toasts = nullptr;
   std::function<void(const QString&)> m_navigate;
   UiPrefs m_uiPrefs;
+  bool m_pluginsInitialized = false;
 };
 
 template <RailViewType V>
