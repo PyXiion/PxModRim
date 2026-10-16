@@ -24,7 +24,7 @@ run-none *args: (_run "NoWorkshop" "none" args)
 [private]
 _run variant dir *args: build-js
     cmake -S . -B build/{{dir}} -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPX_WORKSHOP_VARIANT={{variant}}
-    cmake --build build/{{dir}}
+    cmake --build build/{{dir}} --target pxmodrim
     PX_LOG_LEVEL=debug build/{{dir}}/src/app/pxmodrim {{args}}
 
 test: build
