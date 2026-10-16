@@ -45,7 +45,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ccache dpkg patchelf rpm file libfuse2 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev libspdlog-dev
+          sudo apt-get install -y ninja-build ccache dpkg patchelf rpm file libfuse2 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev libzip-tools libspdlog-dev
 
       - name: Build QCoro against Qt
         shell: bash

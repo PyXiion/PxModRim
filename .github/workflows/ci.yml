@@ -52,7 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ccache libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev libspdlog-dev
+          sudo apt-get install -y ninja-build ccache libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev libzip-tools libspdlog-dev
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'

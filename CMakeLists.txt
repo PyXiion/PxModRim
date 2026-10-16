@@ -24,7 +24,7 @@ set(CPM_USE_LOCAL_PACKAGES ON)
 set(CPM_SOURCE_CACHE "$ENV{HOME}/.cache/CPM" CACHE PATH "")
 include(cmake/CPM.cmake)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Concurrent Network Sql Gui Quick QuickControls2 QuickWidgets Svg Widgets Test)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Concurrent Network Sql Gui Quick QuickControls2 QuickWidgets Svg Widgets Test Qml QmlPrivate)
 qt_standard_project_setup(REQUIRES 6.8)
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml")
 
@@ -34,6 +34,11 @@ endif()
 find_package(QCoro6 REQUIRED COMPONENTS Core Network Qml Quick)
 qcoro_enable_coroutines()
 
+# NoWorkshop ships without Steam downloads, so PxSteamDL is not fetched or linked.
+if(NOT PX_WORKSHOP_VARIANT STREQUAL "NoWorkshop")
+    include(cmake/Steam.cmake OPTIONAL)
+endif()
+
 find_package(pugixml REQUIRED)
 find_package(libzip REQUIRED)
 find_package(spdlog REQUIRED)
@@ -41,11 +46,6 @@ CPMAddPackage("gh:stephenberry/glaze@5.5.4")
 if(PX_BUILD_TESTS)
     CPMAddPackage("gh:catchorg/Catch2@3.8.1")
     list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
-endif()
-
-# NoWorkshop ships without Steam downloads, so PxSteamDL is not fetched or linked.
-if(NOT PX_WORKSHOP_VARIANT STREQUAL "NoWorkshop")
-    include(cmake/Steam.cmake OPTIONAL)
 endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
