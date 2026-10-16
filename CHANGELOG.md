@@ -12,6 +12,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Re-implemented the RimSort-derived modules (XML conversion, game constants, About.xml metadata structures and parsing, startup-impact report parsing) independently of the original code, working only from the clean-room rewrite of their behaviour and the existing tests; their public interfaces are unchanged.
 - Ported the Organizer rail view, folder dialogs, tree and filter models, tag editor, and auto-folder rule editor to the C++/Qt UI, retaining the existing QML behavior and adding Catch2 UI regression coverage.
 
+### Fixed
+- Windows and macOS builds no longer fail on the renamed `Platform` enumerators; the UI-off configuration no longer builds UI tests; presets work with CMake 3.24; `just run*` launches the macOS app bundle; CI/release QCoro builds no longer require Qt WebSockets.
+- Shutting down while a Workshop download is queued, logging in or running no longer leaves the catalog or Steam downloader coroutines touching freed objects.
+- Concurrent Organizer folder moves can no longer create folder cycles; the move is validated against the committed tree.
+- Auto-sort now resolves alternative package ids per dependency declaration instead of one shared substitute per missing id.
+- Configuring the game path after a first run without one now initializes plugins (Organizer, Steam downloader) without a restart.
+- The embedded Steam browser exposes its native bridge only to `steamcommunity.com`; deactivating a Workshop mod from it disables every installed copy; Organizer keyboard focus and range selection survive folder expansion.
+- Mods with a parsed About.xml but no description no longer show the "invalid mod" text.
+- Workshop backend: queue continuations are acknowledged only after they are re-queued, emptied collections drop their old members, picked collections honour version tags in the version filter, and failed search-index writes are retried by the crawler.
+
 ## [0.3.1] - 2026-10-13
 
 ### Changed
