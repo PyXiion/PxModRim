@@ -87,7 +87,7 @@ class Resolver {
 };
 
 bool matchesQuery(const ModLeaf& leaf, const QString& providerId,
-                  const TreeQuery& query) {
+                  const TreeQuery& query, const QString& text) {
   if (query.status == StatusFilter::kActive && !leaf.enabled) {
     return false;
   }
@@ -102,7 +102,6 @@ bool matchesQuery(const ModLeaf& leaf, const QString& providerId,
       return false;
     }
   }
-  const QString text = query.text.trimmed().toCaseFolded();
   if (text.isEmpty()) {
     return true;
   }
@@ -136,7 +135,6 @@ bool folderLess(const Folder& a, const Folder& b) {
 // Builds the folder tree bottom-up. `visited` is shared across the whole walk,
 // so a folder reachable twice is attached once.
 struct TreeBuilder {
-  const OrganizerState& state;
   const QHash<qint64, QList<Folder>>& childrenOf;
   const QHash<qint64, QList<ModLeaf>>& allByFolder;
   const QHash<qint64, QList<ModLeaf>>& visibleByFolder;
@@ -370,6 +368,8 @@ FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods,
                      const QSet<QString>& active,
                      const std::optional<TreeQuery>& query) {
   const bool filtering = query && !query->isEmpty();
+  const QString text =
+      filtering ? query->text.trimmed().toCaseFolded() : QString{};
   const Resolver resolver(state);
 
   QHash<qint64, QList<ModLeaf>> allByFolder;
@@ -393,7 +393,7 @@ FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods,
         .placement = where.placement,
     };
     allByFolder[where.folderId].append(leaf);
-    if (!filtering || matchesQuery(leaf, mod.providerId, *query)) {
+    if (!filtering || matchesQuery(leaf, mod.providerId, *query, text)) {
       visibleByFolder[where.folderId].append(leaf);
     }
   }
@@ -409,8 +409,8 @@ FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods,
     ruled.insert(rule.folderId);
   }
 
-  TreeBuilder builder{state, childrenOf, allByFolder, visibleByFolder,
-                      ruled, filtering,  {}};
+  TreeBuilder builder{childrenOf, allByFolder, visibleByFolder,
+                      ruled,      filtering,   {}};
   return builder.build(state.folders.value(kRootId), 0);
 }
 

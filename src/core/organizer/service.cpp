@@ -124,22 +124,12 @@ Result<Tag> OrganizerService::findTag(qint64 tagId) const {
 int OrganizerService::depth(qint64 folderId) const {
   const auto& folders = state().folders;
   int count = 0;
-  Folder current = folders.value(folderId);
-  while (current.parentId && count <= kMaxDepth) {
+  auto current = folders.constFind(folderId);
+  while (current != folders.cend() && current->parentId && count <= kMaxDepth) {
     ++count;
-    current = folders.value(*current.parentId);
+    current = folders.constFind(*current->parentId);
   }
   return count;
-}
-
-QList<Folder> OrganizerService::children(qint64 folderId) const {
-  QList<Folder> result;
-  for (const Folder& folder : state().folders) {
-    if (folder.parentId == folderId) {
-      result.append(folder);
-    }
-  }
-  return result;
 }
 
 QSet<qint64> OrganizerService::subtreeIds(qint64 folderId) const {
@@ -147,8 +137,8 @@ QSet<qint64> OrganizerService::subtreeIds(qint64 folderId) const {
   QList<qint64> pending{folderId};
   while (!pending.isEmpty()) {
     const qint64 current = pending.takeLast();
-    for (const Folder& child : children(current)) {
-      if (!ids.contains(child.id)) {
+    for (const Folder& child : state().folders) {
+      if (child.parentId == current && !ids.contains(child.id)) {
         ids.insert(child.id);
         pending.append(child.id);
       }
@@ -162,8 +152,10 @@ int OrganizerService::height(qint64 folderId, int limit) const {
     return 1;
   }
   int tallest = 0;
-  for (const Folder& child : children(folderId)) {
-    tallest = std::max(tallest, height(child.id, limit - 1));
+  for (const Folder& child : state().folders) {
+    if (child.parentId == folderId) {
+      tallest = std::max(tallest, height(child.id, limit - 1));
+    }
   }
   return 1 + tallest;
 }
@@ -181,8 +173,8 @@ Result<void> OrganizerService::checkDepth(qint64 parentId,
 Result<void> OrganizerService::checkUniqueFolderName(
     qint64 parentId, const QString& name, std::optional<qint64> exclude) const {
   const QString key = name.toCaseFolded();
-  for (const Folder& sibling : children(parentId)) {
-    if (exclude && sibling.id == *exclude) {
+  for (const Folder& sibling : state().folders) {
+    if (sibling.parentId != parentId || sibling.id == exclude) {
       continue;
     }
     if (sibling.name.toCaseFolded() == key) {
@@ -477,9 +469,7 @@ QCoro::Task<Result<void>> OrganizerService::setModTags(QStringList packageIds,
 // ── Rules ────────────────────────────────────────────────────────────────────
 
 QCoro::Task<Result<void>> OrganizerService::setRules(QList<RuleSpec> specs) {
-  QList<RuleSpec> cleaned;
-  cleaned.reserve(specs.size());
-  for (RuleSpec spec : specs) {
+  for (RuleSpec& spec : specs) {
     spec.pattern = spec.pattern.trimmed();
     if (spec.pattern.isEmpty()) {
       co_return std::unexpected(
@@ -492,9 +482,8 @@ QCoro::Task<Result<void>> OrganizerService::setRules(QList<RuleSpec> specs) {
     if (auto target = findFolder(spec.folderId); !target) {
       co_return std::unexpected(target.error());
     }
-    cleaned.append(std::move(spec));
   }
-  if (auto replaced = co_await m_db.replaceRules(cleaned); !replaced) {
+  if (auto replaced = co_await m_db.replaceRules(specs); !replaced) {
     co_return std::unexpected(replaced.error());
   }
   co_return co_await commit();
@@ -510,14 +499,15 @@ QCoro::Task<Result<int>> OrganizerService::addStandardRules() {
                     rule.pattern.toCaseFolded());
   }
 
-  QSet<QString> existing;
-  for (const Folder& folder : children(kRootId)) {
-    existing.insert(folder.name.toCaseFolded());
+  QSet<QString> knownFolders;
+  for (const Folder& folder : state().folders) {
+    if (folder.parentId == kRootId) {
+      knownFolders.insert(folder.name.toCaseFolded());
+    }
   }
 
   QList<StandardRule> rules;
   QStringList newFolders;
-  QSet<QString> newFolderKeys;
   for (const StandardRule& rule : standardRules()) {
     const RuleKey key{static_cast<int>(rule.field), static_cast<int>(rule.op),
                       rule.pattern.toCaseFolded()};
@@ -529,8 +519,8 @@ QCoro::Task<Result<int>> OrganizerService::addStandardRules() {
     // The first spelling of a missing top-level folder names it, as in the
     // legacy service.
     const QString folderKey = rule.folder.toCaseFolded();
-    if (!existing.contains(folderKey) && !newFolderKeys.contains(folderKey)) {
-      newFolderKeys.insert(folderKey);
+    if (!knownFolders.contains(folderKey)) {
+      knownFolders.insert(folderKey);
       newFolders.append(rule.folder);
     }
   }
@@ -616,10 +606,11 @@ Result<QSet<qint64>> OrganizerService::folderMoveTargets(
     if (depth(candidate.id) + treeHeight > kMaxDepth) {
       continue;
     }
-    const QList<Folder> siblings = children(candidate.id);
-    const bool clash = std::any_of(siblings.cbegin(), siblings.cend(),
-                                   [&key](const Folder& child) {
-                                     return child.name.toCaseFolded() == key;
+    const auto& folders = state().folders;
+    const bool clash = std::any_of(folders.cbegin(), folders.cend(),
+                                   [&candidate, &key](const Folder& child) {
+                                     return child.parentId == candidate.id &&
+                                            child.name.toCaseFolded() == key;
                                    });
     if (!clash) {
       targets.insert(candidate.id);
