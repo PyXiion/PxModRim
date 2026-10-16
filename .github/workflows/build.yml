@@ -108,6 +108,8 @@ jobs:
           curl -fsSL -o "$tools/linuxdeploy-plugin-qt" https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x "$tools/linuxdeploy" "$tools/linuxdeploy-plugin-qt"
           cp src/ui/assets/logo.svg dist/pxmodrim.svg
+          # Only SQLite is used; other drivers require external database clients.
+          find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name libqsqlite.so -delete
           export PATH="$tools:$PATH" APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64
           export QMAKE="$QT_ROOT_DIR/bin/qmake" QML_SOURCES_PATHS="$PWD/src/ui"
           export OUTPUT="$PWD/dist/PxModRim-Linux-x86_64-$VARIANT.AppImage"
