@@ -1,4 +1,4 @@
-import type { DepNode, DepItemsResult } from "./types";
+import type { DepNode } from "./types";
 import { Config } from "./types";
 import { log, warn, parseHTML, scrapeDepsFromContainer } from "./utils";
 import { PxModRimAPI } from "./api";
@@ -149,7 +149,9 @@ async function buildDomDepTree(
     const resolvers = _fetchResolvers.get(modId);
     if (resolvers) {
       _fetchResolvers.delete(modId);
-      resolvers.forEach((r) => r());
+      resolvers.forEach((r) => {
+        r();
+      });
     }
   }
 }
@@ -210,7 +212,9 @@ export function flattenDepTree(
 }
 
 export function cancelPendingDepFetches(): void {
-  DepState.aborters.forEach((controller) => controller.abort());
+  DepState.aborters.forEach((controller) => {
+    controller.abort();
+  });
   DepState.aborters.clear();
   DepState.fetching.clear();
 }

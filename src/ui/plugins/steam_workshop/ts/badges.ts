@@ -1,4 +1,3 @@
-import { ModState } from "./types";
 import { log, getModId, getModTitle, findItemCard } from "./utils";
 import { getModState, applyModState, handleClick } from "./controls";
 import { isBridgeDataReady } from "./bridge";

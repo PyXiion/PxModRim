@@ -1,5 +1,5 @@
 import { ModState, type ModStatus } from "./types";
-import { log, warn } from "./utils";
+import { warn } from "./utils";
 import { getDepsFor, flattenDepTree } from "./deps";
 import { PxModRimAPI } from "./api";
 

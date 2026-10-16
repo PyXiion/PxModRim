@@ -1,5 +1,5 @@
 import type { DepItemsResult } from "./types";
-import { PxModRimRPC } from "./bridge";
+import type { PxModRimRPC } from "./bridge";
 
 let _rpc: PxModRimRPC | null = null;
 

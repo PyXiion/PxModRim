@@ -91,7 +91,9 @@ export function initRPC(): Promise<PxModRimRPC> {
 
 export function __pxmSetInstalled(modIds: string[]): void {
   window.__pxmodrim.installedIds.clear();
-  (modIds || []).forEach((id) => window.__pxmodrim.installedIds.add(id));
+  (modIds || []).forEach((id) => {
+    window.__pxmodrim.installedIds.add(id);
+  });
   if (_bridgeDataReady) {
     updateAllModBadges();
     refreshAllDepsBadges();
@@ -115,7 +117,9 @@ export function __pxmClearChecked(): void {
 
 export function __pxmSetActive(modIds: string[]): void {
   window.__pxmodrim.activeIds.clear();
-  (modIds || []).forEach((id) => window.__pxmodrim.activeIds.add(id));
+  (modIds || []).forEach((id) => {
+    window.__pxmodrim.activeIds.add(id);
+  });
   if (_bridgeDataReady) {
     updateAllModBadges();
     refreshAllDepsBadges();

@@ -1,4 +1,4 @@
-import { ModState, Config } from "./types";
+import { Config } from "./types";
 import { log, warn } from "./utils";
 import { getModState, applyModState, handleClick, performModAction } from "./controls";
 import { getDepsFor } from "./deps";
@@ -121,7 +121,7 @@ export async function createDetailButton(): Promise<void> {
   if ((createDetailButton as Record<string, unknown>)._running) return;
   (createDetailButton as Record<string, unknown>)._running = true;
   try {
-    log("createDetailButton ENTER url=" + window.location.href);
+    log(`createDetailButton ENTER url=${window.location.href}`);
     const currentUrl = window.location.href;
     if (DetailState.injectedUrl !== currentUrl) {
       DetailState.injectedUrl = currentUrl;
