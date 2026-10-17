@@ -148,6 +148,8 @@ Release builds run on `v*` tags or manual dispatch (`build.yml`); only tag runs 
 - **macOS**: install as `pxmodrim.app`, rename to `PxModRim.app`, `macdeployqt -qmldir=src/ui`, `dylibbundler -of` for Homebrew dylibs while preserving the deployed Qt frameworks (`-od` would erase them). Developer ID signing and notarization run only when the secrets are set; otherwise the app is ad-hoc signed.
 - Package versions come from the tag on tag runs and `CMAKE_PROJECT_VERSION` on manual dispatch; keep `project(VERSION)` in the root CMakeLists in step with release tags.
 - Linux and macOS deploy only the SQLite SQL driver; other Qt SQL drivers require external database clients that the application does not use.
+- Every package goes through `scripts/prune-qt-deploy.sh` after deployment, which drops what the UI never loads (non-Basic Quick Controls styles, Particles, Effects, Qt `.qm` catalogs; Dialogs too unless the variant is SteamWorkshop, because QtWebEngine's QML delegates import `QtQuick.Dialogs`), then `scripts/smoke-package.sh` starts the packaged app and fails on missing QML modules or libraries (Linux runs it under `xvfb-run`). A new QML import of a pruned module needs its entry removed from the prune script.
+- The Linux bundle must ship `libssl.so.3` next to `libcrypto.so.3`: Qt's OpenSSL backend `dlopen`s libssl, and a host libssl of another version cannot pair with the bundled libcrypto (TLS then fails to initialize). `cmake --install --strip` strips the executable.
 
 ## AI PRs
 PR description starts with: "Greetings, PyXiion! The silicon-based contributor is here."

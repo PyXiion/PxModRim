@@ -49,7 +49,7 @@ jobs:
           # GCC 13 provides C++23 <expected> while Jammy preserves glibc 2.35.
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y gcc-13 g++-13 ninja-build ccache dpkg patchelf rpm file libfuse2 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev zipcmp zipmerge ziptool libspdlog-dev
+          sudo apt-get install -y gcc-13 g++-13 ninja-build ccache dpkg patchelf rpm file libfuse2 xvfb libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev zipcmp zipmerge ziptool libspdlog-dev
 
       - name: Build QCoro against Qt
         shell: bash
@@ -87,7 +87,7 @@ jobs:
         run: cmake --build --preset release
 
       - name: Install into AppDir
-        run: cmake --install build/release --prefix "$PWD/dist/AppDir/usr"
+        run: cmake --install build/release --prefix "$PWD/dist/AppDir/usr" --strip
 
       - name: Verify glibc floor
         run: |
@@ -113,12 +113,23 @@ jobs:
           export PATH="$tools:$PATH" APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64
           export QMAKE="$QT_ROOT_DIR/bin/qmake" QML_SOURCES_PATHS="$PWD/src/ui"
           export OUTPUT="$PWD/dist/PxModRim-Linux-x86_64-$VARIANT.AppImage"
+          # Qt's OpenSSL backend dlopens libssl at run time and linuxdeploy only
+          # sees libcrypto, so a host libssl of another version would not pair
+          # with the bundled libcrypto and TLS would fail to initialize.
+          libdir=/lib/x86_64-linux-gnu
           linuxdeploy --appdir dist/AppDir \
             --executable dist/AppDir/usr/bin/pxmodrim \
             --desktop-file dist/AppDir/usr/share/applications/pxmodrim.desktop \
             --icon-file dist/pxmodrim.svg \
-            --plugin qt \
-            --output appimage
+            --library "$libdir/libssl.so.3" \
+            --library "$libdir/libcrypto.so.3" \
+            --plugin qt
+          keep=""
+          if [ "$VARIANT" = SteamWorkshop ]; then keep=keep-dialogs; fi
+          scripts/prune-qt-deploy.sh dist/AppDir/usr $keep
+          test -f dist/AppDir/usr/lib/libssl.so.3
+          xvfb-run -a scripts/smoke-package.sh dist/AppDir/usr/bin/pxmodrim
+          linuxdeploy --appdir dist/AppDir --output appimage
           tar -czf "dist/PxModRim-Linux-$VARIANT.tar.gz" -C dist/AppDir usr
 
       - name: Build deb and rpm
@@ -320,6 +331,10 @@ jobs:
             find dist/PxModRim/bin/qtwebengine_locales -name '*.pak' ! -name 'en-US.pak' ! -name 'en-GB.pak' -delete
           fi
           rm -f dist/PxModRim/bin/qtwebengine_devtools_resources.pak
+          keep=""
+          if [ "$VARIANT" = SteamWorkshop ]; then keep=keep-dialogs; fi
+          scripts/prune-qt-deploy.sh dist/PxModRim/bin $keep
+          scripts/smoke-package.sh dist/PxModRim/bin/PxModRim.exe
 
       - name: Build NSIS installer and zip
         shell: pwsh
@@ -429,6 +444,9 @@ jobs:
           # Only SQLite is used; other drivers require external database clients.
           find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name libqsqlite.dylib -delete
           macdeployqt dist/PxModRim.app -qmldir=src/ui -always-overwrite
+          keep=""
+          if [ "$VARIANT" = SteamWorkshop ]; then keep=keep-dialogs; fi
+          scripts/prune-qt-deploy.sh dist/PxModRim.app $keep
           mkdir -p dist/PxModRim.app/Contents/Frameworks
           # Preserve the Qt frameworks already copied by macdeployqt.
           dylibbundler -of -b -x dist/PxModRim.app/Contents/MacOS/pxmodrim \
@@ -496,6 +514,9 @@ jobs:
           hdiutil create -volname PxModRim \
             -srcfolder dist/PxModRim.app \
             -ov -format UDZO dist/PxModRim-macOS.dmg
+
+      - name: Smoke test the packaged app
+        run: scripts/smoke-package.sh dist/PxModRim.app/Contents/MacOS/pxmodrim
 
       - name: Rename macOS packages
         run: |
