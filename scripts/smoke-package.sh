@@ -12,16 +12,21 @@ seconds="${2:-10}"
 
 home="$(mktemp -d)"
 log="$home/out.txt"
-HOME="$home" XDG_CONFIG_HOME="$home/.config" \
-  PX_LOG_LEVEL=info timeout "$seconds" "$exe" >"$log" 2>&1
-status=$?
-cat "$log"
-
-# timeout exits 124 when the app was still running, which is the success case.
-if [ "$status" -ne 124 ]; then
+# No `timeout`: it does not exist on macOS runners.
+HOME="$home" XDG_CONFIG_HOME="$home/.config" PX_LOG_LEVEL=info \
+  "$exe" >"$log" 2>&1 &
+pid=$!
+sleep "$seconds"
+if ! kill "$pid" 2>/dev/null; then
+  status=0
+  wait "$pid" || status=$?
+  cat "$log"
   echo "smoke: app exited early with status $status" >&2
   exit 1
 fi
+wait "$pid" 2>/dev/null || true
+cat "$log"
+
 if grep -Eiq 'is not installed|cannot load library|failed to load' "$log"; then
   echo "smoke: deployment is missing a Qt component" >&2
   exit 1
