@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+env:
+  QT_VERSION: '6.10.3'
+  QCORO_REF: 'v0.13.0'
+
 jobs:
   build-linux:
     runs-on: ubuntu-22.04
@@ -17,19 +21,18 @@ jobs:
       matrix:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     env:
-      UV_NO_SYNC: '1'
+      VARIANT: ${{ matrix.workshop }}
+      CC: gcc-13
+      CXX: g++-13
     steps:
       - uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@main
+      - name: Install Qt
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
-          python-version-file: pyproject.toml
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtshadertools qtpositioning qtwebchannel qtwebengine' || 'qtshadertools' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -37,53 +40,147 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2.87.16
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
         with:
-          tool: just@1.40.0
+          tool: just
 
       - name: Install system dependencies
         run: |
+          # GCC 13 provides C++23 <expected> while Jammy preserves glibc 2.35.
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y dpkg libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 patchelf ccache rpm
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
-          chmod +x /usr/local/bin/appimagetool
+          sudo apt-get install -y gcc-13 g++-13 ninja-build ccache dpkg patchelf rpm file libfuse2 xvfb libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libpugixml-dev libzip-dev zipcmp zipmerge ziptool libspdlog-dev
 
-      - name: Install Dependencies
-        run: uv sync --locked --dev ${{ matrix.workshop == 'NoWorkshop' && '--no-install-package pxsteamdl' || '--extra steam' }}
+      - name: Build QCoro against Qt
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "$QCORO_REF" https://github.com/qcoro/qcoro.git "$RUNNER_TEMP/qcoro-src"
+          cmake -S "$RUNNER_TEMP/qcoro-src" -B "$RUNNER_TEMP/qcoro-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
+            -DUSE_QT_VERSION=6 \
+            -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_WITH_QTWEBSOCKETS=OFF \
+            -DQCORO_BUILD_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/qcoro-build"
+          cmake --install "$RUNNER_TEMP/qcoro-build"
 
-      - name: Build with Nuitka
-        run: just build-release-bundled --workshop ${{ matrix.workshop }}
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2
+        with:
+          key: release-linux-${{ matrix.workshop }}
+
+      - name: Build injected JavaScript
+        run: just build-js
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake --preset release \
+            -DPX_WORKSHOP_VARIANT="$VARIANT" \
+            -DPX_BUILD_TESTS=OFF \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR;$RUNNER_TEMP/qcoro"
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Install into AppDir
+        run: cmake --install build/release --prefix "$PWD/dist/AppDir/usr" --strip
 
       - name: Verify glibc floor
         run: |
           set -euo pipefail
-          max=$(find dist/entrypoint.dist -type f \( -name '*.so*' -o -perm -u+x \) -exec objdump -T {} + 2>/dev/null \
+          max=$(find dist/AppDir/usr -type f \( -name '*.so*' -o -perm -u+x \) -exec objdump -T {} + 2>/dev/null \
             | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1 || true)
           echo "Highest GLIBC symbol: ${max:-none}"
           test -n "$max"
           test "$(printf '%s\nGLIBC_2.35\n' "$max" | sort -V | tail -1)" = "GLIBC_2.35"
 
-      - name: Package tar.gz
-        run: tar -czf PxModRim-Linux-${{ matrix.workshop }}.tar.gz -C dist entrypoint.dist/
-
-      - name: Rename Linux packages
+      - name: Deploy Qt and build AppImage
+        shell: bash
         run: |
           set -euo pipefail
-          mv dist/PxModRim-x86_64.AppImage dist/PxModRim-Linux-x86_64-${{ matrix.workshop }}.AppImage
-          for f in dist/*.deb; do
-            [ -f "$f" ] || continue
-            mv "$f" "${f%.deb}-${{ matrix.workshop }}.deb"
+          tools="$RUNNER_TEMP/tools"
+          mkdir -p "$tools"
+          curl -fsSL -o "$tools/linuxdeploy" https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -fsSL -o "$tools/linuxdeploy-plugin-qt" https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x "$tools/linuxdeploy" "$tools/linuxdeploy-plugin-qt"
+          cp src/ui/assets/logo.svg dist/pxmodrim.svg
+          # Only SQLite is used; other drivers require external database clients.
+          find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name libqsqlite.so -delete
+          export PATH="$tools:$PATH" APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64
+          export QMAKE="$QT_ROOT_DIR/bin/qmake" QML_SOURCES_PATHS="$PWD/src/ui"
+          export OUTPUT="$PWD/dist/PxModRim-Linux-x86_64-$VARIANT.AppImage"
+          # Qt's OpenSSL backend dlopens libssl at run time and linuxdeploy only
+          # sees libcrypto, so a host libssl of another version would not pair
+          # with the bundled libcrypto and TLS would fail to initialize.
+          libdir=/lib/x86_64-linux-gnu
+          linuxdeploy --appdir dist/AppDir \
+            --executable dist/AppDir/usr/bin/pxmodrim \
+            --desktop-file dist/AppDir/usr/share/applications/pxmodrim.desktop \
+            --icon-file dist/pxmodrim.svg \
+            --library "$libdir/libssl.so.3" \
+            --library "$libdir/libcrypto.so.3" \
+            --plugin qt
+          keep=""
+          if [ "$VARIANT" = SteamWorkshop ]; then keep=keep-dialogs; fi
+          scripts/prune-qt-deploy.sh dist/AppDir/usr $keep
+          test -f dist/AppDir/usr/lib/libssl.so.3
+          xvfb-run -a scripts/smoke-package.sh dist/AppDir/usr/bin/pxmodrim
+          linuxdeploy --appdir dist/AppDir --output appimage
+          tar -czf "dist/PxModRim-Linux-$VARIANT.tar.gz" -C dist/AppDir usr
+
+      - name: Build deb and rpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' build/release/CMakeCache.txt)
+          fi
+
+          pkg=dist/deb
+          rm -rf "$pkg"
+          mkdir -p "$pkg/DEBIAN" "$pkg/opt/pxmodrim" "$pkg/usr/bin" \
+            "$pkg/usr/share/applications" "$pkg/usr/share/icons/hicolor/scalable/apps"
+          cp -a dist/AppDir/usr/. "$pkg/opt/pxmodrim/"
+          ln -s /opt/pxmodrim/bin/pxmodrim "$pkg/usr/bin/pxmodrim"
+          install -m 644 packaging/linux/pxmodrim.desktop "$pkg/usr/share/applications/pxmodrim.desktop"
+          install -m 644 src/ui/assets/logo.svg "$pkg/usr/share/icons/hicolor/scalable/apps/pxmodrim.svg"
+          installed_size=$(du -sk "$pkg" | cut -f1)
+          cat > "$pkg/DEBIAN/control" <<EOF
+          Package: pxmodrim
+          Version: $version
+          Section: games
+          Priority: optional
+          Architecture: amd64
+          Installed-Size: $installed_size
+          Maintainer: PyXiion
+          Homepage: https://github.com/PyXiion/PxModRim
+          Description: Mod manager for RimWorld
+           PxModRim is a fast and modern mod manager for RimWorld.
+          EOF
+          dpkg-deb --build --root-owner-group "$pkg" "dist/pxmodrim_${version}_amd64-$VARIANT.deb"
+          rm -rf "$pkg"
+
+          rpmbuild -bb \
+            --define "_topdir $PWD/dist/rpmbuild" \
+            --define "project_root $PWD" \
+            --define "version $version" \
+            packaging/linux/pxmodrim.spec
+          for rpm in dist/rpmbuild/RPMS/*/*.rpm; do
+            mv "$rpm" "dist/$(basename "${rpm%.rpm}")-$VARIANT.rpm"
           done
-          for f in dist/*.rpm; do
-            [ -f "$f" ] || continue
-            mv "$f" "${f%.rpm}-${{ matrix.workshop }}.rpm"
-          done
+          rm -rf dist/rpmbuild
 
       - name: Upload artifact (tar.gz)
         uses: actions/upload-artifact@v7
         with:
           name: PxModRim-Linux-${{ matrix.workshop }}
-          path: PxModRim-Linux-${{ matrix.workshop }}.tar.gz
+          path: dist/PxModRim-Linux-${{ matrix.workshop }}.tar.gz
 
       - name: Upload artifact (AppImage)
         uses: actions/upload-artifact@v7
@@ -102,6 +199,7 @@ jobs:
         with:
           name: PxModRim-Linux-RPM-${{ matrix.workshop }}
           path: dist/*-${{ matrix.workshop }}.rpm
+
   build-flatpak:
     needs: [build-linux]
     runs-on: ubuntu-latest
@@ -127,13 +225,14 @@ jobs:
           tar -xzf dist-archive/PxModRim-Linux-${{ matrix.workshop }}.tar.gz -C dist
 
       - name: Build Flatpak bundle
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           manifest-path: packaging/flatpak/com.github.PyXiion.PxModRim.yaml
           bundle: PxModRim-Linux-${{ matrix.workshop }}.flatpak
           build-bundle: true
           upload-artifact: true
           artifact-name: PxModRim-Flatpak-${{ matrix.workshop }}
+
   build-windows:
     runs-on: windows-latest
     strategy:
@@ -141,19 +240,19 @@ jobs:
       matrix:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     env:
-      UV_NO_SYNC: '1'
+      VARIANT: ${{ matrix.workshop }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@main
+      - name: Install Qt
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
-          python-version-file: pyproject.toml
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtshadertools qtpositioning qtwebchannel qtwebengine' || 'qtshadertools' }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -161,15 +260,15 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2.87.16
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
         with:
-          tool: just@1.40.0
+          tool: just
 
-      - name: Install Dependencies
-        run: uv sync --locked --dev ${{ matrix.workshop == 'NoWorkshop' && '--no-install-package pxsteamdl' || '--extra steam' }}
-      - name: Install NSIS
+      - name: Install dependencies
         shell: pwsh
         run: |
+          choco install ninja ccache --yes --no-progress
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install pugixml libzip spdlog --triplet x64-windows-static-md
           choco install nsis --version=3.11 --yes --no-progress
           $nsisDir = Join-Path ${env:ProgramFiles(x86)} "NSIS"
           $makensis = Join-Path $nsisDir "makensis.exe"
@@ -177,27 +276,91 @@ jobs:
             throw "NSIS installation did not provide makensis.exe"
           }
           $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "NSIS_DIR=$nsisDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           & $makensis /VERSION
 
-      - name: Build with Nuitka
-        run: just build-release-bundled --workshop ${{ matrix.workshop }}
-
-      - name: Rename Windows installer
+      - name: Build QCoro against Qt
         shell: bash
-        run: mv dist/PxModRim-Setup.exe dist/PxModRim-Windows-${{ matrix.workshop }}-Setup.exe
+        run: |
+          git clone --depth 1 --branch "$QCORO_REF" https://github.com/qcoro/qcoro.git "$RUNNER_TEMP/qcoro-src"
+          cmake -S "$RUNNER_TEMP/qcoro-src" -B "$RUNNER_TEMP/qcoro-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
+            -DUSE_QT_VERSION=6 \
+            -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_WITH_QTWEBSOCKETS=OFF \
+            -DQCORO_BUILD_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/qcoro-build"
+          cmake --install "$RUNNER_TEMP/qcoro-build"
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2
+        with:
+          key: release-windows-${{ matrix.workshop }}
+
+      - name: Build injected JavaScript
+        run: just build-js
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake --preset release \
+            -DPX_WORKSHOP_VARIANT="$VARIANT" \
+            -DPX_BUILD_TESTS=OFF \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR;$RUNNER_TEMP/qcoro" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Install
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --install build/release --prefix "$PWD/dist/PxModRim"
+          mv dist/PxModRim/bin/pxmodrim.exe dist/PxModRim/bin/PxModRim.exe
+
+      - name: Deploy Qt
+        shell: bash
+        run: |
+          set -euo pipefail
+          windeployqt --release --no-translations --qmldir src/ui dist/PxModRim/bin/PxModRim.exe
+          if [ -d dist/PxModRim/bin/qtwebengine_locales ]; then
+            find dist/PxModRim/bin/qtwebengine_locales -name '*.pak' ! -name 'en-US.pak' ! -name 'en-GB.pak' -delete
+          fi
+          rm -f dist/PxModRim/bin/qtwebengine_devtools_resources.pak
+          keep=""
+          if [ "$VARIANT" = SteamWorkshop ]; then keep=keep-dialogs; fi
+          scripts/prune-qt-deploy.sh dist/PxModRim/bin $keep
+          scripts/smoke-package.sh dist/PxModRim/bin/PxModRim.exe
+
+      - name: Build NSIS installer and zip
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            $version = (Select-String '^CMAKE_PROJECT_VERSION:STATIC=' build/release/CMakeCache.txt).Line.Split('=')[1]
+          }
+          makensis.exe "/DVERSION=$version" "/DDIST_DIR=$PWD/dist/PxModRim/bin" `
+            "/DOUTPUT_FILE=$PWD/dist/PxModRim-Windows-$env:VARIANT-Setup.exe" packaging/windows/installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          7z a "dist/PxModRim-Windows-$env:VARIANT.zip" "./dist/PxModRim/bin/*"
 
       - name: Upload artifact (dist)
         uses: actions/upload-artifact@v7
         with:
           name: PxModRim-Windows-${{ matrix.workshop }}
-          path: dist/entrypoint.dist/*
+          path: dist/PxModRim-Windows-${{ matrix.workshop }}.zip
 
       - name: Upload artifact (installer)
         uses: actions/upload-artifact@v7
         with:
           name: PxModRim-Windows-Installer-${{ matrix.workshop }}
           path: dist/PxModRim-Windows-${{ matrix.workshop }}-Setup.exe
+
   build-macos:
     runs-on: macos-latest
     strategy:
@@ -205,7 +368,7 @@ jobs:
       matrix:
         workshop: [NoWorkshop, SteamWorkshop, NativeWorkshop]
     env:
-      UV_NO_SYNC: '1'
+      VARIANT: ${{ matrix.workshop }}
       MACOS_SIGNING_CONFIGURED: >-
         ${{ secrets.MACOS_CERT != '' &&
             secrets.MACOS_CERT_PASSWORD != '' &&
@@ -216,15 +379,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@main
+      - name: Install Qt
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
-          python-version-file: pyproject.toml
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          modules: ${{ matrix.workshop == 'SteamWorkshop' && 'qtshadertools qtpositioning qtwebchannel qtwebengine' || 'qtshadertools' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -232,15 +392,67 @@ jobs:
           node-version: 22
 
       - name: Install just
-        uses: taiki-e/install-action@v2.87.15
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
         with:
-          tool: just@1.40.0
+          tool: just
 
-      - name: Install Dependencies
-        run: uv sync --locked --dev ${{ matrix.workshop == 'NoWorkshop' && '--no-install-package pxsteamdl' || '--extra steam' }}
+      - name: Install dependencies
+        run: brew install ninja ccache pugixml libzip spdlog dylibbundler
 
-      - name: Build with Nuitka
-        run: just build-release-bundled --workshop ${{ matrix.workshop }}
+      - name: Build QCoro against Qt
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "$QCORO_REF" https://github.com/qcoro/qcoro.git "$RUNNER_TEMP/qcoro-src"
+          cmake -S "$RUNNER_TEMP/qcoro-src" -B "$RUNNER_TEMP/qcoro-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qcoro" \
+            -DUSE_QT_VERSION=6 \
+            -DQCORO_WITH_QTDBUS=OFF \
+            -DQCORO_WITH_QTWEBSOCKETS=OFF \
+            -DQCORO_BUILD_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/qcoro-build"
+          cmake --install "$RUNNER_TEMP/qcoro-build"
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2
+        with:
+          key: release-macos-${{ matrix.workshop }}
+
+      - name: Build injected JavaScript
+        run: just build-js
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake --preset release \
+            -DPX_WORKSHOP_VARIANT="$VARIANT" \
+            -DPX_BUILD_TESTS=OFF \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR;$RUNNER_TEMP/qcoro"
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Install and deploy Qt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --install build/release --prefix "$PWD/dist/stage"
+          mv dist/stage/pxmodrim.app dist/PxModRim.app
+          rm -rf dist/stage
+          # Only SQLite is used; other drivers require external database clients.
+          find "$QT_ROOT_DIR/plugins/sqldrivers" -type f ! -name libqsqlite.dylib -delete
+          macdeployqt dist/PxModRim.app -qmldir=src/ui -always-overwrite
+          keep=""
+          if [ "$VARIANT" = SteamWorkshop ]; then keep=keep-dialogs; fi
+          scripts/prune-qt-deploy.sh dist/PxModRim.app $keep
+          mkdir -p dist/PxModRim.app/Contents/Frameworks
+          # Preserve the Qt frameworks already copied by macdeployqt.
+          dylibbundler -of -b -x dist/PxModRim.app/Contents/MacOS/pxmodrim \
+            -s "$PWD/dist/PxModRim.app/Contents/Frameworks" \
+            -d dist/PxModRim.app/Contents/Frameworks/ -p @executable_path/../Frameworks/
+          test -f dist/PxModRim.app/Contents/Frameworks/QtCore.framework/QtCore
 
       - name: Sign and notarize macOS app
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
@@ -293,11 +505,24 @@ jobs:
           security delete-keychain "$keychain_path"
           rm -f "$certificate" "$notary_zip"
 
+      - name: Ad-hoc sign and archive macOS app
+        if: env.MACOS_SIGNING_CONFIGURED != 'true'
+        run: |
+          set -euo pipefail
+          codesign --force --deep --sign - dist/PxModRim.app
+          ditto -c -k --keepParent dist/PxModRim.app dist/PxModRim-macOS.zip
+          hdiutil create -volname PxModRim \
+            -srcfolder dist/PxModRim.app \
+            -ov -format UDZO dist/PxModRim-macOS.dmg
+
+      - name: Smoke test the packaged app
+        run: scripts/smoke-package.sh dist/PxModRim.app/Contents/MacOS/pxmodrim
+
       - name: Rename macOS packages
         run: |
           set -euo pipefail
-          mv dist/PxModRim-macOS.zip dist/PxModRim-macOS-${{ matrix.workshop }}.zip
-          mv dist/PxModRim-macOS.dmg dist/PxModRim-macOS-${{ matrix.workshop }}.dmg
+          mv dist/PxModRim-macOS.zip "dist/PxModRim-macOS-$VARIANT.zip"
+          mv dist/PxModRim-macOS.dmg "dist/PxModRim-macOS-$VARIANT.dmg"
 
       - name: Upload artifact (dmg)
         uses: actions/upload-artifact@v7
@@ -310,6 +535,7 @@ jobs:
         with:
           name: PxModRim-macOS-ZIP-${{ matrix.workshop }}
           path: dist/PxModRim-macOS-${{ matrix.workshop }}.zip
+
   release:
     needs: [build-linux, build-flatpak, build-windows, build-macos]
     runs-on: ubuntu-latest
@@ -322,14 +548,8 @@ jobs:
           path: artifacts
           merge-multiple: false
 
-      - name: Package Windows release
-        run: |
-          for variant in NoWorkshop SteamWorkshop NativeWorkshop; do
-            7z a "PxModRim-Windows-${variant}.zip" "./artifacts/PxModRim-Windows-${variant}/*"
-          done
-
       - name: Create Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: |
             artifacts/PxModRim-Linux-*/*.tar.gz
@@ -337,7 +557,7 @@ jobs:
             artifacts/PxModRim-Linux-Deb-*/*.deb
             artifacts/PxModRim-Linux-RPM-*/*.rpm
             artifacts/PxModRim-Flatpak-*/*.flatpak
-            PxModRim-Windows-*.zip
+            artifacts/PxModRim-Windows-*/*.zip
             artifacts/PxModRim-Windows-Installer-*/*-Setup.exe
             artifacts/PxModRim-macOS-DMG-*/*.dmg
             artifacts/PxModRim-macOS-ZIP-*/*.zip

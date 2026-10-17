@@ -1,82 +1,70 @@
-ruff_config := "--config pyproject.toml"
-pytest_opts := "--doctest-modules --no-qt-log"
+set windows-shell := ["bash", "-cu"]
+
+python := if os() == "windows" { "python" } else { "python3" }
+app_exe := if os() == "macos" { "pxmodrim.app/Contents/MacOS/pxmodrim" } else { "pxmodrim" }
+clang_tidy := env("CLANG_TIDY", "clang-tidy")
 
 @default:
     just --list
 
+configure *args:
+    cmake --preset default {{args}}
+
+build *args: build-js
+    [ -f build/default/CMakeCache.txt ] || cmake --preset default
+    cmake --build --preset default {{args}}
+
+# Build and start the app (Steam browser variant); each variant has its own build directory
+run *args: (_run "SteamWorkshop" "default" args)
+
+# Build and start the app with the native Workshop browser
+run-native *args: (_run "NativeWorkshop" "native" args)
+
+# Build and start the app as a plain mod sorter (no Workshop)
+run-none *args: (_run "NoWorkshop" "none" args)
+
+[private]
+_run variant dir *args: build-js
+    cmake -S . -B build/{{dir}} -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPX_WORKSHOP_VARIANT={{variant}}
+    cmake --build build/{{dir}} --target pxmodrim
+    PX_LOG_LEVEL=debug build/{{dir}}/src/app/{{app_exe}} {{args}}
+
+test: build
+    QT_QPA_PLATFORM=offscreen ctest --preset default
+
+build-release: build-js
+    [ -f build/release/CMakeCache.txt ] || cmake --preset release
+    cmake --build --preset release
+
 build-js:
-    uv run python scripts/build-inject-js.py
+    {{python}} scripts/build-inject-js.py
 
-run: build-js dev-setup
-    LOGURU_LEVEL=DEBUG uv run python -m pxmodrim
+format:
+    find src tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format -i
 
-test: build-js dev-setup
-    QT_QPA_PLATFORM=offscreen uv run pytest {{pytest_opts}} -s
+format-check:
+    find src tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format --dry-run --Werror
 
-test-verbose: build-js dev-setup
-    QT_QPA_PLATFORM=offscreen uv run pytest {{pytest_opts}} -v --tb=short -s
+# Qt adds GCC-only flags that clang rejects, so clang-tidy reads a filtered copy.
+lint-db:
+    [ -f build/default/compile_commands.json ] || cmake --preset default
+    mkdir -p build/lint
+    sed 's/ -mno-direct-extern-access//g' build/default/compile_commands.json > build/lint/compile_commands.json
 
-pyright:
-    uv run python -m pyright -p pyproject.toml src/ tests/
+lint *args: lint-db
+    run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -extra-arg=-Wno-unknown-warning-option {{args}} '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
 
-ruff-fix:
-    uv run ruff check {{ruff_config}} src/ tests/ scripts/ packaging/ --fix
+lint-fix: lint-db
+    run-clang-tidy -clang-tidy-binary {{clang_tidy}} -p build/lint -quiet -fix -extra-arg=-Wno-unknown-warning-option '^{{justfile_directory()}}/(src|tests)/.*\.cpp$'
 
-ruff-format-fix:
-    uv run ruff format {{ruff_config}} src/ tests/ scripts/ packaging/
-
-ruff-check:
-    uv run ruff check {{ruff_config}} src/ tests/ scripts/ packaging/
-
-ruff-format-check:
-    uv run ruff format --check {{ruff_config}} src/ tests/ scripts/ packaging/
-
-fix: ruff-fix ruff-format-fix
-
-check: ruff-check ruff-format-check build-js pyright check-deps
-
-check-deps:
-    uv run python scripts/check-deps.py
+check: format-check lint build
 
 ci: check test
 
-dev-setup:
-    uv venv --allow-existing
-    uv sync --dev
-
 linux-copy-desktop:
     mkdir -p ~/.local/share/applications
-    sed "s|Icon=pxmodrim|Icon={{justfile_directory()}}/src/pxmodrim/ui/assets/logo.svg|" packaging/linux/pxmodrim.desktop > ~/.local/share/applications/pxmodrim.desktop
+    sed "s|Icon=pxmodrim|Icon={{justfile_directory()}}/src/ui/assets/logo.svg|" packaging/linux/pxmodrim.desktop > ~/.local/share/applications/pxmodrim.desktop
     kbuildsycoca6 --noincremental
 
-bench name="":
-    #!/usr/bin/env python3
-    import glob, subprocess, sys
-    from pathlib import Path
-    root = Path("{{justfile_directory()}}") / "tests" / "benchmarks"
-    scripts = sorted(glob.glob(str(root / "bench_*.py")))
-    name = "{{name}}"
-    if name and name != "all":
-        scripts = [s for s in scripts if name in s]
-    if not scripts:
-        print("no benchmark found"); sys.exit(1)
-    for s in scripts:
-        print(f"  === {Path(s).stem} ===")
-        subprocess.run(["uv", "run", "python", s])
-
-build *args: build-js
-    uv run python packaging/build.py {{args}}
-
-build-release *args: build-js
-    uv run python packaging/build.py --release {{args}}
-
-build-release-bundled *args: build-js
-    uv run python packaging/build.py --release --bundle-qt {{args}}
-
-build-clean:
-    rm -rf build/ dist/ *.build/ *.dist/ *.onefile-build/
-
 clean:
-    rm -rf build/ dist/ *.egg-info
-    rm -rf .pytest_cache .mypy_cache .ruff_cache
-    find . -path ./rimsort-original -prune -o -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+    rm -rf build dist

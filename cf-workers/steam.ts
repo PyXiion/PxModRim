@@ -204,7 +204,14 @@ function normalized(file: SteamFile, authors: Map<string, Author>): CatalogItem 
   };
 }
 
-export async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
+export async function saveItems(db: D1Database, items: CatalogItem[], requireIndex = false): Promise<void> {
+  // Index first so failed crawl writes remain eligible for verification retries.
+  try {
+    await indexMods(db, items.filter((item): item is CatalogMod => item.kind === 'mod'));
+  } catch (error) {
+    if (requireIndex) throw error;
+    console.error('Search index update failed', error instanceof Error ? error.message : error);
+  }
   const now = Date.now();
   let rowsWritten = 0;
   for (let offset = 0; offset < items.length; offset += API_BATCH_SIZE) {
@@ -214,11 +221,9 @@ export async function saveItems(db: D1Database, items: CatalogItem[]): Promise<v
     rowsWritten += results.reduce((total, result) => total + result.meta.rows_written, 0);
   }
   if (items.length) console.log('[D1_WRITES]', JSON.stringify({ category: 'catalog_cache', rows_written: rowsWritten }));
-  await indexMods(db, items.filter((item): item is CatalogMod => item.kind === 'mod')).catch(error =>
-    console.error('Search index update failed', error instanceof Error ? error.message : error));
 }
 
-export async function refreshSteamItems(env: Env, ids: string[]): Promise<Map<string, CatalogItem>> {
+export async function refreshSteamItems(env: Env, ids: string[], requireIndex = false): Promise<Map<string, CatalogItem>> {
   const fetched = new Map<string, CatalogItem>();
   const unavailable: string[] = [];
   for (let offset = 0; offset < ids.length; offset += API_BATCH_SIZE) {
@@ -250,7 +255,7 @@ export async function refreshSteamItems(env: Env, ids: string[]): Promise<Map<st
     for (const item of items) fetched.set(item.kind === 'collection' ? item.steam_id! : item.id, item);
   }
   // Do not evict anything if a later Steam batch or creator lookup fails.
-  await saveItems(env.DB, [...fetched.values()]);
+  await saveItems(env.DB, [...fetched.values()], requireIndex);
   let rowsWritten = 0;
   for (let offset = 0; offset < unavailable.length; offset += API_BATCH_SIZE) {
     const results = await env.DB.batch(unavailable.slice(offset, offset + API_BATCH_SIZE).map(id => env.DB.prepare(

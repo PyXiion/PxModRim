@@ -90,7 +90,6 @@ class LRUMap {
   }
   has(key: string): boolean { return this._map.has(key); }
   delete(key: string): boolean { return this._map.delete(key); }
-  get size(): number { return this._map.size; }
 }
 
 const GLOBAL_RAM_CACHE = new LRUMap(10000);
@@ -270,26 +269,21 @@ function buildTree(targetId: string): { itemsMap: Record<string, DependencyItem>
     visited.add(currentId);
 
     const cached = GLOBAL_RAM_CACHE.get(currentId);
-    if (cached) {
-      const ttl = cached.status === 'OK'
-        ? (cached.data.is_collection ? CACHE_TTL_OK_COLLECTION : CACHE_TTL_OK_MOD)
-        : CACHE_TTL_ERROR;
-
-      if ((now - cached.timestamp) < ttl && cached.status !== 'PENDING') {
-        itemsMap[currentId] = cached.data;
-        if (Array.isArray(cached.data.deps)) {
-          queue.push(...cached.data.deps);
-        }
-        continue;
-      }
-
-      if (Array.isArray(cached.data.deps)) {
-        queue.push(...cached.data.deps);
-      }
-
+    if (!cached) {
       missingIds.add(currentId);
+      continue;
+    }
+    const ttl = cached.status === 'OK'
+      ? (cached.data.is_collection ? CACHE_TTL_OK_COLLECTION : CACHE_TTL_OK_MOD)
+      : CACHE_TTL_ERROR;
+
+    if ((now - cached.timestamp) < ttl && cached.status !== 'PENDING') {
+      itemsMap[currentId] = cached.data;
     } else {
       missingIds.add(currentId);
+    }
+    if (Array.isArray(cached.data.deps)) {
+      queue.push(...cached.data.deps);
     }
   }
 
@@ -335,7 +329,7 @@ async function fetchSteamApiDetails(apiKey: string | undefined, modIds: string[]
   }
 }
 
-function processApiResults(details: SteamFile[]): { processed: ApiDependencyItem[] } {
+function processApiResults(details: SteamFile[]): ApiDependencyItem[] {
   const processed: ApiDependencyItem[] = [];
 
   for (const detail of details) {
@@ -362,7 +356,7 @@ function processApiResults(details: SteamFile[]): { processed: ApiDependencyItem
     });
   }
 
-  return { processed };
+  return processed;
 }
 
 // ============================================================================
@@ -530,7 +524,6 @@ async function ensureCollectionRootDeps(env: Env, rootId: string): Promise<boole
   if (!rootDetail || rootDetail.result !== 1) return false;
 
   const children = (rootDetail.children || []).map(c => c.publishedfileid).filter(Boolean);
-  if (children.length === 0) return false;
 
   const currentDeps = cached.data.deps || [];
   const depsChanged = children.length !== currentDeps.length ||
@@ -652,7 +645,7 @@ async function scrapeInline(env: Env, missingIds: Set<string>, rootId: string | 
       continue;
     }
 
-    const { processed } = processApiResults(apiDetails);
+    const processed = processApiResults(apiDetails);
 
     const respondedIds = new Set(processed.map(m => m.id));
     for (const id of batch) {
@@ -691,12 +684,10 @@ async function scrapeInline(env: Env, missingIds: Set<string>, rootId: string | 
       scraped.add(mod.id);
       scrapedCount++;
 
-      if (depsToSave.length > 0) {
-        for (const dep of depsToSave) {
-          if (!scraped.has(dep) && !inQueue.has(dep)) {
-            toScrape.push(dep);
-            inQueue.add(dep);
-          }
+      for (const dep of depsToSave) {
+        if (!scraped.has(dep) && !inQueue.has(dep)) {
+          toScrape.push(dep);
+          inQueue.add(dep);
         }
       }
     }
@@ -889,16 +880,15 @@ export default {
         const check = buildTree(rootId);
         if (check.missingIds.size === 0) {
           console.log(`[QUEUE COMPLETE] Root ${rootId} fully resolved`);
-          message.ack();
         } else {
           console.log(`[QUEUE CONTINUE] Root ${rootId}: ${check.missingIds.size} still missing, re-scheduling`);
           if (!env.SCRAPE_QUEUE) throw new Error('SCRAPE_QUEUE not configured');
-          message.ack();
           await env.SCRAPE_QUEUE.send(
             { rootId },
             { delaySeconds: 30 }
           );
         }
+        message.ack();
       } catch (err) {
         console.error(`[QUEUE ERROR] Root ${rootId}:`, err instanceof Error ? err.message : err);
         message.retry();

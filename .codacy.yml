@@ -1,7 +1,5 @@
 ---
 exclude_paths:
-  - "uv.lock"
-  - "**/uv.lock"
   - "pnpm-lock.yaml"
   - "rimsort-original/**"
   - "tests/**"

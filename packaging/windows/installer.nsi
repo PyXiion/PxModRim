@@ -13,7 +13,7 @@
 !endif
 
 !ifndef DIST_DIR
-  !define DIST_DIR "..\..\dist\entrypoint.dist"
+  !define DIST_DIR "..\..\dist\PxModRim\bin"
 !endif
 
 !ifndef OUTPUT_FILE

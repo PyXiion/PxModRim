@@ -24,20 +24,20 @@ modules:
     buildsystem: simple
     build-commands:
       - install -d /app/lib/pxmodrim
-      - cp -a entrypoint.dist/* /app/lib/pxmodrim/
+      - cp -a usr/. /app/lib/pxmodrim/
       - install -d /app/bin
-      - ln -s /app/lib/pxmodrim/PxModRim /app/bin/PxModRim
+      - ln -s /app/lib/pxmodrim/bin/pxmodrim /app/bin/PxModRim
       - install -Dm644 com.github.PyXiion.PxModRim.desktop /app/share/applications/com.github.PyXiion.PxModRim.desktop
       - install -Dm644 com.github.PyXiion.PxModRim.svg /app/share/icons/hicolor/scalable/apps/com.github.PyXiion.PxModRim.svg
       - install -Dm644 com.github.PyXiion.PxModRim.metainfo.xml /app/share/metainfo/com.github.PyXiion.PxModRim.metainfo.xml
     sources:
       - type: dir
-        path: ../../dist/entrypoint.dist
-        dest: entrypoint.dist
+        path: ../../dist/usr
+        dest: usr
       - type: file
         path: com.github.PyXiion.PxModRim.desktop
       - type: file
-        path: ../../src/pxmodrim/ui/assets/logo.svg
+        path: ../../src/ui/assets/logo.svg
         dest-filename: com.github.PyXiion.PxModRim.svg
       - type: file
         path: com.github.PyXiion.PxModRim.metainfo.xml
