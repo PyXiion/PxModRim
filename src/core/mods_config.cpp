@@ -104,6 +104,12 @@ struct SnapshotFile {
 // Snapshots ordered by (mtime, name), newest first. Nanosecond mtimes match the
 // legacy ordering; names break ties because they embed the creation time.
 QStringList snapshotFiles(const QString& snapshotsDir) {
+  // pathlib's glob is case-sensitive on POSIX, unlike QDir::match.
+#ifdef Q_OS_WIN
+  constexpr auto kCaseSensitivity = Qt::CaseInsensitive;
+#else
+  constexpr auto kCaseSensitivity = Qt::CaseSensitive;
+#endif
   std::vector<SnapshotFile> found;
   std::error_code ec;
   std::filesystem::directory_iterator it(toFs(snapshotsDir), ec);
@@ -112,7 +118,8 @@ QStringList snapshotFiles(const QString& snapshotsDir) {
     const auto& entry = *it;
     const QString name = fromFs(entry.path().filename());
     std::error_code entryEc;
-    if (!QDir::match(QStringLiteral("ModsConfig_*.xml"), name) ||
+    if (!name.startsWith(QStringLiteral("ModsConfig_"), kCaseSensitivity) ||
+        !name.endsWith(QStringLiteral(".xml"), kCaseSensitivity) ||
         !std::filesystem::is_regular_file(entry.path(), entryEc)) {
       continue;
     }

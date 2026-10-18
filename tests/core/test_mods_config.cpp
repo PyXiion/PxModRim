@@ -198,6 +198,46 @@ TEST_CASE("write keeps unknown XML in an existing ModsConfigData document") {
           "author.updated");
 }
 
+#ifndef Q_OS_WIN
+TEST_CASE("snapshot discovery and pruning match Python's POSIX glob") {
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  const QString snapshotsDir = dir.filePath(QStringLiteral("snapshots"));
+  REQUIRE(QDir().mkpath(snapshotsDir));
+  const QString pythonSnapshot = QDir(snapshotsDir).filePath(
+      QStringLiteral("ModsConfig_20260922_100000_123456_001.xml"));
+  const QString lowerPrefix = QDir(snapshotsDir).filePath(
+      QStringLiteral("modsconfig_20260922_100001_123456.xml"));
+  const QString upperSuffix = QDir(snapshotsDir).filePath(
+      QStringLiteral("ModsConfig_20260922_100002_123456.XML"));
+  const QString snapshotDirectory = QDir(snapshotsDir).filePath(
+      QStringLiteral("ModsConfig_20260922_100003_123456.xml"));
+  REQUIRE(writeBytes(pythonSnapshot, kSampleXml));
+  REQUIRE(writeBytes(lowerPrefix, kSampleXml));
+  REQUIRE(writeBytes(upperSuffix, kSampleXml));
+  REQUIRE(QDir().mkpath(snapshotDirectory));
+
+  REQUIRE(getSnapshots(snapshotsDir) == QStringList{pythonSnapshot});
+  const auto parsed = parseModsConfig(pythonSnapshot);
+  REQUIRE(parsed.has_value());
+  REQUIRE(parsed->version == QStringLiteral("1.6.4871 rev600"));
+
+  const QString configPath = dir.filePath(QStringLiteral("ModsConfig.xml"));
+  REQUIRE(writeBytes(configPath,
+                     "<ModsConfigData><version>1.6</version>"
+                     "<activeMods><li>mod.current</li></activeMods>"
+                     "</ModsConfigData>"));
+  const auto created = createSnapshot(configPath, snapshotsDir, 1);
+  REQUIRE(created.has_value());
+  REQUIRE(created->has_value());
+  REQUIRE(getSnapshots(snapshotsDir) == QStringList{**created});
+  REQUIRE_FALSE(QFileInfo::exists(pythonSnapshot));
+  REQUIRE(readBytes(lowerPrefix) == kSampleXml);
+  REQUIRE(readBytes(upperSuffix) == kSampleXml);
+  REQUIRE(QFileInfo(snapshotDirectory).isDir());
+}
+#endif
+
 TEST_CASE("replacing a config keeps the previous contents as a snapshot") {
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
