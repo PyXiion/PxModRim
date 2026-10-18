@@ -204,14 +204,19 @@ TEST_CASE("snapshot discovery and pruning match Python's POSIX glob") {
   REQUIRE(dir.isValid());
   const QString snapshotsDir = dir.filePath(QStringLiteral("snapshots"));
   REQUIRE(QDir().mkpath(snapshotsDir));
-  const QString pythonSnapshot = QDir(snapshotsDir).filePath(
-      QStringLiteral("ModsConfig_20260922_100000_123456_001.xml"));
-  const QString lowerPrefix = QDir(snapshotsDir).filePath(
-      QStringLiteral("modsconfig_20260922_100001_123456.xml"));
-  const QString upperSuffix = QDir(snapshotsDir).filePath(
-      QStringLiteral("ModsConfig_20260922_100002_123456.XML"));
-  const QString snapshotDirectory = QDir(snapshotsDir).filePath(
-      QStringLiteral("ModsConfig_20260922_100003_123456.xml"));
+  const QString pythonSnapshot =
+      QDir(snapshotsDir)
+          .filePath(
+              QStringLiteral("ModsConfig_20260922_100000_123456_001.xml"));
+  const QString lowerPrefix =
+      QDir(snapshotsDir)
+          .filePath(QStringLiteral("modsconfig_20260922_100001_123456.xml"));
+  const QString upperSuffix =
+      QDir(snapshotsDir)
+          .filePath(QStringLiteral("ModsConfig_20260922_100002_123456.XML"));
+  const QString snapshotDirectory =
+      QDir(snapshotsDir)
+          .filePath(QStringLiteral("ModsConfig_20260922_100003_123456.xml"));
   REQUIRE(writeBytes(pythonSnapshot, kSampleXml));
   REQUIRE(writeBytes(lowerPrefix, kSampleXml));
   REQUIRE(writeBytes(upperSuffix, kSampleXml));

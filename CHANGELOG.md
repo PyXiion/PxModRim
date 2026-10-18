@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Removed unused Workshop injection imports and discarded callback results explicitly to satisfy static analysis.
 
 ### Fixed
+- Moving from the Python app preserves dependency declaration order by rebuilding legacy metadata-cache rows from About.xml once.
+- Snapshot discovery and retention follow Python's platform-specific filename matching, leaving unrelated case-mismatched files untouched on POSIX.
 - Windows and macOS builds no longer fail on the renamed `Platform` enumerators; the UI-off configuration no longer builds UI tests; presets work with CMake 3.24; `just run*` launches the macOS app bundle; CI/release QCoro builds no longer require Qt WebSockets.
 - Shutting down while a Workshop download is queued, logging in or running no longer leaves the catalog or Steam downloader coroutines touching freed objects.
 - Concurrent Organizer folder moves can no longer create folder cycles; the move is validated against the committed tree.
