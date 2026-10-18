@@ -294,6 +294,36 @@ async def test_corrupt_cache_recovers_safely(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_foreign_payload_shape_is_reparsed(tmp_path: Path) -> None:
+    mods_root = tmp_path / "mods"
+    mod_a = _create_mod(mods_root / "ModA", ABOUT_XML_V1)
+    db_path = tmp_path / "metadata-cache.db"
+
+    cache = MetadataCache(db_path)
+    try:
+        await LocalModProvider(mods_root, metadata_cache=cache).discover("1.5")
+    finally:
+        await cache.close()
+
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            "UPDATE mod_metadata SET payload_json = json_set(payload_json,"
+            " '$.about_rules.dependencies', json('[{\"package_id\": \"x.y\"}]'))"
+        )
+        await conn.commit()
+
+    cache = MetadataCache(db_path)
+    try:
+        discovered = await LocalModProvider(mods_root, metadata_cache=cache).discover(
+            "1.5"
+        )
+        deps = discovered[str(mod_a)].about_rules.dependencies
+        assert list(deps) == ["ludeon.rimworld"]
+    finally:
+        await cache.close()
+
+
+@pytest.mark.asyncio
 async def test_provider_distinctions_preserved(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
     steam_root = tmp_path / "downloaded"

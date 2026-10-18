@@ -151,9 +151,10 @@ def _decode_rows(
             and file_size == cur_size
             and ver == target_version
         ):
+            # Other builds share this file: a payload of another shape is a miss.
             try:
                 mod = deserialize_mod(orig_mod_path, json.loads(payload))
-            except (json.JSONDecodeError, KeyError) as e:
+            except (json.JSONDecodeError, KeyError, AttributeError, TypeError) as e:
                 logger.warning("Corrupted metadata cache payload for {}: {}", norm_p, e)
                 continue
             cached_mods[orig_mod_path] = mod

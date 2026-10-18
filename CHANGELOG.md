@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
 
+### Fixed
+- Startup no longer crashes when the metadata cache holds entries in a shape this build cannot read (for example, written by another build sharing the config directory); those mods are re-parsed instead.
+
 ## [0.3.1] - 2026-10-13
 
 ### Changed
