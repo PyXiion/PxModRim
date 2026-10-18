@@ -2,6 +2,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTemporaryDir>
@@ -212,6 +215,121 @@ TEST_CASE(
       runAsync(cache.getMods({candidate}, QStringLiteral("1.4")));
   CHECK(otherVersion.cached.isEmpty());
   CHECK(otherVersion.missing.size() == 1);
+}
+
+TEST_CASE("discovery rewrites Python cache dependencies in declaration order") {
+  EventLoop loop;
+  QTemporaryDir root;
+  REQUIRE(root.isValid());
+  const QString modsRoot = QDir(root.path()).filePath(QStringLiteral("mods"));
+  const QString modDir =
+      createMod(QDir(modsRoot).filePath(QStringLiteral("ModA")), R"(
+<ModMetaData>
+  <name>Python Cached Mod</name>
+  <packageId>author.cached</packageId>
+  <supportedVersions><li>1.5</li></supportedVersions>
+  <modDependencies>
+    <li><packageId>z.first</packageId><displayName>First</displayName></li>
+    <li><packageId>a.second</packageId><displayName>Second</displayName></li>
+  </modDependencies>
+</ModMetaData>
+)");
+  const ModCandidate candidate = candidateFor(modDir);
+  const QString dbPath = metadataCachePath(root.path());
+  const QString connection = QStringLiteral("python-metadata-cache-fixture");
+  {
+    QSqlDatabase db =
+        QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+    db.setDatabaseName(dbPath);
+    REQUIRE(db.open());
+    QSqlQuery query(db);
+    REQUIRE(query.exec(QStringLiteral(R"(
+CREATE TABLE mod_metadata (
+  mod_path TEXT PRIMARY KEY,
+  about_path TEXT NOT NULL,
+  mtime REAL NOT NULL,
+  file_size INTEGER NOT NULL DEFAULT 0,
+  target_version TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+))")));
+    REQUIRE(query.exec(QStringLiteral("PRAGMA user_version = 2")));
+    REQUIRE(query.prepare(
+        QStringLiteral("INSERT INTO mod_metadata VALUES (?, ?, ?, ?, ?, ?)")));
+    query.addBindValue(normalizePath(modDir));
+    query.addBindValue(normalizePath(candidate.aboutXmlPath));
+    query.addBindValue(candidate.mtime);
+    query.addBindValue(candidate.size);
+    query.addBindValue(QStringLiteral("1.5"));
+    query.addBindValue(QStringLiteral(R"({
+  "name": "Python Cached Mod",
+  "package_id": "author.cached",
+  "authors": [],
+  "mod_version": "",
+  "mod_icon_path": null,
+  "steam_app_id": -1,
+  "url": "",
+  "description": "",
+  "supported_versions": ["1.5"],
+  "valid": true,
+  "mtime": %1,
+  "about_rules": {
+    "load_before": [],
+    "load_after": [],
+    "incompatible_with": [],
+    "dependencies": {
+      "z.first": {
+        "name": "First", "package_id": "z.first", "workshop_url": "",
+        "alternative_package_ids": []
+      },
+      "a.second": {
+        "name": "Second", "package_id": "a.second", "workshop_url": "",
+        "alternative_package_ids": []
+      }
+    }
+  }
+})")
+                           .arg(QString::number(candidate.mtime, 'f', 3)));
+    REQUIRE(query.exec());
+    query.finish();
+
+    MetadataCache cache(dbPath);
+    const CacheLookup legacy =
+        runAsync(cache.getMods({candidate}, QStringLiteral("1.5")));
+    CHECK(legacy.cached.isEmpty());
+    REQUIRE(legacy.missing.size() == 1);
+    LocalModProvider provider(modsRoot, nullptr, &cache);
+    for (int pass = 0; pass < 2; ++pass) {
+      const auto discovered =
+          runAsync(provider.discover(QStringLiteral("1.5")));
+      REQUIRE(discovered.has_value());
+      REQUIRE(discovered->contains(modDir));
+      const auto mod =
+          std::dynamic_pointer_cast<AboutXmlMod>((*discovered)[modDir]);
+      REQUIRE(mod != nullptr);
+      REQUIRE(mod->aboutRules.dependencies.size() == 2);
+      CHECK(mod->aboutRules.dependencies[0].packageId.str() ==
+            QStringLiteral("z.first"));
+      CHECK(mod->aboutRules.dependencies[1].packageId.str() ==
+            QStringLiteral("a.second"));
+    }
+
+    REQUIRE(
+        query.exec(QStringLiteral("SELECT payload_json FROM mod_metadata")));
+    REQUIRE(query.next());
+    const QJsonObject payload =
+        QJsonDocument::fromJson(query.value(0).toByteArray()).object();
+    const QJsonValue dependencies = payload.value(QStringLiteral("about_rules"))
+                                        .toObject()
+                                        .value(QStringLiteral("dependencies"));
+    REQUIRE(dependencies.isArray());
+    const QJsonArray array = dependencies.toArray();
+    REQUIRE(array.size() == 2);
+    CHECK(array[0].toObject().value(QStringLiteral("package_id")).toString() ==
+          QStringLiteral("z.first"));
+    CHECK(array[1].toObject().value(QStringLiteral("package_id")).toString() ==
+          QStringLiteral("a.second"));
+  }
+  QSqlDatabase::removeDatabase(connection);
 }
 
 TEST_CASE("pruning removes entries for mods that disappeared") {

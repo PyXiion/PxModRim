@@ -154,9 +154,8 @@ QJsonObject serializeMod(const AboutXmlMod& mod) {
   object[QStringLiteral("valid")] = mod.valid;
   object[QStringLiteral("mtime")] = mod.mtime;
 
-  // Declaration order matters to the checker, which QJsonObject would sort
-  // away, so dependencies are an array here. deserialize_mod still reads the
-  // legacy object form.
+  // Declaration order matters to the checker. Object-form payloads are
+  // re-parsed from About.xml because QJsonObject sorts their dependency keys.
   QJsonArray dependencies;
   for (const DependencyMod& dep : mod.aboutRules.dependencies) {
     QJsonObject entry;
@@ -193,10 +192,10 @@ QStringList stringList(const QJsonValue& value) {
   return values;
 }
 
-void addDependency(BaseRules& rules, const QJsonObject& data,
-                   const QString& fallbackPid) {
+void addDependency(BaseRules& rules, const QJsonObject& data) {
   DependencyMod dep;
-  dep.packageId = CaseInsensitiveStr(stringOr(data, "package_id", fallbackPid));
+  dep.packageId = CaseInsensitiveStr(
+      stringOr(data, "package_id", QStringLiteral("invalid.mod")));
   dep.name = stringOr(data, "name", QString());
   dep.workshopUrl = stringOr(data, "workshop_url", QString());
   dep.alternativePackageIds = CaseInsensitiveSet(
@@ -205,18 +204,9 @@ void addDependency(BaseRules& rules, const QJsonObject& data,
 }
 
 void readDependencies(BaseRules& rules, const QJsonValue& value) {
-  if (value.isArray()) {
-    for (const QJsonValue& item : value.toArray()) {
-      if (item.isObject()) {
-        addDependency(rules, item.toObject(), QStringLiteral("invalid.mod"));
-      }
-    }
-  } else if (value.isObject()) {
-    const QJsonObject legacy = value.toObject();
-    for (auto it = legacy.constBegin(); it != legacy.constEnd(); ++it) {
-      if (it.value().isObject()) {
-        addDependency(rules, it.value().toObject(), it.key());
-      }
+  for (const QJsonValue& item : value.toArray()) {
+    if (item.isObject()) {
+      addDependency(rules, item.toObject());
     }
   }
 }
@@ -229,6 +219,14 @@ Result<std::shared_ptr<AboutXmlMod>> deserializeMod(const QString& payload) {
         Error{QStringLiteral("payload is not a JSON object")});
   }
   const QJsonObject data = document.object();
+  const QJsonObject rulesData =
+      data.value(QLatin1StringView("about_rules")).toObject();
+  const QJsonValue dependencies =
+      rulesData.value(QLatin1StringView("dependencies"));
+  if (dependencies.isObject()) {
+    return std::unexpected(
+        Error{QStringLiteral("object-form dependencies require re-parsing")});
+  }
 
   auto mod = std::make_shared<AboutXmlMod>();
   mod->name = stringOr(data, "name", QStringLiteral("Unknown Mod Name"));
@@ -249,17 +247,13 @@ Result<std::shared_ptr<AboutXmlMod>> deserializeMod(const QString& payload) {
   mod->valid = data.value(QLatin1StringView("valid")).toBool(true);
   mod->mtime = data.value(QLatin1StringView("mtime")).toDouble(0.0);
 
-  const QJsonValue rulesValue = data.value(QLatin1StringView("about_rules"));
-  const QJsonObject rulesData =
-      rulesValue.isObject() ? rulesValue.toObject() : QJsonObject{};
   mod->aboutRules.loadBefore = CaseInsensitiveSet(
       stringList(rulesData.value(QLatin1StringView("load_before"))));
   mod->aboutRules.loadAfter = CaseInsensitiveSet(
       stringList(rulesData.value(QLatin1StringView("load_after"))));
   mod->aboutRules.incompatibleWith = CaseInsensitiveSet(
       stringList(rulesData.value(QLatin1StringView("incompatible_with"))));
-  readDependencies(mod->aboutRules,
-                   rulesData.value(QLatin1StringView("dependencies")));
+  readDependencies(mod->aboutRules, dependencies);
   return mod;
 }
 
