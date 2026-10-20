@@ -206,6 +206,13 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
 
 int main(int argc, char* argv[]) {
   setEnvDefaults();
+  if (!qEnvironmentVariableIsSet("QT_SCALE_FACTOR")) {
+    const px::modrim::ConfigService config(px::modrim::configDir());
+    const int scale = px::modrim::loadUiScale(config);
+    if (scale != 100) {
+      qputenv("QT_SCALE_FACTOR", px::modrim::uiScaleFactor(scale));
+    }
+  }
 
   QApplication qtApp(argc, argv);
   qtApp.setApplicationName(QStringLiteral("PxModRim"));

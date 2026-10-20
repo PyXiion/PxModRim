@@ -93,6 +93,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
       m_app(app),
       m_ctx(app.coreContext()),
       m_startedWithoutGamePath(m_ctx.config().paths.game.empty()),
+      m_initialUiScale(app.uiPrefs().ui_scale),
       m_engine(createQmlEngine(this)),
       m_savedActive(m_ctx.loadedActiveUuids()),
       m_updates(appVersion(), m_ctx.network()) {
@@ -567,6 +568,18 @@ QCoro::Task<void> MainWindow::openSettings() {
   if (!saved) {
     m_toasts->error(saved.error().message);
     co_return;
+  }
+  const auto prefsSaved =
+      saveUiPrefs(dialog->getUiPrefs(), m_ctx.configService());
+  if (!prefsSaved) {
+    m_toasts->error(prefsSaved.error().message);
+    co_return;
+  }
+  m_app.uiPrefs() = dialog->getUiPrefs();
+  if (m_app.uiPrefs().ui_scale != m_initialUiScale) {
+    m_toasts->info(
+        QStringLiteral("Interface scale changed. Restart PxModRim to apply."),
+        6000);
   }
   m_ctx.updateConfig(config);
   m_ctx.resetProviders(config.paths);

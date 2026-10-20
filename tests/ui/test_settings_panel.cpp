@@ -6,6 +6,8 @@
 #include <QQuickItem>
 #include <QQuickWidget>
 #include <QTimer>
+#include <limits>
+#include <string_view>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -14,6 +16,7 @@
 #include "ui/components/svg_provider.hpp"
 #include "ui/panels/settings_panel.hpp"
 #include "ui/theme/qml_theme.hpp"
+#include "ui/ui_prefs.hpp"
 namespace {
 void ensureApplication() {
   if (QCoreApplication::instance()) return;
@@ -66,4 +69,42 @@ TEST_CASE("Cancel settings unloads QML without binding errors") {
   CHECK(quick->rootObject() == nullptr);
   CHECK_FALSE(panel.isVisible());
   CHECK(warnings.isEmpty());
+}
+
+TEST_CASE("Interface scale clamps JSON percentages and maps Qt factors") {
+  using namespace px::modrim;
+  const auto parse = [](std::string_view json) {
+    glz::json_t value;
+    REQUIRE_FALSE(glz::read_json(value, json));
+    return parseUiScale(value);
+  };
+
+  CHECK(UiPrefs{}.ui_scale == 100);
+  UiPrefs legacy;
+  REQUIRE_FALSE(glz::read_json(legacy, R"({"rail_collapsed":true})"));
+  CHECK(legacy.ui_scale == 100);
+  CHECK(legacy.rail_collapsed);
+  CHECK(clampUiScale(std::numeric_limits<int>::min()) == 100);
+  CHECK(clampUiScale(137) == 137);
+  CHECK(clampUiScale(std::numeric_limits<int>::max()) == 250);
+  CHECK(parse("null") == 100);
+  CHECK(parse("true") == 100);
+  CHECK(parse(R"("garbage")") == 100);
+  CHECK(parse(R"("150")") == 100);
+  CHECK(parse("[]") == 100);
+  CHECK(parse("{}") == 100);
+  CHECK(parse("150.5") == 100);
+  CHECK(parse("-1000") == 100);
+  CHECK(parse("137") == 137);
+  CHECK(parse("150") == 150);
+  CHECK(parse("1000000000000") == 250);
+
+  CHECK(uiScaleFactor(100) == "1");
+  CHECK(uiScaleFactor(125) == "1.25");
+  CHECK(uiScaleFactor(137) == "1.37");
+  CHECK(uiScaleFactor(150) == "1.5");
+  CHECK(uiScaleFactor(175) == "1.75");
+  CHECK(uiScaleFactor(200) == "2");
+  CHECK(uiScaleFactor(225) == "2.25");
+  CHECK(uiScaleFactor(250) == "2.5");
 }

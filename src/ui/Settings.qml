@@ -19,6 +19,7 @@ Rectangle {
             workshop: workshop.text.trim(),
             config: configFolder.text.trim(),
             compact: compact.checked,
+            uiScale: uiScale.currentValue,
             launchArgs: launchArgs.text.trim(),
             launchWrapper: launchWrapper.text.trim(),
             afterLaunch: afterLaunch.currentValue,
@@ -299,6 +300,41 @@ Rectangle {
 
                     Group {
                         title: "Appearance"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Interface scale"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxComboBox {
+                                id: uiScale
+                                objectName: "interfaceScale"
+                                Layout.preferredWidth: 120
+                                Accessible.name: "Interface scale"
+                                textRole: "text"
+                                valueRole: "value"
+                                model: {
+                                    const scales = [100, 125, 150, 175, 200, 225, 250]
+                                    if (scales.indexOf(root.initial.uiScale) < 0)
+                                        scales.push(root.initial.uiScale)
+                                    scales.sort((a, b) => a - b)
+                                    return scales.map(value => ({ text: value + "%", value: value }))
+                                }
+                                Component.onCompleted: currentIndex = indexOfValue(root.initial.uiScale)
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Takes effect after restart."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                        }
                         PxCheckBox {
                             id: compact
                             text: "Compact mod list"

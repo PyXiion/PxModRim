@@ -10,6 +10,8 @@
 
 namespace px::modrim {
 
+int loadUiScale(const ConfigService& svc);
+
 // Writes ui_prefs.json. Other UI code calls this after changing prefs.
 Result<void> saveUiPrefs(const UiPrefs& prefs, const ConfigService& svc);
 

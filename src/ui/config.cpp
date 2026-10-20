@@ -10,6 +10,12 @@ const QString kUiPrefsFile = QStringLiteral("ui_prefs.json");
 
 }  // namespace
 
+int loadUiScale(const ConfigService& svc) {
+  const auto raw = svc.loadRaw(kUiPrefsFile);
+  const auto found = raw.find("ui_scale");
+  return found == raw.end() ? 100 : parseUiScale(found->second);
+}
+
 Result<void> saveUiPrefs(const UiPrefs& prefs, const ConfigService& svc) {
   return svc.save(kUiPrefsFile, prefs);
 }
@@ -22,6 +28,7 @@ QCoro::Task<Result<void>> UiPrefsService::setup() {
     co_return std::unexpected(loaded.error());
   }
   m_prefs = std::move(*loaded);
+  m_prefs->ui_scale = loadUiScale(m_svc);
   co_return {};
 }
 

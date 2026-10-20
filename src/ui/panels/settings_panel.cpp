@@ -28,7 +28,8 @@ class FolderDialog : public QFileDialog {
 };
 }  // namespace
 SettingsBackend::SettingsBackend(CoreContext& ctx, QDialog* dialog,
-                                 const std::vector<SettingsSection*>& sections)
+                                 const std::vector<SettingsSection*>& sections,
+                                 const UiPrefs& prefs)
     : QObject(dialog), m_ctx(ctx), m_dialog(dialog) {
   for (auto* section : sections)
     m_sections.append(QVariantMap{
@@ -44,6 +45,7 @@ SettingsBackend::SettingsBackend(CoreContext& ctx, QDialog* dialog,
                {"workshop", text(cfg.paths.workshop)},
                {"config", text(cfg.paths.config_folder)},
                {"compact", cfg.compact_mod_list},
+               {"uiScale", prefs.ui_scale},
                {"launchArgs", text(cfg.launch_args)},
                {"launchWrapper", text(cfg.launch_wrapper)},
                {"afterLaunch", static_cast<int>(cfg.after_launch)},
@@ -148,9 +150,10 @@ void SettingsBackend::reportSaveError(const QString& message) {
 }
 SettingsPanel::SettingsPanel(
     CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
-    const std::vector<SettingsSectionFactory>& factories)
+    const std::vector<SettingsSectionFactory>& factories, UiPrefs prefs)
     : QDialog(parent),
       m_config(ctx.config()),
+      m_uiPrefs(std::move(prefs)),
       m_backend(nullptr),
       m_qml(new QQuickWidget(engine, this)) {
   setObjectName(QStringLiteral("settingsPanel"));
@@ -158,7 +161,7 @@ SettingsPanel::SettingsPanel(
   setModal(true);
   resize(700, 560);
   for (const auto& factory : factories) m_sections.push_back(factory(this));
-  m_backend = new SettingsBackend(ctx, this, m_sections);
+  m_backend = new SettingsBackend(ctx, this, m_sections, m_uiPrefs);
   connect(m_backend, &SettingsBackend::saveRequested, this,
           &SettingsPanel::save);
   connect(m_backend, &SettingsBackend::cancelRequested, this, &QDialog::reject);
@@ -178,8 +181,8 @@ SettingsPanel::SettingsPanel(
 }
 SettingsPanel::SettingsPanel(AppContext& app, QQmlEngine* engine,
                              QWidget* parent)
-    : SettingsPanel(app.coreContext(), engine, parent, app.settingsSections()) {
-}
+    : SettingsPanel(app.coreContext(), engine, parent, app.settingsSections(),
+                    app.uiPrefs()) {}
 SettingsPanel::~SettingsPanel() { m_qml->setSource(QUrl{}); }
 void SettingsPanel::save(const QVariantMap& values) {
   auto updated = m_config;
@@ -210,6 +213,7 @@ void SettingsPanel::save(const QVariantMap& values) {
     }
   }
   m_config = std::move(updated);
+  m_uiPrefs.ui_scale = clampUiScale(values.value("uiScale", 100).toInt());
   accept();
 }
 }  // namespace px::modrim

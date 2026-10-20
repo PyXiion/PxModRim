@@ -96,6 +96,7 @@ class MainWindow : public QMainWindow {
   AppContext& m_app;
   CoreContext& m_ctx;
   const bool m_startedWithoutGamePath;
+  const int m_initialUiScale;
   QQmlEngine* m_engine;
   HeaderController* m_headerController = nullptr;
   HeaderPanel* m_header = nullptr;
