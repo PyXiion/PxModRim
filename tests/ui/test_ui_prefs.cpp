@@ -84,6 +84,10 @@ TEST_CASE("An unusable saved interface scale keeps the other preferences") {
   const std::pair<std::string, int> cases[] = {
       {R"("175")", 100},
       {"1.5", 100},
+      {"150.5", 100},
+      {"150.0", 150},
+      {"1.5e2", 150},
+      {R"("150.0")", 100},
       {"99999999999999999999999", 250},
       {"-99999999999999999999999", 100},
       {"null", 100},
