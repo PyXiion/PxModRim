@@ -8,8 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Settings > General > Appearance: Interface scale (100–250%) enlarges text, controls, icons and rows together after restarting. An externally set `QT_SCALE_FACTOR` takes precedence.
+- Interface-scale changes offer a **Restart now** action after saving, using the normal close and shutdown path.
+- `--ui-scale N` (also `--ui-scale=N`) and `PX_UI_SCALE` temporarily override the saved scale; `--ui-scale 100` recovers from an unusable saved value. An existing `QT_SCALE_FACTOR` still takes precedence.
 
 ### Changed
+- Settings identifies active interface-scale overrides and hides restart prompts while an override prevents saved changes from taking effect.
+- The main window's initial size and position fit the available screen, including smaller screens and enlarged interface scales.
 - Rewrote PxModRim in C++23 on Qt 6 (Qt Quick UI, QCoro coroutines) with CMake, replacing the Python/PySide6 implementation. User-visible behaviour is unchanged. Building from source now needs CMake 3.24+, Qt 6.8+ (CI uses 6.11), QCoro, pugixml, libzip and spdlog, see `AGENTS.md`; release packages are built from CMake install rules and Qt deployment tools.
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
 - Re-implemented the RimSort-derived modules (XML conversion, game constants, About.xml metadata structures and parsing, startup-impact report parsing) independently of the original code, working only from the clean-room rewrite of their behaviour and the existing tests; their public interfaces are unchanged.

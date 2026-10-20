@@ -17,6 +17,7 @@
 #include <QQmlEngine>
 #include <QResizeEvent>
 #include <QScopeGuard>
+#include <QScreen>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QUrl>
@@ -54,6 +55,7 @@
 #include "ui/theme/constants.hpp"
 #include "ui/theme/qml_theme.hpp"
 #include "ui/views/mods_view.hpp"
+#include "ui/window/geometry.hpp"
 #include "ui/window/menu_bar.hpp"
 
 namespace px::modrim {
@@ -93,13 +95,11 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
       m_app(app),
       m_ctx(app.coreContext()),
       m_startedWithoutGamePath(m_ctx.config().paths.game.empty()),
-      m_initialUiScale(app.uiPrefs().ui_scale),
       m_engine(createQmlEngine(this)),
       m_savedActive(m_ctx.loadedActiveUuids()),
       m_updates(appVersion(), m_ctx.network()) {
   setWindowTitle(QStringLiteral("PxModRim[*]"));
   setWindowIcon(QIcon(QStringLiteral(":/qt/qml/PxModRim/assets/logo.svg")));
-  resize(1400, 850);
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint |
                  Qt::WindowCloseButtonHint);
@@ -269,6 +269,12 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
   qApp->installEventFilter(this);
   if (!m_views.empty()) showView(0);
   refreshUnsavedState();
+  const QRect available = screen()->availableGeometry();
+  const QSize initialSize(1400, 850);
+  const QRect initial(available.center() - QPoint(initialSize.width() / 2,
+                                                  initialSize.height() / 2),
+                      initialSize);
+  setGeometry(fitWindowGeometry(initial, available));
 }
 
 MainWindow::~MainWindow() {
@@ -339,6 +345,10 @@ void MainWindow::setupActions() {
 
 void MainWindow::setAppQuitCallback(std::function<void()> callback) {
   m_quit = std::move(callback);
+}
+
+void MainWindow::setRestartCallback(std::function<bool()> callback) {
+  m_restart = std::move(callback);
 }
 
 void MainWindow::openRoute(const QString& url) {
@@ -460,6 +470,15 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     }
     return;
   }
+  if (m_restartRequested) {
+    m_restartRequested = false;
+    if (!m_restart || !m_restart()) {
+      m_closeConfirmed = false;
+      event->ignore();
+      m_toasts->error(QStringLiteral("Could not restart PxModRim."));
+      return;
+    }
+  }
   m_closing = true;
   for (auto* view : m_views) view->teardown();
   event->accept();
@@ -471,9 +490,14 @@ QCoro::Task<void> MainWindow::confirmClose() {
       co_await awaitDialog<UnsavedChangesDialog>(this);
   m_closePromptOpen = false;
   if (result == QMessageBox::Save) {
-    if (!co_await saveActiveMods()) co_return;
-  } else if (result != QMessageBox::Discard)
+    if (!co_await saveActiveMods()) {
+      m_restartRequested = false;
+      co_return;
+    }
+  } else if (result != QMessageBox::Discard) {
+    m_restartRequested = false;
     co_return;
+  }
   m_closeConfirmed = true;
   close();
 }
@@ -576,13 +600,18 @@ QCoro::Task<void> MainWindow::openSettings() {
     co_return;
   }
   m_app.uiPrefs() = dialog->getUiPrefs();
-  if (m_app.uiPrefs().ui_scale != m_initialUiScale) {
-    m_toasts->info(
-        QStringLiteral("Interface scale changed. Restart PxModRim to apply."),
-        6000);
-  }
   m_ctx.updateConfig(config);
   m_ctx.resetProviders(config.paths);
+  if (m_app.initialScale().source == QStringLiteral("saved") &&
+      m_app.uiPrefs().ui_scale != m_app.initialUiScale()) {
+    m_toasts->info(
+        QStringLiteral("Restart PxModRim to apply the interface scale."), 0,
+        QStringLiteral("Restart now"), [this] {
+          if (m_closing || m_closePromptOpen) return;
+          m_restartRequested = true;
+          close();
+        });
+  }
   const auto reloaded = co_await m_ctx.modService().reload();
   if (!reloaded) {
     m_toasts->error(reloaded.error().message);

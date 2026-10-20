@@ -24,6 +24,8 @@ CI runs configure, build and test on every OS (see CI matrix). Only the Linux St
 - Chain: `src/app/main.cpp` `main()` → `runApp()`, the composition root:
   config services → `CoreContext::create` → `px::modrim::registerCorePlugins` → `px::modrim::AppContext` → `px::modrim::registerUiPlugins` → `setupAll()` → `MainWindow` → `refreshMods()` → `initAll()`.
 - `src/app/plugins.cpp` is the only list of concrete plugins.
+- Interface scale is saved in `ui_prefs.json` as a percentage (100–250). Use `--ui-scale 100` (or `--ui-scale=100`) to recover from an unusable saved scale. `PX_UI_SCALE=150` also overrides the saved scale for one run. Precedence: existing `QT_SCALE_FACTOR` > `--ui-scale` > `PX_UI_SCALE` > saved preference. Invalid CLI/environment percentages are ignored with a warning; valid integers are clamped to 100–250 and never persisted. Qt arguments and unknown flags are left untouched.
+- Settings shows the effective scale override and its source. Only saved-scale changes offer **Restart now**; restarting preserves original arguments, follows normal unsaved-mod confirmation and plugin shutdown, and removes only the app-generated `QT_SCALE_FACTOR` from the child environment.
 
 ## Module layout
 ```

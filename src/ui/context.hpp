@@ -36,7 +36,9 @@ class Notifier {
  public:
   virtual ~Notifier() = default;
 
-  virtual void info(const QString& message, int durationMs = 3000) = 0;
+  virtual void info(const QString& message, int durationMs = 3000,
+                    const QString& actionLabel = {},
+                    std::function<void()> action = {}) = 0;
   virtual void success(const QString& message, int durationMs = 3000) = 0;
   virtual void warning(const QString& message, int durationMs = 4000) = 0;
   virtual void error(const QString& message, int durationMs = 5000) = 0;
@@ -93,7 +95,8 @@ concept RailViewType =
 // through coreContext(), which must outlive this object.
 class AppContext {
  public:
-  AppContext(CoreContext& core, UiPrefs prefs = {});
+  AppContext(CoreContext& core, UiPrefs prefs = {},
+             std::optional<ResolvedScale> initialScale = std::nullopt);
   AppContext(const AppContext&) = delete;
   AppContext& operator=(const AppContext&) = delete;
   AppContext(AppContext&&) = delete;
@@ -132,6 +135,8 @@ class AppContext {
   // ── UI prefs ──────────────────────────────────────
   UiPrefs& uiPrefs() noexcept { return m_uiPrefs; }
   const UiPrefs& uiPrefs() const noexcept { return m_uiPrefs; }
+  double initialUiScale() const noexcept { return m_initialScale.scale; }
+  const ResolvedScale& initialScale() const noexcept { return m_initialScale; }
 
   // ── Core access ───────────────────────────────────
   CoreContext& coreContext() const noexcept { return m_core; }
@@ -155,6 +160,7 @@ class AppContext {
   Notifier* m_toasts = nullptr;
   std::function<void(const QString&)> m_navigate;
   UiPrefs m_uiPrefs;
+  const ResolvedScale m_initialScale;
   bool m_pluginsInitialized = false;
 };
 

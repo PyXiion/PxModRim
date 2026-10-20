@@ -29,7 +29,8 @@ class FolderDialog : public QFileDialog {
 }  // namespace
 SettingsBackend::SettingsBackend(CoreContext& ctx, QDialog* dialog,
                                  const std::vector<SettingsSection*>& sections,
-                                 const UiPrefs& prefs)
+                                 const UiPrefs& prefs,
+                                 const ResolvedScale& initialScale)
     : QObject(dialog), m_ctx(ctx), m_dialog(dialog) {
   for (auto* section : sections)
     m_sections.append(QVariantMap{
@@ -55,6 +56,22 @@ SettingsBackend::SettingsBackend(CoreContext& ctx, QDialog* dialog,
                {"useAltIds", cfg.sort.use_alternative_package_ids},
                {"checkMissing", cfg.sort.check_missing_dependencies},
                {"useCommunity", cfg.sort.use_community_rules}};
+  if (initialScale.source == QStringLiteral("qt-env")) {
+    m_scaleOverrideNote =
+        QStringLiteral(
+            "Overridden by the QT_SCALE_FACTOR environment variable "
+            "(%1); this setting has no effect while it is set.")
+            .arg(initialScale.qtScaleFactor);
+  } else if (initialScale.source != QStringLiteral("saved")) {
+    m_scaleOverrideNote =
+        QStringLiteral(
+            "This session uses %1% from %2; the saved value applies "
+            "when that is removed.")
+            .arg(initialScale.scale)
+            .arg(initialScale.source == QStringLiteral("cli")
+                     ? QStringLiteral("--ui-scale")
+                     : QStringLiteral("PX_UI_SCALE"));
+  }
   const auto path = communityRulesFile();
   m_communityStatus = QFileInfo::exists(path)
                           ? "Found: " + path
@@ -150,7 +167,8 @@ void SettingsBackend::reportSaveError(const QString& message) {
 }
 SettingsPanel::SettingsPanel(
     CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
-    const std::vector<SettingsSectionFactory>& factories, UiPrefs prefs)
+    const std::vector<SettingsSectionFactory>& factories, UiPrefs prefs,
+    ResolvedScale initialScale)
     : QDialog(parent),
       m_config(ctx.config()),
       m_uiPrefs(std::move(prefs)),
@@ -161,7 +179,8 @@ SettingsPanel::SettingsPanel(
   setModal(true);
   resize(700, 560);
   for (const auto& factory : factories) m_sections.push_back(factory(this));
-  m_backend = new SettingsBackend(ctx, this, m_sections, m_uiPrefs);
+  m_backend =
+      new SettingsBackend(ctx, this, m_sections, m_uiPrefs, initialScale);
   connect(m_backend, &SettingsBackend::saveRequested, this,
           &SettingsPanel::save);
   connect(m_backend, &SettingsBackend::cancelRequested, this, &QDialog::reject);
@@ -182,7 +201,7 @@ SettingsPanel::SettingsPanel(
 SettingsPanel::SettingsPanel(AppContext& app, QQmlEngine* engine,
                              QWidget* parent)
     : SettingsPanel(app.coreContext(), engine, parent, app.settingsSections(),
-                    app.uiPrefs()) {}
+                    app.uiPrefs(), app.initialScale()) {}
 SettingsPanel::~SettingsPanel() { m_qml->setSource(QUrl{}); }
 void SettingsPanel::save(const QVariantMap& values) {
   auto updated = m_config;

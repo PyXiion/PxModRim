@@ -22,10 +22,11 @@ class SettingsBackend : public QObject {
   Q_PROPERTY(QString cacheStatus READ cacheStatus NOTIFY cacheChanged)
   Q_PROPERTY(bool cacheAvailable READ cacheAvailable CONSTANT)
   Q_PROPERTY(bool cacheBusy READ cacheBusy NOTIFY cacheChanged)
+  Q_PROPERTY(QString scaleOverrideNote READ scaleOverrideNote CONSTANT)
  public:
   SettingsBackend(CoreContext& ctx, QDialog* dialog,
                   const std::vector<SettingsSection*>& sections,
-                  const UiPrefs& prefs);
+                  const UiPrefs& prefs, const ResolvedScale& initialScale);
   QVariantMap initial() const { return m_initial; }
   QVariantList sections() const { return m_sections; }
   QString communityStatus() const { return m_communityStatus; }
@@ -33,6 +34,7 @@ class SettingsBackend : public QObject {
   QString cacheStatus() const { return m_cacheStatus; }
   bool cacheAvailable() const { return m_cacheAvailable; }
   bool cacheBusy() const { return m_cacheBusy; }
+  QString scaleOverrideNote() const { return m_scaleOverrideNote; }
   Q_INVOKABLE QCoro::Task<void> browse(QString key);
   Q_INVOKABLE QString localCandidate(const QString& gamePath) const;
   Q_INVOKABLE void autoDetect();
@@ -56,6 +58,7 @@ class SettingsBackend : public QObject {
   QVariantMap m_initial;
   QVariantList m_sections;
   QString m_communityStatus, m_cacheStatus;
+  QString m_scaleOverrideNote;
   bool m_communityBusy = false, m_cacheBusy = false, m_cacheAvailable = false;
 };
 class SettingsPanel : public QDialog {
@@ -63,7 +66,7 @@ class SettingsPanel : public QDialog {
  public:
   SettingsPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
                 const std::vector<SettingsSectionFactory>& sections = {},
-                UiPrefs prefs = {});
+                UiPrefs prefs = {}, ResolvedScale initialScale = {});
   SettingsPanel(AppContext& app, QQmlEngine* engine, QWidget* parent);
   ~SettingsPanel() override;
   const AppConfig& getConfig() const { return m_config; }

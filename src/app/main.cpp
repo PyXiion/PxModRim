@@ -3,6 +3,8 @@
 #include <QDir>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QProcess>
+#include <QProcessEnvironment>
 #include <QStyleHints>
 #include <QTimer>
 #include <cstddef>
@@ -114,7 +116,9 @@ QCoro::Task<void> teardown(px::modrim::AppContext& appContext,
 // Startup, then waiting for the application to quit. Eager: it runs until the
 // first suspension, which is the quit wait, so main can tell an early failure
 // from a running app (see main()).
-QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
+QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
+                        px::modrim::ResolvedScale initialScale,
+                        QStringList originalArguments) {
   spdlog::info("Starting PxModRim");
 
   px::modrim::ConfigService configService(px::modrim::configDir());
@@ -156,7 +160,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
   const QStringList downloaders = px::modrim::registerCorePlugins(
       *ctx, configService, organizerDb, disabled);
 
-  px::modrim::AppContext appContext(*ctx, uiPrefsService.prefs());
+  px::modrim::AppContext appContext(*ctx, uiPrefsService.prefs(), initialScale);
   px::modrim::PluginSelection selection{std::move(disabled), downloaders};
   px::modrim::registerUiPlugins(appContext, selection);
 
@@ -172,6 +176,19 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
   // The window opens before mods load, as in the legacy app.
   auto window = std::make_unique<px::modrim::MainWindow>(appContext);
   window->setAppQuitCallback([] { QCoreApplication::quit(); });
+  window->setRestartCallback(
+      [arguments = std::move(originalArguments),
+       keepQtScale = initialScale.source == QStringLiteral("qt-env")] {
+        QProcess process;
+        process.setProgram(QCoreApplication::applicationFilePath());
+        process.setArguments(arguments.sliced(1));
+        auto environment = QProcessEnvironment::systemEnvironment();
+        if (!keepQtScale) {
+          environment.remove(QStringLiteral("QT_SCALE_FACTOR"));
+        }
+        process.setProcessEnvironment(environment);
+        return process.startDetached();
+      });
   window->show();
 
   if (ctx->config().paths.game.empty()) {
@@ -206,12 +223,21 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled) {
 
 int main(int argc, char* argv[]) {
   setEnvDefaults();
-  if (!qEnvironmentVariableIsSet("QT_SCALE_FACTOR")) {
-    const px::modrim::ConfigService config(px::modrim::configDir());
-    const int scale = px::modrim::loadUiScale(config);
-    if (scale != 100) {
-      qputenv("QT_SCALE_FACTOR", px::modrim::uiScaleFactor(scale));
-    }
+  QStringList originalArguments;
+  originalArguments.reserve(argc);
+  for (int index = 0; index < argc; ++index) {
+    originalArguments.append(QString::fromLocal8Bit(argv[index]));
+  }
+  const QString cliScale = px::modrim::uiScaleArgument(originalArguments);
+  const QString envScale = qEnvironmentVariable("PX_UI_SCALE");
+  const QString qtScale = qEnvironmentVariable("QT_SCALE_FACTOR");
+  const px::modrim::ConfigService config(px::modrim::configDir());
+  const auto initialScale = px::modrim::resolveUiScale(
+      px::modrim::loadUiScale(config), cliScale, envScale, qtScale);
+  if (initialScale.source != QStringLiteral("qt-env") &&
+      initialScale.scale != 100) {
+    qputenv("QT_SCALE_FACTOR",
+            px::modrim::uiScaleFactor(static_cast<int>(initialScale.scale)));
   }
 
   QApplication qtApp(argc, argv);
@@ -230,6 +256,14 @@ int main(int argc, char* argv[]) {
 
   configureLogging(
       QDir(px::modrim::configDir()).filePath(QStringLiteral("logs")));
+  for (const auto& [source, value] :
+       {std::pair{QStringLiteral("--ui-scale"), cliScale},
+        std::pair{QStringLiteral("PX_UI_SCALE"), envScale}}) {
+    if (!value.isNull() && !px::modrim::parseScaleOverride(value)) {
+      spdlog::warn("Ignoring invalid {} value: {}", source.toStdString(),
+                   value.toStdString());
+    }
+  }
 
   if (const int smokeMs = smokeExitMs(); smokeMs > 0) {
     QTimer::singleShot(smokeMs, &qtApp, &QCoreApplication::quit);
@@ -245,7 +279,8 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  auto run = runApp(qtApp, std::move(*disabled));
+  auto run = runApp(qtApp, std::move(*disabled), initialScale,
+                    std::move(originalArguments));
   // An early failure has already finished the run; otherwise run the event loop
   // until quit.
   if (!run.isReady()) {

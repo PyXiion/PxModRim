@@ -19,7 +19,8 @@ class Toast : public QWidget {
   Q_OBJECT
 
  public:
-  Toast(const QString& message, ToastLevel level, QWidget* parent = nullptr);
+  Toast(const QString& message, ToastLevel level, QWidget* parent = nullptr,
+        const QString& actionLabel = {}, std::function<void()> action = {});
 
   void showWithAnimation();
   void dismiss();
@@ -43,9 +44,12 @@ class ToastManager : public QWidget, public Notifier {
   explicit ToastManager(QWidget* parent = nullptr);
 
   void showToast(const QString& message, ToastLevel level = ToastLevel::kInfo,
-                 int durationMs = 3000);
+                 int durationMs = 3000, const QString& actionLabel = {},
+                 std::function<void()> action = {});
 
-  void info(const QString& message, int durationMs = 3000) override;
+  void info(const QString& message, int durationMs = 3000,
+            const QString& actionLabel = {},
+            std::function<void()> action = {}) override;
   void success(const QString& message, int durationMs = 3000) override;
   void warning(const QString& message, int durationMs = 4000) override;
   void error(const QString& message, int durationMs = 5000) override;

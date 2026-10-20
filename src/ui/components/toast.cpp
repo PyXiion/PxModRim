@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <cstddef>
+#include <utility>
 
 #include "ui/components/icons.hpp"
 #include "ui/theme/palette.hpp"
@@ -41,7 +42,8 @@ QIcon requireIcon(QStringView name, int size, QStringView color) {
 
 }  // namespace
 
-Toast::Toast(const QString& message, ToastLevel level, QWidget* parent)
+Toast::Toast(const QString& message, ToastLevel level, QWidget* parent,
+             const QString& actionLabel, std::function<void()> action)
     : QWidget(parent) {
   setObjectName(QStringLiteral("toast"));
   setFixedWidth(320);
@@ -67,6 +69,18 @@ Toast::Toast(const QString& message, ToastLevel level, QWidget* parent)
   messageLabel->setObjectName(QStringLiteral("toastMessage"));
   messageLabel->setWordWrap(true);
   layout->addWidget(messageLabel, 1);
+
+  if (!actionLabel.isEmpty() && action) {
+    auto* button = new QPushButton(actionLabel, this);
+    button->setObjectName(QStringLiteral("toastAction"));
+    connect(button, &QPushButton::clicked, this,
+            [this, button, action = std::move(action)] {
+              button->setEnabled(false);
+              dismiss();
+              action();
+            });
+    layout->addWidget(button);
+  }
 
   auto* close = new QPushButton(this);
   close->setObjectName(QStringLiteral("toastClose"));
@@ -109,7 +123,7 @@ void Toast::dismiss() {
 
 ToastManager::ToastManager(QWidget* parent) : QWidget(parent) {
   setObjectName(QStringLiteral("toastManager"));
-  setAttribute(Qt::WA_TransparentForMouseEvents, true);
+  hide();
 
   m_layout = new QVBoxLayout(this);
   m_layout->setContentsMargins(0, 0, 16, 16);
@@ -118,20 +132,27 @@ ToastManager::ToastManager(QWidget* parent) : QWidget(parent) {
 }
 
 void ToastManager::showToast(const QString& message, ToastLevel level,
-                             int durationMs) {
-  auto* toast = new Toast(message, level, this);
+                             int durationMs, const QString& actionLabel,
+                             std::function<void()> action) {
+  auto* toast = new Toast(message, level, this, actionLabel, std::move(action));
   m_layout->addWidget(toast);
+  show();
+  raise();
   connect(toast, &Toast::dismissed, this, [this, toast] { remove(toast); });
 
   toast->showWithAnimation();
+  resizeToParent();
 
   if (durationMs > 0) {
     QTimer::singleShot(durationMs, toast, &Toast::dismiss);
   }
 }
 
-void ToastManager::info(const QString& message, int durationMs) {
-  showToast(message, ToastLevel::kInfo, durationMs);
+void ToastManager::info(const QString& message, int durationMs,
+                        const QString& actionLabel,
+                        std::function<void()> action) {
+  showToast(message, ToastLevel::kInfo, durationMs, actionLabel,
+            std::move(action));
 }
 
 void ToastManager::success(const QString& message, int durationMs) {
@@ -148,7 +169,9 @@ void ToastManager::error(const QString& message, int durationMs) {
 
 void ToastManager::resizeToParent() {
   if (const QWidget* parent = parentWidget()) {
-    setGeometry(parent->rect());
+    const QSize size = sizeHint().boundedTo(parent->size());
+    setGeometry(parent->width() - size.width(),
+                parent->height() - size.height(), size.width(), size.height());
   }
 }
 
@@ -156,6 +179,8 @@ void ToastManager::remove(Toast* toast) {
   toast->hide();
   m_layout->removeWidget(toast);
   toast->deleteLater();
+  resizeToParent();
+  if (m_layout->count() == 0) hide();
 }
 
 }  // namespace px::modrim
