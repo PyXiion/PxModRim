@@ -105,40 +105,52 @@ class ConfigService:
     def config_dir(self) -> Path:
         return self._config_dir
 
-    def load(self, filename: str, struct_type: type[StructT]) -> StructT:
+    def load(
+        self,
+        filename: str,
+        struct_type: type[StructT],
+        *,
+        normalize: Callable[[dict[str, Any]], None] | None = None,
+    ) -> StructT:
+        """Typed *filename*; *normalize* repairs the migrated raw object first."""
         path = self._config_dir / filename
         if not path.exists():
             return struct_type()
         try:
-            if filename not in _VERSIONED_CONFIG_FILES:
+            if filename not in _VERSIONED_CONFIG_FILES and normalize is None:
                 return msgspec.json.decode(
                     path.read_bytes(), type=struct_type, dec_hook=dec_hook
                 )
 
             raw = msgspec.json.decode(path.read_bytes(), type=dict[str, Any])
-            marker = raw.pop(_JSON_SCHEMA_MARKER, None)
-            if marker is None:
-                version = 0
-            elif type(marker) is int and marker >= 0:
-                version = marker
-            else:
-                raise msgspec.DecodeError("Invalid JSON schema version")
-
-            if version < CURRENT_CONFIG_SCHEMA_VERSION:
-                _migrate_json(raw, version)
-                backup = path.with_suffix(f"{path.suffix}.bak.{int(time())}")
-                shutil.copy2(path, backup)
-                raw[_JSON_SCHEMA_MARKER] = CURRENT_CONFIG_SCHEMA_VERSION
-                self._write(path, raw)
-            elif version > CURRENT_CONFIG_SCHEMA_VERSION:
-                _migrate_json(raw, version)
-
+            if filename in _VERSIONED_CONFIG_FILES:
+                self._migrate(path, raw)
+            if normalize is not None:
+                normalize(raw)
             return msgspec.json.decode(
                 msgspec.json.encode(raw), type=struct_type, dec_hook=dec_hook
             )
         except (OSError, msgspec.DecodeError) as e:
             logger.warning(f"Failed to load {filename}: {e}")
             return struct_type()
+
+    def _migrate(self, path: Path, raw: dict[str, Any]) -> None:
+        marker = raw.pop(_JSON_SCHEMA_MARKER, None)
+        if marker is None:
+            version = 0
+        elif type(marker) is int and marker >= 0:
+            version = marker
+        else:
+            raise msgspec.DecodeError("Invalid JSON schema version")
+
+        if version < CURRENT_CONFIG_SCHEMA_VERSION:
+            _migrate_json(raw, version)
+            backup = path.with_suffix(f"{path.suffix}.bak.{int(time())}")
+            shutil.copy2(path, backup)
+            raw[_JSON_SCHEMA_MARKER] = CURRENT_CONFIG_SCHEMA_VERSION
+            self._write(path, raw)
+        elif version > CURRENT_CONFIG_SCHEMA_VERSION:
+            _migrate_json(raw, version)
 
     def save(self, filename: str, data: msgspec.Struct) -> None:
         path = self._config_dir / filename

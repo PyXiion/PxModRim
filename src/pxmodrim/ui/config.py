@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from pxmodrim.ui.ui_prefs import UIPrefs
+from pxmodrim.ui.ui_prefs import UIPrefs, clamp_ui_scale
 
 if TYPE_CHECKING:
     from pxmodrim.core.config import ConfigService
@@ -10,9 +10,15 @@ if TYPE_CHECKING:
 __all__ = ["UIPrefs", "UIPrefsService", "load_ui_prefs", "save_ui_prefs"]
 
 
+def _normalize_ui_prefs(raw: dict[str, Any]) -> None:
+    # A bad ui_scale must not fail the typed decode and drop every other pref.
+    if "ui_scale" in raw:
+        raw["ui_scale"] = clamp_ui_scale(raw["ui_scale"])
+
+
 def load_ui_prefs(config_service: ConfigService) -> UIPrefs:
     """Load UI prefs from ``ui_prefs.json`` via config service."""
-    return config_service.load("ui_prefs.json", UIPrefs)
+    return config_service.load("ui_prefs.json", UIPrefs, normalize=_normalize_ui_prefs)
 
 
 def save_ui_prefs(prefs: UIPrefs, config_service: ConfigService) -> None:

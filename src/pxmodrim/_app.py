@@ -5,6 +5,7 @@ import os
 import sys
 import traceback
 from importlib.resources import files as resource_files
+from pathlib import Path
 from types import TracebackType
 
 from loguru import logger
@@ -129,13 +130,30 @@ def _parse_disabled_plugins() -> set[str]:
 _WHEEL_SCROLL_LINES = 8
 
 
+def _appimage_path(
+    appimage: str | None, appdir: str | None, executable: str
+) -> str | None:
+    # APPIMAGE and APPDIR leak into children of other AppImages, so they only
+    # describe this process when it runs from inside APPDIR.
+    if not appimage or not appdir or not os.path.isfile(appimage):
+        return None
+    root = Path(os.path.realpath(appdir))
+    inside = Path(os.path.realpath(executable)).is_relative_to(root)
+    return appimage if inside else None
+
+
 def _restart_command(
-    original_arguments: list[str], qt_scale_factor_override: str | None
+    original_arguments: list[str],
+    qt_scale_factor_override: str | None,
+    appimage: str | None,
 ) -> tuple[str, list[str], QProcessEnvironment]:
     environment = QProcessEnvironment.systemEnvironment()
     if qt_scale_factor_override is None:
         environment.remove("QT_SCALE_FACTOR")
-    return sys.executable, original_arguments[1:], environment
+    # The executable inside an AppImage lives in a mount (or extraction dir)
+    # that the runtime removes once this process exits.
+    program = appimage if appimage is not None else sys.executable
+    return program, original_arguments[1:], environment
 
 
 class App:
@@ -206,7 +224,11 @@ class App:
 
     def _start_restart_process(self) -> bool:
         program, arguments, environment = _restart_command(
-            self._original_arguments, self._qt_scale_factor_override
+            self._original_arguments,
+            self._qt_scale_factor_override,
+            _appimage_path(
+                os.environ.get("APPIMAGE"), os.environ.get("APPDIR"), sys.executable
+            ),
         )
         process = QProcess(self.qt_app)
         process.setProgram(program)

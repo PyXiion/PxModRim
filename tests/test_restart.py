@@ -52,6 +52,7 @@ def test_restart_relaunches_with_original_arguments_and_clean_scale_env(
     app = _app_stub(qapp, [sys.executable, "-c", code, "--flag"], override)
     # An app-generated factor lives in the parent's environment only.
     monkeypatch.setenv("QT_SCALE_FACTOR", "1.5")
+    monkeypatch.delenv("APPIMAGE", raising=False)
 
     assert App._start_restart_process(app) is True
 
@@ -62,9 +63,82 @@ def test_restart_reports_launch_failure(
     qapp: QApplication, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(sys, "executable", str(tmp_path / "missing-python"))
+    monkeypatch.delenv("APPIMAGE", raising=False)
     app = _app_stub(qapp, ["python"], None)
 
     assert App._start_restart_process(app) is False
+
+
+_FROZEN_ARGUMENTS = ["/tmp/.mount_PxModR/PxModRim", "--ui-scale", "150"]
+
+
+def _appimage_paths(tmp_path: Path) -> tuple[str, str, str]:
+    appimage = tmp_path / "PxModRim-x86_64.AppImage"
+    appimage.write_bytes(b"")
+    appdir = tmp_path / "mount"
+    appdir.mkdir()
+    return str(appimage), str(appdir), str(appdir / "PxModRim")
+
+
+def test_restart_relaunches_running_appimage_with_original_arguments(
+    tmp_path: Path,
+) -> None:
+    appimage, appdir, executable = _appimage_paths(tmp_path)
+
+    program, arguments, _ = app_module._restart_command(
+        _FROZEN_ARGUMENTS,
+        None,
+        app_module._appimage_path(appimage, appdir, executable),
+    )
+
+    assert program == appimage
+    assert arguments == ["--ui-scale", "150"]
+
+
+@pytest.mark.parametrize(
+    ("appimage", "appdir", "executable"),
+    [
+        (None, "mount", "mount/PxModRim"),
+        ("", "mount", "mount/PxModRim"),
+        ("missing.AppImage", "mount", "mount/PxModRim"),
+        ("PxModRim-x86_64.AppImage", None, "mount/PxModRim"),
+        ("PxModRim-x86_64.AppImage", "", "mount/PxModRim"),
+        ("PxModRim-x86_64.AppImage", "mount", "elsewhere/PxModRim"),
+        ("PxModRim-x86_64.AppImage", "mount", "mount-other/PxModRim"),
+    ],
+)
+def test_restart_outside_running_appimage_relaunches_executable(
+    tmp_path: Path, appimage: str | None, appdir: str | None, executable: str
+) -> None:
+    _appimage_paths(tmp_path)
+
+    def resolve(value: str | None) -> str | None:
+        return str(tmp_path / value) if value else value
+
+    program, arguments, _ = app_module._restart_command(
+        _FROZEN_ARGUMENTS,
+        None,
+        app_module._appimage_path(
+            resolve(appimage), resolve(appdir), str(tmp_path / executable)
+        ),
+    )
+
+    assert program == sys.executable
+    assert arguments == ["--ui-scale", "150"]
+
+
+def test_restart_keeps_user_scale_factor_when_relaunching_appimage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    appimage = app_module._appimage_path(*_appimage_paths(tmp_path))
+    monkeypatch.setenv("QT_SCALE_FACTOR", "1.5")
+
+    _, _, generated = app_module._restart_command(_FROZEN_ARGUMENTS, None, appimage)
+    _, _, user = app_module._restart_command(_FROZEN_ARGUMENTS, "1.5", appimage)
+
+    assert appimage is not None
+    assert not generated.contains("QT_SCALE_FACTOR")
+    assert user.value("QT_SCALE_FACTOR") == "1.5"
 
 
 @pytest.mark.parametrize("restart_pending", [False, True])

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import msgspec
 import pytest
 
+from pxmodrim.core.config import ConfigService
+from pxmodrim.ui.config import load_ui_prefs
 from pxmodrim.ui.ui_prefs import (
     UIPrefs,
     clamp_ui_scale,
@@ -45,6 +49,36 @@ def test_ui_scale_loads_old_preferences_and_clamps_disk_values() -> None:
         rail_collapsed=True
     )
     assert msgspec.json.decode(b'{"ui_scale": 500}', type=UIPrefs).ui_scale == 250
+
+
+@pytest.mark.parametrize("schema", ['"schema_version": 1, ', ""])
+@pytest.mark.parametrize(
+    ("ui_scale", "expected"),
+    [
+        ('"150"', 100),
+        ("150.5", 100),
+        ("100000000000000000000000000000", 250),
+        ("-100000000000000000000000000000", 100),
+        ("null", 100),
+        ("true", 100),
+        ("500", 250),
+        ("175", 175),
+    ],
+)
+def test_bad_saved_ui_scale_keeps_other_preferences(
+    tmp_path: Path, schema: str, ui_scale: str, expected: int
+) -> None:
+    (tmp_path / "ui_prefs.json").write_text(
+        f'{{{schema}"rail_collapsed": true, "skipped_update_tag": "v9", '
+        f'"ui_scale": {ui_scale}}}',
+        encoding="utf-8",
+    )
+
+    prefs = load_ui_prefs(ConfigService(tmp_path))
+
+    assert prefs == UIPrefs(
+        rail_collapsed=True, skipped_update_tag="v9", ui_scale=expected
+    )
 
 
 @pytest.mark.parametrize(
