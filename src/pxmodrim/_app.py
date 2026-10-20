@@ -129,6 +129,15 @@ def _parse_disabled_plugins() -> set[str]:
 _WHEEL_SCROLL_LINES = 8
 
 
+def _restart_command(
+    original_arguments: list[str], qt_scale_factor_override: str | None
+) -> tuple[str, list[str], QProcessEnvironment]:
+    environment = QProcessEnvironment.systemEnvironment()
+    if qt_scale_factor_override is None:
+        environment.remove("QT_SCALE_FACTOR")
+    return sys.executable, original_arguments[1:], environment
+
+
 class App:
     """Top-level application class wiring together Qt, services, and the main window."""
 
@@ -193,25 +202,22 @@ class App:
         self._apply_theme()
 
     def _restart(self) -> None:
-        self.main_window.request_restart(self._start_restart_process)
+        self.main_window.request_restart()
 
     def _start_restart_process(self) -> bool:
-        program, arguments = sys.executable, self._original_arguments[1:]
+        program, arguments, environment = _restart_command(
+            self._original_arguments, self._qt_scale_factor_override
+        )
         process = QProcess(self.qt_app)
         process.setProgram(program)
         process.setArguments(arguments)
-        environment = QProcessEnvironment.systemEnvironment()
-        if self._qt_scale_factor_override is None:
-            environment.remove("QT_SCALE_FACTOR")
         process.setProcessEnvironment(environment)
         # The PySide6 stub says (bool, pid) here; the runtime returns a bool.
         result: bool | tuple[bool, int] = process.startDetached()
         started = result[0] if isinstance(result, tuple) else result
-        if not started and self._app_ctx.toasts is not None:
-            self._app_ctx.toasts.error(
-                "Could not restart PxModRim. The application is still running."
-            )
         process.deleteLater()
+        if not started:
+            logger.error("Could not restart PxModRim; manual startup is required")
         return started
 
     def _apply_theme(self) -> None:
@@ -394,7 +400,10 @@ class App:
         loop = QEventLoop()
         loop.set_exception_handler(_async_exception_handler)
         try:
-            return asyncio.run(self.async_run(), loop_factory=lambda: loop)
+            result = asyncio.run(self.async_run(), loop_factory=lambda: loop)
         finally:
             if self._ctx is not None:
                 self._ctx.close_sync()
+        if self._ctx is not None and self.main_window.restart_pending:
+            self._start_restart_process()
+        return result

@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- The interface-scale restart notification now includes a **Restart now** action that saves state and shuts down plugins normally; failed relaunches leave the app open.
+- The interface-scale restart notification now includes a **Restart now** action that saves state and finishes plugin and database shutdown before relaunching; a failed relaunch is written to the log and the app must be started manually.
 - Recover an oversized interface with `--ui-scale 100` (also `--ui-scale=100`) or `PX_UI_SCALE=100`, without changing the saved preference.
 
 ### Changed

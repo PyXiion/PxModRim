@@ -208,6 +208,7 @@ async def test_successful_save_clears_unsaved_state() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("restart_pending", [False, True])
 @pytest.mark.parametrize(
     ("choice", "save_succeeds", "expected_closed"),
     [
@@ -222,6 +223,7 @@ async def test_async_close_choice(
     choice: QMessageBox.StandardButton,
     save_succeeds: bool,
     expected_closed: bool,
+    restart_pending: bool,
 ) -> None:
     async def choose(
         dialog: type[QMessageBox], _parent: object
@@ -236,6 +238,7 @@ async def test_async_close_choice(
         _close_confirmed = False
         closed = False
         save_calls = 0
+        restart_pending = False
 
         async def _save_active_mods(self) -> bool:
             self.save_calls += 1
@@ -245,11 +248,13 @@ async def test_async_close_choice(
             self.closed = True
 
     window = Window()
+    window.restart_pending = restart_pending
     await MainWindow._confirm_close(cast(MainWindow, window))
 
     assert window.closed is expected_closed
     assert window._close_confirmed is expected_closed
     assert window.save_calls == (choice == QMessageBox.StandardButton.Save)
+    assert window.restart_pending is (restart_pending and expected_closed)
 
 
 class _CloseEvent:
@@ -303,7 +308,7 @@ def test_confirmed_dirty_close_event_is_accepted(
         _views=[],
         _update_task=None,
         _launch_task=None,
-        _restart_callback=None,
+        restart_pending=False,
         _app_quit_callback=lambda: quit_calls.append(None),
         deleteLater=lambda: None,
     )

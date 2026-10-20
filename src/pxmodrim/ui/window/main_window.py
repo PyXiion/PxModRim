@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._app_quit_callback: Callable[[], None] | None = None
-        self._restart_callback: Callable[[], bool] | None = None
+        self.restart_pending = False
         self._is_frameless: bool = False
         self._app_ctx = app_ctx
         self._ctx = app_ctx.core
@@ -461,8 +461,8 @@ class MainWindow(QMainWindow):
         """Store the callback used to end the async run loop on close."""
         self._app_quit_callback = callback
 
-    def request_restart(self, start_process: Callable[[], bool]) -> None:
-        self._restart_callback = start_process
+    def request_restart(self) -> None:
+        self.restart_pending = True
         self.close()
 
     async def _confirm_close(self) -> None:
@@ -473,10 +473,10 @@ class MainWindow(QMainWindow):
 
         if result == QMessageBox.StandardButton.Save:
             if not await self._save_active_mods():
-                self._restart_callback = None
+                self.restart_pending = False
                 return
         elif result != QMessageBox.StandardButton.Discard:
-            self._restart_callback = None
+            self.restart_pending = False
             return
 
         self._close_confirmed = True
@@ -489,13 +489,6 @@ class MainWindow(QMainWindow):
                 self._close_prompt_open = True
                 self._close_task = asyncio.create_task(self._confirm_close())
             return
-        if self._restart_callback is not None:
-            start_process = self._restart_callback
-            self._restart_callback = None
-            if not start_process():
-                self._close_confirmed = False
-                event.ignore()
-                return
         logger.info("main_window: shutting down")
         if self._update_task is not None:
             self._update_task.cancel()
