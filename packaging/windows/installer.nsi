@@ -9,7 +9,7 @@
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 
 !ifndef VERSION
-  !define VERSION "0.3.1"
+  !define VERSION "0.3.2"
 !endif
 
 !ifndef DIST_DIR
