@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Settings shows the effective interface scale and its source when a command-line or environment override is active, and no longer offers an ineffective restart.
-- The main window starts within the screen's available logical area, shrinking on smaller displays and keeping its position on-screen.
+- The main window's initial size and position are clamped to the screen's available logical area. The layout's own minimum width (rail, sidebar and info pane) is not reduced, so very large interface scales on small screens can still make the window larger than the screen.
 
 ### Fixed
 - An invalid saved interface scale in `ui_prefs.json` now falls back to 100% instead of resetting every other UI preference.
