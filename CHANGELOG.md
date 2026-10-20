@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Settings identifies active interface-scale overrides and hides restart prompts while an override prevents saved changes from taking effect.
-- The main window's initial size and position fit the available screen, including smaller screens and enlarged interface scales.
+- The main window's initial size and position are clamped to the screen's available logical area. The layout's own minimum width (rail, sidebar and info pane) is not reduced, so very large interface scales on small screens can still make the window larger than the screen.
 - Rewrote PxModRim in C++23 on Qt 6 (Qt Quick UI, QCoro coroutines) with CMake, replacing the Python/PySide6 implementation. User-visible behaviour is unchanged. Building from source now needs CMake 3.24+, Qt 6.8+ (CI uses 6.11), QCoro, pugixml, libzip and spdlog, see `AGENTS.md`; release packages are built from CMake install rules and Qt deployment tools.
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
 - Re-implemented the RimSort-derived modules (XML conversion, game constants, About.xml metadata structures and parsing, startup-impact report parsing) independently of the original code, working only from the clean-room rewrite of their behaviour and the existing tests; their public interfaces are unchanged.
