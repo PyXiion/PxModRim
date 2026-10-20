@@ -30,6 +30,7 @@
 #include "ui/context.hpp"
 #include "ui/theme/palette.hpp"
 #include "ui/window/main_window.hpp"
+#include "ui/window/restart.hpp"
 
 Q_IMPORT_QML_PLUGIN(PxModRimPlugin)
 
@@ -38,6 +39,8 @@ namespace {
 constexpr int kWheelScrollLines = 8;
 constexpr qint64 kLogMaxBytes = 10 * 1024 * 1024;
 constexpr std::size_t kLogRetention = 5;
+
+enum class AppExit { kSuccess, kFailure, kRestart };
 
 // Qt6 defaults to PassThrough, which makes QtWebEngine render at integer buffer
 // scale while the compositor upscales fractional scales, which blurs.
@@ -116,9 +119,8 @@ QCoro::Task<void> teardown(px::modrim::AppContext& appContext,
 // Startup, then waiting for the application to quit. Eager: it runs until the
 // first suspension, which is the quit wait, so main can tell an early failure
 // from a running app (see main()).
-QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
-                        px::modrim::ResolvedScale initialScale,
-                        QStringList originalArguments) {
+QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
+                            px::modrim::ResolvedScale initialScale) {
   spdlog::info("Starting PxModRim");
 
   px::modrim::ConfigService configService(px::modrim::configDir());
@@ -128,12 +130,12 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
   if (auto setup = co_await appConfigService.setup(); !setup) {
     spdlog::error("Failed to initialize configuration: {}",
                   setup.error().message.toStdString());
-    co_return 1;
+    co_return AppExit::kFailure;
   }
   if (auto setup = co_await uiPrefsService.setup(); !setup) {
     spdlog::error("Failed to initialize UI preferences: {}",
                   setup.error().message.toStdString());
-    co_return 1;
+    co_return AppExit::kFailure;
   }
 
   px::modrim::AppConfig cfg = appConfigService.cfg();
@@ -168,7 +170,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
     spdlog::error("Plugin setup failed: {}",
                   setup.error().message.toStdString());
     ctx->closeSync();
-    co_return 1;
+    co_return AppExit::kFailure;
   }
   spdlog::info("Services initialized for game version {}",
                ctx->gameVersion().toStdString());
@@ -176,19 +178,6 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
   // The window opens before mods load, as in the legacy app.
   auto window = std::make_unique<px::modrim::MainWindow>(appContext);
   window->setAppQuitCallback([] { QCoreApplication::quit(); });
-  window->setRestartCallback(
-      [arguments = std::move(originalArguments),
-       keepQtScale = initialScale.source == QStringLiteral("qt-env")] {
-        QProcess process;
-        process.setProgram(QCoreApplication::applicationFilePath());
-        process.setArguments(arguments.sliced(1));
-        auto environment = QProcessEnvironment::systemEnvironment();
-        if (!keepQtScale) {
-          environment.remove(QStringLiteral("QT_SCALE_FACTOR"));
-        }
-        process.setProcessEnvironment(environment);
-        return process.startDetached();
-      });
   window->show();
 
   if (ctx->config().paths.game.empty()) {
@@ -200,7 +189,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
       spdlog::error("Mod load failed: {}",
                     refreshed.error().message.toStdString());
       co_await teardown(appContext, *ctx);
-      co_return 1;
+      co_return AppExit::kFailure;
     }
     spdlog::info("Initial mod load complete: {} mods", *refreshed);
 
@@ -208,7 +197,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
       spdlog::error("Plugin init failed: {}",
                     init.error().message.toStdString());
       co_await teardown(appContext, *ctx);
-      co_return 1;
+      co_return AppExit::kFailure;
     }
     window->startStartupUpdateCheck();
   }
@@ -216,7 +205,7 @@ QCoro::Task<int> runApp(QApplication& qtApp, QSet<QString> disabled,
   // Runs until the application quits (window close, or PX_SMOKE_EXIT_MS).
   co_await qCoro(&qtApp, &QCoreApplication::aboutToQuit);
   co_await teardown(appContext, *ctx);
-  co_return 0;
+  co_return window->restartRequested() ? AppExit::kRestart : AppExit::kSuccess;
 }
 
 }  // namespace
@@ -279,12 +268,29 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  auto run = runApp(qtApp, std::move(*disabled), initialScale,
-                    std::move(originalArguments));
+  auto run = runApp(qtApp, std::move(*disabled), initialScale);
   // An early failure has already finished the run; otherwise run the event loop
   // until quit.
   if (!run.isReady()) {
     qtApp.exec();
   }
-  return QCoro::waitFor(std::move(run));
+  const auto result = QCoro::waitFor(std::move(run));
+  // The run has finished plugin shutdown and destroyed its services before a
+  // replacement can touch the same configuration and databases.
+  if (result == AppExit::kRestart) {
+    const auto command = px::modrim::restartCommand(
+        QCoreApplication::applicationFilePath(), originalArguments,
+        QProcessEnvironment::systemEnvironment(),
+        initialScale.source == QStringLiteral("qt-env"));
+    QProcess process(&qtApp);
+    process.setProgram(command.program);
+    process.setArguments(command.arguments);
+    process.setProcessEnvironment(command.environment);
+    if (!process.startDetached()) {
+      spdlog::error("Could not restart PxModRim: {}",
+                    process.errorString().toStdString());
+      return 1;
+    }
+  }
+  return result == AppExit::kFailure ? 1 : 0;
 }

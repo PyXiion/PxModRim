@@ -347,8 +347,10 @@ void MainWindow::setAppQuitCallback(std::function<void()> callback) {
   m_quit = std::move(callback);
 }
 
-void MainWindow::setRestartCallback(std::function<bool()> callback) {
-  m_restart = std::move(callback);
+void MainWindow::requestRestart() {
+  if (m_closing || m_closePromptOpen) return;
+  m_restartRequested = true;
+  close();
 }
 
 void MainWindow::openRoute(const QString& url) {
@@ -469,15 +471,6 @@ void MainWindow::closeEvent(QCloseEvent* event) {
       confirmClose();
     }
     return;
-  }
-  if (m_restartRequested) {
-    m_restartRequested = false;
-    if (!m_restart || !m_restart()) {
-      m_closeConfirmed = false;
-      event->ignore();
-      m_toasts->error(QStringLiteral("Could not restart PxModRim."));
-      return;
-    }
   }
   m_closing = true;
   for (auto* view : m_views) view->teardown();
@@ -606,11 +599,7 @@ QCoro::Task<void> MainWindow::openSettings() {
       m_app.uiPrefs().ui_scale != m_app.initialUiScale()) {
     m_toasts->info(
         QStringLiteral("Restart PxModRim to apply the interface scale."), 0,
-        QStringLiteral("Restart now"), [this] {
-          if (m_closing || m_closePromptOpen) return;
-          m_restartRequested = true;
-          close();
-        });
+        QStringLiteral("Restart now"), [this] { requestRestart(); });
   }
   const auto reloaded = co_await m_ctx.modService().reload();
   if (!reloaded) {

@@ -51,7 +51,8 @@ class MainWindow : public QMainWindow {
 
   QQmlEngine* qmlEngine() const noexcept { return m_engine; }
   void setAppQuitCallback(std::function<void()> callback);
-  void setRestartCallback(std::function<bool()> callback);
+  void requestRestart();
+  bool restartRequested() const noexcept { return m_restartRequested; }
   void startStartupUpdateCheck();
   void openRoute(const QString& url);
   void selectView(int index);
@@ -112,7 +113,6 @@ class MainWindow : public QMainWindow {
   QStringList m_savedActive;
   ActionMap m_actions;
   std::function<void()> m_quit;
-  std::function<bool()> m_restart;
   services::UpdateService m_updates;
   bool m_unsaved = false;
   bool m_closePromptOpen = false;
