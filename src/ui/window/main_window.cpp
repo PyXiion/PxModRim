@@ -270,11 +270,8 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
   if (!m_views.empty()) showView(0);
   refreshUnsavedState();
   const QRect available = screen()->availableGeometry();
-  const QSize initialSize(1400, 850);
-  const QRect initial(available.center() - QPoint(initialSize.width() / 2,
-                                                  initialSize.height() / 2),
-                      initialSize);
-  setGeometry(fitWindowGeometry(initial, available));
+  const QRect centred(available.center() - QPoint(700, 425), QSize(1400, 850));
+  setGeometry(fitWindowGeometry(centred, available));
 }
 
 MainWindow::~MainWindow() {
@@ -482,12 +479,9 @@ QCoro::Task<void> MainWindow::confirmClose() {
   const auto [result, dialog] =
       co_await awaitDialog<UnsavedChangesDialog>(this);
   m_closePromptOpen = false;
-  if (result == QMessageBox::Save) {
-    if (!co_await saveActiveMods()) {
-      m_restartRequested = false;
-      co_return;
-    }
-  } else if (result != QMessageBox::Discard) {
+  bool proceed = result == QMessageBox::Discard;
+  if (result == QMessageBox::Save) proceed = co_await saveActiveMods();
+  if (!proceed) {
     m_restartRequested = false;
     co_return;
   }
@@ -589,7 +583,7 @@ QCoro::Task<void> MainWindow::openSettings() {
   // Other prefs may have changed while Settings was open (e.g. skipping an
   // update), so only the scale comes from the dialog.
   auto prefs = m_app.uiPrefs();
-  prefs.ui_scale = dialog->getUiPrefs().ui_scale;
+  prefs.ui_scale = dialog->getUiScale();
   const auto prefsSaved = saveUiPrefs(prefs, m_ctx.configService());
   if (!prefsSaved) {
     m_toasts->error(prefsSaved.error().message);
@@ -598,8 +592,9 @@ QCoro::Task<void> MainWindow::openSettings() {
   m_app.uiPrefs() = prefs;
   m_ctx.updateConfig(config);
   m_ctx.resetProviders(config.paths);
-  if (m_app.initialScale().source == QStringLiteral("saved") &&
-      m_app.uiPrefs().ui_scale != m_app.initialUiScale()) {
+  const auto& initialScale = m_app.initialScale();
+  if (initialScale.source == ScaleSource::kSaved &&
+      prefs.ui_scale != initialScale.scale) {
     m_toasts->info(
         QStringLiteral("Restart PxModRim to apply the interface scale."), 0,
         QStringLiteral("Restart now"), [this] { requestRestart(); });

@@ -108,6 +108,64 @@ int smokeExitMs() {
   return ok ? ms : 0;
 }
 
+QStringList commandLine(int argc, char* argv[]) {
+  QStringList arguments;
+  arguments.reserve(argc);
+  for (int index = 0; index < argc; ++index) {
+    arguments.append(QString::fromLocal8Bit(argv[index]));
+  }
+  return arguments;
+}
+
+// Exports the scale as QT_SCALE_FACTOR, so it must run before QApplication
+// exists. A user-set QT_SCALE_FACTOR is left alone.
+px::modrim::ResolvedScale applyStartupScale(const QString& cliScale,
+                                            const QString& envScale) {
+  const px::modrim::ConfigService config(px::modrim::configDir());
+  const auto scale = px::modrim::resolveUiScale(
+      px::modrim::loadUiScale(config), cliScale, envScale,
+      qEnvironmentVariable("QT_SCALE_FACTOR"));
+  if (scale.source != px::modrim::ScaleSource::kQtEnv && scale.scale != 100) {
+    qputenv("QT_SCALE_FACTOR",
+            px::modrim::uiScaleFactor(static_cast<int>(scale.scale)));
+  }
+  return scale;
+}
+
+// Runs once logging exists, which is after the scale had to be applied.
+void warnInvalidScaleOverrides(const QString& cliScale,
+                               const QString& envScale) {
+  for (const auto& [source, value] : {std::pair{"--ui-scale", cliScale},
+                                      std::pair{"PX_UI_SCALE", envScale}}) {
+    if (!value.isNull() && !px::modrim::parseScaleOverride(value)) {
+      spdlog::warn("Ignoring invalid {} value: {}", source,
+                   value.toStdString());
+    }
+  }
+}
+
+// Must run after the previous run has shut its plugins down and destroyed its
+// services, so the new process never shares configuration or databases.
+bool relaunch(const QStringList& originalArguments, bool keepQtScale) {
+  const auto environment = QProcessEnvironment::systemEnvironment();
+  const QString program = px::modrim::restartProgram(
+      environment, QCoreApplication::applicationFilePath(),
+      [](const QString& path) { return QFileInfo(path).isFile(); },
+      [](const QString& path) { return QFileInfo(path).canonicalFilePath(); });
+  const auto command = px::modrim::restartCommand(program, originalArguments,
+                                                  environment, keepQtScale);
+  QProcess process;
+  process.setProgram(command.program);
+  process.setArguments(command.arguments);
+  process.setProcessEnvironment(command.environment);
+  if (!process.startDetached()) {
+    spdlog::error("Could not restart PxModRim: {}",
+                  process.errorString().toStdString());
+    return false;
+  }
+  return true;
+}
+
 // Shuts UI plugins down, then the core context. Used once the app has started.
 QCoro::Task<void> teardown(px::modrim::AppContext& appContext,
                            px::modrim::CoreContext& ctx) {
@@ -213,22 +271,10 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
 
 int main(int argc, char* argv[]) {
   setEnvDefaults();
-  QStringList originalArguments;
-  originalArguments.reserve(argc);
-  for (int index = 0; index < argc; ++index) {
-    originalArguments.append(QString::fromLocal8Bit(argv[index]));
-  }
+  const QStringList originalArguments = commandLine(argc, argv);
   const QString cliScale = px::modrim::uiScaleArgument(originalArguments);
   const QString envScale = qEnvironmentVariable("PX_UI_SCALE");
-  const QString qtScale = qEnvironmentVariable("QT_SCALE_FACTOR");
-  const px::modrim::ConfigService config(px::modrim::configDir());
-  const auto initialScale = px::modrim::resolveUiScale(
-      px::modrim::loadUiScale(config), cliScale, envScale, qtScale);
-  if (initialScale.source != QStringLiteral("qt-env") &&
-      initialScale.scale != 100) {
-    qputenv("QT_SCALE_FACTOR",
-            px::modrim::uiScaleFactor(static_cast<int>(initialScale.scale)));
-  }
+  const auto initialScale = applyStartupScale(cliScale, envScale);
 
   QApplication qtApp(argc, argv);
   qtApp.setApplicationName(QStringLiteral("PxModRim"));
@@ -246,14 +292,7 @@ int main(int argc, char* argv[]) {
 
   configureLogging(
       QDir(px::modrim::configDir()).filePath(QStringLiteral("logs")));
-  for (const auto& [source, value] :
-       {std::pair{QStringLiteral("--ui-scale"), cliScale},
-        std::pair{QStringLiteral("PX_UI_SCALE"), envScale}}) {
-    if (!value.isNull() && !px::modrim::parseScaleOverride(value)) {
-      spdlog::warn("Ignoring invalid {} value: {}", source.toStdString(),
-                   value.toStdString());
-    }
-  }
+  warnInvalidScaleOverrides(cliScale, envScale);
 
   if (const int smokeMs = smokeExitMs(); smokeMs > 0) {
     QTimer::singleShot(smokeMs, &qtApp, &QCoreApplication::quit);
@@ -276,29 +315,10 @@ int main(int argc, char* argv[]) {
     qtApp.exec();
   }
   const auto result = QCoro::waitFor(std::move(run));
-  // The run has finished plugin shutdown and destroyed its services before a
-  // replacement can touch the same configuration and databases.
-  if (result == AppExit::kRestart) {
-    const QString executable = QCoreApplication::applicationFilePath();
-    const auto environment = QProcessEnvironment::systemEnvironment();
-    const QString appImage = px::modrim::relaunchAppImage(
-        environment, executable,
-        [](const QString& path) { return QFileInfo(path).isFile(); },
-        [](const QString& path) {
-          return QFileInfo(path).canonicalFilePath();
-        });
-    const auto command = px::modrim::restartCommand(
-        executable, appImage, originalArguments, environment,
-        initialScale.source == QStringLiteral("qt-env"));
-    QProcess process(&qtApp);
-    process.setProgram(command.program);
-    process.setArguments(command.arguments);
-    process.setProcessEnvironment(command.environment);
-    if (!process.startDetached()) {
-      spdlog::error("Could not restart PxModRim: {}",
-                    process.errorString().toStdString());
-      return 1;
-    }
+  if (result == AppExit::kRestart &&
+      !relaunch(originalArguments,
+                initialScale.source == px::modrim::ScaleSource::kQtEnv)) {
+    return 1;
   }
   return result == AppExit::kFailure ? 1 : 0;
 }

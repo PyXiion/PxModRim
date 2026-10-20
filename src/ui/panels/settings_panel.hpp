@@ -25,8 +25,8 @@ class SettingsBackend : public QObject {
   Q_PROPERTY(QString scaleOverrideNote READ scaleOverrideNote CONSTANT)
  public:
   SettingsBackend(CoreContext& ctx, QDialog* dialog,
-                  const std::vector<SettingsSection*>& sections,
-                  const UiPrefs& prefs, const ResolvedScale& initialScale);
+                  const std::vector<SettingsSection*>& sections, int uiScale,
+                  const ResolvedScale& initialScale);
   QVariantMap initial() const { return m_initial; }
   QVariantList sections() const { return m_sections; }
   QString communityStatus() const { return m_communityStatus; }
@@ -66,16 +66,16 @@ class SettingsPanel : public QDialog {
  public:
   SettingsPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
                 const std::vector<SettingsSectionFactory>& sections = {},
-                UiPrefs prefs = {}, ResolvedScale initialScale = {});
+                int uiScale = 100, const ResolvedScale& initialScale = {});
   SettingsPanel(AppContext& app, QQmlEngine* engine, QWidget* parent);
   ~SettingsPanel() override;
   const AppConfig& getConfig() const { return m_config; }
-  const UiPrefs& getUiPrefs() const { return m_uiPrefs; }
+  int getUiScale() const { return m_uiScale; }
 
  private:
   void save(const QVariantMap& values);
   AppConfig m_config;
-  UiPrefs m_uiPrefs;
+  int m_uiScale;
   std::vector<SettingsSection*> m_sections;
   SettingsBackend* m_backend;
   QQuickWidget* m_qml;

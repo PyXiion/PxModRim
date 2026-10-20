@@ -18,11 +18,10 @@ void RailView::preload() {}
 void RailView::teardown() {}
 
 AppContext::AppContext(CoreContext& core, UiPrefs prefs,
-                       std::optional<ResolvedScale> initialScale)
+                       ResolvedScale initialScale)
     : m_core(core),
       m_uiPrefs(std::move(prefs)),
-      m_initialScale(initialScale ? std::move(*initialScale)
-                                  : resolveUiScale(m_uiPrefs.ui_scale)) {}
+      m_initialScale(std::move(initialScale)) {}
 
 AppContext::~AppContext() = default;
 

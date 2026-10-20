@@ -29,9 +29,9 @@ struct FakeFiles {
        "/tmp/.mount_PxModR-other/usr/bin/pxmodrim"},
       {"/usr/bin/pxmodrim", "/usr/bin/pxmodrim"}};
 
-  QString appImageFor(const QProcessEnvironment& environment,
-                      const QString& executable) const {
-    return relaunchAppImage(
+  QString programFor(const QProcessEnvironment& environment,
+                     const QString& executable) const {
+    return restartProgram(
         environment, executable,
         [this](const QString& path) { return files.contains(path); },
         [this](const QString& path) { return canonical.value(path); });
@@ -48,97 +48,68 @@ QProcessEnvironment appImageEnvironment(const QString& appImage = kAppImage,
 
 }  // namespace
 
-TEST_CASE("Restart preserves the executable and original arguments") {
+TEST_CASE("Restart preserves the program and original arguments") {
   const QStringList arguments{"pxmodrim",        "--ui-scale", "175",
                               "-platform",       "offscreen",  "--unknown",
                               "path with spaces"};
-  const auto command = restartCommand("/opt/PxModRim/pxmodrim", {}, arguments,
+  const auto command = restartCommand("/opt/PxModRim/pxmodrim", arguments,
                                       QProcessEnvironment{}, false);
 
   CHECK(command.program == "/opt/PxModRim/pxmodrim");
   CHECK(command.arguments == arguments.sliced(1));
-  CHECK(
-      restartCommand("pxmodrim", {}, {"pxmodrim"}, QProcessEnvironment{}, false)
-          .arguments.isEmpty());
+  CHECK(restartCommand("pxmodrim", {"pxmodrim"}, QProcessEnvironment{}, false)
+            .arguments.isEmpty());
 }
 
 TEST_CASE("Restart relaunches the AppImage that runs this executable") {
   const FakeFiles files;
-  const auto environment = appImageEnvironment();
-  const QStringList arguments{kMountedExecutable, "--ui-scale", "175",
-                              "path with spaces"};
 
-  const QString appImage = files.appImageFor(environment, kMountedExecutable);
-  CHECK(appImage == kAppImage);
-  const auto command = restartCommand(kMountedExecutable, appImage, arguments,
-                                      environment, false);
-  CHECK(command.program == kAppImage);
-  CHECK(command.arguments == arguments.sliced(1));
-
-  CHECK(files.appImageFor(environment, "/tmp/link/pxmodrim") == kAppImage);
-  CHECK(files.appImageFor(appImageEnvironment(kAppImage, kAppDir + "/"),
-                          kMountedExecutable) == kAppImage);
+  CHECK(files.programFor(appImageEnvironment(), kMountedExecutable) ==
+        kAppImage);
+  CHECK(files.programFor(appImageEnvironment(), "/tmp/link/pxmodrim") ==
+        kAppImage);
+  CHECK(files.programFor(appImageEnvironment(kAppImage, kAppDir + "/"),
+                         kMountedExecutable) == kAppImage);
 }
 
 TEST_CASE("Restart ignores an AppImage that does not run this executable") {
   const FakeFiles files;
+  const auto keepsExecutable = [&](const QProcessEnvironment& environment,
+                                   const QString& executable) {
+    return files.programFor(environment, executable) == executable;
+  };
 
   // Inherited from a parent AppImage while running from a normal install.
+  CHECK(keepsExecutable(appImageEnvironment(), "/usr/bin/pxmodrim"));
+  CHECK(keepsExecutable(appImageEnvironment(),
+                        "/tmp/.mount_PxModR-other/usr/bin/pxmodrim"));
+  CHECK(keepsExecutable(appImageEnvironment(), kAppDir));
+  CHECK(keepsExecutable(appImageEnvironment("/home/user/Apps/Missing.AppImage"),
+                        kMountedExecutable));
+  CHECK(keepsExecutable(appImageEnvironment(""), kMountedExecutable));
   CHECK(
-      files.appImageFor(appImageEnvironment(), "/usr/bin/pxmodrim").isEmpty());
-  CHECK(files
-            .appImageFor(appImageEnvironment(),
-                         "/tmp/.mount_PxModR-other/usr/bin/pxmodrim")
-            .isEmpty());
-  CHECK(files.appImageFor(appImageEnvironment(), kAppDir).isEmpty());
-  CHECK(
-      files
-          .appImageFor(appImageEnvironment("/home/user/Apps/Missing.AppImage"),
-                       kMountedExecutable)
-          .isEmpty());
-  CHECK(
-      files.appImageFor(appImageEnvironment(""), kMountedExecutable).isEmpty());
-  CHECK(
-      files.appImageFor(appImageEnvironment(kAppImage, ""), kMountedExecutable)
-          .isEmpty());
-  CHECK(files
-            .appImageFor(appImageEnvironment(kAppImage, "/tmp/missing"),
-                         kMountedExecutable)
-            .isEmpty());
-  CHECK(files.appImageFor(QProcessEnvironment{}, kMountedExecutable).isEmpty());
-
-  const QStringList arguments{"/usr/bin/pxmodrim", "--unknown"};
-  const auto command = restartCommand("/usr/bin/pxmodrim", {}, arguments,
-                                      appImageEnvironment(), false);
-  CHECK(command.program == "/usr/bin/pxmodrim");
-  CHECK(command.arguments == arguments.sliced(1));
+      keepsExecutable(appImageEnvironment(kAppImage, ""), kMountedExecutable));
+  CHECK(keepsExecutable(appImageEnvironment(kAppImage, "/tmp/missing"),
+                        kMountedExecutable));
+  CHECK(keepsExecutable(QProcessEnvironment{}, kMountedExecutable));
 }
 
-TEST_CASE("Restart removes only the application-generated Qt scale") {
+TEST_CASE("Restart drops only an application-generated Qt scale") {
   QProcessEnvironment environment;
   environment.insert("QT_SCALE_FACTOR", "1.75");
   environment.insert("PX_UI_SCALE", "150");
-  environment.insert("QT_QPA_PLATFORM", "offscreen");
   environment.insert("PATH", "/usr/bin");
 
-  const auto command =
-      restartCommand("pxmodrim", {}, {"pxmodrim"}, environment, false);
   auto expected = environment;
   expected.remove("QT_SCALE_FACTOR");
+  CHECK(restartCommand("pxmodrim", {"pxmodrim"}, environment, false)
+            .environment == expected);
 
-  CHECK(command.environment == expected);
-  CHECK(environment.value("QT_SCALE_FACTOR") == "1.75");
-}
-
-TEST_CASE("Restart retains a user-provided Qt scale unchanged") {
-  QProcessEnvironment environment;
-  environment.insert("QT_SCALE_FACTOR", "1.5");
-  environment.insert("PX_UI_SCALE", "175");
-
-  CHECK(restartCommand("pxmodrim", {}, {"pxmodrim"}, environment, true)
-            .environment == environment);
-
+  CHECK(
+      restartCommand("pxmodrim", {"pxmodrim"}, environment, true).environment ==
+      environment);
   environment.insert("QT_SCALE_FACTOR", "");
-  CHECK(restartCommand("pxmodrim", {}, {"pxmodrim"}, environment, true)
-            .environment == environment);
+  CHECK(
+      restartCommand("pxmodrim", {"pxmodrim"}, environment, true).environment ==
+      environment);
 }

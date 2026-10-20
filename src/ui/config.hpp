@@ -10,6 +10,8 @@
 
 namespace px::modrim {
 
+// The saved scale, read at startup before Qt and logging exist, so it never
+// migrates or logs; an unreadable file gives 100.
 int loadUiScale(const ConfigService& svc);
 
 // Reads ui_prefs.json. An invalid ui_scale loads as 100 and a valid one is

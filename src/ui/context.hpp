@@ -96,7 +96,7 @@ concept RailViewType =
 class AppContext {
  public:
   AppContext(CoreContext& core, UiPrefs prefs = {},
-             std::optional<ResolvedScale> initialScale = std::nullopt);
+             ResolvedScale initialScale = {});
   AppContext(const AppContext&) = delete;
   AppContext& operator=(const AppContext&) = delete;
   AppContext(AppContext&&) = delete;
@@ -135,7 +135,6 @@ class AppContext {
   // ── UI prefs ──────────────────────────────────────
   UiPrefs& uiPrefs() noexcept { return m_uiPrefs; }
   const UiPrefs& uiPrefs() const noexcept { return m_uiPrefs; }
-  double initialUiScale() const noexcept { return m_initialScale.scale; }
   const ResolvedScale& initialScale() const noexcept { return m_initialScale; }
 
   // ── Core access ───────────────────────────────────

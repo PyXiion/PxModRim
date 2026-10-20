@@ -24,42 +24,39 @@ inline bool isWithinDirectory(const QString& path, const QString& directory) {
                     pathParts.begin());
 }
 
-// The AppImage to relaunch, or empty when this process is not running from
-// one. An AppImage runs its executable from a mount or extraction directory
-// (APPDIR) that the runtime removes once this process exits. APPIMAGE alone is
-// not proof, because processes started by another AppImage inherit it.
-// `canonicalPath` returns an empty string for a missing path.
-inline QString relaunchAppImage(
+// The program to relaunch: the AppImage when this executable runs from inside
+// one, otherwise the executable itself. An AppImage runs its executable from a
+// mount or extraction directory (APPDIR) that the runtime removes once this
+// process exits. APPIMAGE alone is not proof, because processes started by
+// another AppImage inherit it. `canonicalPath` returns an empty string for a
+// missing path.
+inline QString restartProgram(
     const QProcessEnvironment& environment, const QString& executable,
     const std::function<bool(const QString&)>& isFile,
     const std::function<QString(const QString&)>& canonicalPath) {
   const QString appImage = environment.value(QStringLiteral("APPIMAGE"));
   const QString appDir = environment.value(QStringLiteral("APPDIR"));
   if (appImage.isEmpty() || appDir.isEmpty() || !isFile(appImage)) {
-    return {};
+    return executable;
   }
+  // A missing APPDIR canonicalises to "", which would contain every path.
   const QString canonicalAppDir = canonicalPath(appDir);
-  const QString canonicalExecutable = canonicalPath(executable);
-  if (canonicalAppDir.isEmpty() || canonicalExecutable.isEmpty() ||
-      !isWithinDirectory(canonicalExecutable, canonicalAppDir)) {
-    return {};
-  }
-  return appImage;
+  const bool inside =
+      !canonicalAppDir.isEmpty() &&
+      isWithinDirectory(canonicalPath(executable), canonicalAppDir);
+  return inside ? appImage : executable;
 }
 
-// `appImage` comes from relaunchAppImage; when set it replaces the executable.
-inline RestartCommand restartCommand(QString executable,
-                                     const QString& appImage,
+// `keepQtScale` keeps a QT_SCALE_FACTOR the user set; otherwise the one this
+// process exported is dropped so the saved scale applies again.
+inline RestartCommand restartCommand(QString program,
                                      const QStringList& originalArguments,
                                      QProcessEnvironment environment,
                                      bool keepQtScale) {
-  if (!appImage.isEmpty()) {
-    executable = appImage;
-  }
   if (!keepQtScale) {
     environment.remove(QStringLiteral("QT_SCALE_FACTOR"));
   }
-  return {std::move(executable), originalArguments.sliced(1),
+  return {std::move(program), originalArguments.sliced(1),
           std::move(environment)};
 }
 
