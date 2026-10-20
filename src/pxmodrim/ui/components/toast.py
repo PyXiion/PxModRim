@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Literal
 
 from PySide6.QtCore import QPropertyAnimation, Qt, QTimer, Signal
@@ -33,6 +34,9 @@ class Toast(QWidget):
         message: str,
         level: ToastLevel = "info",
         parent: QWidget | None = None,
+        *,
+        action_label: str = "",
+        action: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("toast")
@@ -55,10 +59,22 @@ class Toast(QWidget):
         icon_label.setFixedSize(16, 16)
         layout.addWidget(icon_label)
 
-        self._message_label = QLabel(message)
+        content = QVBoxLayout()
+        self._message_label = QLabel(message, self)
         self._message_label.setObjectName("toastMessage")
         self._message_label.setWordWrap(True)
-        layout.addWidget(self._message_label, 1)
+        content.addWidget(self._message_label)
+        if action is not None:
+            action_button = QPushButton(action_label, self)
+            action_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            def activate() -> None:
+                self.dismiss()
+                action()
+
+            action_button.clicked.connect(activate)
+            content.addWidget(action_button, 0, Qt.AlignmentFlag.AlignLeft)
+        layout.addLayout(content, 1)
 
         close_btn = QPushButton()
         close_btn.setObjectName("toastClose")
@@ -98,7 +114,7 @@ class ToastManager(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("toastManager")
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
 
         self._layout = QVBoxLayout(self)
@@ -115,13 +131,17 @@ class ToastManager(QWidget):
         message: str,
         level: ToastLevel = "info",
         duration_ms: int = 3000,
+        *,
+        action_label: str = "",
+        action: Callable[[], None] | None = None,
     ) -> None:
-        toast = Toast(message, level, self)
+        toast = Toast(message, level, self, action_label=action_label, action=action)
         self._layout.addWidget(toast)
         self._active_toasts.append(toast)
         toast.dismissed.connect(lambda: self._remove(toast))
 
         toast.show_with_animation()
+        self.resize_to_parent()
 
         if duration_ms > 0:
             QTimer.singleShot(duration_ms, toast, toast.dismiss)
@@ -132,20 +152,69 @@ class ToastManager(QWidget):
         toast.deleteLater()
         if toast in self._active_toasts:
             self._active_toasts.remove(toast)
+        self.resize_to_parent()
 
-    def info(self, message: str, duration: int = 3000) -> None:
-        self.show_toast(message, "info", duration)
+    def info(
+        self,
+        message: str,
+        duration: int = 3000,
+        *,
+        action_label: str = "",
+        action: Callable[[], None] | None = None,
+    ) -> None:
+        self.show_toast(
+            message, "info", duration, action_label=action_label, action=action
+        )
 
-    def success(self, message: str, duration: int = 3000) -> None:
-        self.show_toast(message, "success", duration)
+    def success(
+        self,
+        message: str,
+        duration: int = 3000,
+        *,
+        action_label: str = "",
+        action: Callable[[], None] | None = None,
+    ) -> None:
+        self.show_toast(
+            message, "success", duration, action_label=action_label, action=action
+        )
 
-    def warning(self, message: str, duration: int = 4000) -> None:
-        self.show_toast(message, "warning", duration)
+    def warning(
+        self,
+        message: str,
+        duration: int = 4000,
+        *,
+        action_label: str = "",
+        action: Callable[[], None] | None = None,
+    ) -> None:
+        self.show_toast(
+            message, "warning", duration, action_label=action_label, action=action
+        )
 
-    def error(self, message: str, duration: int = 5000) -> None:
-        self.show_toast(message, "error", duration)
+    def error(
+        self,
+        message: str,
+        duration: int = 5000,
+        *,
+        action_label: str = "",
+        action: Callable[[], None] | None = None,
+    ) -> None:
+        self.show_toast(
+            message, "error", duration, action_label=action_label, action=action
+        )
 
     def resize_to_parent(self) -> None:
+        if not self._active_toasts:
+            self.hide()
+            return
+        self.show()
         parent = self.parentWidget()
         if parent:
-            self.setGeometry(parent.rect())
+            self._layout.activate()
+            size = self.sizeHint()
+            self.setGeometry(
+                parent.width() - size.width(),
+                parent.height() - size.height(),
+                size.width(),
+                size.height(),
+            )
+            self.raise_()

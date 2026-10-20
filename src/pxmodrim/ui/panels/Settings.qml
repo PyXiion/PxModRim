@@ -335,7 +335,7 @@ Rectangle {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "Takes effect after restart."
+                            text: root.initial.uiScaleOverrideNote || "Takes effect after restart."
                             wrapMode: Text.Wrap
                             color: Theme.textDim
                             font.family: Theme.fontFamily

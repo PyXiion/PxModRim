@@ -303,6 +303,7 @@ def test_confirmed_dirty_close_event_is_accepted(
         _views=[],
         _update_task=None,
         _launch_task=None,
+        _restart_callback=None,
         _app_quit_callback=lambda: quit_calls.append(None),
         deleteLater=lambda: None,
     )

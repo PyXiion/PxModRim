@@ -16,6 +16,7 @@ Task runner is **just** (`just` to list). CI uses `uv sync --locked --dev`.
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)
 - `uv run python -m pxmodrim`
 - Chain: `__main__.py` -> `_app.py` (`App().run()`) -> DI composition root
+- UI scale recovery: launch with `--ui-scale 100` (or `--ui-scale=100`) to recover from an oversized saved interface. `PX_UI_SCALE=100` provides the same per-run override. Values are integer percentages clamped to 100–250; invalid values log a warning and fall through. Precedence: existing `QT_SCALE_FACTOR` > `--ui-scale` > `PX_UI_SCALE` > saved preference. Overrides are never saved, unknown command-line flags and Qt arguments are left untouched, and Settings identifies the active override.
 
 ## Module layout
 ```

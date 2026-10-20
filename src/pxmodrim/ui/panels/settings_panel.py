@@ -70,6 +70,19 @@ class _SettingsBackend(QObject):
             for section in sections
         ]
         cfg = self._ctx.config
+        override_note = ""
+        if app_ctx.ui_scale_source == "qt-env":
+            override_note = (
+                "Overridden by the QT_SCALE_FACTOR environment variable "
+                f"({app_ctx.qt_scale_factor_override}); this setting has no effect "
+                "while it is set."
+            )
+        elif app_ctx.ui_scale_source != "saved":
+            source = "--ui-scale" if app_ctx.ui_scale_source == "cli" else "PX_UI_SCALE"
+            override_note = (
+                f"This session uses {app_ctx.initial_ui_scale:g}% from {source}; "
+                "the saved value applies when that is removed."
+            )
         self._initial: dict[str, Any] = {
             "game": cfg.paths.game,
             "local": cfg.paths.local,
@@ -77,6 +90,7 @@ class _SettingsBackend(QObject):
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
             "uiScale": app_ctx.ui_prefs.ui_scale,
+            "uiScaleOverrideNote": override_note,
             "launchArgs": cfg.launch_args,
             "launchWrapper": cfg.launch_wrapper,
             "afterLaunch": int(cfg.after_launch),
@@ -268,9 +282,15 @@ class SettingsPanel(QDialog):
         save_ui_prefs(self._app_ctx.ui_prefs, self._ctx.config_service)
         if (
             self._app_ctx.ui_prefs.ui_scale != self._app_ctx.initial_ui_scale
+            and self._app_ctx.ui_scale_source == "saved"
             and self._app_ctx.toasts is not None
         ):
-            self._app_ctx.toasts.info("Restart PxModRim to apply the interface scale.")
+            self._app_ctx.toasts.info(
+                "Restart PxModRim to apply the interface scale.",
+                duration=0,
+                action_label="Restart now",
+                action=self._app_ctx.restart,
+            )
         self.accept()
 
     def get_config(self) -> AppConfig:

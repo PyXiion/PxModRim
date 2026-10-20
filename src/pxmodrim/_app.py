@@ -8,6 +8,7 @@ from importlib.resources import files as resource_files
 from types import TracebackType
 
 from loguru import logger
+from PySide6.QtCore import QProcess, QProcessEnvironment
 from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 from qasync import QEventLoop
@@ -49,7 +50,9 @@ from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet  # noqa: E402
 from pxmodrim.ui.ui_prefs import (  # noqa: E402
     UIPrefs,
     clamp_ui_scale,
+    resolve_ui_scale,
     scale_factor_env,
+    ui_scale_cli_value,
 )
 from pxmodrim.ui.views.mods_view import ModsViewPanel  # noqa: E402
 from pxmodrim.ui.window.main_window import MainWindow  # noqa: E402
@@ -134,18 +137,36 @@ class App:
         "_ctx",
         "_disabled_plugins",
         "_initial_ui_scale",
+        "_original_arguments",
+        "_qt_scale_factor_override",
+        "_resolved_ui_scale",
         "main_window",
         "qt_app",
     )
 
     def __init__(self) -> None:
         _configure_file_logging()
-        self._initial_ui_scale = clamp_ui_scale(
-            ConfigService(config_dir()).load_raw("ui_prefs.json").get("ui_scale")
+        self._original_arguments = (
+            [sys.executable, *sys.argv[1:]]
+            if getattr(sys, "frozen", False) or "__compiled__" in globals()
+            else list(sys.orig_argv)
         )
-        scale_factor = scale_factor_env(self._initial_ui_scale)
-        if scale_factor is not None:
-            os.environ.setdefault("QT_SCALE_FACTOR", scale_factor)
+        self._qt_scale_factor_override = os.environ.get("QT_SCALE_FACTOR")
+        self._resolved_ui_scale = resolve_ui_scale(
+            clamp_ui_scale(
+                ConfigService(config_dir()).load_raw("ui_prefs.json").get("ui_scale")
+            ),
+            ui_scale_cli_value(sys.argv[1:]),
+            os.environ.get("PX_UI_SCALE"),
+            self._qt_scale_factor_override,
+        )
+        for warning in self._resolved_ui_scale.warnings:
+            logger.warning(warning)
+        self._initial_ui_scale = self._resolved_ui_scale.scale
+        if self._resolved_ui_scale.source != "qt-env":
+            scale_factor = scale_factor_env(int(self._initial_ui_scale))
+            if scale_factor is not None:
+                os.environ["QT_SCALE_FACTOR"] = scale_factor
         self._disabled_plugins = _parse_disabled_plugins()
         if (
             "steamworkshop" not in self._disabled_plugins
@@ -170,6 +191,28 @@ class App:
         # Honoured by widgets and Qt Quick alike; the default of 3 feels slow.
         self.qt_app.styleHints().setWheelScrollLines(_WHEEL_SCROLL_LINES)
         self._apply_theme()
+
+    def _restart(self) -> None:
+        self.main_window.request_restart(self._start_restart_process)
+
+    def _start_restart_process(self) -> bool:
+        program, arguments = sys.executable, self._original_arguments[1:]
+        process = QProcess(self.qt_app)
+        process.setProgram(program)
+        process.setArguments(arguments)
+        environment = QProcessEnvironment.systemEnvironment()
+        if self._qt_scale_factor_override is None:
+            environment.remove("QT_SCALE_FACTOR")
+        process.setProcessEnvironment(environment)
+        # The PySide6 stub says (bool, pid) here; the runtime returns a bool.
+        result: bool | tuple[bool, int] = process.startDetached()
+        started = result[0] if isinstance(result, tuple) else result
+        if not started and self._app_ctx.toasts is not None:
+            self._app_ctx.toasts.error(
+                "Could not restart PxModRim. The application is still running."
+            )
+        process.deleteLater()
+        return started
 
     def _apply_theme(self) -> None:
         """Set Fusion style, dark palette, and stylesheet."""
@@ -209,7 +252,12 @@ class App:
         ctx = CoreContext.create(cfg, config_svc)
         self._ctx = ctx
         self._app_ctx = AppContext(
-            ctx, ui_prefs, initial_ui_scale=self._initial_ui_scale
+            ctx,
+            ui_prefs,
+            initial_ui_scale=self._initial_ui_scale,
+            ui_scale_source=self._resolved_ui_scale.source,
+            qt_scale_factor_override=self._qt_scale_factor_override,
+            restart=self._restart,
         )
         self._app_ctx.add_rail_view(ModsViewPanel)
 

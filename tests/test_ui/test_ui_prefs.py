@@ -3,7 +3,13 @@ from __future__ import annotations
 import msgspec
 import pytest
 
-from pxmodrim.ui.ui_prefs import UIPrefs, clamp_ui_scale, scale_factor_env
+from pxmodrim.ui.ui_prefs import (
+    UIPrefs,
+    clamp_ui_scale,
+    resolve_ui_scale,
+    scale_factor_env,
+    ui_scale_cli_value,
+)
 
 
 @pytest.mark.parametrize(
@@ -39,3 +45,71 @@ def test_ui_scale_loads_old_preferences_and_clamps_disk_values() -> None:
         rail_collapsed=True
     )
     assert msgspec.json.decode(b'{"ui_scale": 500}', type=UIPrefs).ui_scale == 250
+
+
+@pytest.mark.parametrize(
+    ("saved", "cli", "env", "qt_env", "expected", "source", "warnings"),
+    [
+        (125, None, None, None, 125, "saved", 0),
+        (125, None, "150", None, 150, "env", 0),
+        (125, "175", "150", None, 175, "cli", 0),
+        (125, "175", "150", "1.5", 150, "qt-env", 0),
+        (125, "bad", "150", None, 150, "env", 1),
+        (125, "bad", "bad", None, 125, "saved", 2),
+        (125, None, "bad", None, 125, "saved", 1),
+        (125, "1.5", "175", None, 175, "env", 1),
+        (125, "", "175", None, 175, "env", 1),
+        (125, "--unknown", "175", None, 175, "env", 1),
+        (125, "1_75", None, None, 125, "saved", 1),
+        (125, "50", None, None, 100, "cli", 0),
+        (125, "999", None, None, 250, "cli", 0),
+        (125, None, "-1", None, 100, "env", 0),
+        (125, None, "999", None, 250, "env", 0),
+        (125, "9" * 5000, None, None, 250, "cli", 0),
+        (125, None, "-" + "9" * 5000, None, 100, "env", 0),
+        (125, "0" * 5000 + "175", None, None, 175, "cli", 0),
+        (999, None, None, None, 250, "saved", 0),
+        (125, "bad", "bad", "3", 300, "qt-env", 0),
+        (125, "175", "150", "", 100, "qt-env", 0),
+        (125, "175", "150", "invalid", 100, "qt-env", 0),
+        (125, None, None, "nan", 100, "qt-env", 0),
+        (125, " +175 ", "150", None, 175, "cli", 0),
+    ],
+)
+def test_startup_scale_resolution(
+    saved: int,
+    cli: str | None,
+    env: str | None,
+    qt_env: str | None,
+    expected: float,
+    source: str,
+    warnings: int,
+) -> None:
+    resolved = resolve_ui_scale(saved, cli, env, qt_env)
+    assert (resolved.scale, resolved.source, len(resolved.warnings)) == (
+        expected,
+        source,
+        warnings,
+    )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        ([], None),
+        (["--ui-scale", "175"], "175"),
+        (["--ui-scale=175"], "175"),
+        (["-platform", "offscreen", "--ui-scale", "100", "--unknown"], "100"),
+        (["--ui-scale"], ""),
+        (["--ui-scale="], ""),
+        (["--ui-scale", "-platform", "offscreen"], "-platform"),
+        (["--ui-scale=125", "--ui-scale", "175"], "175"),
+        (["--", "--ui-scale=175"], None),
+    ],
+)
+def test_scale_flag_preserves_other_arguments(
+    arguments: list[str], expected: str | None
+) -> None:
+    original = arguments.copy()
+    assert ui_scale_cli_value(arguments) == expected
+    assert arguments == original

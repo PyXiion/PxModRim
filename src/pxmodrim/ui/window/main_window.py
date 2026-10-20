@@ -78,6 +78,7 @@ from pxmodrim.ui.window.actions import (
     create_actions,
     shortcut_rows,
 )
+from pxmodrim.ui.window.geometry import fit_window_geometry
 from pxmodrim.ui.window.menu_bar import MenuBar
 
 _ISSUES_URL = "https://github.com/PyXiion/PxModRim/issues"
@@ -138,6 +139,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._app_quit_callback: Callable[[], None] | None = None
+        self._restart_callback: Callable[[], bool] | None = None
         self._is_frameless: bool = False
         self._app_ctx = app_ctx
         self._ctx = app_ctx.core
@@ -162,6 +164,13 @@ class MainWindow(QMainWindow):
         self._ctx.mod_service.mods_changed.connect(self._on_mods_reloaded)
         self._setup_content_and_views()
         self._setup_toast_and_events()
+        screen = self.screen().availableGeometry()
+        self.setGeometry(
+            *fit_window_geometry(
+                (1400, 850),
+                (screen.x(), screen.y(), screen.width(), screen.height()),
+            )
+        )
 
     def _setup_window_basics(self) -> None:
         logger.debug("main_window: setting up window basics")
@@ -169,7 +178,6 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(
             QIcon(str(resource_files("pxmodrim.ui.assets") / "logo.svg"))
         )
-        self.resize(1400, 850)
 
         self._ctx.diagnostics_service.diagnostics_summary_changed.connect(
             self._on_diagnostics_summary_changed
@@ -453,6 +461,10 @@ class MainWindow(QMainWindow):
         """Store the callback used to end the async run loop on close."""
         self._app_quit_callback = callback
 
+    def request_restart(self, start_process: Callable[[], bool]) -> None:
+        self._restart_callback = start_process
+        self.close()
+
     async def _confirm_close(self) -> None:
         try:
             result, _ = await await_dialog(UnsavedChangesDialog, self)
@@ -461,8 +473,10 @@ class MainWindow(QMainWindow):
 
         if result == QMessageBox.StandardButton.Save:
             if not await self._save_active_mods():
+                self._restart_callback = None
                 return
         elif result != QMessageBox.StandardButton.Discard:
+            self._restart_callback = None
             return
 
         self._close_confirmed = True
@@ -475,6 +489,13 @@ class MainWindow(QMainWindow):
                 self._close_prompt_open = True
                 self._close_task = asyncio.create_task(self._confirm_close())
             return
+        if self._restart_callback is not None:
+            start_process = self._restart_callback
+            self._restart_callback = None
+            if not start_process():
+                self._close_confirmed = False
+                event.ignore()
+                return
         logger.info("main_window: shutting down")
         if self._update_task is not None:
             self._update_task.cancel()

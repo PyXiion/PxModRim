@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- The interface-scale restart notification now includes a **Restart now** action that saves state and shuts down plugins normally; failed relaunches leave the app open.
+- Recover an oversized interface with `--ui-scale 100` (also `--ui-scale=100`) or `PX_UI_SCALE=100`, without changing the saved preference.
+
+### Changed
+- Settings shows the effective interface scale and its source when a command-line or environment override is active, and no longer offers an ineffective restart.
+- The main window starts within the screen's available logical area, shrinking on smaller displays and keeping its position on-screen.
+
 ## [0.3.2] - 2026-10-20
 
 ### Added
