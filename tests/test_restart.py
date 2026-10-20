@@ -83,21 +83,23 @@ def _appimage_paths(tmp_path: Path) -> tuple[str, str, str]:
     return str(appimage), str(appdir), str(appdir / "PxModRim")
 
 
-@pytest.mark.parametrize("keep_qt_scale_factor", [False, True])
-def test_restart_relaunches_running_appimage(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, keep_qt_scale_factor: bool
-) -> None:
+def test_running_appimage_is_relaunched_by_its_outer_path(tmp_path: Path) -> None:
     appimage, appdir, executable = _appimage_paths(tmp_path)
-    monkeypatch.setenv("APPIMAGE", appimage)
-    monkeypatch.setenv("APPDIR", appdir)
+
+    assert app_module._appimage_path(appimage, appdir, executable) == appimage
+
+
+@pytest.mark.parametrize("keep_qt_scale_factor", [False, True])
+def test_restart_command_keeps_arguments_and_scale_only_when_user_set(
+    monkeypatch: pytest.MonkeyPatch, keep_qt_scale_factor: bool
+) -> None:
     monkeypatch.setenv("QT_SCALE_FACTOR", "1.5")
-    monkeypatch.setattr(sys, "executable", executable)
 
     program, arguments, environment = app_module._restart_command(
-        _FROZEN_ARGUMENTS, keep_qt_scale_factor
+        "/opt/PxModRim", _FROZEN_ARGUMENTS, keep_qt_scale_factor
     )
 
-    assert program == appimage
+    assert program == "/opt/PxModRim"
     assert arguments == ["--ui-scale", "150"]
     assert environment.contains("QT_SCALE_FACTOR") is keep_qt_scale_factor
 

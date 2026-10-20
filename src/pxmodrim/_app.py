@@ -166,17 +166,12 @@ def _appimage_path(
 
 
 def _restart_command(
-    original_arguments: list[str], keep_qt_scale_factor: bool
+    program: str, original_arguments: list[str], keep_qt_scale_factor: bool
 ) -> tuple[str, list[str], QProcessEnvironment]:
     environment = QProcessEnvironment.systemEnvironment()
     if not keep_qt_scale_factor:
         environment.remove("QT_SCALE_FACTOR")
-    # The executable inside an AppImage lives in a mount (or extraction dir)
-    # that the runtime removes once this process exits.
-    appimage = _appimage_path(
-        os.environ.get("APPIMAGE"), os.environ.get("APPDIR"), sys.executable
-    )
-    return appimage or sys.executable, original_arguments[1:], environment
+    return program, original_arguments[1:], environment
 
 
 class App:
@@ -225,7 +220,13 @@ class App:
         self.main_window.request_restart()
 
     def _start_restart_process(self) -> bool:
+        # The executable inside an AppImage lives in a mount (or extraction dir)
+        # that the runtime removes once this process exits.
+        appimage = _appimage_path(
+            os.environ.get("APPIMAGE"), os.environ.get("APPDIR"), sys.executable
+        )
         program, arguments, environment = _restart_command(
+            appimage or sys.executable,
             self._original_arguments,
             keep_qt_scale_factor=self._initial_scale.source == "qt-env",
         )
