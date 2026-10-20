@@ -10,7 +10,7 @@
 ## Environment
 **uv**, **Python 3.12.\*** only, **PySide6 >=6.11 + qasync**.
 Task runner is **just** (`just` to list). CI uses `uv sync --locked --dev`.
-`pxsteamdl` (Workshop downloader) is an optional dependency (`steam` extra, also in the `dev` group), built from source: needs CMake >= 3.24 and a C++20 compiler (GCC, Clang, or MSVC); external dependencies are vendored via CPM. Without it the app runs as a plain mod sorter.
+`pxsteamdl` (Workshop downloader) is an optional dependency (`steam` extra, also in the `dev` group), installed from PyPI. Prebuilt CPython 3.12 wheels support Linux x86_64 (glibc >= 2.28), Windows x64 and macOS arm64 (11.0+), so these platforms need no CMake or C++ compiler for the downloader. Without it the app runs as a plain mod sorter.
 
 ## Entrypoint
 - `just run` (sets `LOGURU_LEVEL=DEBUG`)

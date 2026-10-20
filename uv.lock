@@ -265,7 +265,7 @@ requires-dist = [
     { name = "lxml", specifier = ">=6.1.1" },
     { name = "msgspec", specifier = ">=0.21.1" },
     { name = "psutil", specifier = ">=7.2.2" },
-    { name = "pxsteamdl", marker = "extra == 'steam'", git = "https://github.com/PyXiion/PxSteamDL" },
+    { name = "pxsteamdl", marker = "extra == 'steam'", specifier = ">=0.3.0" },
     { name = "pyside6", specifier = ">=6.11.1" },
     { name = "qasync", specifier = ">=0.28.0" },
     { name = "toposort", specifier = ">=1.10" },
@@ -276,7 +276,7 @@ provides-extras = ["steam"]
 [package.metadata.requires-dev]
 dev = [
     { name = "nuitka", specifier = ">=2.6.7" },
-    { name = "pxsteamdl", git = "https://github.com/PyXiion/PxSteamDL" },
+    { name = "pxsteamdl", specifier = ">=0.3.0" },
     { name = "pydeps", specifier = ">=3.0.7" },
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "pytest", specifier = ">=9.1.1" },
@@ -288,8 +288,14 @@ dev = [
 
 [[package]]
 name = "pxsteamdl"
-version = "0.3.0"
-source = { git = "https://github.com/PyXiion/PxSteamDL#d486d6b2125b8354cf4382020afd7c0774b678cc" }
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/c9/6ccab10843266c16d5647dc6a3314f80efedd6dc22f993816920d84e77b9/pxsteamdl-0.4.0.tar.gz", hash = "sha256:0fa0430ccc0479d517a5157d4372f50ccc458ef6212b1b8d3e5bcadfe7583180", size = 123050, upload-time = "2026-10-18T20:59:17.547Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/7d/9dc2ef725240d2368047cc0b77c8eb10a5f378a0c00657bde23623dac2c2/pxsteamdl-0.4.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:b2c45ad4a5755dcf90127f4a9ad855d08fd06fb6481ed56d88ebfb6658bd254b", size = 985711, upload-time = "2026-10-18T20:59:13.134Z" },
+    { url = "https://files.pythonhosted.org/packages/73/df/ab4bb76b62add12c1030fb41ec23895d1f552a8b22100f8dd9a0a8ad7aa5/pxsteamdl-0.4.0-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:631336f3ea2d7177e479c9141da05da96f328dd9e2e2c1e2ec1bd6c4d01b8b27", size = 1336781, upload-time = "2026-10-18T20:59:14.823Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/16/c131bdf64e142f42df2490f092abee11f58f4f07f4bdcc632459ac0b7be7/pxsteamdl-0.4.0-cp312-abi3-win_amd64.whl", hash = "sha256:36cf90523fe446fb1202a21f9f3ca19d77d1f6633936915eebbc723801dbbc72", size = 1181157, upload-time = "2026-10-18T20:59:16.192Z" },
+]
 
 [[package]]
 name = "pydeps"

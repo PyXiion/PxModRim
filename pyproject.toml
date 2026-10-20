@@ -46,9 +46,6 @@ environments = [
     "sys_platform == 'darwin'",
 ]
 
-[tool.uv.sources]
-pxsteamdl = { git = "https://github.com/PyXiion/PxSteamDL" }
-
 [tool.ruff]
 line-length = 88
 indent-width = 4
