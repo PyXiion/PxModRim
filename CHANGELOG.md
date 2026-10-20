@@ -7,8 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Settings > General > Appearance: Interface scale (100–250%) enlarges text, controls, icons and rows together after restarting. An externally set `QT_SCALE_FACTOR` takes precedence.
-- Interface-scale changes offer a **Restart now** action after saving, using the normal close and shutdown path.
+- Settings > General > Appearance: Interface scale (100–250%) enlarges text, controls, icons and rows together after restarting. An externally set `QT_SCALE_FACTOR` takes precedence. An invalid saved scale loads as 100% without resetting the other interface preferences.
+- Interface-scale changes offer a **Restart now** action after saving, using the normal close and shutdown path. AppImage builds relaunch the AppImage itself.
 - `--ui-scale N` (also `--ui-scale=N`) and `PX_UI_SCALE` temporarily override the saved scale; `--ui-scale 100` recovers from an unusable saved value. An existing `QT_SCALE_FACTOR` still takes precedence.
 
 ### Changed

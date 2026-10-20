@@ -12,6 +12,11 @@ namespace px::modrim {
 
 int loadUiScale(const ConfigService& svc);
 
+// Reads ui_prefs.json. An invalid ui_scale loads as 100 and a valid one is
+// clamped, without discarding the other prefs. Fails only when the file cannot
+// be migrated.
+Result<UiPrefs> loadUiPrefs(const ConfigService& svc);
+
 // Writes ui_prefs.json. Other UI code calls this after changing prefs.
 Result<void> saveUiPrefs(const UiPrefs& prefs, const ConfigService& svc);
 

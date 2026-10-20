@@ -1,5 +1,13 @@
+#include <QDir>
+#include <QFile>
+#include <QTemporaryDir>
+#include <string>
+#include <utility>
+
 #include <catch2/catch_test_macros.hpp>
 
+#include "core/config.hpp"
+#include "ui/config.hpp"
 #include "ui/ui_prefs.hpp"
 
 using namespace px::modrim;
@@ -67,4 +75,38 @@ TEST_CASE("Interface scale arguments leave unknown and Qt arguments alone") {
                        uiScaleArgument({"pxmodrim", "--ui-scale", "--unknown"}),
                        "150")
             .scale == 150);
+}
+
+TEST_CASE("An unusable saved interface scale keeps the other preferences") {
+  QTemporaryDir directory;
+  REQUIRE(directory.isValid());
+  const ConfigService config(directory.path());
+  const std::pair<std::string, int> cases[] = {
+      {R"("175")", 100},
+      {"1.5", 100},
+      {"99999999999999999999999", 250},
+      {"-99999999999999999999999", 100},
+      {"null", 100},
+      {"true", 100},
+      {"{}", 100},
+      {"175", 175},
+      {"500", 250},
+      {"50", 100},
+  };
+  for (const auto& [scale, expected] : cases) {
+    CAPTURE(scale);
+    const std::string text = R"({"rail_collapsed": true, )"
+                             R"("skipped_update_tag": "v9.9.9", "ui_scale": )" +
+                             scale + R"(, "schema_version": 1})";
+    QFile file(QDir(directory.path()).filePath("ui_prefs.json"));
+    REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    file.write(text.data(), static_cast<qint64>(text.size()));
+    file.close();
+
+    const auto prefs = loadUiPrefs(config);
+    REQUIRE(prefs);
+    CHECK(prefs->rail_collapsed);
+    CHECK(prefs->skipped_update_tag == "v9.9.9");
+    CHECK(prefs->ui_scale == expected);
+  }
 }

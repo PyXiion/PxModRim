@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QProcess>
@@ -278,9 +279,16 @@ int main(int argc, char* argv[]) {
   // The run has finished plugin shutdown and destroyed its services before a
   // replacement can touch the same configuration and databases.
   if (result == AppExit::kRestart) {
+    const QString executable = QCoreApplication::applicationFilePath();
+    const auto environment = QProcessEnvironment::systemEnvironment();
+    const QString appImage = px::modrim::relaunchAppImage(
+        environment, executable,
+        [](const QString& path) { return QFileInfo(path).isFile(); },
+        [](const QString& path) {
+          return QFileInfo(path).canonicalFilePath();
+        });
     const auto command = px::modrim::restartCommand(
-        QCoreApplication::applicationFilePath(), originalArguments,
-        QProcessEnvironment::systemEnvironment(),
+        executable, appImage, originalArguments, environment,
         initialScale.source == QStringLiteral("qt-env"));
     QProcess process(&qtApp);
     process.setProgram(command.program);

@@ -586,13 +586,16 @@ QCoro::Task<void> MainWindow::openSettings() {
     m_toasts->error(saved.error().message);
     co_return;
   }
-  const auto prefsSaved =
-      saveUiPrefs(dialog->getUiPrefs(), m_ctx.configService());
+  // Other prefs may have changed while Settings was open (e.g. skipping an
+  // update), so only the scale comes from the dialog.
+  auto prefs = m_app.uiPrefs();
+  prefs.ui_scale = dialog->getUiPrefs().ui_scale;
+  const auto prefsSaved = saveUiPrefs(prefs, m_ctx.configService());
   if (!prefsSaved) {
     m_toasts->error(prefsSaved.error().message);
     co_return;
   }
-  m_app.uiPrefs() = dialog->getUiPrefs();
+  m_app.uiPrefs() = prefs;
   m_ctx.updateConfig(config);
   m_ctx.resetProviders(config.paths);
   if (m_app.initialScale().source == QStringLiteral("saved") &&
