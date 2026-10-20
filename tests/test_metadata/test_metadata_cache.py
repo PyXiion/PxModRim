@@ -317,7 +317,9 @@ async def test_foreign_payload_shape_is_reparsed(tmp_path: Path) -> None:
         discovered = await LocalModProvider(mods_root, metadata_cache=cache).discover(
             "1.5"
         )
-        deps = discovered[str(mod_a)].about_rules.dependencies
+        mod = discovered[str(mod_a)]
+        assert isinstance(mod, AboutXmlMod)
+        deps = mod.about_rules.dependencies
         assert list(deps) == ["ludeon.rimworld"]
     finally:
         await cache.close()

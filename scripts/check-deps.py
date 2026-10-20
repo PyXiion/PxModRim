@@ -155,6 +155,7 @@ ALLOWED: dict[str, set[str]] = {
     },
     "ui.panels": {
         "ui.settings_section",
+        "ui.context",
         "ui.theme",
         "ui.components",
         "ui.models",
