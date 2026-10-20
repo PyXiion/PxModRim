@@ -11,8 +11,8 @@ from pxmodrim.ui.ui_prefs import (
     UIPrefs,
     clamp_ui_scale,
     resolve_ui_scale,
-    scale_factor_env,
-    ui_scale_cli_value,
+    ui_scale_argument,
+    ui_scale_factor,
 )
 
 
@@ -42,7 +42,7 @@ def test_ui_scale_clamping_and_environment_factor(
 ) -> None:
     scale = clamp_ui_scale(value)
     assert scale == expected
-    assert scale_factor_env(scale) == factor
+    assert ui_scale_factor(scale) == factor
 
 
 def test_ui_scale_loads_old_preferences_and_clamps_disk_values() -> None:
@@ -151,5 +151,5 @@ def test_scale_flag_preserves_other_arguments(
     arguments: list[str], expected: str | None
 ) -> None:
     original = arguments.copy()
-    assert ui_scale_cli_value(arguments) == expected
+    assert ui_scale_argument(arguments) == expected
     assert arguments == original

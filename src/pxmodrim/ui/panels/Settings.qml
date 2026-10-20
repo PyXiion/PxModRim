@@ -327,9 +327,10 @@ Rectangle {
                                     { text: "250%", value: 250 }
                                 ]
                                 Component.onCompleted: {
-                                    if (indexOfValue(root.initial.uiScale) < 0)
-                                        model = model.concat([{ text: root.initial.uiScale + "%", value: root.initial.uiScale }])
-                                    currentIndex = indexOfValue(root.initial.uiScale)
+                                    const saved = root.initial.uiScale
+                                    if (indexOfValue(saved) < 0)
+                                        model = model.concat([{ text: saved + "%", value: saved }])
+                                    currentIndex = indexOfValue(saved)
                                 }
                             }
                         }

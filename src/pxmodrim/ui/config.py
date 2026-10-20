@@ -7,7 +7,13 @@ from pxmodrim.ui.ui_prefs import UIPrefs, clamp_ui_scale
 if TYPE_CHECKING:
     from pxmodrim.core.config import ConfigService
 
-__all__ = ["UIPrefs", "UIPrefsService", "load_ui_prefs", "save_ui_prefs"]
+__all__ = [
+    "UIPrefs",
+    "UIPrefsService",
+    "load_ui_prefs",
+    "load_ui_scale",
+    "save_ui_prefs",
+]
 
 
 def _normalize_ui_prefs(raw: dict[str, Any]) -> None:
@@ -19,6 +25,11 @@ def _normalize_ui_prefs(raw: dict[str, Any]) -> None:
 def load_ui_prefs(config_service: ConfigService) -> UIPrefs:
     """Load UI prefs from ``ui_prefs.json`` via config service."""
     return config_service.load("ui_prefs.json", UIPrefs, normalize=_normalize_ui_prefs)
+
+
+def load_ui_scale(config_service: ConfigService) -> int:
+    """The saved scale, read before the rest of the prefs can be loaded."""
+    return clamp_ui_scale(config_service.load_raw("ui_prefs.json").get("ui_scale"))
 
 
 def save_ui_prefs(prefs: UIPrefs, config_service: ConfigService) -> None:

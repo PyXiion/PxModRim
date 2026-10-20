@@ -27,7 +27,7 @@ from pxmodrim.ui.config import save_ui_prefs
 from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.settings_section import SettingsSection
 from pxmodrim.ui.theme.palette import PALETTE
-from pxmodrim.ui.ui_prefs import clamp_ui_scale
+from pxmodrim.ui.ui_prefs import ResolvedScale, clamp_ui_scale
 
 _QML = Path(__file__).parent / "Settings.qml"
 
@@ -44,6 +44,22 @@ class _FolderDialog(QFileDialog):
         super().__init__(parent, title)
         self.setFileMode(QFileDialog.FileMode.Directory)
         self.setOption(QFileDialog.Option.ShowDirsOnly)
+
+
+def _scale_override_note(initial_scale: ResolvedScale) -> str:
+    if initial_scale.source == "saved":
+        return ""
+    if initial_scale.source == "qt-env":
+        return (
+            "Overridden by the QT_SCALE_FACTOR environment variable "
+            f"({initial_scale.qt_scale_factor}); this setting has no effect "
+            "while it is set."
+        )
+    source = "--ui-scale" if initial_scale.source == "cli" else "PX_UI_SCALE"
+    return (
+        f"This session uses {initial_scale.scale:g}% from {source}; "
+        "the saved value applies when that is removed."
+    )
 
 
 class _SettingsBackend(QObject):
@@ -70,19 +86,6 @@ class _SettingsBackend(QObject):
             for section in sections
         ]
         cfg = self._ctx.config
-        override_note = ""
-        if app_ctx.ui_scale_source == "qt-env":
-            override_note = (
-                "Overridden by the QT_SCALE_FACTOR environment variable "
-                f"({app_ctx.qt_scale_factor_override}); this setting has no effect "
-                "while it is set."
-            )
-        elif app_ctx.ui_scale_source != "saved":
-            source = "--ui-scale" if app_ctx.ui_scale_source == "cli" else "PX_UI_SCALE"
-            override_note = (
-                f"This session uses {app_ctx.initial_ui_scale:g}% from {source}; "
-                "the saved value applies when that is removed."
-            )
         self._initial: dict[str, Any] = {
             "game": cfg.paths.game,
             "local": cfg.paths.local,
@@ -90,7 +93,7 @@ class _SettingsBackend(QObject):
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
             "uiScale": app_ctx.ui_prefs.ui_scale,
-            "uiScaleOverrideNote": override_note,
+            "uiScaleOverrideNote": _scale_override_note(app_ctx.initial_scale),
             "launchArgs": cfg.launch_args,
             "launchWrapper": cfg.launch_wrapper,
             "afterLaunch": int(cfg.after_launch),
@@ -278,11 +281,13 @@ class SettingsPanel(QDialog):
         )
         for section in self._sections:
             section.apply()
-        self._app_ctx.ui_prefs.ui_scale = clamp_ui_scale(values["uiScale"])
-        save_ui_prefs(self._app_ctx.ui_prefs, self._ctx.config_service)
+        ui_prefs = self._app_ctx.ui_prefs
+        ui_prefs.ui_scale = clamp_ui_scale(values["uiScale"])
+        save_ui_prefs(ui_prefs, self._ctx.config_service)
+        initial_scale = self._app_ctx.initial_scale
         if (
-            self._app_ctx.ui_prefs.ui_scale != self._app_ctx.initial_ui_scale
-            and self._app_ctx.ui_scale_source == "saved"
+            initial_scale.source == "saved"
+            and ui_prefs.ui_scale != initial_scale.scale
             and self._app_ctx.toasts is not None
         ):
             self._app_ctx.toasts.info(

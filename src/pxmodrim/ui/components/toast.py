@@ -166,41 +166,14 @@ class ToastManager(QWidget):
             message, "info", duration, action_label=action_label, action=action
         )
 
-    def success(
-        self,
-        message: str,
-        duration: int = 3000,
-        *,
-        action_label: str = "",
-        action: Callable[[], None] | None = None,
-    ) -> None:
-        self.show_toast(
-            message, "success", duration, action_label=action_label, action=action
-        )
+    def success(self, message: str, duration: int = 3000) -> None:
+        self.show_toast(message, "success", duration)
 
-    def warning(
-        self,
-        message: str,
-        duration: int = 4000,
-        *,
-        action_label: str = "",
-        action: Callable[[], None] | None = None,
-    ) -> None:
-        self.show_toast(
-            message, "warning", duration, action_label=action_label, action=action
-        )
+    def warning(self, message: str, duration: int = 4000) -> None:
+        self.show_toast(message, "warning", duration)
 
-    def error(
-        self,
-        message: str,
-        duration: int = 5000,
-        *,
-        action_label: str = "",
-        action: Callable[[], None] | None = None,
-    ) -> None:
-        self.show_toast(
-            message, "error", duration, action_label=action_label, action=action
-        )
+    def error(self, message: str, duration: int = 5000) -> None:
+        self.show_toast(message, "error", duration)
 
     def resize_to_parent(self) -> None:
         if not self._active_toasts:

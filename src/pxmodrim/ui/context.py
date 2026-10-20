@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QWidget
 
 from pxmodrim.core.plugin import Plugin, PluginRegistry
 from pxmodrim.ui.settings_section import SettingsSectionFactory
-from pxmodrim.ui.ui_prefs import UIPrefs
+from pxmodrim.ui.ui_prefs import ResolvedScale, UIPrefs
 
 if TYPE_CHECKING:
     from PySide6.QtQml import QQmlEngine
@@ -24,30 +24,9 @@ class Notifier(Protocol):
         action_label: str = ...,
         action: Callable[[], None] | None = ...,
     ) -> None: ...
-    def success(
-        self,
-        message: str,
-        duration: int = ...,
-        *,
-        action_label: str = ...,
-        action: Callable[[], None] | None = ...,
-    ) -> None: ...
-    def warning(
-        self,
-        message: str,
-        duration: int = ...,
-        *,
-        action_label: str = ...,
-        action: Callable[[], None] | None = ...,
-    ) -> None: ...
-    def error(
-        self,
-        message: str,
-        duration: int = ...,
-        *,
-        action_label: str = ...,
-        action: Callable[[], None] | None = ...,
-    ) -> None: ...
+    def success(self, message: str, duration: int = ...) -> None: ...
+    def warning(self, message: str, duration: int = ...) -> None: ...
+    def error(self, message: str, duration: int = ...) -> None: ...
 
 
 class RailView(QWidget):
@@ -76,16 +55,14 @@ class RailView(QWidget):
 class AppContext:
     __slots__ = (
         "_core",
-        "_initial_ui_scale",
+        "_initial_scale",
         "_navigate",
         "_plugins",
-        "_qt_scale_factor_override",
         "_rail_views",
         "_restart",
         "_settings_sections",
         "_toasts",
         "_ui_prefs",
-        "_ui_scale_source",
     )
 
     def __init__(
@@ -93,9 +70,7 @@ class AppContext:
         core: CoreContext,
         ui_prefs: UIPrefs | None = None,
         *,
-        initial_ui_scale: float = 100,
-        ui_scale_source: str = "saved",
-        qt_scale_factor_override: str | None = None,
+        initial_scale: ResolvedScale | None = None,
         restart: Callable[[], None] | None = None,
     ) -> None:
         self._core = core
@@ -105,9 +80,7 @@ class AppContext:
         self._toasts: Notifier | None = None
         self._navigate: Callable[[str], None] | None = None
         self._ui_prefs = ui_prefs or UIPrefs()
-        self._initial_ui_scale = initial_ui_scale
-        self._ui_scale_source = ui_scale_source
-        self._qt_scale_factor_override = qt_scale_factor_override
+        self._initial_scale = initial_scale or ResolvedScale(100, "saved")
         self._restart = restart
 
     # ── Plugin system (UI layer) ──────────────────────
@@ -170,16 +143,9 @@ class AppContext:
         return self._ui_prefs
 
     @property
-    def initial_ui_scale(self) -> float:
-        return self._initial_ui_scale
-
-    @property
-    def ui_scale_source(self) -> str:
-        return self._ui_scale_source
-
-    @property
-    def qt_scale_factor_override(self) -> str | None:
-        return self._qt_scale_factor_override
+    def initial_scale(self) -> ResolvedScale:
+        """The scale this session started with; changes apply after a restart."""
+        return self._initial_scale
 
     def restart(self) -> None:
         if self._restart is not None:

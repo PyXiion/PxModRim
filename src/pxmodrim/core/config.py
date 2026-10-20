@@ -116,14 +116,15 @@ class ConfigService:
         path = self._config_dir / filename
         if not path.exists():
             return struct_type()
+        versioned = filename in _VERSIONED_CONFIG_FILES
         try:
-            if filename not in _VERSIONED_CONFIG_FILES and normalize is None:
+            if not versioned and normalize is None:
                 return msgspec.json.decode(
                     path.read_bytes(), type=struct_type, dec_hook=dec_hook
                 )
 
             raw = msgspec.json.decode(path.read_bytes(), type=dict[str, Any])
-            if filename in _VERSIONED_CONFIG_FILES:
+            if versioned:
                 self._migrate(path, raw)
             if normalize is not None:
                 normalize(raw)
