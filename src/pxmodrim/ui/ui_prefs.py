@@ -12,6 +12,8 @@ from pxmodrim.core.constants import LaunchStrategy
 
 
 def clamp_ui_scale(value: object) -> int:
+    if type(value) is float and value.is_integer():
+        value = int(value)
     if type(value) is not int:
         return 100
     return max(100, min(250, value))
