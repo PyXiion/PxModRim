@@ -606,10 +606,9 @@ class MainWindow(QMainWindow):
     async def _open_settings(self) -> None:
         result, dialog = await await_dialog(
             SettingsPanel,
-            self._ctx,
+            self._app_ctx,
             self._qml_engine,
             self,
-            self._app_ctx.settings_sections,
         )
         if result != QDialog.DialogCode.Accepted:
             return

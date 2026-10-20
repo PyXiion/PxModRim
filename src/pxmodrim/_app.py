@@ -46,7 +46,11 @@ from pxmodrim.ui.config import UIPrefsService  # noqa: E402
 from pxmodrim.ui.context import AppContext  # noqa: E402
 from pxmodrim.ui.panels.settings_panel import SettingsPanel  # noqa: E402
 from pxmodrim.ui.theme.palette import PALETTE, get_stylesheet  # noqa: E402
-from pxmodrim.ui.ui_prefs import UIPrefs  # noqa: E402
+from pxmodrim.ui.ui_prefs import (  # noqa: E402
+    UIPrefs,
+    clamp_ui_scale,
+    scale_factor_env,
+)
 from pxmodrim.ui.views.mods_view import ModsViewPanel  # noqa: E402
 from pxmodrim.ui.window.main_window import MainWindow  # noqa: E402
 
@@ -129,12 +133,19 @@ class App:
         "_app_ctx",
         "_ctx",
         "_disabled_plugins",
+        "_initial_ui_scale",
         "main_window",
         "qt_app",
     )
 
     def __init__(self) -> None:
         _configure_file_logging()
+        self._initial_ui_scale = clamp_ui_scale(
+            ConfigService(config_dir()).load_raw("ui_prefs.json").get("ui_scale")
+        )
+        scale_factor = scale_factor_env(self._initial_ui_scale)
+        if scale_factor is not None:
+            os.environ.setdefault("QT_SCALE_FACTOR", scale_factor)
         self._disabled_plugins = _parse_disabled_plugins()
         if (
             "steamworkshop" not in self._disabled_plugins
@@ -197,7 +208,9 @@ class App:
 
         ctx = CoreContext.create(cfg, config_svc)
         self._ctx = ctx
-        self._app_ctx = AppContext(ctx, ui_prefs)
+        self._app_ctx = AppContext(
+            ctx, ui_prefs, initial_ui_scale=self._initial_ui_scale
+        )
         self._app_ctx.add_rail_view(ModsViewPanel)
 
         from pxmodrim.core.organizer import OrganizerDb, OrganizerService
@@ -304,10 +317,9 @@ class App:
             logger.info("No game path found, showing settings dialog")
             result, dialog = await await_dialog(
                 SettingsPanel,
-                ctx,
+                self._app_ctx,
                 self.main_window.qml_engine,
                 self.main_window,
-                self._app_ctx.settings_sections,
             )
             if app_close_event.is_set():
                 await self._app_ctx.shutdown_all()

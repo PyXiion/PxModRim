@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Settings > General > Appearance: Interface scale (100–250%) enlarges text, controls, icons and rows together after restarting PxModRim.
+
 ### Changed
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
 - Install PxSteamDL from PyPI wheels instead of building it from GitHub source; supported platforms no longer need CMake or a C++ compiler for the downloader.

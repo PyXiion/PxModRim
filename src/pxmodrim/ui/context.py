@@ -48,6 +48,7 @@ class RailView(QWidget):
 class AppContext:
     __slots__ = (
         "_core",
+        "_initial_ui_scale",
         "_navigate",
         "_plugins",
         "_rail_views",
@@ -56,7 +57,13 @@ class AppContext:
         "_ui_prefs",
     )
 
-    def __init__(self, core: CoreContext, ui_prefs: UIPrefs | None = None) -> None:
+    def __init__(
+        self,
+        core: CoreContext,
+        ui_prefs: UIPrefs | None = None,
+        *,
+        initial_ui_scale: int = 100,
+    ) -> None:
         self._core = core
         self._plugins = PluginRegistry()
         self._rail_views: list[type[RailView]] = []
@@ -64,6 +71,7 @@ class AppContext:
         self._toasts: Notifier | None = None
         self._navigate: Callable[[str], None] | None = None
         self._ui_prefs = ui_prefs or UIPrefs()
+        self._initial_ui_scale = initial_ui_scale
 
     # ── Plugin system (UI layer) ──────────────────────
 
@@ -123,6 +131,10 @@ class AppContext:
     @property
     def ui_prefs(self) -> UIPrefs:
         return self._ui_prefs
+
+    @property
+    def initial_ui_scale(self) -> int:
+        return self._initial_ui_scale
 
     # ── Core access ───────────────────────────────────
 

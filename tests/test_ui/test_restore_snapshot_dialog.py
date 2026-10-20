@@ -24,6 +24,7 @@ from pxmodrim.core.context import CoreContext
 from pxmodrim.core.mod_service import ModService
 from pxmodrim.core.models.metadata.structures import CaseInsensitiveStr, ModsConfig
 from pxmodrim.core.mods_config import parse_mods_config, write_mods_config
+from pxmodrim.ui.context import AppContext
 from pxmodrim.ui.panels.restore_snapshot_dialog import (
     ConfirmRestoreDialog,
     RestoreSnapshotDialog,
@@ -277,17 +278,19 @@ async def test_mod_service_configurable_retention_honored(
     assert len(service.get_snapshots()) == 3
 
 
-def test_settings_panel_save_preserves_max_snapshots(qapp: QApplication) -> None:
+def test_settings_panel_save_preserves_max_snapshots(
+    qapp: QApplication, tmp_path: Path
+) -> None:
     from pxmodrim.ui.components.svg_provider import create_qml_engine
     from pxmodrim.ui.panels.settings_panel import SettingsPanel
     from pxmodrim.ui.theme.qml_theme import Theme
 
     cfg = AppConfig(max_snapshots=7)
-    ctx = CoreContext(cfg)
+    ctx = CoreContext(cfg, ConfigService(tmp_path))
     host = QWidget()
     engine = create_qml_engine()
     engine.rootContext().setContextProperty("Theme", Theme(engine))
-    panel = SettingsPanel(ctx, engine, host)
+    panel = SettingsPanel(AppContext(ctx), engine, host)
     panel._save(panel._backend._initial)
     assert panel.get_config().max_snapshots == 7
 

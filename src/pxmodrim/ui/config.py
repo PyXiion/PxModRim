@@ -33,7 +33,7 @@ class UIPrefsService:
         self._prefs: UIPrefs | None = None
 
     async def setup(self) -> None:
-        self._prefs = self._svc.load("ui_prefs.json", UIPrefs)
+        self._prefs = load_ui_prefs(self._svc)
 
     def prefs(self) -> UIPrefs:
         assert self._prefs is not None

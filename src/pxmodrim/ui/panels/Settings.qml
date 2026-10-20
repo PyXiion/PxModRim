@@ -19,6 +19,7 @@ Rectangle {
             workshop: workshop.text.trim(),
             config: configFolder.text.trim(),
             compact: compact.checked,
+            uiScale: uiScale.currentValue,
             launchArgs: launchArgs.text.trim(),
             launchWrapper: launchWrapper.text.trim(),
             afterLaunch: afterLaunch.currentValue,
@@ -299,6 +300,47 @@ Rectangle {
 
                     Group {
                         title: "Appearance"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Text {
+                                Layout.preferredWidth: 150
+                                text: "Interface scale"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                            }
+                            PxComboBox {
+                                id: uiScale
+                                objectName: "interfaceScale"
+                                Layout.preferredWidth: 220
+                                Accessible.name: "Interface scale"
+                                textRole: "text"
+                                valueRole: "value"
+                                model: [
+                                    { text: "100%", value: 100 },
+                                    { text: "125%", value: 125 },
+                                    { text: "150%", value: 150 },
+                                    { text: "175%", value: 175 },
+                                    { text: "200%", value: 200 },
+                                    { text: "225%", value: 225 },
+                                    { text: "250%", value: 250 }
+                                ]
+                                Component.onCompleted: {
+                                    if (indexOfValue(root.initial.uiScale) < 0)
+                                        model = model.concat([{ text: root.initial.uiScale + "%", value: root.initial.uiScale }])
+                                    currentIndex = indexOfValue(root.initial.uiScale)
+                                }
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Takes effect after restart."
+                            wrapMode: Text.Wrap
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                        }
                         PxCheckBox {
                             id: compact
                             text: "Compact mod list"

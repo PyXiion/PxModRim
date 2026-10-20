@@ -528,12 +528,11 @@ async def test_settings_saves_and_applies_catalog_url(
 
     view, catalog, warnings = panel
     await asyncio.sleep(0)
-    settings = SettingsPanel(
-        view._ctx,
-        view._qml.engine(),
-        view,
-        [lambda parent: CatalogSettingsSection(catalog.settings, parent)],
+    app_ctx = AppContext(view._ctx)
+    app_ctx.add_settings_section(
+        lambda parent: CatalogSettingsSection(catalog.settings, parent)
     )
+    settings = SettingsPanel(app_ctx, view._qml.engine(), view)
     settings.show()
     await asyncio.sleep(0.2)
     root = settings._qml.rootObject()

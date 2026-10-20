@@ -19,13 +19,15 @@ from pxmodrim.core.config import (
     detect_game_paths,
 )
 from pxmodrim.core.constants import AfterLaunch
-from pxmodrim.core.context import CoreContext
 from pxmodrim.core.loading import LoadingState
 from pxmodrim.core.sort.community_service import CommunityRulesService
 from pxmodrim.ui.components.dialogs import await_dialog
 from pxmodrim.ui.components.progress_dialog import ProgressDialog
-from pxmodrim.ui.settings_section import SettingsSection, SettingsSectionFactory
+from pxmodrim.ui.config import save_ui_prefs
+from pxmodrim.ui.context import AppContext
+from pxmodrim.ui.settings_section import SettingsSection
 from pxmodrim.ui.theme.palette import PALETTE
+from pxmodrim.ui.ui_prefs import clamp_ui_scale
 
 _QML = Path(__file__).parent / "Settings.qml"
 
@@ -54,10 +56,10 @@ class _SettingsBackend(QObject):
     cacheChanged = Signal()
 
     def __init__(
-        self, ctx: CoreContext, dialog: QDialog, sections: Sequence[SettingsSection]
+        self, app_ctx: AppContext, dialog: QDialog, sections: Sequence[SettingsSection]
     ) -> None:
         super().__init__(dialog)
-        self._ctx = ctx
+        self._ctx = app_ctx.core
         self._dialog = dialog
         self._sections = [
             {
@@ -67,13 +69,14 @@ class _SettingsBackend(QObject):
             }
             for section in sections
         ]
-        cfg = ctx.config
+        cfg = self._ctx.config
         self._initial: dict[str, Any] = {
             "game": cfg.paths.game,
             "local": cfg.paths.local,
             "workshop": cfg.paths.workshop,
             "config": cfg.paths.config_folder,
             "compact": cfg.compact_mod_list,
+            "uiScale": app_ctx.ui_prefs.ui_scale,
             "launchArgs": cfg.launch_args,
             "launchWrapper": cfg.launch_wrapper,
             "afterLaunch": int(cfg.after_launch),
@@ -199,10 +202,9 @@ class _SettingsBackend(QObject):
 class SettingsPanel(QDialog):
     def __init__(
         self,
-        ctx: CoreContext,
+        app_ctx: AppContext,
         qml_engine: QQmlEngine,
         parent: QWidget,
-        sections: Sequence[SettingsSectionFactory] = (),
     ) -> None:
         super().__init__(parent)
         self.setObjectName("settingsPanel")
@@ -210,11 +212,12 @@ class SettingsPanel(QDialog):
         self.setModal(True)
         self.resize(700, 560)
 
-        self._ctx = ctx
-        self._config = ctx.config
+        self._app_ctx = app_ctx
+        self._ctx = app_ctx.core
+        self._config = self._ctx.config
 
-        self._sections = [factory(self) for factory in sections]
-        self._backend = _SettingsBackend(ctx, self, self._sections)
+        self._sections = [factory(self) for factory in app_ctx.settings_sections]
+        self._backend = _SettingsBackend(app_ctx, self, self._sections)
         self._backend.saveRequested.connect(self._save)
         self._backend.cancelRequested.connect(self.reject)
 
@@ -261,6 +264,13 @@ class SettingsPanel(QDialog):
         )
         for section in self._sections:
             section.apply()
+        self._app_ctx.ui_prefs.ui_scale = clamp_ui_scale(values["uiScale"])
+        save_ui_prefs(self._app_ctx.ui_prefs, self._ctx.config_service)
+        if (
+            self._app_ctx.ui_prefs.ui_scale != self._app_ctx.initial_ui_scale
+            and self._app_ctx.toasts is not None
+        ):
+            self._app_ctx.toasts.info("Restart PxModRim to apply the interface scale.")
         self.accept()
 
     def get_config(self) -> AppConfig:
