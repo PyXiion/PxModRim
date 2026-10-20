@@ -29,7 +29,8 @@ TEST_CASE("Interface scale clamps percentages and maps them to Qt factors") {
 
 TEST_CASE(
     "Startup interface scale resolves overrides without persisting them") {
-  const UiPrefs prefs{.ui_scale = 125};
+  UiPrefs prefs;
+  prefs.ui_scale = 125;
   const auto saved = resolveUiScale(prefs.ui_scale);
   CHECK(saved.scale == 125);
   CHECK(saved.source == ScaleSource::kSaved);
