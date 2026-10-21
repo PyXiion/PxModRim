@@ -1,0 +1,537 @@
+/* ── Base ── */
+QMainWindow,
+QDialog {
+    background-color: $ELEVATE_0;
+    color: $TEXT_MAIN;
+}
+
+QWidget {
+    color: $TEXT_MAIN;
+    font-family: "Source Sans 3", "Liberation Sans", sans-serif;
+}
+
+/* ── Panel containers ── */
+QWidget#outerContainer {
+    background-color: $ELEVATE_0;
+}
+QWidget#contentArea {
+    background-color: $ELEVATE_0;
+}
+QWidget#sidebarPanel {
+    background-color: $ELEVATE_2;
+}
+QWidget#modListPanel {
+    background-color: $ELEVATE_1;
+}
+QWidget#modInfoPanel {
+    background-color: $ELEVATE_2;
+}
+
+/* ── Transparent overrides ── */
+QScrollArea,
+QWidget#toastManager {
+    background-color: transparent;
+}
+
+/* ── Menu Bar ── */
+QMenuBar {
+    background-color: $ELEVATE_1;
+    border-bottom: 1px solid $BORDER;
+    padding: 2px 4px;
+    color: $TEXT_MUTED;
+    font-size: 13px;
+}
+QMenuBar::item {
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: transparent;
+}
+QMenuBar::item:selected {
+    background-color: $ELEVATE_3;
+    color: $TEXT_MAIN;
+}
+
+QMenu {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    padding: 4px;
+    color: $TEXT_MAIN;
+}
+QMenu::item {
+    padding: 6px 28px 6px 12px;
+    border-radius: 4px;
+}
+QMenu::item:selected {
+    background-color: $ELEVATE_3;
+}
+QMenu::item:disabled {
+    color: $TEXT_DIM;
+}
+QMenu::item:disabled:selected {
+    background-color: transparent;
+}
+QMenu::separator {
+    height: 1px;
+    background-color: $BORDER;
+    margin: 4px 8px;
+}
+
+/* ── Buttons ── */
+QPushButton {
+    background-color: $ELEVATE_3;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    font-size: 13px;
+    font-weight: 500;
+}
+QPushButton#appBtn,
+QPushButton#primaryAction {
+    padding: 6px 14px;
+    min-height: 18px;
+}
+QPushButton:hover {
+    background-color: $ELEVATE_4;
+    border-color: $ELEVATE_4;
+}
+QPushButton:pressed {
+    background-color: $ELEVATE_4;
+}
+QPushButton#primaryAction {
+    background-color: $PRIMARY;
+    border-color: $PRIMARY;
+    color: $ELEVATE_0;
+    font-weight: 600;
+}
+QPushButton#primaryAction:hover {
+    background-color: $PRIMARY_HOVER;
+    border-color: $PRIMARY_HOVER;
+}
+/* Platform themes (e.g. Breeze) add dark icons to standard dialog buttons that
+   vanish on our dark background; drop them and match the appBtn sizing. */
+QDialogButtonBox {
+    dialogbuttonbox-buttons-have-icons: 0;
+}
+QMessageBox QPushButton,
+QDialogButtonBox QPushButton {
+    padding: 6px 14px;
+    min-height: 18px;
+    min-width: 64px;
+}
+
+/* ── Line Edit ── */
+QLineEdit {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 7px 10px;
+    font-size: 13px;
+    selection-background-color: $PRIMARY;
+}
+QLineEdit:focus {
+    border-color: $PRIMARY;
+}
+QWidget#searchBox {
+    background-color: $ELEVATE_1;
+    border-bottom: 1px solid $BORDER;
+}
+
+/* ── Combo Box ── */
+QComboBox {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 6px 10px;
+    font-size: 13px;
+    min-width: 80px;
+}
+QComboBox:hover {
+    border-color: $ELEVATE_4;
+}
+QComboBox:focus {
+    border-color: $PRIMARY;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px;
+    border-left: 1px solid $BORDER;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QComboBox::down-arrow {
+    width: 8px;
+    height: 8px;
+}
+QComboBox QAbstractItemView {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    selection-background-color: $ELEVATE_3;
+    selection-color: $TEXT_MAIN;
+    color: $TEXT_MAIN;
+    outline: none;
+    padding: 4px;
+}
+
+/* ── Item Views ── */
+QTableWidget,
+QTableView,
+QListWidget,
+QListView,
+QTreeWidget,
+QTreeView {
+    background-color: $ELEVATE_0;
+    alternate-background-color: $ELEVATE_1;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    gridline-color: $BORDER;
+    selection-background-color: $PRIMARY;
+    selection-color: $ELEVATE_0;
+    outline: none;
+}
+QTableWidget::item,
+QTableView::item {
+    padding: 4px 8px;
+}
+QListWidget::item:disabled,
+QListView::item:disabled,
+QTreeWidget::item:disabled,
+QTreeView::item:disabled {
+    color: $TEXT_DIM;
+}
+QListWidget::item,
+QListView::item,
+QTreeWidget::item,
+QTreeView::item {
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+QListWidget::item:hover,
+QListView::item:hover,
+QTreeWidget::item:hover,
+QTreeView::item:hover {
+    background-color: $ELEVATE_3;
+}
+QTableWidget::item:selected,
+QTableView::item:selected,
+QListWidget::item:selected,
+QListView::item:selected,
+QTreeWidget::item:selected,
+QTreeView::item:selected {
+    background-color: $PRIMARY;
+    color: $ELEVATE_0;
+}
+QHeaderView {
+    background-color: $ELEVATE_2;
+}
+QHeaderView::section {
+    background-color: $ELEVATE_2;
+    color: $TEXT_DIM;
+    border: none;
+    border-bottom: 1px solid $BORDER;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+QTableCornerButton::section {
+    background-color: $ELEVATE_2;
+    border: none;
+}
+
+/* ── Scroll Area ── */
+QScrollArea {
+    border: none;
+    background-color: transparent;
+}
+
+/* ── Scroll Bars ── */
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 6px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background-color: $ELEVATE_4;
+    border-radius: 3px;
+    min-height: 30px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical:hover {
+    background-color: $TEXT_DIM;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
+}
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+QScrollBar:horizontal {
+    background-color: transparent;
+    height: 6px;
+    margin: 0;
+}
+QScrollBar::handle:horizontal {
+    background-color: $ELEVATE_4;
+    border-radius: 3px;
+    min-width: 30px;
+    margin: 2px;
+}
+QScrollBar::handle:horizontal:hover {
+    background-color: $TEXT_DIM;
+}
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    width: 0;
+}
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
+/* ── Dialog / Organizer labels ── */
+QLabel#dialogTitle {
+    font-size: 15px;
+    font-weight: 600;
+}
+QLabel#organizerStatus {
+    color: $TEXT_DIM;
+    padding: 5px 12px;
+}
+
+/* ── Placeholder ── */
+QLabel#placeholder {
+    color: $TEXT_DIM;
+    font-size: 14px;
+    padding: 32px;
+}
+
+/* ── Status Bar ── */
+QStatusBar {
+    background-color: $ELEVATE_2;
+    border-top: 1px solid $BORDER;
+    color: $TEXT_MUTED;
+    font-size: 11px;
+    padding: 2px 8px;
+}
+
+/* ── Tool Tip ── */
+QToolTip {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    color: $TEXT_MAIN;
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+/* ── Group Box ── */
+QGroupBox {
+    border: 1px solid $BORDER;
+    border-radius: 6px;
+    margin-top: 12px;
+    padding: 16px 12px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: $TEXT_MAIN;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 8px;
+    color: $TEXT_DIM;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* ── Check Box ── */
+QCheckBox {
+    color: $TEXT_MAIN;
+    font-size: 13px;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid $BORDER;
+    border-radius: 3px;
+    background: transparent;
+}
+QCheckBox::indicator:hover {
+    border-color: $TEXT_DIM;
+}
+QCheckBox::indicator:checked {
+    background: $PRIMARY;
+    border-color: $PRIMARY;
+}
+
+/* ── Tab Widget ── */
+QTabWidget::pane {
+    border: none;
+    background: transparent;
+}
+QTabBar::tab {
+    background: transparent;
+    color: $TEXT_MUTED;
+    padding: 8px 16px;
+    border-bottom: 2px solid transparent;
+    font-size: 12px;
+}
+QTabBar::tab:selected {
+    color: $PRIMARY;
+    border-bottom-color: $PRIMARY;
+}
+QTabBar::tab:hover {
+    color: $TEXT_MAIN;
+}
+
+
+
+/* ── Dialog chrome (frameless dialogs) ── */
+QDialog[chromed="true"] {
+    border: 1px solid $BORDER;
+}
+QWidget#dialogTitleBar {
+    background-color: $ELEVATE_1;
+    border-bottom: 1px solid $BORDER;
+}
+QLabel#dialogTitleText {
+    background: transparent;
+    font-weight: 600;
+    font-size: 13px;
+}
+QPushButton#dialogCloseBtn {
+    background-color: $DANGER_BG;
+    border: 1px solid $DANGER_BG;
+    border-radius: 6px;
+    padding: 0;
+}
+QPushButton#dialogCloseBtn:hover {
+    background-color: $DANGER;
+    border-color: $DANGER;
+}
+
+/* ── Toast ── */
+QWidget#toast {
+    background-color: $SURFACE;
+    border: 1px solid $BORDER;
+    border-radius: 8px;
+}
+QLabel#toastMessage {
+    color: $TEXT_MAIN;
+    font-size: 12px;
+}
+QPushButton#toastClose {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 0;
+    min-height: 0;
+}
+QPushButton#toastClose:hover {
+    background-color: $ELEVATE_3;
+}
+QWidget#toastManager {
+    background: transparent;
+    border: none;
+}
+
+/* ── Settings Dialog ── */
+QWidget#settingsPanel {
+    background-color: $ELEVATE_1;
+}
+QWidget#settingsPanel QTabWidget::pane {
+    background-color: $ELEVATE_1;
+}
+QWidget#settingsPanel QGroupBox {
+    background-color: $ELEVATE_2;
+}
+QWidget#settingsPanel QFormLayout {
+    background-color: transparent;
+}
+
+/* ── Progress Bar ── */
+QProgressBar {
+    border: 1px solid $BORDER;
+    border-radius: 4px;
+    background: $ELEVATE_0;
+    text-align: center;
+    font-size: 11px;
+    height: 18px;
+}
+QProgressBar::chunk {
+    background: $PRIMARY;
+    border-radius: 3px;
+}
+
+/* ── About Dialog ── */
+QDialog#aboutPanel,
+QDialog#creditsDialog {
+    background-color: $ELEVATE_1;
+}
+QFrame#aboutHero {
+    background-color: $ELEVATE_2;
+    border: 1px solid $BORDER;
+    border-radius: 10px;
+}
+QLabel#aboutTitle,
+QLabel#creditsTitle {
+    font-size: 24px;
+    font-weight: 700;
+    color: $TEXT_MAIN;
+}
+QLabel#aboutVersionBadge {
+    background-color: $PRIMARY;
+    border-radius: 8px;
+    color: $ELEVATE_0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+}
+QLabel#aboutTagline {
+    color: $TEXT_MAIN;
+    font-size: 15px;
+    font-weight: 600;
+}
+QLabel#aboutDescription,
+QLabel#aboutStory {
+    color: $TEXT_MUTED;
+    font-size: 13px;
+}
+QLabel#aboutSectionTitle,
+QLabel#aboutMetaLabel {
+    color: $TEXT_DIM;
+    font-size: 10px;
+    font-weight: 700;
+}
+QFrame#aboutDetails {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 8px;
+}
+QLabel#aboutMetaValue {
+    color: $TEXT_MAIN;
+    font-size: 12px;
+}
+QLabel#aboutDisclaimer {
+    color: $TEXT_DIM;
+    font-size: 11px;
+    font-style: italic;
+}
+QTextBrowser#creditsBrowser {
+    background-color: $ELEVATE_0;
+    border: 1px solid $BORDER;
+    border-radius: 8px;
+    color: $TEXT_MAIN;
+    padding: 12px;
+}

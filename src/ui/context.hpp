@@ -1,0 +1,182 @@
+#pragma once
+
+#include <QLatin1StringView>
+#include <QString>
+#include <QStringList>
+#include <QWidget>
+#include <concepts>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <vector>
+
+#include <QCoro/QCoroTask>
+
+#include "core/context.hpp"
+#include "core/error.hpp"
+#include "core/plugin.hpp"
+#include "ui/settings_section.hpp"
+#include "ui/ui_prefs.hpp"
+
+class QQmlEngine;
+
+namespace px::modrim {
+
+class AppContext;
+
+// UI-layer plugins: same lifecycle as core plugins, but their context is the
+// AppContext.
+using UiPlugin = BasicPlugin<AppContext>;
+using UiPluginRegistry = BasicPluginRegistry<AppContext>;
+
+// Toast sink. Durations are milliseconds; the defaults match the legacy toast
+// manager.
+class Notifier {
+ public:
+  virtual ~Notifier() = default;
+
+  virtual void info(const QString& message, int durationMs = 3000,
+                    const QString& actionLabel = {},
+                    std::function<void()> action = {}) = 0;
+  virtual void success(const QString& message, int durationMs = 3000) = 0;
+  virtual void warning(const QString& message, int durationMs = 4000) = 0;
+  virtual void error(const QString& message, int durationMs = 5000) = 0;
+};
+
+// Class-level metadata of a rail view, read before the view is constructed.
+// Each RailView subclass declares `static constexpr RailViewMeta kRailMeta`.
+struct RailViewMeta {
+  QLatin1StringView viewId;
+  QLatin1StringView iconName;
+  QLatin1StringView label;
+  // The download queue: the header's downloads button opens it, and the header
+  // hides its own download progress while it is shown.
+  bool listsDownloads = false;
+};
+
+// Base of widgets registered on the navigation rail.
+class RailView : public QWidget {
+  Q_OBJECT
+
+ public:
+  RailView(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
+           AppContext& app);
+
+  // Handles the part of a `modrim://<viewId>/…` link after the view id.
+  virtual void openRoute(const QStringList& path);
+
+  // Called when the rail reveals the view ahead of its first use, and when the
+  // window closes. Views that hold resources (e.g. web profiles) release them
+  // in teardown().
+  virtual void preload();
+  virtual void teardown();
+
+ protected:
+  CoreContext& m_ctx;
+  QQmlEngine* m_engine;
+  AppContext& m_app;
+};
+
+using RailViewFactory =
+    std::function<RailView*(CoreContext&, QQmlEngine*, QWidget*, AppContext&)>;
+
+struct RailViewSpec {
+  RailViewMeta meta;
+  RailViewFactory create;
+};
+
+template <class V>
+concept RailViewType =
+    std::derived_from<V, RailView> && requires { V::kRailMeta; };
+
+// The UI composition context: owns the UI plugin registry, the rail and
+// settings contributions, the toast sink and the navigator. Core state is read
+// through coreContext(), which must outlive this object.
+class AppContext {
+ public:
+  AppContext(CoreContext& core, UiPrefs prefs = {},
+             ResolvedScale initialScale = {});
+  AppContext(const AppContext&) = delete;
+  AppContext& operator=(const AppContext&) = delete;
+  AppContext(AppContext&&) = delete;
+  AppContext& operator=(AppContext&&) = delete;
+  ~AppContext();
+
+  // ── Plugin system (UI layer) ──────────────────────
+  void registerPlugin(std::unique_ptr<UiPlugin> plugin);
+  UiPluginRegistry& plugins() noexcept { return m_plugins; }
+
+  // ── Rail views ────────────────────────────────────
+  // Appends, or inserts at `position` when given.
+  template <RailViewType V>
+  void addRailView(std::optional<std::size_t> position = std::nullopt);
+  const std::vector<RailViewSpec>& railViews() const noexcept {
+    return m_railViews;
+  }
+
+  // ── Settings sections ─────────────────────────────
+  // Each section is built per dialog, parented to that dialog.
+  void addSettingsSection(SettingsSectionFactory factory);
+  const std::vector<SettingsSectionFactory>& settingsSections() const noexcept {
+    return m_settingsSections;
+  }
+
+  // ── Toasts ────────────────────────────────────────
+  // Not owned; nullptr when no toast surface is shown.
+  Notifier* toasts() const noexcept { return m_toasts; }
+  void setToasts(Notifier* notifier) noexcept { m_toasts = notifier; }
+
+  // ── Navigation ────────────────────────────────────
+  // Opens a `modrim://<viewId>[/…]` link; a no-op until a navigator is set.
+  void navigate(const QString& url) const;
+  void setNavigator(std::function<void(const QString&)> navigate);
+
+  // ── UI prefs ──────────────────────────────────────
+  UiPrefs& uiPrefs() noexcept { return m_uiPrefs; }
+  const UiPrefs& uiPrefs() const noexcept { return m_uiPrefs; }
+  const ResolvedScale& initialScale() const noexcept { return m_initialScale; }
+
+  // ── Core access ───────────────────────────────────
+  CoreContext& coreContext() const noexcept { return m_core; }
+
+  // ── Lifecycle ─────────────────────────────────────
+  // Core plugins first, then UI plugins; UI plugins may depend on core plugin
+  // names.
+  Result<void> setupAll();
+  QCoro::Task<Result<void>> initAll();
+  bool pluginsInitialized() const noexcept { return m_pluginsInitialized; }
+  // Reloads mods and resolves to how many are now loaded.
+  QCoro::Task<Result<int>> refreshMods(bool full = false);
+  // UI plugins shut down before core plugins.
+  QCoro::Task<Result<void>> shutdownAll();
+
+ private:
+  CoreContext& m_core;
+  UiPluginRegistry m_plugins;
+  std::vector<RailViewSpec> m_railViews;
+  std::vector<SettingsSectionFactory> m_settingsSections;
+  Notifier* m_toasts = nullptr;
+  std::function<void(const QString&)> m_navigate;
+  UiPrefs m_uiPrefs;
+  const ResolvedScale m_initialScale;
+  bool m_pluginsInitialized = false;
+};
+
+template <RailViewType V>
+void AppContext::addRailView(std::optional<std::size_t> position) {
+  RailViewSpec spec{
+      V::kRailMeta,
+      [](CoreContext& ctx, QQmlEngine* engine, QWidget* parent, AppContext& app)
+          -> RailView* { return new V(ctx, engine, parent, app); },
+  };
+  if (position) {
+    m_railViews.insert(
+        m_railViews.begin() + static_cast<std::ptrdiff_t>(*position),
+        std::move(spec));
+  } else {
+    m_railViews.push_back(std::move(spec));
+  }
+}
+
+}  // namespace px::modrim

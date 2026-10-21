@@ -35,7 +35,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     if (!fields.has(field)) throw new HttpError(400, `Unexpected field: ${field}`);
   }
   for (const field of ['title', 'author', 'description', 'member_ids']) {
-    if (!Object.prototype.hasOwnProperty.call(input, field)) {
+    if (!Object.hasOwn(input, field)) {
       throw new HttpError(400, `Missing required field: ${field}`);
     }
   }
@@ -65,23 +65,21 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
   }
 
   let previewUrl: string | null = null;
-  if (Object.prototype.hasOwnProperty.call(input, 'preview_url')) {
-    if (input.preview_url !== null) {
-      if (typeof input.preview_url !== 'string' || input.preview_url.length > 2048) {
-        throw new HttpError(400, 'preview_url must be null or an HTTPS URL of at most 2048 characters');
-      }
-      let url: URL;
-      try {
-        url = new URL(input.preview_url);
-      } catch {
-        throw new HttpError(400, 'preview_url must be a valid HTTPS URL');
-      }
-      if (url.protocol !== 'https:') throw new HttpError(400, 'preview_url must use HTTPS');
-      previewUrl = input.preview_url;
+  if (Object.hasOwn(input, 'preview_url') && input.preview_url !== null) {
+    if (typeof input.preview_url !== 'string' || input.preview_url.length > 2048) {
+      throw new HttpError(400, 'preview_url must be null or an HTTPS URL of at most 2048 characters');
     }
+    let url: URL;
+    try {
+      url = new URL(input.preview_url);
+    } catch {
+      throw new HttpError(400, 'preview_url must be a valid HTTPS URL');
+    }
+    if (url.protocol !== 'https:') throw new HttpError(400, 'preview_url must use HTTPS');
+    previewUrl = input.preview_url;
   }
   const tags: string[] = [];
-  if (Object.prototype.hasOwnProperty.call(input, 'tags')) {
+  if (Object.hasOwn(input, 'tags')) {
     if (!Array.isArray(input.tags) || input.tags.length > 30) {
       throw new HttpError(400, 'tags must contain at most 30 strings of at most 100 characters');
     }
@@ -93,7 +91,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     }
   }
   const versions: string[] = [];
-  if (Object.prototype.hasOwnProperty.call(input, 'supported_versions')) {
+  if (Object.hasOwn(input, 'supported_versions')) {
     if (!Array.isArray(input.supported_versions) || input.supported_versions.length > 20) {
       throw new HttpError(400, 'supported_versions must contain at most 20 versions in major.minor[.patch] form');
     }
@@ -106,7 +104,7 @@ export function parsePickInput(value: unknown): PickedCollectionInput {
     }
   }
   let featuredRank = 0;
-  if (Object.prototype.hasOwnProperty.call(input, 'featured_rank')) {
+  if (Object.hasOwn(input, 'featured_rank')) {
     if (typeof input.featured_rank !== 'number' || !Number.isInteger(input.featured_rank) ||
         input.featured_rank < 0 || input.featured_rank > 1000000) {
       throw new HttpError(400, 'featured_rank must be an integer from 0 to 1000000');
@@ -170,8 +168,10 @@ export async function listPicks(
     bindings.push(options.tag);
   }
   if (options.version !== null) {
-    predicates.push('EXISTS (SELECT 1 FROM json_each(p.supported_versions) WHERE value = ?)');
+    const taggedVersion = /^\d+\.\d+(?:\.\d+)?$/.test(options.version);
+    predicates.push(`(EXISTS (SELECT 1 FROM json_each(p.supported_versions) WHERE value = ?)${taggedVersion ? ' OR EXISTS (SELECT 1 FROM json_each(p.tags) WHERE value = ?)' : ''})`);
     bindings.push(options.version);
+    if (taggedVersion) bindings.push(options.version);
   }
   const where = predicates.length ? ` WHERE ${predicates.join(' AND ')}` : '';
   const orders = {

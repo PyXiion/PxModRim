@@ -1,0 +1,481 @@
+#include "core/config.hpp"
+
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QRegularExpression>
+#include <QSettings>
+#include <QString>
+#include <QStringList>
+#include <QtGlobal>
+#include <algorithm>
+#include <cmath>
+#include <initializer_list>
+
+#include <spdlog/spdlog.h>
+
+#include "core/constants.hpp"
+
+namespace px::modrim {
+
+namespace {
+
+const QString kUiPrefsFile = QStringLiteral("ui_prefs.json");
+
+// Schema versions above this are far beyond any real file; clamping keeps them
+// representable while still being rejected as unsupported.
+constexpr double kMaxSchemaVersion = 1e15;
+
+QString steamAppId() { return QString(kRimworldSteamAppId); }
+
+QString joinPath(QString path, std::initializer_list<QString> parts) {
+  for (const auto& part : parts) {
+    path.append(u'/').append(part);
+  }
+  return QDir::cleanPath(path);
+}
+
+bool isDir(const QString& path) { return QFileInfo(path).isDir(); }
+
+QString gameDirIn(const QString& root) {
+  return joinPath(root, {QStringLiteral("steamapps"), QStringLiteral("common"),
+                         QStringLiteral("RimWorld")});
+}
+
+QString workshopDirIn(const QString& root, const QString& steamId) {
+  return joinPath(root,
+                  {QStringLiteral("steamapps"), QStringLiteral("workshop"),
+                   QStringLiteral("content"), steamId});
+}
+
+QString findRimworldInSteamRoot(const QString& root, const QString& steamId);
+
+// Parses a libraryfolders.vdf for an alternate library holding RimWorld.
+QString vdfFindRimworld(const QString& vdfPath, const QString& steamId) {
+  auto bytes = readFileBytes(vdfPath);
+  if (!bytes) {
+    spdlog::warn("Failed to parse libraryfolders.vdf");
+    return {};
+  }
+  const QString text =
+      QString::fromUtf8(bytes->data(), static_cast<qsizetype>(bytes->size()));
+
+  // Matches `"path" "<library>"` and `"<appid>" {` lines of libraryfolders.vdf.
+  static const QRegularExpression pathPattern(
+      QStringLiteral(R"re("path"\s+"(.+?)")re"));
+  const QRegularExpression appPattern(QStringLiteral("\"") +
+                                      QRegularExpression::escape(steamId) +
+                                      QStringLiteral(R"re("\s*\{)re"));
+
+  QString currentPath;
+  for (const auto& rawLine : text.split(u'\n')) {
+    const QString line = rawLine.trimmed();
+    if (const auto match = pathPattern.match(line); match.hasMatch()) {
+      currentPath = match.captured(1);
+      continue;
+    }
+    if (!currentPath.isEmpty() && appPattern.match(line).hasMatch()) {
+      const QString game = gameDirIn(currentPath);
+      if (isDir(game)) {
+        return game;
+      }
+    }
+  }
+  return {};
+}
+
+QString findRimworldInSteamRoot(const QString& root, const QString& steamId) {
+  QString game = gameDirIn(root);
+  if (isDir(game)) {
+    return game;
+  }
+  const QString configVdf = joinPath(
+      root, {QStringLiteral("config"), QStringLiteral("libraryfolders.vdf")});
+  if (QFileInfo::exists(configVdf)) {
+    return vdfFindRimworld(configVdf, steamId);
+  }
+  const QString steamappsVdf = joinPath(
+      root,
+      {QStringLiteral("steamapps"), QStringLiteral("libraryfolders.vdf")});
+  if (QFileInfo::exists(steamappsVdf)) {
+    return vdfFindRimworld(steamappsVdf, steamId);
+  }
+  return {};
+}
+
+// Workshop content lives beside the `common` folder that holds the game.
+QString workshopPathFromGame(const QString& game, const QString& steamRoot,
+                             const QString& steamId) {
+  const QString normalized = QDir::fromNativeSeparators(game);
+  const QStringList parts = normalized.split(u'/', Qt::SkipEmptyParts);
+  const qsizetype common = parts.indexOf(QStringLiteral("common"));
+  if (common >= 0) {
+    QString base = parts.mid(0, common).join(u'/');
+    if (normalized.startsWith(u'/')) {
+      base.prepend(u'/');
+    }
+    const QString workshop = joinPath(
+        base, {QStringLiteral("workshop"), QStringLiteral("content"), steamId});
+    if (isDir(workshop)) {
+      return workshop;
+    }
+  }
+  return workshopDirIn(steamRoot, steamId);
+}
+
+struct GamePaths {
+  QString game;
+  QString local;
+  QString workshop;
+};
+
+GamePaths gamePathsFor(const QString& game, const QString& workshop) {
+  return GamePaths{
+      .game = game,
+      .local = joinPath(game, {QStringLiteral("Mods")}),
+      .workshop = workshop,
+  };
+}
+
+#if defined(Q_OS_LINUX)
+GamePaths findGamePaths(QString& foundRoot) {
+  const QString steamId = steamAppId();
+  const QString home = QDir::homePath();
+  const QStringList candidates = {
+      joinPath(home, {QStringLiteral(".steam"),
+                      QStringLiteral("debian-installation")}),
+      joinPath(home, {QStringLiteral(".steam"), QStringLiteral("steam")}),
+      joinPath(home, {QStringLiteral(".local"), QStringLiteral("share"),
+                      QStringLiteral("Steam")}),
+      joinPath(home, {QStringLiteral(".var"), QStringLiteral("app"),
+                      QStringLiteral("com.valvesoftware.Steam"),
+                      QStringLiteral(".local"), QStringLiteral("share"),
+                      QStringLiteral("Steam")}),
+      joinPath(home, {QStringLiteral("snap"), QStringLiteral("steam"),
+                      QStringLiteral("common"), QStringLiteral(".local"),
+                      QStringLiteral("share"), QStringLiteral("Steam")}),
+  };
+  for (const auto& root : candidates) {
+    if (!isDir(root)) {
+      continue;
+    }
+    if (const QString game = findRimworldInSteamRoot(root, steamId);
+        !game.isEmpty()) {
+      foundRoot = root;
+      return gamePathsFor(game, workshopPathFromGame(game, root, steamId));
+    }
+  }
+
+  const QString fallbackRoot =
+      joinPath(home, {QStringLiteral(".steam"), QStringLiteral("steam")});
+  const QString fallback = gameDirIn(fallbackRoot);
+  if (isDir(fallback)) {
+    foundRoot = isDir(fallbackRoot) ? fallbackRoot : QString();
+    return gamePathsFor(fallback, workshopDirIn(fallbackRoot, steamId));
+  }
+  return {};
+}
+#elif defined(Q_OS_MACOS)
+QString find_mac_app(const QString& rimworld_dir) {
+  if (!isDir(rimworld_dir)) {
+    return {};
+  }
+  const QStringList apps =
+      QDir(rimworld_dir)
+          .entryList({QStringLiteral("*.app")},
+                     QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
+                     QDir::Name);
+  return apps.isEmpty() ? QString() : joinPath(rimworld_dir, {apps.first()});
+}
+
+GamePaths findGamePaths(QString& foundRoot) {
+  const QString steamId = steamAppId();
+  const QString steamRoot =
+      joinPath(QDir::homePath(), {QStringLiteral("Library"),
+                                  QStringLiteral("Application Support"),
+                                  QStringLiteral("Steam")});
+  foundRoot = isDir(steamRoot) ? steamRoot : QString();
+  if (const QString game = findRimworldInSteamRoot(steamRoot, steamId);
+      !game.isEmpty()) {
+    return gamePathsFor(game, workshopPathFromGame(game, steamRoot, steamId));
+  }
+  const QString fallback = gameDirIn(steamRoot);
+  if (const QString app_bundle = find_mac_app(fallback);
+      !app_bundle.isEmpty()) {
+    return GamePaths{
+        .game = app_bundle,
+        .local = joinPath(fallback, {QStringLiteral("Mods")}),
+        .workshop = workshopDirIn(steamRoot, steamId),
+    };
+  }
+  return {};
+}
+#elif defined(Q_OS_WIN)
+// Steam's install location is recorded in the registry; the 32-bit view is
+// checked first, as the legacy detection did.
+GamePaths findGamePaths(QString& foundRoot) {
+  const QString steamId = steamAppId();
+  const QStringList registry_keys = {
+      QStringLiteral(R"(HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Valve\Steam)"),
+      QStringLiteral(R"(HKEY_LOCAL_MACHINE\SOFTWARE\Valve\Steam)"),
+  };
+  for (const auto& key : registry_keys) {
+    const QString steamRoot = QSettings(key, QSettings::NativeFormat)
+                                  .value(QStringLiteral("InstallPath"))
+                                  .toString();
+    if (steamRoot.isEmpty()) {
+      spdlog::debug("Unable to inspect Windows Steam registry key {}",
+                    key.toStdString());
+      continue;
+    }
+    if (const QString game = findRimworldInSteamRoot(steamRoot, steamId);
+        !game.isEmpty()) {
+      return gamePathsFor(game, workshopPathFromGame(game, steamRoot, steamId));
+    }
+  }
+
+  const QString fallback = QStringLiteral("C:/Program Files (x86)/Steam");
+  if (const QString game = gameDirIn(fallback); isDir(game)) {
+    return gamePathsFor(game, workshopDirIn(fallback, steamId));
+  }
+  return {};
+}
+#else
+GamePaths findGamePaths(QString&) { return {}; }
+#endif
+
+// Locates the RimWorld Config folder, which the game writes beside its save
+// data.
+QString detectConfigFolder([[maybe_unused]] const QString& steamRoot) {
+#if defined(Q_OS_LINUX)
+  const QString steamId = steamAppId();
+  if (!steamRoot.isEmpty()) {
+    const QString proton = joinPath(
+        steamRoot, {QStringLiteral("steamapps"), QStringLiteral("compatdata"),
+                    steamId, QStringLiteral("pfx"), QStringLiteral("drive_c"),
+                    QStringLiteral("users"), QStringLiteral("steamuser"),
+                    QStringLiteral("AppData"), QStringLiteral("LocalLow"),
+                    QStringLiteral("Ludeon Studios"),
+                    QStringLiteral("RimWorld by Ludeon Studios"),
+                    QStringLiteral("Config")});
+    if (isDir(proton)) {
+      spdlog::debug("Detected Proton config folder: {}", proton.toStdString());
+      return proton;
+    }
+  }
+  QString native = joinPath(
+      QDir::homePath(),
+      {QStringLiteral(".config"), QStringLiteral("unity3d"),
+       QStringLiteral("Ludeon Studios"),
+       QStringLiteral("RimWorld by Ludeon Studios"), QStringLiteral("Config")});
+  if (isDir(native)) {
+    spdlog::debug("Detected native config folder: {}", native.toStdString());
+    return native;
+  }
+#elif defined(Q_OS_MACOS)
+  const QString config = joinPath(
+      QDir::homePath(),
+      {QStringLiteral("Library"), QStringLiteral("Application Support"),
+       QStringLiteral("Rimworld"), QStringLiteral("Config")});
+  if (isDir(config)) {
+    spdlog::debug("Detected macOS config folder: {}", config.toStdString());
+    return config;
+  }
+#elif defined(Q_OS_WIN)
+  const QString config = joinPath(
+      QDir::homePath(),
+      {QStringLiteral("AppData"), QStringLiteral("LocalLow"),
+       QStringLiteral("Ludeon Studios"),
+       QStringLiteral("RimWorld by Ludeon Studios"), QStringLiteral("Config")});
+  if (isDir(config)) {
+    spdlog::debug("Detected Windows config folder: {}", config.toStdString());
+    return config;
+  }
+#endif
+  return {};
+}
+
+}  // namespace
+
+ConfigService::ConfigService(QString configDir, JsonMigrations migrations)
+    : m_dir(std::move(configDir)), m_migrations(std::move(migrations)) {}
+
+const QString& ConfigService::directory() const noexcept { return m_dir; }
+
+QString ConfigService::filePath(const QString& filename) const {
+  return QDir(m_dir).filePath(filename);
+}
+
+bool ConfigService::isVersioned(const QString& filename) {
+  return filename == kConfigFile || filename == kUiPrefsFile;
+}
+
+std::string ConfigService::withSchemaMarker(std::string prettyObject) {
+  // Pretty output ends with the object's closing brace; the marker goes after
+  // the last non-space character before it, which is the last member's value or
+  // the opening brace.
+  const auto close = prettyObject.rfind('}');
+  if (close == std::string::npos) {
+    return prettyObject;
+  }
+  auto last = prettyObject.find_last_not_of(" \t\r\n", close - 1);
+  if (last == std::string::npos) {
+    return prettyObject;
+  }
+  const bool emptyObject = prettyObject[last] == '{';
+  const std::string marker =
+      std::string("\"") + std::string(kSchemaVersionKey) +
+      "\": " + std::to_string(kCurrentConfigSchemaVersion);
+  prettyObject.insert(last + 1,
+                      emptyObject ? "\n  " + marker + "\n" : ",\n  " + marker);
+  return prettyObject;
+}
+
+namespace {
+
+Result<JsonObject> readJsonObject(const QString& path) {
+  auto bytes = readFileBytes(path);
+  if (!bytes) {
+    return std::unexpected(bytes.error());
+  }
+  glz::json_t document;
+  if (auto error = glz::read_json(document, *bytes)) {
+    return std::unexpected(
+        Error{QString::fromStdString(glz::format_error(error, *bytes))});
+  }
+  if (!document.is_object()) {
+    return std::unexpected(
+        Error{QStringLiteral("top-level value is not an object")});
+  }
+  return std::move(document.get_object());
+}
+
+}  // namespace
+
+JsonObject ConfigService::loadRaw(const QString& filename) const {
+  auto raw = readJsonObject(filePath(filename));
+  return raw ? std::move(*raw) : JsonObject{};
+}
+
+Result<std::optional<JsonObject>> ConfigService::loadVersioned(
+    const QString& filename) const {
+  const QString path = filePath(filename);
+  auto loaded = readJsonObject(path);
+  if (!loaded) {
+    spdlog::warn("Failed to load {}: {}", filename.toStdString(),
+                 loaded.error().message.toStdString());
+    return std::optional<JsonObject>{};
+  }
+  JsonObject raw = std::move(*loaded);
+
+  // A missing marker or an explicit null means schema version 0.
+  std::int64_t version = 0;
+  if (auto marker = raw.find(std::string(kSchemaVersionKey));
+      marker != raw.end()) {
+    const auto& value = marker->second;
+    if (!value.is_null()) {
+      const bool valid = value.is_number() && value.get<double>() >= 0 &&
+                         std::trunc(value.get<double>()) == value.get<double>();
+      if (!valid) {
+        spdlog::warn("Failed to load {}: Invalid JSON schema version",
+                     filename.toStdString());
+        return std::optional<JsonObject>{};
+      }
+      version = static_cast<std::int64_t>(
+          std::min(value.get<double>(), kMaxSchemaVersion));
+    }
+    raw.erase(marker);
+  }
+
+  if (auto migrated = migrate(raw, version); !migrated) {
+    return std::unexpected(migrated.error());
+  }
+  if (version == kCurrentConfigSchemaVersion) {
+    return std::optional<JsonObject>(std::move(raw));
+  }
+
+  // Keep the pre-migration file as a backup before the rewritten one replaces
+  // it.
+  const QString backup = path + QStringLiteral(".bak.") +
+                         QString::number(QDateTime::currentSecsSinceEpoch());
+  if (auto copied = copyFileReplacing(path, backup); !copied) {
+    spdlog::warn("Failed to load {}: {}", filename.toStdString(),
+                 copied.error().message.toStdString());
+    return std::optional<JsonObject>{};
+  }
+  raw[std::string(kSchemaVersionKey)] =
+      static_cast<double>(kCurrentConfigSchemaVersion);
+  auto text = glz::write<kJsonPrettyOpts>(raw);
+  if (!text) {
+    spdlog::warn("Failed to load {}: cannot encode migrated document",
+                 filename.toStdString());
+    return std::optional<JsonObject>{};
+  }
+  if (auto written = writeFileAtomically(path, *text); !written) {
+    spdlog::warn("Failed to load {}: {}", filename.toStdString(),
+                 written.error().message.toStdString());
+    return std::optional<JsonObject>{};
+  }
+  return std::optional<JsonObject>(std::move(raw));
+}
+
+Result<void> ConfigService::migrate(JsonObject& data,
+                                    std::int64_t current) const {
+  if (current > kCurrentConfigSchemaVersion) {
+    return std::unexpected(
+        Error{QStringLiteral("Unsupported JSON schema version %1; latest is %2")
+                  .arg(current)
+                  .arg(kCurrentConfigSchemaVersion)});
+  }
+  for (std::int64_t target = current + 1; target <= kCurrentConfigSchemaVersion;
+       ++target) {
+    const auto migration = m_migrations.find(static_cast<int>(target));
+    if (migration == m_migrations.end()) {
+      return std::unexpected(Error{
+          QStringLiteral("Missing JSON migration step for target version %1")
+              .arg(target)});
+    }
+    migration->second(data);
+  }
+  return {};
+}
+
+QString configDir() {
+  const QString base = qEnvironmentVariable(
+      "XDG_CONFIG_HOME", QDir::homePath() + QStringLiteral("/.config"));
+  return QDir(base).filePath(QStringLiteral("pxmodrim"));
+}
+
+QString communityRulesFile() {
+  return QDir(configDir()).filePath(QStringLiteral("communityRules.json"));
+}
+
+std::optional<QString> readGameVersion(const QString& gamePath) {
+  const QString path = QDir(gamePath).filePath(QStringLiteral("Version.txt"));
+  if (!QFileInfo::exists(path)) {
+    return std::nullopt;
+  }
+  auto bytes = readFileBytes(path);
+  if (!bytes) {
+    spdlog::warn("Failed to read game version from {}", path.toStdString());
+    return std::nullopt;
+  }
+  return QString::fromUtf8(bytes->data(), static_cast<qsizetype>(bytes->size()))
+      .trimmed();
+}
+
+PathConfig detectGamePaths() {
+  QString foundRoot;
+  const GamePaths found = findGamePaths(foundRoot);
+
+  PathConfig result;
+  result.game = found.game.toStdString();
+  result.local = found.local.toStdString();
+  result.workshop = found.workshop.toStdString();
+  result.config_folder = detectConfigFolder(foundRoot).toStdString();
+  result.community_rules_file = communityRulesFile().toStdString();
+  return result;
+}
+
+}  // namespace px::modrim

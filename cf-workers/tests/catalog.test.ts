@@ -3,8 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import { after, before, test } from 'node:test';
 import { Miniflare } from 'miniflare';
-import type { CatalogCollection, CatalogItem, CatalogMod, CatalogPage, SteamFile } from '../types';
+import type { CatalogCollection, CatalogItem, CatalogMod, CatalogPage, DependencyMessage, Env, SteamFile } from '../types';
 import { indexMods } from '../search';
+import { indexTick } from '../indexer';
+import workerHandler from '../worker';
 
 const creator = '76561198000000001';
 function mod(id: string, title: string, children: string[] = [], versions = ['1.6']): SteamFile {
@@ -217,6 +219,40 @@ test('picked search treats wildcard text literally, combines tag/version filters
   assert.equal((await (await request('/catalog/collections?source=picked&q=%25&version=1.5')).json() as CatalogPage<CatalogCollection>).total, 0);
 });
 
+test('picked version filters include numeric tag declarations with correct totals and pagination', async () => {
+  const declarations = [
+    { slug: 'version-filter-tagged', tags: ['version-filter', '1.6'], supported_versions: [] },
+    { slug: 'version-filter-explicit', tags: ['version-filter', '1.6'], supported_versions: ['1.6'] },
+    { slug: 'version-filter-patch', tags: ['version-filter', '1.6.1'], supported_versions: [] },
+    { slug: 'version-filter-lookalike', tags: ['version-filter', 'v1.6', '1.6beta', '1.60'], supported_versions: [] },
+  ];
+  try {
+    for (const { slug, ...declaration } of declarations) {
+      await createPick(slug, ['10', '14'], slug, declaration);
+    }
+    const detail = await (await request('/catalog/collections/picked/version-filter-tagged')).json() as { collection: CatalogCollection };
+    assert.deepEqual(detail.collection.supported_versions, ['1.6']);
+    const path = '/catalog/collections?source=picked&tag=version-filter&version=1.6&limit=1';
+    const first = await (await request(path)).json() as CatalogPage<CatalogCollection>;
+    assert.equal(first.total, 2);
+    assert.equal(first.items.length, 1);
+    assert.ok(first.next_cursor);
+    const second = await (await request(`${path}&cursor=${encodeURIComponent(first.next_cursor!)}`)).json() as CatalogPage<CatalogCollection>;
+    assert.equal(second.total, 2);
+    assert.equal(second.next_cursor, null);
+    assert.deepEqual([...first.items, ...second.items].map(item => item.id).sort(), [
+      'picked:version-filter-explicit', 'picked:version-filter-tagged',
+    ]);
+    const patch = await (await request('/catalog/collections?source=picked&tag=version-filter&version=1.6.1')).json() as CatalogPage<CatalogCollection>;
+    assert.equal(patch.total, 1);
+    assert.deepEqual(patch.items.map(item => item.id), ['picked:version-filter-patch']);
+  } finally {
+    for (const { slug } of declarations) {
+      await request(`/catalog/collections/picked/${slug}`, 'DELETE', undefined, 'test-admin');
+    }
+  }
+});
+
 test('picked ranks round-trip through PUT, detail and ordered lists when editing metadata', async () => {
   const slugs = ['rank-first', 'rank-second'];
   const body = {
@@ -359,6 +395,121 @@ test('the idempotent dependency migration and existing /deps response preserve p
   assert.equal(value.isComplete, true);
   assert.deepEqual(value.items['777']?.deps, ['778']);
   assert.equal(value.items['777']?.package_id, 'existing.mod');
+});
+
+test('an authoritative empty Steam collection clears stored and cached dependency membership', async () => {
+  const rootId = '80001';
+  const memberId = '80002';
+  files[rootId] = { ...mod(rootId, 'Emptied collection', [memberId]), file_type: 2, result: 15 };
+  const now = Date.now();
+  await db.batch([
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind(rootId, 'Emptied collection', 1, 'OK', now, '', memberId),
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind(memberId, 'Removed member', 0, 'OK', now, '', ''),
+  ]);
+  try {
+    const retained = await (await request(`/deps?id=${rootId}&read=unavailable`)).json() as { items: Record<string, { deps: string[] }> };
+    assert.deepEqual(retained.items[rootId]?.deps, [memberId]);
+    files[rootId] = { ...mod(rootId, 'Emptied collection'), file_type: 2 };
+    for (let read = 0; read < 2; read++) {
+      const response = await request(`/deps?id=${rootId}&read=${read}`);
+      assert.equal(response.status, 200);
+      const value = await response.json() as { isComplete: boolean; items: Record<string, { deps: string[] }> };
+      assert.equal(value.isComplete, true);
+      assert.deepEqual(value.items[rootId]?.deps, []);
+      assert.deepEqual(Object.keys(value.items), [rootId]);
+    }
+    const stored = await db.prepare('SELECT deps FROM items WHERE id = ?').bind(rootId).first<{ deps: string }>();
+    assert.equal(stored?.deps, '');
+  } finally {
+    delete files[rootId];
+    await db.prepare('DELETE FROM items WHERE id IN (?, ?)').bind(rootId, memberId).run();
+  }
+});
+
+test('a Steam detail outage keeps a stored collection root membership', async () => {
+  const rootId = '80011';
+  const memberId = '80012';
+  files[rootId] = { ...mod(rootId, 'Stored collection', [memberId]), file_type: 2 };
+  const now = Date.now();
+  await db.batch([
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind(rootId, 'Stored collection', 1, 'OK', now, '', memberId),
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind(memberId, 'Stored member', 0, 'OK', now, '', ''),
+  ]);
+  detailFailures.set(rootId, 'http');
+  try {
+    const response = await request(`/deps?id=${rootId}`);
+    assert.equal(response.status, 200);
+    const value = await response.json() as { isComplete: boolean; items: Record<string, { deps: string[] }> };
+    assert.equal(value.isComplete, true);
+    assert.deepEqual(value.items[rootId]?.deps, [memberId]);
+  } finally {
+    detailFailures.delete(rootId);
+    delete files[rootId];
+    await db.prepare('DELETE FROM items WHERE id IN (?, ?)').bind(rootId, memberId).run();
+  }
+});
+
+test('a Steam detail outage without a scraper is not reported as a successful dependency graph', async () => {
+  const rootId = '80021';
+  detailFailures.set(rootId, 'http');
+  try {
+    const response = await request(`/deps?id=${rootId}`);
+    assert.equal(response.status, 500);
+    assert.equal(await db.prepare('SELECT id FROM items WHERE id = ?').bind(rootId).first(), null);
+  } finally {
+    detailFailures.delete(rootId);
+  }
+});
+
+test('queue continuations are acknowledged only after sending succeeds and retried on send failure', async (t) => {
+  const roots = ['80101', '80111'];
+  const detailCalls = new Map<string, number>();
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    const { publishedfileids } = JSON.parse(url.searchParams.get('input_json') ?? '{}') as { publishedfileids: string[] };
+    return Response.json({ response: { publishedfiledetails: publishedfileids.map(id => {
+      if (!roots.includes(id)) return mod(id, 'Resolved member');
+      const calls = (detailCalls.get(id) ?? 0) + 1;
+      detailCalls.set(id, calls);
+      const children = [String(Number(id) + 1)];
+      if (calls > 1) children.push(String(Number(id) + 2));
+      return { ...mod(id, 'Growing collection', children), file_type: 2 };
+    }) } });
+  });
+  try {
+    for (const [index, rootId] of roots.entries()) {
+      const initialMember = String(Number(rootId) + 1);
+      await db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)')
+        .bind(rootId, 'Growing collection', 1, 'OK', Date.now(), '', initialMember).run();
+      const events: string[] = [];
+      const env: Env = {
+        DB: db, STEAM_API_KEY: 'fixture-only-key',
+        SCRAPE_QUEUE: {
+          async send(body: DependencyMessage, options?: QueueSendOptions) {
+            assert.deepEqual(body, { rootId });
+            assert.equal(options?.delaySeconds, 30);
+            events.push('send');
+            if (index === 1) throw new Error('Injected queue send failure');
+            return { metadata: { metrics: { backlogCount: 1, backlogBytes: 0 } } };
+          },
+        } as Queue<DependencyMessage>,
+      };
+      await workerHandler.queue({
+        queue: 'dependencies',
+        metadata: { metrics: { backlogCount: 1, backlogBytes: 0 } },
+        messages: [{
+          id: rootId, timestamp: new Date(), attempts: 1, body: { rootId },
+          ack() { events.push('ack'); },
+          retry() { events.push('retry'); },
+        }],
+        ackAll() { assert.fail('Expected per-message acknowledgement'); },
+        retryAll() { assert.fail('Expected per-message retry'); },
+      }, env);
+      assert.deepEqual(events, index === 0 ? ['send', 'ack'] : ['send', 'retry']);
+    }
+  } finally {
+    await db.prepare('DELETE FROM items WHERE id BETWEEN ? AND ?').bind('80101', '80113').run();
+  }
 });
 
 test('an unconfigured Steam key does not turn a missing catalog into a successful empty page', async () => {
@@ -928,3 +1079,88 @@ test('indexMods updates FTS when description changes only beyond the first 300 c
   }
 });
 
+
+test('index crawl retries failed index writes without advancing or marking ready while requests remain best-effort', async (t) => {
+  const isolated = new Miniflare({ workers: [{
+    config: {
+      name: 'index-write-failure', compatibilityDate: '2026-10-05',
+      manifest: { mainModule: 'worker.js', modules: { 'worker.js': { type: 'esm', contents: await readFile(resolvePath('dist/worker.js'), 'utf8') } } },
+      env: {
+        DB: { type: 'd1', id: 'index-write-failure' },
+        STEAM_API_KEY: { type: 'text', value: 'fixture-only-key' },
+      },
+    },
+    dev: { outboundService: { type: 'fetcher', handler: upstream } },
+  }] });
+  const id = '80201';
+  files[id] = mod(id, 'IndexWriteFailureFixture');
+  let nextCursor = 'retry-page';
+  const cursors: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
+    const request = new Request(input);
+    const url = new URL(request.url);
+    if (!url.pathname.includes('QueryFiles')) return await upstream(request);
+    const { cursor } = JSON.parse(url.searchParams.get('input_json') ?? '{}') as { cursor: string };
+    cursors.push(cursor);
+    return Response.json({ response: {
+      total: 1, publishedfiledetails: [files[id]], next_cursor: nextCursor,
+    } });
+  });
+  try {
+    const database = await isolated.getD1Database('DB');
+    await migrate(database);
+    const failIndexWrites = async () => {
+      await database.prepare(`CREATE TRIGGER fail_index_write BEFORE INSERT ON catalog_index
+        WHEN NEW.id = '${id}' BEGIN SELECT RAISE(ABORT, 'Injected search index failure'); END`).run();
+    };
+    const state = async () => await database.prepare(
+      'SELECT cursor, indexed, full_at, cycle_started_at FROM index_state WHERE id = 1',
+    ).first<{ cursor: string; indexed: number; full_at: number; cycle_started_at: number }>();
+    await failIndexWrites();
+    const response = await isolated.dispatchFetch(`https://index-write-failure.test/catalog/mods/${id}`);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json() as CatalogMod).id, id);
+    assert.ok(await database.prepare('SELECT id FROM catalog_items WHERE id = ?').bind(id).first());
+    assert.equal(await database.prepare('SELECT id FROM catalog_index WHERE id = ?').bind(id).first(), null);
+    const env: Env = { DB: database, STEAM_API_KEY: 'fixture-only-key' };
+    await assert.rejects(indexTick(env), /Injected search index failure/);
+    assert.deepEqual(await state(), { cursor: '*', indexed: 0, full_at: 0, cycle_started_at: 0 });
+
+    await database.prepare('DROP TRIGGER fail_index_write').run();
+    await indexTick(env);
+    const pending = await state();
+    assert.equal(pending?.cursor, 'retry-page');
+    assert.equal(pending?.indexed, 1);
+    assert.equal(pending?.full_at, 0);
+    assert.ok((pending?.cycle_started_at ?? 0) > 0);
+    assert.ok(await database.prepare('SELECT id FROM catalog_index WHERE id = ?').bind(id).first());
+
+    nextCursor = '';
+    await failIndexWrites();
+    await assert.rejects(indexTick(env), /Injected search index failure/);
+    assert.deepEqual(await state(), pending);
+    await database.prepare('DROP TRIGGER fail_index_write').run();
+    await indexTick(env);
+    const complete = await state();
+    assert.equal(complete?.cursor, '*');
+    assert.equal(complete?.cycle_started_at, 0);
+    assert.ok((complete?.full_at ?? 0) > 0);
+    assert.deepEqual(cursors, ['*', '*', 'retry-page', 'retry-page']);
+
+    await database.prepare('UPDATE catalog_items SET updated_at = 0 WHERE id = ?').bind(id).run();
+    await database.prepare("UPDATE index_state SET cursor = 'verify:0:', cycle_started_at = ?, full_at = 0 WHERE id = 1").bind(Date.now()).run();
+    const verifying = await state();
+    await failIndexWrites();
+    await assert.rejects(indexTick(env), /Injected search index failure/);
+    assert.deepEqual(await state(), verifying);
+    const stale = await database.prepare('SELECT updated_at FROM catalog_items WHERE id = ?').bind(id).first<{ updated_at: number }>();
+    assert.equal(stale?.updated_at, 0);
+    await database.prepare('DROP TRIGGER fail_index_write').run();
+    await indexTick(env);
+    assert.equal((await state())?.cycle_started_at, 0);
+    assert.ok(((await state())?.full_at ?? 0) > 0);
+  } finally {
+    delete files[id];
+    await isolated.dispose();
+  }
+});

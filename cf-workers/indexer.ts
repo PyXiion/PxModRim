@@ -43,7 +43,7 @@ async function refreshIsolating(env: Env, ids: string[], budget: { left: number 
   if (budget.left <= 0) return false;
   budget.left--;
   try {
-    await refreshSteamItems(env, ids);
+    await refreshSteamItems(env, ids, true);
     return true;
   } catch (error) {
     if (!isPerFileFailure(error)) throw error;
@@ -117,7 +117,7 @@ export async function indexTick(env: Env): Promise<void> {
     state.indexed += result.items.length;
     const reachedSeen = state.since > 0 && result.times_updated.every(time => time * 1000 < state.since);
     const items = state.since === 0 ? result.items : result.items.filter(item => (item.updated_at ?? 0) * 1000 >= state.since);
-    await saveItems(env.DB, items);
+    await saveItems(env.DB, items, true);
     if (result.next_cursor && !reachedSeen) {
       state.cursor = result.next_cursor;
       await saveState(env.DB, state);

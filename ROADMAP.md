@@ -6,6 +6,8 @@ acceptance-criteria-driven plan behind it. It reflects the state of the reposito
 `PyXiion/PxModRim` GitHub tracker as observed on 2026-09-21. Re-verify issue/PR/milestone state
 before treating any of the numbers below as current.
 
+> Historical note: the phases below were written for the Python/PySide6 implementation (`uv`, `just test` via pytest, Nuitka). The project now builds with CMake and `just`; see `AGENTS.md`. Commands quoted in the phase text are kept as they were written.
+
 ## Current state snapshot (2026-09-21)
 
 - Project version: `0.1.0` (`pyproject.toml`).

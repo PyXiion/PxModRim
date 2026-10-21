@@ -17,10 +17,10 @@ mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/share/applications
 mkdir -p %{buildroot}/usr/share/icons/hicolor/scalable/apps
 
-cp -a %{project_root}/dist/entrypoint.dist/* %{buildroot}/opt/pxmodrim/
-ln -s /opt/pxmodrim/PxModRim %{buildroot}/usr/bin/pxmodrim
+cp -a %{project_root}/dist/AppDir/usr/. %{buildroot}/opt/pxmodrim/
+ln -s /opt/pxmodrim/bin/pxmodrim %{buildroot}/usr/bin/pxmodrim
 install -m 644 %{project_root}/packaging/linux/pxmodrim.desktop %{buildroot}/usr/share/applications/pxmodrim.desktop
-install -m 644 %{project_root}/src/pxmodrim/ui/assets/logo.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/pxmodrim.svg
+install -m 644 %{project_root}/src/ui/assets/logo.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/pxmodrim.svg
 
 %files
 /opt/pxmodrim

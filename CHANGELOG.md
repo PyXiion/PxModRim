@@ -6,8 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Settings > General > Appearance: Interface scale (100–250%) enlarges text, controls, icons and rows together after restarting. An externally set `QT_SCALE_FACTOR` takes precedence. An invalid saved scale loads as 100% without resetting the other interface preferences.
+- Interface-scale changes offer a **Restart now** action after saving, using the normal close and shutdown path. AppImage builds relaunch the AppImage itself.
+- `--ui-scale N` (also `--ui-scale=N`) and `PX_UI_SCALE` temporarily override the saved scale; `--ui-scale 100` recovers from an unusable saved value. An existing `QT_SCALE_FACTOR` still takes precedence.
+
 ### Changed
+- Settings identifies active interface-scale overrides and hides restart prompts while an override prevents saved changes from taking effect.
+- The main window's initial size and position are clamped to the screen's available logical area. The layout's own minimum width (rail, sidebar and info pane) is not reduced, so very large interface scales on small screens can still make the window larger than the screen.
+- Rewrote PxModRim in C++23 on Qt 6 (Qt Quick UI, QCoro coroutines) with CMake, replacing the Python/PySide6 implementation. User-visible behaviour is unchanged. Building from source now needs CMake 3.24+, Qt 6.8+ (CI uses 6.11), QCoro, pugixml, libzip and spdlog, see `AGENTS.md`; release packages are built from CMake install rules and Qt deployment tools.
 - Project license changed from LGPL-3.0 to GPL-3.0-or-later. Parts of earlier releases were derived from RimSort (GPL-3.0); `NOTICE` previously described RimSort as MIT-licensed, which was incorrect and is fixed.
+- Re-implemented the RimSort-derived modules (XML conversion, game constants, About.xml metadata structures and parsing, startup-impact report parsing) independently of the original code, working only from the clean-room rewrite of their behaviour and the existing tests; their public interfaces are unchanged.
+- Ported the Organizer rail view, folder dialogs, tree and filter models, tag editor, and auto-folder rule editor to the C++/Qt UI, retaining the existing QML behavior and adding Catch2 UI regression coverage.
+- Pinned third-party CI and release actions to immutable commits without changing their selected versions.
+- Removed unused Workshop injection imports and discarded callback results explicitly to satisfy static analysis.
+- Removed dead code and collapsed single-use abstractions across core and UI (unused dialogs, widgets, QSS rules, test-only helpers, duplicate cached-database and mod-provider classes, nullable `ConfigService` paths); user-visible behaviour is unchanged. The undocumented `PX_SMOKE_EXIT_MS` environment variable is gone, and the app version now comes from `project(VERSION)` in CMake.
+- Workshop cards are built from typed card data in one pass instead of repeatedly patching row maps, the mod information panel refreshes only the parts that changed (metadata, active order or diagnostics), providers take their metadata cache per discovery instead of through two channels, and the Organizer tree model takes ownership of the tree it displays instead of copying it.
+
+### Fixed
+- Under Wayland with an interface scale above 100% (`QT_SCALE_FACTOR`), menus, tooltips and combo box lists opened away from their control, and in the rail, sidebar and other side panels also off by the panel's position; the popup's anchor is now passed to the compositor in the top-level surface's pixels.
+- Malformed or unreadable community rules are ignored with a warning instead of failing the mod load, and rules that are no longer used are dropped so they cannot keep affecting diagnostics and sorting.
+- Auto-sort no longer reads the live checker graph and rules from its worker thread, and a sort whose inputs change while it runs is discarded with a warning instead of overwriting newer user changes.
+- An asynchronous startup failure (mod load or plugin init) now ends the application instead of leaving an open window with no running logic behind it.
+- Workshop backend: Steam HTTP failures no longer reset the dependency crawler's cursor or pass for a complete dependency graph, and the legacy resolver uses the catalog's Steam transport and error classification.
+- Moving from the Python app preserves dependency declaration order by rebuilding legacy metadata-cache rows from About.xml once.
+- Snapshot discovery and retention follow Python's platform-specific filename matching, leaving unrelated case-mismatched files untouched on POSIX.
+- Windows and macOS builds no longer fail on the renamed `Platform` enumerators; the UI-off configuration no longer builds UI tests; presets work with CMake 3.24; `just run*` launches the macOS app bundle; CI/release QCoro builds no longer require Qt WebSockets.
+- Shutting down while a Workshop download is queued, logging in or running no longer leaves the catalog or Steam downloader coroutines touching freed objects.
+- Concurrent Organizer folder moves can no longer create folder cycles; the move is validated against the committed tree.
+- Auto-sort now resolves alternative package ids per dependency declaration instead of one shared substitute per missing id.
+- Configuring the game path after a first run without one now initializes plugins (Organizer, Steam downloader) without a restart.
+- The embedded Steam browser exposes its native bridge only to `steamcommunity.com`; deactivating a Workshop mod from it disables every installed copy; Organizer keyboard focus and range selection survive folder expansion.
+- Mods with a parsed About.xml but no description no longer show the "invalid mod" text.
+- Workshop backend: queue continuations are acknowledged only after they are re-queued, emptied collections drop their old members, picked collections honour version tags in the version filter, and failed search-index writes are retried by the crawler.
+- Workshop backend validates picked-collection fields with the ES2022 own-property API.
 
 ## [0.3.1] - 2026-10-13
 

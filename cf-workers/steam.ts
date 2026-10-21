@@ -6,6 +6,8 @@ const APP_ID = 294100;
 const DETAIL_TTL_MS = 15 * 60 * 1000;
 const QUERY_TTL_SECONDS = 5 * 60;
 const API_BATCH_SIZE = 100;
+/** GetDetails accepts at most this many IDs per request. */
+export const STEAM_DETAILS_BATCH = API_BATCH_SIZE;
 const MAX_STEAM_ID = 18446744073709551615n;
 
 export type SteamSort = 'popular' | 'updated' | 'newest' | 'trending' | 'relevance';
@@ -120,6 +122,62 @@ function fileDetails(response: Record<string, unknown>): SteamFile[] {
   return response.publishedfiledetails as SteamFile[];
 }
 
+/** Which optional GetDetails fields a caller needs; each caller states its own set. */
+export interface SteamDetailsOptions {
+  includeChildren: boolean;
+  includeTags: boolean;
+  includeKvTags: boolean;
+  includeVotes: boolean;
+  includeAdditionalPreviews: boolean;
+}
+
+const CATALOG_DETAILS: SteamDetailsOptions = {
+  includeChildren: true,
+  includeTags: true,
+  includeKvTags: true,
+  includeVotes: true,
+  includeAdditionalPreviews: true,
+};
+
+/**
+ * One validated GetDetails request for at most `STEAM_DETAILS_BATCH` IDs.
+ * Transport and shape failures throw, so callers never mistake them for empty results.
+ */
+export async function fetchSteamFileDetails(env: Env, ids: string[], options: SteamDetailsOptions): Promise<SteamFile[]> {
+  const url = steamUrl(env, 'IPublishedFileService', 'GetDetails');
+  url.searchParams.set('input_json', JSON.stringify({
+    publishedfileids: ids,
+    includechildren: options.includeChildren,
+    includetags: options.includeTags,
+    includekvtags: options.includeKvTags,
+    includevotes: options.includeVotes,
+    includeadditionalpreviews: options.includeAdditionalPreviews,
+    short_description: false,
+  }));
+  const response = responseObject(await steamJson(url));
+  if (response.result !== undefined && response.result !== 1) throw new HttpError(502, 'Steam API request failed');
+  return fileDetails(response);
+}
+
+/** IDs of a QueryFiles page requested with `ids_only`; the other fields are not returned. */
+function queryFileIds(response: Record<string, unknown>): string[] {
+  const details = response.publishedfiledetails;
+  if (details === undefined) {
+    if (response.total === 0) return [];
+    throw new HttpError(502, 'Steam API returned invalid file details');
+  }
+  if (!Array.isArray(details)) throw new HttpError(502, 'Steam API returned invalid file details');
+  const ids: string[] = [];
+  for (const value of details as unknown[]) {
+    if (!value || typeof value !== 'object' || !('publishedfileid' in value) || typeof value.publishedfileid !== 'string') {
+      throw new HttpError(502, 'Steam API returned invalid file details');
+    }
+    try { validateSteamId(value.publishedfileid); } catch { throw new HttpError(502, 'Steam API returned an invalid Workshop ID'); }
+    ids.push(value.publishedfileid);
+  }
+  return ids;
+}
+
 async function authorsFor(env: Env, details: SteamFile[]): Promise<Map<string, Author>> {
   const ids = [...new Set(details.map(file => file.creator).filter((id): id is string => typeof id === 'string' && /^[1-9]\d{0,19}$/.test(id)))];
   const authors = new Map<string, Author>();
@@ -204,7 +262,14 @@ function normalized(file: SteamFile, authors: Map<string, Author>): CatalogItem 
   };
 }
 
-export async function saveItems(db: D1Database, items: CatalogItem[]): Promise<void> {
+export async function saveItems(db: D1Database, items: CatalogItem[], requireIndex = false): Promise<void> {
+  // Index first so failed crawl writes remain eligible for verification retries.
+  try {
+    await indexMods(db, items.filter((item): item is CatalogMod => item.kind === 'mod'));
+  } catch (error) {
+    if (requireIndex) throw error;
+    console.error('Search index update failed', error instanceof Error ? error.message : error);
+  }
   const now = Date.now();
   let rowsWritten = 0;
   for (let offset = 0; offset < items.length; offset += API_BATCH_SIZE) {
@@ -214,30 +279,16 @@ export async function saveItems(db: D1Database, items: CatalogItem[]): Promise<v
     rowsWritten += results.reduce((total, result) => total + result.meta.rows_written, 0);
   }
   if (items.length) console.log('[D1_WRITES]', JSON.stringify({ category: 'catalog_cache', rows_written: rowsWritten }));
-  await indexMods(db, items.filter((item): item is CatalogMod => item.kind === 'mod')).catch(error =>
-    console.error('Search index update failed', error instanceof Error ? error.message : error));
 }
 
-export async function refreshSteamItems(env: Env, ids: string[]): Promise<Map<string, CatalogItem>> {
+export async function refreshSteamItems(env: Env, ids: string[], requireIndex = false): Promise<Map<string, CatalogItem>> {
   const fetched = new Map<string, CatalogItem>();
   const unavailable: string[] = [];
   for (let offset = 0; offset < ids.length; offset += API_BATCH_SIZE) {
     const chunk = ids.slice(offset, offset + API_BATCH_SIZE);
-    const url = steamUrl(env, 'IPublishedFileService', 'GetDetails');
-    url.searchParams.set('input_json', JSON.stringify({
-      publishedfileids: chunk,
-      includechildren: true,
-      includetags: true,
-      includekvtags: true,
-      includevotes: true,
-      includeadditionalpreviews: true,
-      short_description: false,
-    }));
-    const response = responseObject(await steamJson(url));
-    const details = fileDetails(response);
+    const details = await fetchSteamFileDetails(env, chunk, CATALOG_DETAILS);
     const returned = new Set(details.map(file => file.publishedfileid));
-    if ((response.result !== undefined && response.result !== 1) || details.length !== chunk.length
-      || returned.size !== chunk.length || chunk.some(id => !returned.has(id))) {
+    if (details.length !== chunk.length || returned.size !== chunk.length || chunk.some(id => !returned.has(id))) {
       throw new HttpError(502, 'Steam API returned incomplete file details');
     }
     for (const file of details) {
@@ -250,7 +301,7 @@ export async function refreshSteamItems(env: Env, ids: string[]): Promise<Map<st
     for (const item of items) fetched.set(item.kind === 'collection' ? item.steam_id! : item.id, item);
   }
   // Do not evict anything if a later Steam batch or creator lookup fails.
-  await saveItems(env.DB, [...fetched.values()]);
+  await saveItems(env.DB, [...fetched.values()], requireIndex);
   let rowsWritten = 0;
   for (let offset = 0; offset < unavailable.length; offset += API_BATCH_SIZE) {
     const results = await env.DB.batch(unavailable.slice(offset, offset + API_BATCH_SIZE).map(id => env.DB.prepare(
@@ -323,11 +374,20 @@ export interface FilesPage<T extends CatalogItem> {
   times_updated: number[];
 }
 
+async function queryFilesResponse(env: Env, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const url = steamUrl(env, 'IPublishedFileService', 'QueryFiles');
+  url.searchParams.set('input_json', JSON.stringify(input));
+  const response = responseObject(await steamJson(url));
+  if (response.next_cursor !== undefined && typeof response.next_cursor !== 'string') {
+    throw new HttpError(502, 'Steam API returned invalid pagination');
+  }
+  return response;
+}
+
 export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind: K, query: SteamQuery): Promise<FilesPage<K extends 'mod' ? CatalogMod : CatalogCollection>> {
   const queryTypes: Record<SteamSort, number> = { popular: 9, updated: 21, newest: 1, trending: 3, relevance: 12 };
   const requiredTags = [...new Set([query.tag, query.version].filter((tag): tag is string => tag !== null))];
-  const url = steamUrl(env, 'IPublishedFileService', 'QueryFiles');
-  url.searchParams.set('input_json', JSON.stringify({
+  const response = await queryFilesResponse(env, {
     query_type: queryTypes[query.sort],
     page: 1,
     cursor: query.cursor,
@@ -347,10 +407,8 @@ export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind:
     return_previews: true,
     return_short_description: false,
     cache_max_age_seconds: QUERY_TTL_SECONDS,
-  }));
-  const response = responseObject(await steamJson(url));
-  if (typeof response.total !== 'number' || !Number.isSafeInteger(response.total) || response.total < 0
-    || (response.next_cursor !== undefined && typeof response.next_cursor !== 'string')) {
+  });
+  if (typeof response.total !== 'number' || !Number.isSafeInteger(response.total) || response.total < 0) {
     throw new HttpError(502, 'Steam API returned invalid pagination');
   }
   const details = fileDetails(response);
@@ -364,6 +422,36 @@ export async function queryFiles<K extends 'mod' | 'collection'>(env: Env, kind:
     next_cursor: details.length && cursor && cursor !== query.cursor ? cursor : null,
     times_updated: details.map(file => file.time_updated ?? 0),
   } as FilesPage<K extends 'mod' ? CatalogMod : CatalogCollection>;
+}
+
+/**
+ * IDs-only QueryFiles page for the legacy dependency crawler, using that crawler's
+ * established request options. Transport and shape failures throw instead of
+ * returning an empty page, so a fault can never look like crawl exhaustion.
+ */
+export async function querySteamIds(env: Env, limit: number, cursor: string): Promise<{ ids: string[]; next_cursor: string }> {
+  const response = await queryFilesResponse(env, {
+    query_type: 1,
+    page: 1,
+    cursor,
+    numperpage: limit,
+    creator_appid: APP_ID,
+    appid: APP_ID,
+    filetype: 0,
+    ids_only: true,
+    return_children: false,
+    return_vote_data: false,
+    return_tags: false,
+    return_kv_tags: false,
+    return_previews: false,
+    return_short_description: false,
+    return_metadata: false,
+    return_playtime_stats: false,
+  });
+  return {
+    ids: queryFileIds(response),
+    next_cursor: typeof response.next_cursor === 'string' ? response.next_cursor : '',
+  };
 }
 
 const QUERY_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
