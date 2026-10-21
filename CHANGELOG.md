@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workshop cards are built from typed card data in one pass instead of repeatedly patching row maps, the mod information panel refreshes only the parts that changed (metadata, active order or diagnostics), providers take their metadata cache per discovery instead of through two channels, and the Organizer tree model takes ownership of the tree it displays instead of copying it.
 
 ### Fixed
+- Under Wayland with an interface scale above 100% (`QT_SCALE_FACTOR`), menus, tooltips and combo box lists opened away from their control, and in the rail, sidebar and other side panels also off by the panel's position; the popup's anchor is now passed to the compositor in the top-level surface's pixels.
 - Malformed or unreadable community rules are ignored with a warning instead of failing the mod load, and rules that are no longer used are dropped so they cannot keep affecting diagnostics and sorting.
 - Auto-sort no longer reads the live checker graph and rules from its worker thread, and a sort whose inputs change while it runs is discarded with a warning instead of overwriting newer user changes.
 - An asynchronous startup failure (mod load or plugin init) now ends the application instead of leaving an open window with no running logic behind it.
