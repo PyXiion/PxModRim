@@ -6,7 +6,7 @@
 #include "core/models/view/diagnostics.hpp"
 namespace px::modrim {
 inline const QString kImgWidthToken = QStringLiteral("__IMG_WIDTH__");
-QString bbcodeImages(QString text);
+QString bbcodeImages(const QString& text);
 QString restoreEntities(QString text);
 QString bbcodeMarkup(QString text);
 QString autolink(const QString& text);

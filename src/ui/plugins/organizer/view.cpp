@@ -792,7 +792,7 @@ void OrganizerViewPanel::folderMenu(const TreeNode& node) {
     reportError(result.error());
     return;
   }
-  const auto uuids = *result;
+  const auto& uuids = *result;
   m_menu
       ->addAction(QStringLiteral("Enable all"), this,
                   [this, uuids] { applyActivation(m_ctx, this, uuids); })

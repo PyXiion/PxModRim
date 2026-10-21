@@ -64,7 +64,8 @@ QString summarize(const QString& text, const QString& format) {
   result = result.simplified();
   const auto codepoints = result.toUcs4();
   if (codepoints.size() <= 140) return result;
-  result = QString::fromUcs4(codepoints.constData(), 140);
+  result = QString::fromUcs4(
+      reinterpret_cast<const char32_t*>(codepoints.constData()), 140);
   const auto space = result.lastIndexOf(' ');
   if (space >= 0) result.truncate(space);
   const QString punctuation = QStringLiteral(".,;:-–— ");

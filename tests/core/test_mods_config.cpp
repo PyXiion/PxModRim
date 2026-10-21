@@ -7,7 +7,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <pugixml.hpp>
 
-#include "core/file_io.hpp"
 #include "core/models/metadata/structures.hpp"
 #include "core/mods_config.hpp"
 #include "test_support.hpp"

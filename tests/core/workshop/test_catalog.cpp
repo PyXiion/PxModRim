@@ -8,7 +8,6 @@
 #include <QString>
 #include <QStringList>
 #include <QTemporaryDir>
-#include <chrono>
 #include <coroutine>
 #include <map>
 #include <memory>
@@ -25,10 +24,8 @@
 #include "core/downloads/downloader.hpp"
 #include "core/downloads/manager.hpp"
 #include "core/downloads/types.hpp"
-#include "core/file_io.hpp"
 #include "core/models/metadata/structures.hpp"
 #include "core/workshop/catalog.hpp"
-#include "core/workshop/client.hpp"
 #include "core/workshop/types.hpp"
 #include "support.hpp"
 

@@ -42,7 +42,7 @@ std::optional<QString> readWorkshopNumber(const QString& directory) {
     if (decoder.hasError()) {
       return std::nullopt;
     }
-    const QString candidate = text.trimmed();
+    QString candidate = text.trimmed();
     if (isAsciiDigits(candidate)) {
       return candidate;
     }

@@ -19,6 +19,8 @@
 #include <QCoro/QCoroFuture>
 #include <QtConcurrent/QtConcurrentRun>
 
+#include <spdlog/spdlog.h>
+
 #include "core/downloads/manager.hpp"
 #include "core/mod_service.hpp"
 #include "core/services/startup_impact_service/labels.hpp"
@@ -240,7 +242,9 @@ void ModInfoPanel::copyText(const QString& text) {
 }
 void ModInfoPanel::descToggled(bool expanded) {
   m_prefs.desc_expanded = expanded;
-  saveUiPrefs(m_prefs, m_ctx.configService());
+  if (const auto saved = saveUiPrefs(m_prefs, m_ctx.configService()); !saved)
+    spdlog::warn("cannot save UI prefs: {}",
+                 saved.error().message.toStdString());
 }
 void ModInfoPanel::updateMod() {
   if (!m_mod) return;

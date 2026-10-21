@@ -35,7 +35,7 @@ QRegularExpression insensitive(const QString& pattern) {
                                 QRegularExpression::DotMatchesEverythingOption);
 }
 }  // namespace
-QString bbcodeImages(QString text) {
+QString bbcodeImages(const QString& text) {
   static const auto re =
       insensitive(R"(\[img\]((https?)://[^\s\[<"]+)\[/img\])");
   return substitute(text, re, [](const auto& match) {

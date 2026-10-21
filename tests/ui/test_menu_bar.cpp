@@ -2,7 +2,6 @@
 #include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
-#include <memory>
 #include <set>
 
 #include <catch2/catch_test_macros.hpp>

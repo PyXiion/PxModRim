@@ -3,8 +3,6 @@
 #include <QNetworkAccessManager>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <memory>
-#include <tuple>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>

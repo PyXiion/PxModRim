@@ -14,7 +14,7 @@
 
 namespace px::modrim {
 
-inline constexpr int clampUiScale(int percent) {
+constexpr int clampUiScale(int percent) {
   return std::clamp(percent, 100, 250);
 }
 

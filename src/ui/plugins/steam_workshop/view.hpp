@@ -23,8 +23,8 @@ class SteamWorkshopViewPanel final : public BaseViewPanel {
   SteamWorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent,
                          AppContext& app);
   ~SteamWorkshopViewPanel() override;
-  void preload();
-  void teardown();
+  void preload() override;
+  void teardown() override;
   Q_INVOKABLE void navigateHome();
   Q_INVOKABLE void navigateToUrl(const QString& text);
   Q_INVOKABLE static bool isSteamOrigin(const QUrl& url);

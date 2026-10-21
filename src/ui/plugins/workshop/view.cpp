@@ -92,7 +92,7 @@ WorkshopViewPanel::WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine,
 }
 
 WorkshopViewPanel::~WorkshopViewPanel() {
-  teardown();
+  WorkshopViewPanel::teardown();
   // Workshop.qml bindings read workshopPanel; the view must die while this
   // panel is still alive.
   delete m_qml;

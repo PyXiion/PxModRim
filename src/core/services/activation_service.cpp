@@ -3,7 +3,6 @@
 #include <QHash>
 #include <QSet>
 #include <algorithm>
-#include <cstddef>
 #include <functional>
 #include <optional>
 #include <queue>

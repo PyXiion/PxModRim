@@ -132,7 +132,7 @@ MetricKey splitMetricKey(const QString& key) {
 
 QString metricLabel(const QString& key) {
   const auto [base, target] = splitMetricKey(key);
-  const QString label = baseLabel(base);
+  QString label = baseLabel(base);
   if (target.isEmpty()) {
     return label;
   }

@@ -7,7 +7,6 @@
 #include <QUrl>
 #include <algorithm>
 #include <chrono>
-#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -241,7 +240,7 @@ std::optional<QString> findExecutable(const QString& gamePath,
   const QDir dir(gamePath);
   if (platform == Platform::kLinux) {
     for (const char* name : {"RimWorld", "RimWorldLinux"}) {
-      const QString candidate = dir.filePath(QString::fromLatin1(name));
+      QString candidate = dir.filePath(QString::fromLatin1(name));
       const QFileInfo info(candidate);
       if (info.isFile() && info.isExecutable()) {
         return candidate;
@@ -250,7 +249,7 @@ std::optional<QString> findExecutable(const QString& gamePath,
     return std::nullopt;
   }
   if (platform == Platform::kMacOs) {
-    const QString primary = dir.filePath(QStringLiteral("RimWorld.app"));
+    QString primary = dir.filePath(QStringLiteral("RimWorld.app"));
     if (QFileInfo(primary).isDir()) {
       return primary;
     }
@@ -264,7 +263,7 @@ std::optional<QString> findExecutable(const QString& gamePath,
   }
   for (const char* name :
        {"RimWorld.exe", "RimWorldWin64.exe", "RimWorldWin.exe"}) {
-    const QString candidate = dir.filePath(QString::fromLatin1(name));
+    QString candidate = dir.filePath(QString::fromLatin1(name));
     if (QFileInfo(candidate).isFile()) {
       return candidate;
     }

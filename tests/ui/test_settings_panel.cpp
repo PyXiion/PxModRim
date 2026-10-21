@@ -8,7 +8,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "core/context.hpp"
 #include "test_support.hpp"
 #include "ui/components/svg_provider.hpp"
 #include "ui/panels/settings_panel.hpp"

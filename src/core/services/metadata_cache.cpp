@@ -182,7 +182,7 @@ QString stringOr(const QJsonObject& object, const char* key,
 
 QStringList stringList(const QJsonValue& value) {
   QStringList values;
-  for (const QJsonValue& item : value.toArray()) {
+  for (const auto& item : value.toArray()) {
     if (item.isString()) {
       values.append(item.toString());
     }
@@ -232,7 +232,7 @@ Result<std::shared_ptr<AboutXmlMod>> deserializeMod(const QString& payload,
       stringList(rulesData.value(QLatin1StringView("load_after"))));
   mod->aboutRules.incompatibleWith = CaseInsensitiveSet(
       stringList(rulesData.value(QLatin1StringView("incompatible_with"))));
-  for (const QJsonValue& item : dependencies.toArray()) {
+  for (const auto& item : dependencies.toArray()) {
     if (!item.isObject()) {
       continue;
     }

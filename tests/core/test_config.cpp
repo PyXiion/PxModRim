@@ -11,7 +11,6 @@
 
 #include "core/config.hpp"
 #include "core/constants.hpp"
-#include "core/file_io.hpp"
 #include "test_support.hpp"
 
 namespace config_test {

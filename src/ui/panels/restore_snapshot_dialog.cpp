@@ -39,7 +39,7 @@ std::optional<QDateTime> timestampFromStem(const QString& stem) {
   if (parts.size() < 2 || parts[0].size() != 8 || parts[1].size() < 6) {
     return std::nullopt;
   }
-  const QString date = parts[0];
+  const QString& date = parts[0];
   const QString time = parts[1].left(6);
   if (!isAsciiDigits(date) || !isAsciiDigits(time)) {
     return std::nullopt;

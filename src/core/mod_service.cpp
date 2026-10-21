@@ -2,7 +2,6 @@
 
 #include <QDir>
 #include <QSet>
-#include <algorithm>
 #include <utility>
 #include <vector>
 

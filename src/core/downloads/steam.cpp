@@ -12,7 +12,6 @@
 #include <QtConcurrent>
 #include <algorithm>
 #include <charconv>
-#include <cstddef>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -192,7 +191,7 @@ std::optional<QString> SteamDownloader::updatableId(
   if (QDir::cleanPath(info.path()) != QDir::cleanPath(local)) {
     return std::nullopt;
   }
-  const auto pfid = mod.publishedFileId();
+  auto pfid = mod.publishedFileId();
   if (!pfid || *pfid != info.fileName()) {
     return std::nullopt;
   }

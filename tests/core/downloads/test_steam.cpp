@@ -69,11 +69,6 @@ class Flag {
     m_cv.notify_all();
   }
 
-  void clear() {
-    std::lock_guard lock(m_mutex);
-    m_value = false;
-  }
-
   bool isSet() const {
     std::lock_guard lock(m_mutex);
     return m_value;

@@ -13,7 +13,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 #include <zip.h>
 #include <zlib.h>
 

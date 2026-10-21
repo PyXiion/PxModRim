@@ -10,7 +10,7 @@ std::optional<QString> findAboutXml(const QString& modPath) {
     return std::nullopt;
   }
   const QDir modDir(modPath);
-  const QString candidate = modDir.filePath(QStringLiteral("About/About.xml"));
+  QString candidate = modDir.filePath(QStringLiteral("About/About.xml"));
   if (QFileInfo(candidate).isFile()) {
     return candidate;
   }

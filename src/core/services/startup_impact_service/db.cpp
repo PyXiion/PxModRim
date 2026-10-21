@@ -258,7 +258,7 @@ Result<QSqlDatabase> openConnection(StartupImpactDb::Connection& conn,
   };
 
   if (auto ready = prepare(); !ready) {
-    const Error error = ready.error();
+    const Error& error = ready.error();
     db = QSqlDatabase();
     QSqlDatabase::removeDatabase(conn.name);
     return std::unexpected(error);

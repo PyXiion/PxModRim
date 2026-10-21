@@ -10,7 +10,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/checker/checker.hpp"
-#include "core/checker/graph.hpp"
 #include "core/checker/issues.hpp"
 #include "core/checker/models.hpp"
 #include "core/models/metadata/structures.hpp"

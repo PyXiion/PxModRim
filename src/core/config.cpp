@@ -86,7 +86,7 @@ QString vdfFindRimworld(const QString& vdfPath, const QString& steamId) {
 }
 
 QString findRimworldInSteamRoot(const QString& root, const QString& steamId) {
-  const QString game = gameDirIn(root);
+  QString game = gameDirIn(root);
   if (isDir(game)) {
     return game;
   }
@@ -264,7 +264,7 @@ QString detectConfigFolder([[maybe_unused]] const QString& steamRoot) {
       return proton;
     }
   }
-  const QString native = joinPath(
+  QString native = joinPath(
       QDir::homePath(),
       {QStringLiteral(".config"), QStringLiteral("unity3d"),
        QStringLiteral("Ludeon Studios"),

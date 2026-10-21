@@ -32,7 +32,7 @@ QStringList uuidsOf(const QList<ModLeaf>& leaves) {
 }
 
 Result<QString> cleanName(const QString& name, const QString& what) {
-  const QString cleaned = name.trimmed();
+  QString cleaned = name.trimmed();
   if (cleaned.isEmpty()) {
     return std::unexpected(
         Error{QStringLiteral("%1 name cannot be empty.").arg(what)});

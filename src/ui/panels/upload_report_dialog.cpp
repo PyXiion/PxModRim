@@ -125,7 +125,7 @@ QCoro::Task<void> saveReport(QWidget* parent, QString report, Notifier& toast) {
   auto [result, dialog] = co_await awaitDialog<SaveReportFileDialog>(parent);
   const QStringList files = dialog->selectedFiles();
   if (result != QDialog::Accepted || files.isEmpty()) co_return;
-  const QString path = files.first();
+  const QString& path = files.first();
   const QString error = co_await providers::runOnPool<QString>(
       nullptr, [path, report = std::move(report)] {
         QSaveFile file(path);

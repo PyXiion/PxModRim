@@ -15,7 +15,6 @@
 #include <QUrl>
 #include <QtGlobal>
 #include <algorithm>
-#include <array>
 
 #include <QCoro/QCoroNetworkReply>
 
@@ -263,7 +262,7 @@ QString readLogTail(const std::optional<QString>& logPath, qint64 maxBytes) {
         .arg(raw.error().message);
   }
 
-  const QString plain = parseLogText(QString::fromUtf8(*raw));
+  QString plain = parseLogText(QString::fromUtf8(*raw));
   const QByteArray encoded = plain.toUtf8();
   if (encoded.size() <= maxBytes) {
     return plain;
