@@ -110,9 +110,10 @@ void ConstraintGraph::build(const QHash<PackageId, AboutXmlModPtr>& activeMods,
       if (rule == communityRules->cend()) {
         continue;
       }
-      addLoadRules(it.key(), rule->loadBefore, rule->loadAfter,
-                   rule->incompatibleWith, EdgeOrigin::kCommunityRules,
-                   alternatives);
+      addEdges(it.key(), rule->loadAfter, EdgeType::kLoadAfter,
+               EdgeOrigin::kCommunityRules, alternatives);
+      addEdges(it.key(), rule->loadBefore, EdgeType::kLoadBefore,
+               EdgeOrigin::kCommunityRules, alternatives);
     }
   }
 }
@@ -279,19 +280,9 @@ void ConstraintGraph::addRules(
              {});
   }
 
-  addLoadRules(pid, rules.loadBefore, rules.loadAfter, rules.incompatibleWith,
-               origin, alternatives);
-}
-
-void ConstraintGraph::addLoadRules(const PackageId& pid,
-                                   const CaseInsensitiveSet& loadBefore,
-                                   const CaseInsensitiveSet& loadAfter,
-                                   const CaseInsensitiveSet& incompatibleWith,
-                                   EdgeOrigin origin,
-                                   const Alternatives& alternatives) {
-  addEdges(pid, loadAfter, EdgeType::kLoadAfter, origin, alternatives);
-  addEdges(pid, loadBefore, EdgeType::kLoadBefore, origin, alternatives);
-  addEdges(pid, incompatibleWith, EdgeType::kIncompatibility, origin,
+  addEdges(pid, rules.loadAfter, EdgeType::kLoadAfter, origin, alternatives);
+  addEdges(pid, rules.loadBefore, EdgeType::kLoadBefore, origin, alternatives);
+  addEdges(pid, rules.incompatibleWith, EdgeType::kIncompatibility, origin,
            alternatives);
 }
 

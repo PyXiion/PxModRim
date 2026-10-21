@@ -1,32 +1,9 @@
-#include <QApplication>
-#include <QCoreApplication>
 #include <QImage>
 #include <QString>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include "ui/components/procedural_preview.hpp"
-
-namespace {
-
-// generate_preview paints with QPainter and QFont, so it needs a GUI
-// application. Reuse one if the test binary already has it; otherwise create
-// one, offscreen unless the environment picks a platform.
-QApplication& application() {
-  if (auto* app = qobject_cast<QApplication*>(QCoreApplication::instance())) {
-    return *app;
-  }
-  static int argc = 1;
-  static char name[] = "pxmodrim_ui_tests";
-  static char* argv[] = {name, nullptr};
-  if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-  }
-  static QApplication app(argc, argv);
-  return app;
-}
-
-}  // namespace
 
 TEST_CASE("initials abbreviates titles") {
   struct Case {
@@ -53,7 +30,6 @@ TEST_CASE("initials abbreviates titles") {
 }
 
 TEST_CASE("generate preview returns a non-null image of the requested size") {
-  application();
   const QImage image =
       px::modrim::generatePreview(QStringLiteral("[AV] Framework"), 120, 60);
   REQUIRE(!image.isNull());
@@ -62,7 +38,6 @@ TEST_CASE("generate preview returns a non-null image of the requested size") {
 }
 
 TEST_CASE("generate preview returns the cached image for the same request") {
-  application();
   const QImage image =
       px::modrim::generatePreview(QStringLiteral("[AV] Framework"), 120, 60);
   REQUIRE(!image.isNull());

@@ -1,5 +1,4 @@
 #include <QAction>
-#include <QApplication>
 #include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
@@ -10,17 +9,6 @@
 
 #include "ui/window/actions.hpp"
 #include "ui/window/menu_bar.hpp"
-
-namespace {
-void ensureApplication() {
-  static int argc = 1;
-  static char name[] = "pxmodrim-menu-tests";
-  static char* argv[] = {name, nullptr};
-  static std::unique_ptr<QApplication> app;
-  if (!QApplication::instance())
-    app = std::make_unique<QApplication>(argc, argv);
-}
-}  // namespace
 
 TEST_CASE("Every window action belongs to exactly one menu", "[ui][window]") {
   std::multiset<px::modrim::ActionId> placed;
@@ -34,7 +22,6 @@ TEST_CASE("Every window action belongs to exactly one menu", "[ui][window]") {
 
 TEST_CASE("Window shortcuts are unique and view switching is collapsed",
           "[ui][window]") {
-  ensureApplication();
   std::set<QString> shortcuts;
   for (const auto& spec : px::modrim::actionSpecs())
     if (!spec.shortcut.isEmpty()) CHECK(shortcuts.insert(spec.shortcut).second);
@@ -53,7 +40,6 @@ TEST_CASE("Window shortcuts are unique and view switching is collapsed",
 }
 
 TEST_CASE("Hidden menu actions retain their window shortcuts", "[ui][window]") {
-  ensureApplication();
   QMainWindow window;
   const auto actions = px::modrim::createActions(window);
   px::modrim::MenuBar menu(actions, &window);

@@ -1,4 +1,4 @@
-#include <QApplication>
+#include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QJSValue>
 #include <QQmlContext>
@@ -29,22 +29,6 @@ using namespace px::modrim;
 using organizer_test::expect;
 using organizer_test::wait;
 
-// UI tests may share a QApplication supplied by their test executable.
-class Application {
- public:
-  Application() {
-    if (!QCoreApplication::instance())
-      m_app = std::make_unique<QApplication>(m_argc, m_argv);
-    REQUIRE(qobject_cast<QApplication*>(QCoreApplication::instance()));
-  }
-
- private:
-  int m_argc = 1;
-  char m_name[16] = "organizer-test";
-  char* m_argv[2] = {m_name, nullptr};
-  std::unique_ptr<QApplication> m_app;
-};
-
 template <class Predicate>
 void until(Predicate predicate) {
   QElapsedTimer timer;
@@ -62,7 +46,6 @@ QQuickItem* item(QQuickItem* root, const QString& name) {
 }
 
 struct Harness {
-  Application application;
   QTemporaryDir dir;
   std::unique_ptr<CoreContext> ctx = px::ui_test::makeCore(AppConfig{});
   OrganizerDb db{dir.filePath(QStringLiteral("organizer.db"))};

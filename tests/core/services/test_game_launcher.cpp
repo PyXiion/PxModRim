@@ -90,7 +90,7 @@ std::unique_ptr<CoreContext> contextFor(const QString& gamePath) {
   static px::modrim::ConfigService configService(configDir.path());
   AppConfig cfg;
   cfg.paths.game = gamePath.toStdString();
-  return CoreContext::create(cfg, &configService);
+  return CoreContext::create(cfg, configService);
 }
 
 }  // namespace

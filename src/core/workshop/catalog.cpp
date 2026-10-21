@@ -50,7 +50,7 @@ Result<void> writeCached(const QString& directory, const QString& path,
 
 }  // namespace detail
 
-WorkshopCatalog::WorkshopCatalog(ConfigService* config,
+WorkshopCatalog::WorkshopCatalog(ConfigService& config,
                                  DownloadManager& downloads,
                                  InstalledModsProvider installedMods)
     : Plugin(QStringLiteral("workshop_catalog"), {QStringLiteral("downloads")}),
@@ -59,12 +59,10 @@ WorkshopCatalog::WorkshopCatalog(ConfigService* config,
           {{QStringLiteral("workshop_catalog_url"), QStringLiteral("url")}}),
       m_baseUrl(
           normalizeBaseUrl(QString::fromStdString(m_settings.value().url))),
+      m_cacheDir(config.directory() + QStringLiteral("/workshop-cache")),
       m_favourites(config),
       m_downloads(&downloads),
       m_installedMods(std::move(installedMods)) {
-  if (config) {
-    m_cacheDir = config->directory() + QStringLiteral("/workshop-cache");
-  }
   m_settings.changed.connect([this](const CatalogSettings& settings) {
     changeUrl(QString::fromStdString(settings.url));
   });
@@ -148,7 +146,7 @@ QString WorkshopCatalog::cacheFile(const QString& key) const {
   const QByteArray digest =
       QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256)
           .toHex();
-  return *m_cacheDir + QLatin1Char('/') + QString::fromLatin1(digest.left(32)) +
+  return m_cacheDir + QLatin1Char('/') + QString::fromLatin1(digest.left(32)) +
          QStringLiteral(".json");
 }
 

@@ -240,7 +240,7 @@ void ModInfoPanel::copyText(const QString& text) {
 }
 void ModInfoPanel::descToggled(bool expanded) {
   m_prefs.desc_expanded = expanded;
-  if (m_ctx.hasConfigService()) saveUiPrefs(m_prefs, m_ctx.configService());
+  saveUiPrefs(m_prefs, m_ctx.configService());
 }
 void ModInfoPanel::updateMod() {
   if (!m_mod) return;

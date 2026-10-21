@@ -75,7 +75,7 @@ struct Fixture {
   QTemporaryDir dir;
   ConfigService configService{dir.path()};
   std::unique_ptr<CoreContext> ctx =
-      CoreContext::create(AppConfig{}, &configService);
+      CoreContext::create(AppConfig{}, configService);
 
   Fixture() {
     ctx->load(baseMods(), ids({"uuid-c", "uuid-d", "uuid-a", "uuid-b"}));

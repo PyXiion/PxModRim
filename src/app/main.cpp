@@ -211,7 +211,7 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
   // holds it.
   px::modrim::organizer::OrganizerDb organizerDb(
       px::modrim::organizer::dbPath(configService.directory()));
-  auto ctx = px::modrim::CoreContext::create(cfg, &configService);
+  auto ctx = px::modrim::CoreContext::create(cfg, configService);
   const QStringList downloaders = px::modrim::registerCorePlugins(
       *ctx, configService, organizerDb, disabled);
 

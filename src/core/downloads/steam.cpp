@@ -131,7 +131,7 @@ SteamDownloader::SteamDownloader(SteamDownloaderDeps deps)
       m_localModsPath(std::move(deps.localModsPath)),
       m_installedMods(std::move(deps.installedMods)),
       m_clientFactory(std::move(deps.clientFactory)),
-      m_settings(&deps.config, QStringLiteral("steam_downloader"),
+      m_settings(deps.config, QStringLiteral("steam_downloader"),
                  {{"workshop_auto_update_hours", "auto_update_hours"},
                   {"workshop_parallel_items", "parallel_items"},
                   {"workshop_threads_per_item", "threads_per_item"},

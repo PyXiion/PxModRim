@@ -5,7 +5,7 @@
 
 namespace px::modrim::workshop {
 
-FavouriteCollections::FavouriteCollections(ConfigService* service)
+FavouriteCollections::FavouriteCollections(ConfigService& service)
     : m_config(service, QStringLiteral("workshop_favourites")) {}
 
 bool FavouriteCollections::contains(const std::string& collectionId) const {

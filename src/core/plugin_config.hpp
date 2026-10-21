@@ -21,11 +21,11 @@ concept PluginSettings =
 
 // A plugin's own settings, kept in plugins/<name>.json. `legacy` maps keys of
 // the old shared config.json to fields of T; they seed the file the first time
-// it is created. Without a service the settings live in memory only.
+// it is created.
 template <PluginSettings T>
 class PluginConfig {
  public:
-  PluginConfig(ConfigService* service, const QString& name,
+  PluginConfig(ConfigService& service, const QString& name,
                const QHash<QString, QString>& legacy = {});
 
   const T& value() const noexcept { return m_value; }
@@ -38,33 +38,30 @@ class PluginConfig {
   T seed(const QHash<QString, QString>& legacy) const;
   void store(const T& value) const;
 
-  ConfigService* m_service;
+  ConfigService& m_service;
   QString m_filename;
   T m_value{};
 };
 
 template <PluginSettings T>
-PluginConfig<T>::PluginConfig(ConfigService* service, const QString& name,
+PluginConfig<T>::PluginConfig(ConfigService& service, const QString& name,
                               const QHash<QString, QString>& legacy)
     : m_service(service),
       m_filename(QStringLiteral("plugins/%1.json").arg(name)) {
-  std::optional<T> stored;
-  if (m_service) {
-    // plugins/*.json is unversioned, so loading cannot fail with a migration
-    // error.
-    auto loaded = m_service->loadExisting<T>(m_filename);
-    Q_ASSERT(loaded.has_value());
-    stored = loaded.value_or(std::nullopt);
-  }
+  // plugins/*.json is unversioned, so loading cannot fail with a migration
+  // error.
+  auto loaded = m_service.loadExisting<T>(m_filename);
+  Q_ASSERT(loaded.has_value());
+  std::optional<T> stored = loaded.value_or(std::nullopt);
   m_value = stored ? std::move(*stored) : seed(legacy);
 }
 
 template <PluginSettings T>
 T PluginConfig<T>::seed(const QHash<QString, QString>& legacy) const {
-  if (!m_service || legacy.isEmpty()) {
+  if (legacy.isEmpty()) {
     return T{};
   }
-  const auto raw = m_service->loadRaw(kConfigFile);
+  const auto raw = m_service.loadRaw(kConfigFile);
   glz::json_t::object_t fields;
   for (auto it = legacy.cbegin(); it != legacy.cend(); ++it) {
     if (auto found = raw.find(it.key().toStdString()); found != raw.end()) {
@@ -102,10 +99,7 @@ void PluginConfig<T>::update(T value) {
 
 template <PluginSettings T>
 void PluginConfig<T>::store(const T& value) const {
-  if (!m_service) {
-    return;
-  }
-  if (auto saved = m_service->save(m_filename, value); !saved) {
+  if (auto saved = m_service.save(m_filename, value); !saved) {
     spdlog::warn("Cannot save {}: {}", m_filename.toStdString(),
                  saved.error().message.toStdString());
   }

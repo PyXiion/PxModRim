@@ -36,12 +36,10 @@ qcoro_enable_coroutines()
 
 # NoWorkshop ships without Steam downloads, so PxSteamDL is not fetched or linked.
 if(NOT PX_WORKSHOP_VARIANT STREQUAL "NoWorkshop")
-    include(cmake/Steam.cmake OPTIONAL)
+    include(cmake/Steam.cmake)
 endif()
 
-if(NOT TARGET ZLIB::ZLIB)
-    find_package(ZLIB REQUIRED)
-endif()
+find_package(ZLIB REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(libzip REQUIRED)
 find_package(spdlog REQUIRED)

@@ -1,5 +1,5 @@
-#include <QApplication>
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QDir>
 #include <QEventLoop>
 #include <QMessageBox>
@@ -22,15 +22,6 @@
 #include "ui/window/main_window.hpp"
 
 namespace {
-void ensureApplication() {
-  static int argc = 1;
-  static char name[] = "pxmodrim-window-tests";
-  static char* argv[] = {name, nullptr};
-  static std::unique_ptr<QApplication> app;
-  if (!QApplication::instance())
-    app = std::make_unique<QApplication>(argc, argv);
-}
-
 class FirstView : public px::modrim::RailView {
  public:
   using RailView::RailView;
@@ -77,7 +68,6 @@ struct Fixture {
   std::unique_ptr<px::modrim::CoreContext> core;
   std::unique_ptr<px::modrim::AppContext> app;
   explicit Fixture(bool canSave = true) {
-    ensureApplication();
     px::modrim::AppConfig config;
     if (canSave) {
       config.paths.config_folder = QDir(directory.path())
@@ -85,7 +75,7 @@ struct Fixture {
                                        .toStdString();
       QDir().mkpath(QString::fromStdString(config.paths.config_folder));
     }
-    core = px::modrim::CoreContext::create(config, &configService);
+    core = px::modrim::CoreContext::create(config, configService);
     core->registerPlugin(std::make_unique<px::modrim::DownloadManager>());
     auto a = std::make_shared<px::modrim::AboutXmlMod>();
     a->packageId = px::modrim::CaseInsensitiveStr(u"test.a");

@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Ported the Organizer rail view, folder dialogs, tree and filter models, tag editor, and auto-folder rule editor to the C++/Qt UI, retaining the existing QML behavior and adding Catch2 UI regression coverage.
 - Pinned third-party CI and release actions to immutable commits without changing their selected versions.
 - Removed unused Workshop injection imports and discarded callback results explicitly to satisfy static analysis.
+- Removed dead code and collapsed single-use abstractions across core and UI (unused dialogs, widgets, QSS rules, test-only helpers, duplicate cached-database and mod-provider classes, nullable `ConfigService` paths); user-visible behaviour is unchanged. The undocumented `PX_SMOKE_EXIT_MS` environment variable is gone, and the app version now comes from `project(VERSION)` in CMake.
 
 ### Fixed
 - Moving from the Python app preserves dependency declaration order by rebuilding legacy metadata-cache rows from About.xml once.

@@ -46,7 +46,6 @@ TEST_CASE("community rules are keyed by lowercased package id") {
   CHECK(rule.loadBefore.contains(QStringLiteral("late.mod")));
   CHECK(rule.loadFirst);
   CHECK_FALSE(rule.loadLast);
-  CHECK(rule.incompatibleWith.empty());
 }
 
 TEST_CASE("a malformed community rules file is an error") {

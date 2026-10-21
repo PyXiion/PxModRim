@@ -431,10 +431,8 @@ void MainWindow::focusSearch() {
 }
 
 void MainWindow::savePrefs() {
-  if (m_ctx.hasConfigService()) {
-    const auto result = saveUiPrefs(m_app.uiPrefs(), m_ctx.configService());
-    if (!result) m_toasts->error(result.error().message);
-  }
+  const auto result = saveUiPrefs(m_app.uiPrefs(), m_ctx.configService());
+  if (!result) m_toasts->error(result.error().message);
 }
 
 void MainWindow::snapRail() {

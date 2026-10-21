@@ -23,8 +23,6 @@
 namespace workshop_view_test {
 using namespace px::modrim;
 using namespace px::modrim::workshop;
-using namespace px::modrim;
-using namespace px::modrim::workshop;
 using workshop_test::HttpRequest;
 using workshop_test::HttpResponse;
 using workshop_test::run;
@@ -67,7 +65,8 @@ struct PanelFixture {
   std::unique_ptr<CoreContext> core = px::ui_test::makeCore(AppConfig{});
   AppContext app{*core};
   DownloaderFixture downloader{core->downloads()};
-  WorkshopCatalog catalog{nullptr, core->downloads(),
+  ConfigService config{dir.path()};
+  WorkshopCatalog catalog{config, core->downloads(),
                           [this] { return core->allMods().values(); }};
   CatalogMod mod;
   CatalogMod dependency;

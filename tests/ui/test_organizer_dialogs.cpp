@@ -1,4 +1,3 @@
-#include <QApplication>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QWidget>
@@ -10,17 +9,7 @@
 
 using px::modrim::DeleteFolderDialog;
 
-namespace {
-
-// The shared QApplication is created by tests/ui/main.cpp.
-QApplication& widgetApp() {
-  return *static_cast<QApplication*>(QApplication::instance());
-}
-
-}  // namespace
-
 TEST_CASE("delete folder dialog confirms with yes button") {
-  widgetApp();
   QWidget parent;
   DeleteFolderDialog dialog(QStringLiteral("Fixes"), &parent);
   auto* yes = qobject_cast<QPushButton*>(dialog.button(QMessageBox::Yes));

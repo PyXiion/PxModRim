@@ -87,10 +87,6 @@ class ConstraintGraph {
                 const Alternatives& alternatives,
                 const QHash<PackageId, AboutXmlModPtr>& activeMods,
                 bool useAlternativePackageIds);
-  void addLoadRules(const PackageId& pid, const CaseInsensitiveSet& loadBefore,
-                    const CaseInsensitiveSet& loadAfter,
-                    const CaseInsensitiveSet& incompatibleWith,
-                    EdgeOrigin origin, const Alternatives& alternatives);
   void rebuildIndex();
   QList<QList<PackageId>> findCycleComponents() const;
 

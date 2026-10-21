@@ -34,9 +34,9 @@ class GameLauncher;
 // to the context, so it is built only through create() and never moved.
 class CoreContext {
  public:
-  // `config_service` is not owned and must outlive the context.
-  static std::unique_ptr<CoreContext> create(
-      AppConfig cfg, ConfigService* configService = nullptr);
+  // `configService` is not owned and must outlive the context.
+  static std::unique_ptr<CoreContext> create(AppConfig cfg,
+                                             ConfigService& configService);
 
   ~CoreContext();
   CoreContext(const CoreContext&) = delete;
@@ -80,8 +80,7 @@ class CoreContext {
   }
   Event<AppConfig>& configChanged() noexcept { return m_configChanged; }
 
-  bool hasConfigService() const noexcept { return m_configService != nullptr; }
-  ConfigService& configService() const;
+  ConfigService& configService() const noexcept { return m_configService; }
   QNetworkAccessManager& network() noexcept { return m_network; }
 
   ModService& modService() noexcept { return *m_modService; }
@@ -95,11 +94,11 @@ class CoreContext {
   PluginRegistry& plugins() noexcept { return m_plugins; }
 
  private:
-  CoreContext(AppConfig cfg, ConfigService* configService);
+  CoreContext(AppConfig cfg, ConfigService& configService);
   void refreshGameVersion();
 
   AppConfig m_cfg;
-  ConfigService* m_configService;
+  ConfigService& m_configService;
   QHash<QString, ListedModPtr> m_mods;
   QStringList m_activeUuids;
   QStringList m_loadedActiveUuids;

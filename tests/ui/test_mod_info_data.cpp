@@ -1,4 +1,3 @@
-#include <QApplication>
 #include <QFile>
 #include <QHash>
 #include <QTemporaryDir>
@@ -36,14 +35,6 @@ struct ModInfoContext {
   std::unique_ptr<CoreContext> ctx;
 
   ModInfoContext(const QList<ListedModPtr>& mods, QStringList active) {
-    if (!QCoreApplication::instance()) {
-      if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
-        qputenv("QT_QPA_PLATFORM", "offscreen");
-      static int argc = 1;
-      static char name[] = "pxmodrim-mod-info-tests";
-      static char* argv[] = {name, nullptr};
-      static QApplication application(argc, argv);
-    }
     REQUIRE(game.isValid());
     QFile version(game.filePath("Version.txt"));
     REQUIRE(version.open(QIODevice::WriteOnly));

@@ -4,7 +4,6 @@ file(GLOB_RECURSE PX_CORE_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/co
 add_executable(pxcore_tests ${PX_CORE_TESTS})
 target_link_libraries(pxcore_tests PRIVATE pxcore Catch2::Catch2WithMain)
 catch_discover_tests(pxcore_tests)
-target_compile_definitions(pxcore_tests PRIVATE PX_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 
 if(PX_BUILD_UI)
     file(GLOB_RECURSE PX_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp)

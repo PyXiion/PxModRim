@@ -29,7 +29,7 @@ ModService::ModService(CoreContext& ctx, providers::ProviderList providers,
       m_providers(std::move(providers)),
       m_metadataCache(std::move(metadataCache)),
       m_startupImpact(ctx) {
-  if (!m_metadataCache && ctx.hasConfigService()) {
+  if (!m_metadataCache) {
     m_metadataCache = std::make_unique<services::MetadataCache>(
         services::metadataCachePath(ctx.configService().directory()));
   }
@@ -151,10 +151,7 @@ QCoro::Task<Result<void>> ModService::runRefreshPipeline(const QString& label,
   co_return {};
 }
 
-std::optional<QString> ModService::snapshotsDir() const {
-  if (!m_ctx.hasConfigService()) {
-    return std::nullopt;
-  }
+QString ModService::snapshotsDir() const {
   return QDir(m_ctx.configService().directory())
       .filePath(QStringLiteral("snapshots"));
 }
@@ -164,21 +161,20 @@ QCoro::Task<Result<void>> ModService::reload(bool full) {
 }
 
 QStringList ModService::getSnapshots() const {
-  const auto snapshots = snapshotsDir();
-  return snapshots ? px::modrim::getSnapshots(*snapshots) : QStringList{};
+  return px::modrim::getSnapshots(snapshotsDir());
 }
 
 QCoro::Task<bool> ModService::restoreSnapshot(QString snapshotPath) {
   const QString configFolder = configFolderOf(m_ctx);
-  const auto snapshots = snapshotsDir();
-  if (configFolder.isEmpty() || !snapshots) {
+  const QString snapshots = snapshotsDir();
+  if (configFolder.isEmpty()) {
     spdlog::warn("Cannot restore snapshot: configuration is incomplete");
     co_return false;
   }
 
   const QString configPath = modsConfigPath(configFolder);
   auto restored = px::modrim::restoreSnapshot(
-      snapshotPath, configPath, *snapshots, m_ctx.config().max_snapshots);
+      snapshotPath, configPath, snapshots, m_ctx.config().max_snapshots);
   if (!restored) {
     spdlog::warn("Failed to restore snapshot: {}",
                  restored.error().message.toStdString());
@@ -195,8 +191,7 @@ QCoro::Task<bool> ModService::restoreSnapshot(QString snapshotPath) {
 
 QCoro::Task<bool> ModService::saveActiveLayout(QStringList activeIds) {
   const QString configFolder = configFolderOf(m_ctx);
-  const auto snapshots = snapshotsDir();
-  if (configFolder.isEmpty() || !snapshots) {
+  if (configFolder.isEmpty()) {
     co_return false;
   }
 
@@ -210,7 +205,7 @@ QCoro::Task<bool> ModService::saveActiveLayout(QStringList activeIds) {
   const QString configPath = modsConfigPath(configFolder);
   const QString targetVersion = m_ctx.targetVersion();
   const int maxSnapshots = m_ctx.config().max_snapshots;
-  const QString snapshotsPath = *snapshots;
+  const QString snapshotsPath = snapshotsDir();
 
   auto written = co_await providers::runOnPool<Result<void>>(
       nullptr, [this, configPath, snapshotsPath, targetVersion, maxSnapshots,

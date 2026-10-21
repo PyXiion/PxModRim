@@ -39,7 +39,7 @@ std::unique_ptr<CoreContext> makeContext(const QString& gamePath = {}) {
   static px::modrim::ConfigService configService(configDir.path());
   AppConfig cfg;
   cfg.paths.game = gamePath.toStdString();
-  return CoreContext::create(cfg, &configService);
+  return CoreContext::create(cfg, configService);
 }
 
 void writeVersion(const QString& gameDir, const QString& version) {

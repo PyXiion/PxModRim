@@ -25,8 +25,7 @@ struct FavouritesState {
 // and survives the catalog dropping it.
 class FavouriteCollections {
  public:
-  // Without a service the favourites live in memory only.
-  explicit FavouriteCollections(ConfigService* service);
+  explicit FavouriteCollections(ConfigService& service);
 
   Event<FavouritesState>& changed() noexcept { return m_config.changed; }
   const std::vector<CatalogCollection>& items() const noexcept {

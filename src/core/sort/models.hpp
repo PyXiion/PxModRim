@@ -15,7 +15,6 @@ struct CommunityRule {
   CaseInsensitiveSet loadBefore;
   bool loadFirst = false;
   bool loadLast = false;
-  CaseInsensitiveSet incompatibleWith;
 };
 
 using CommunityRules = QHash<PackageId, CommunityRule>;

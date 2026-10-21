@@ -95,9 +95,7 @@ Result<void> writeCached(const QString& directory, const QString& path,
 // installed mods itself.
 class WorkshopCatalog : public Plugin {
  public:
-  // `config` may be null: settings, favourites and the response cache then stay
-  // in memory.
-  WorkshopCatalog(ConfigService* config, DownloadManager& downloads,
+  WorkshopCatalog(ConfigService& config, DownloadManager& downloads,
                   InstalledModsProvider installedMods);
   void setup(CoreContext& ctx) override;
   ~WorkshopCatalog();
@@ -189,7 +187,7 @@ class WorkshopCatalog : public Plugin {
 
   PluginConfig<CatalogSettings> m_settings;
   QString m_baseUrl;
-  std::optional<QString> m_cacheDir;
+  QString m_cacheDir;
   FavouriteCollections m_favourites;
   DownloadManager* m_downloads = nullptr;
   InstalledModsProvider m_installedMods;
@@ -240,7 +238,7 @@ QCoro::Task<CatalogResult<void>> WorkshopCatalog::cached(
     std::function<void(const T&)> show, double freshFor, bool persist) {
   const QString fullKey = m_baseUrl + QLatin1Char('|') + key;
   std::optional<QString> path;
-  if (persist && m_cacheDir) {
+  if (persist) {
     path = cacheFile(fullKey);
   }
 
@@ -279,7 +277,7 @@ QCoro::Task<CatalogResult<void>> WorkshopCatalog::cached(
     auto encoded = glz::write<kWireOpts>(remembered);
     if (encoded) {
       auto saved = co_await QtConcurrent::run(
-          [directory = *m_cacheDir, file = *path, bytes = std::move(*encoded)] {
+          [directory = m_cacheDir, file = *path, bytes = std::move(*encoded)] {
             return detail::writeCached(directory, file, bytes);
           });
       if (!saved) {

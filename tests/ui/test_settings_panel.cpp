@@ -1,4 +1,3 @@
-#include <QApplication>
 #include <QEventLoop>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -15,15 +14,6 @@
 #include "ui/panels/settings_panel.hpp"
 #include "ui/theme/qml_theme.hpp"
 namespace {
-void ensureApplication() {
-  if (QCoreApplication::instance()) return;
-  static int argc = 1;
-  static char name[] = "settings_panel_tests";
-  static char* argv[] = {name, nullptr};
-  if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-  static QApplication app(argc, argv);
-}
 void settle(int milliseconds) {
   QEventLoop loop;
   QTimer timer;
@@ -34,7 +24,6 @@ void settle(int milliseconds) {
 }
 }  // namespace
 TEST_CASE("Cancel settings unloads QML without binding errors") {
-  ensureApplication();
   QWidget host;
   auto* engine = px::modrim::createQmlEngine(&host);
   engine->rootContext()->setContextProperty(QStringLiteral("Theme"),

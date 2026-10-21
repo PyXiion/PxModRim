@@ -89,7 +89,7 @@ QStringList registerCorePlugins(CoreContext& ctx, ConfigService& config,
   if (!downloaders.isEmpty() &&
       !disabled.contains(QStringLiteral("workshop_catalog"))) {
     ctx.registerPlugin(std::make_unique<px::modrim::workshop::WorkshopCatalog>(
-        &config, ctx.downloads(), [&ctx] { return ctx.allMods().values(); }));
+        config, ctx.downloads(), [&ctx] { return ctx.allMods().values(); }));
   }
   return downloaders;
 }

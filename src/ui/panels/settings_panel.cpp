@@ -117,12 +117,6 @@ QCoro::Task<void> SettingsBackend::downloadCommunityRules() {
   m_communityStatus = QStringLiteral("Downloading…");
   m_communityBusy = true;
   emit communityChanged();
-  if (!m_ctx.hasConfigService()) {
-    m_communityStatus = QStringLiteral("Download failed");
-    m_communityBusy = false;
-    emit communityChanged();
-    co_return;
-  }
   LoadingState loading;
   auto* progress =
       new QProgressDialog(QStringLiteral("Downloading community rules…"),

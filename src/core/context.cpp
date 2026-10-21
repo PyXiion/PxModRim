@@ -25,7 +25,7 @@ constexpr qsizetype kVersionMinParts = 2;
 
 }  // namespace
 
-CoreContext::CoreContext(AppConfig cfg, ConfigService* configService)
+CoreContext::CoreContext(AppConfig cfg, ConfigService& configService)
     : m_cfg(std::move(cfg)), m_configService(configService) {
   refreshGameVersion();
   m_plugins.registerPlugin(std::make_unique<DownloadManager>());
@@ -34,7 +34,7 @@ CoreContext::CoreContext(AppConfig cfg, ConfigService* configService)
 CoreContext::~CoreContext() = default;
 
 std::unique_ptr<CoreContext> CoreContext::create(AppConfig cfg,
-                                                 ConfigService* configService) {
+                                                 ConfigService& configService) {
   std::unique_ptr<CoreContext> ctx(
       new CoreContext(std::move(cfg), configService));
   ProfileSession session(QStringLiteral("services.create"));
@@ -137,11 +137,6 @@ QString CoreContext::targetVersion() const {
     return QStringLiteral("%1.%2").arg(parts[0], parts[1]);
   }
   return QStringLiteral("Unknown");
-}
-
-ConfigService& CoreContext::configService() const {
-  Q_ASSERT(m_configService != nullptr);
-  return *m_configService;
 }
 
 DownloadManager& CoreContext::downloads() const {

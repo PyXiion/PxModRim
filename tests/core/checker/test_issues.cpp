@@ -152,41 +152,6 @@ TEST_CASE("IncompatibilityIssueChecker reverse-declared incompatibility") {
   CHECK(issues[0].shortMessage == QStringLiteral("Incompatibilities detected"));
 }
 
-TEST_CASE(
-    "IncompatibilityIssueChecker reverse-declared deduplicated across "
-    "origins") {
-  auto declarer = makeMod(QStringLiteral("mod.declarer"));
-  auto target = makeMod(QStringLiteral("mod.target"));
-  const PackageId declarerPid(QStringLiteral("mod.declarer"));
-  const PackageId targetPid(QStringLiteral("mod.target"));
-  declarer->aboutRules.incompatibleWith.add(targetPid.str());
-
-  sort::SortSettings settings;
-  settings.use_community_rules = true;
-  settings.use_alternative_package_ids = true;
-  settings.check_missing_dependencies = true;
-
-  sort::CommunityRule rule;
-  rule.packageId = declarerPid;
-  rule.incompatibleWith.add(targetPid.str());
-  sort::CommunityRules cr{{declarerPid, rule}};
-
-  auto storage = makeStorage({{declarerPid, declarer}, {targetPid, target}},
-                             std::nullopt, &settings, &cr);
-
-  auto incomingEdges =
-      storage.graph.incomingOfType(targetPid, EdgeType::kIncompatibility);
-  QSet<EdgeOrigin> origins;
-  for (const auto& edge : incomingEdges) {
-    origins.insert(edge.origin);
-  }
-  CHECK(origins ==
-        QSet<EdgeOrigin>{EdgeOrigin::kAboutXml, EdgeOrigin::kCommunityRules});
-
-  auto issues = IncompatibilityIssueChecker().check(*target, storage.ctx());
-  REQUIRE(issues.size() == 1);
-}
-
 TEST_CASE("LoadOrderIssueChecker no violations when order satisfies rules") {
   auto a = makeMod(QStringLiteral("mod.a"));
   auto b = makeMod(QStringLiteral("mod.b"));

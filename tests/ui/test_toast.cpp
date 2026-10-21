@@ -1,5 +1,3 @@
-#include <QApplication>
-#include <QCoreApplication>
 #include <QEventLoop>
 #include <QLayout>
 #include <QPushButton>
@@ -17,17 +15,6 @@ using px::modrim::Toast;
 using px::modrim::ToastLevel;
 using px::modrim::ToastManager;
 
-QApplication& application() {
-  if (auto* app = qobject_cast<QApplication*>(QCoreApplication::instance())) {
-    return *app;
-  }
-  static int argc = 1;
-  static char name[] = "test_toast";
-  static char* argv[] = {name, nullptr};
-  static QApplication app(argc, argv);
-  return app;
-}
-
 // Runs the event loop for `ms` so animations and timers can fire.
 void waitMs(int ms) {
   QEventLoop loop;
@@ -38,7 +25,6 @@ void waitMs(int ms) {
 }  // namespace
 
 TEST_CASE("close button removes a persistent toast") {
-  application();
   QWidget parent;
   ToastManager manager(&parent);
   manager.showToast(QStringLiteral("stays"), ToastLevel::kInfo, 0);
@@ -55,7 +41,6 @@ TEST_CASE("close button removes a persistent toast") {
 }
 
 TEST_CASE("timed toast dismisses itself after its duration") {
-  application();
   QWidget parent;
   ToastManager manager(&parent);
   manager.info(QStringLiteral("gone soon"), 50);

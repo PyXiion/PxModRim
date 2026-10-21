@@ -171,7 +171,7 @@ using namespace catalog_test;
 
 TEST_CASE("workshop install state uses sync timestamp, not directory mtime") {
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
 
   CHECK(catalog.installState(modWith("1", 100)) == InstallState::kInstalled);
@@ -208,7 +208,7 @@ TEST_CASE("workshop plan keeps dependency order and incomplete flags") {
     return {200, wire(answer)};
   });
 
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
   catalog.setBaseUrl(server.url());
 
@@ -248,7 +248,7 @@ TEST_CASE("workshop installed metadata uses batch") {
     return {200, wire(answer)};
   });
 
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
   catalog.setBaseUrl(server.url());
 
@@ -279,7 +279,7 @@ TEST_CASE("workshop download delegates without side effects") {
 TEST_CASE("workshop empty URL is disabled without creating a client") {
   TestApplication app;
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
   catalog.setBaseUrl(QString());
   CHECK_FALSE(catalog.configured());
@@ -300,7 +300,7 @@ TEST_CASE("workshop empty URL is disabled without creating a client") {
 TEST_CASE("workshop configuration and installed events") {
   TestApplication app;
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
 
   std::vector<QString> urlChanges;
@@ -333,7 +333,7 @@ TEST_CASE("workshop configuration and installed events") {
 TEST_CASE("workshop cached serves remembered value before refreshing") {
   TestApplication app;
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
 
   std::vector<std::string> sequence{"first", "second", "second"};
@@ -366,7 +366,7 @@ TEST_CASE("workshop cached serves remembered value before refreshing") {
 TEST_CASE("workshop enqueue runs batches in order after the running download") {
   TestApplication app;
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
 
   fixture.downloader->isBusy = true;
@@ -398,7 +398,7 @@ TEST_CASE("workshop shutdown waits for its cancelled download to finish") {
   ContextFixture fixture;
   fixture.downloader->gate.emplace();
   auto catalog = std::make_unique<WorkshopCatalog>(
-      fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
+      *fixture.config, fixture.downloads, [&] { return fixture.mods; });
   catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("5")}});
   catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("6")}});
   REQUIRE(fixture.downloader->isBusy);
@@ -436,7 +436,7 @@ TEST_CASE("workshop destruction leaves a suspended download safe to finish") {
   ContextFixture fixture;
   fixture.downloader->gate.emplace();
   auto catalog = std::make_unique<WorkshopCatalog>(
-      fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
+      *fixture.config, fixture.downloads, [&] { return fixture.mods; });
   int queueChanges = 0;
   catalog->queueChanged.connect([&](std::monostate) { ++queueChanges; });
   catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("5")}});
@@ -458,7 +458,7 @@ TEST_CASE("workshop shutdown releases idle waiters without cancelling others") {
   ContextFixture fixture;
   fixture.downloader->isBusy = true;
   auto catalog = std::make_unique<WorkshopCatalog>(
-      fixture.config.get(), fixture.downloads, [&] { return fixture.mods; });
+      *fixture.config, fixture.downloads, [&] { return fixture.mods; });
   catalog->enqueue(DownloadPlan{.to_download = {QStringLiteral("5")}});
   REQUIRE(fixture.downloader->recordedCalls.empty());
 
@@ -492,7 +492,7 @@ TEST_CASE(
 
   // First run persists to disk.
   {
-    WorkshopCatalog first(fixture.config.get(), fixture.downloads,
+    WorkshopCatalog first(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
     std::vector<int> out;
     const auto done = run(first.cached<std::vector<int>>(
@@ -504,7 +504,7 @@ TEST_CASE(
 
   // Second run loads from disk without invoking produce.
   {
-    WorkshopCatalog second(fixture.config.get(), fixture.downloads,
+    WorkshopCatalog second(*fixture.config, fixture.downloads,
                            [&] { return fixture.mods; });
     std::vector<int> out;
     const auto done = run(second.cached<std::vector<int>>(
@@ -522,7 +522,7 @@ TEST_CASE(
     REQUIRE(writeBytes(file.absoluteFilePath(), "{not json"));
   }
   {
-    WorkshopCatalog third(fixture.config.get(), fixture.downloads,
+    WorkshopCatalog third(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
     std::vector<int> out;
     const auto done = run(third.cached<std::vector<int>>(
@@ -537,7 +537,7 @@ TEST_CASE(
     "workshop equal cache refresh keeps the displayed mods and refreshes age") {
   TestApplication app;
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog catalog(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
 
   int calls = 0;
@@ -591,7 +591,7 @@ TEST_CASE("workshop disk cache is reused in memory after first load") {
   };
 
   {
-    WorkshopCatalog first(fixture.config.get(), fixture.downloads,
+    WorkshopCatalog first(*fixture.config, fixture.downloads,
                           [&] { return fixture.mods; });
     REQUIRE(
         run(first.cached<std::vector<CatalogMod>>(
@@ -600,7 +600,7 @@ TEST_CASE("workshop disk cache is reused in memory after first load") {
             .has_value());
   }
 
-  WorkshopCatalog second(fixture.config.get(), fixture.downloads,
+  WorkshopCatalog second(*fixture.config, fixture.downloads,
                          [&] { return fixture.mods; });
   std::vector<CatalogMod> loaded;
   REQUIRE(run(second.cached<std::vector<CatalogMod>>(
@@ -636,7 +636,7 @@ TEST_CASE("workshop catalog URL moves out of the old shared config") {
 
   ConfigService service(dir.path());
   DownloadManager downloads;
-  WorkshopCatalog catalog(&service, downloads,
+  WorkshopCatalog catalog(service, downloads,
                           [] { return QList<ListedModPtr>{}; });
   CHECK(catalog.settings().url == "http://localhost:8787");
 

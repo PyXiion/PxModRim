@@ -40,7 +40,7 @@ TEST_CASE(
 
   ConfigService service(dir.path());
   PluginConfig<DemoSettings> settings(
-      &service, QStringLiteral("demo"),
+      service, QStringLiteral("demo"),
       QHash<QString, QString>{
           {QStringLiteral("old_badges"), QStringLiteral("show_badges")}});
   REQUIRE(settings.value().show_badges);
@@ -59,13 +59,6 @@ TEST_CASE(
   settings.update(DemoSettings{.show_badges = false, .level = 2});
   REQUIRE(emitted == 1);
 
-  PluginConfig<DemoSettings> reloaded(&service, QStringLiteral("demo"));
+  PluginConfig<DemoSettings> reloaded(service, QStringLiteral("demo"));
   REQUIRE(reloaded.value() == DemoSettings{.show_badges = false, .level = 2});
-}
-
-TEST_CASE("plugin config without a service keeps settings in memory") {
-  PluginConfig<DemoSettings> settings(nullptr, QStringLiteral("memory"));
-  REQUIRE(settings.value() == DemoSettings{});
-  settings.update(DemoSettings{.show_badges = true, .level = 0});
-  REQUIRE(settings.value().show_badges);
 }

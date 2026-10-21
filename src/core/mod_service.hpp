@@ -64,7 +64,7 @@ class ModService {
       providers::BaseModProvider& provider, Profiler& timer, bool forceReparse);
   QCoro::Task<Result<void>> runRefreshPipeline(const QString& label,
                                                bool forceReparse);
-  std::optional<QString> snapshotsDir() const;
+  QString snapshotsDir() const;
 
   CoreContext& m_ctx;
   providers::ProviderList m_providers;

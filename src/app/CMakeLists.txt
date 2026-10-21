@@ -5,7 +5,7 @@ target_link_libraries(pxmodrim PRIVATE pxui pxuiplugin)
 include(GNUInstallDirs)
 
 # The app reads the Workshop variant from workshop-variant.txt beside its executable
-# (px::app::parseDisabledPlugins), so the build tree and the install get the file too.
+# (px::modrim::parseDisabledPlugins), so the build tree and the install get the file too.
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/workshop-variant.txt"
      CONTENT "${PX_WORKSHOP_VARIANT}\n")
 add_custom_command(TARGET pxmodrim POST_BUILD

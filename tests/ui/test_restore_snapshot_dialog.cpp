@@ -1,4 +1,3 @@
-#include <QApplication>
 #include <QByteArray>
 #include <QFile>
 #include <QFileInfo>
@@ -25,21 +24,6 @@ using px::modrim::CaseInsensitiveStr;
 using px::modrim::ConfirmRestoreDialog;
 using px::modrim::ModsConfig;
 using px::modrim::RestoreSnapshotDialog;
-
-// Widgets need a QApplication for the whole run; the first test that asks for
-// it creates it.
-QApplication& ensureApp() {
-  if (auto* existing =
-          qobject_cast<QApplication*>(QCoreApplication::instance()))
-    return *existing;
-  if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-  static int argc = 1;
-  static char name[] = "pxmodrim_tests";
-  static char* argv[] = {name, nullptr};
-  static QApplication app(argc, argv);
-  return app;
-}
 
 void writeText(const QString& path, const QByteArray& bytes) {
   QFile file(path);
@@ -89,7 +73,6 @@ TEST_CASE(
     "Restore dialog selects readable snapshots and disables Restore for "
     "unreadable ones",
     "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
 
@@ -136,7 +119,6 @@ TEST_CASE(
 
 TEST_CASE("Restore dialog Restore button accepts the selected snapshot",
           "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
 
@@ -155,7 +137,6 @@ TEST_CASE("Restore dialog Restore button accepts the selected snapshot",
 TEST_CASE(
     "Restore dialog double-click on an unreadable snapshot does not accept",
     "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
 
@@ -174,7 +155,6 @@ TEST_CASE(
 TEST_CASE(
     "Restore dialog lists snapshot timestamps and mod counts in given order",
     "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
 
@@ -218,7 +198,6 @@ TEST_CASE(
     "Restore dialog falls back to file modification time for unnamed or "
     "invalid snapshot names",
     "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
 
@@ -241,7 +220,6 @@ TEST_CASE(
 
 TEST_CASE("Restore dialog details describe the selected snapshot",
           "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
 
@@ -276,8 +254,6 @@ TEST_CASE("Restore dialog details describe the selected snapshot",
 
 TEST_CASE("Restore dialog with no snapshots has nothing to select",
           "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
-
   RestoreSnapshotDialog dialog(QStringList{});
   QListWidget* list = listOf(dialog);
   REQUIRE(list != nullptr);
@@ -290,8 +266,6 @@ TEST_CASE("Restore dialog with no snapshots has nothing to select",
 
 TEST_CASE("Confirm restore dialog names the snapshot and defaults to Cancel",
           "[ui][restore_snapshot]") {
-  [[maybe_unused]] auto& app = ensureApp();
-
   ConfirmRestoreDialog confirm(
       QStringLiteral("ModsConfig_20260922_120000.xml"));
   REQUIRE(confirm.windowTitle() == QStringLiteral("Restore Mod List"));

@@ -15,7 +15,7 @@ inline std::unique_ptr<px::modrim::CoreContext> makeCore(
     px::modrim::AppConfig config = {}) {
   static QTemporaryDir configDir;
   static px::modrim::ConfigService configService(configDir.path());
-  return px::modrim::CoreContext::create(std::move(config), &configService);
+  return px::modrim::CoreContext::create(std::move(config), configService);
 }
 
 }  // namespace px::ui_test
