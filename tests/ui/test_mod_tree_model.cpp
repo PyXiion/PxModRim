@@ -4,6 +4,7 @@
 #include <QQmlEngine>
 #include <QSignalSpy>
 #include <memory>
+#include <utility>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -301,7 +302,7 @@ TEST_CASE("organizer provider metadata tags and rule badges expose QML roles") {
   tree.children[0].hasRules = true;
   tree.hasRules = true;
   ModTreeModel model(noDiagnostics);
-  model.setTree(tree, f.mods,
+  model.setTree(std::move(tree), f.mods,
                 {{QStringLiteral("local"), QStringLiteral("green")}}, false,
                 f.state.tags);
   const auto one = model.indexForUuid("u1");

@@ -113,6 +113,7 @@ class MainWindow : public QMainWindow {
   std::uint64_t m_diagnosticsConnection = 0;
   std::uint64_t m_statusConnection = 0;
   std::uint64_t m_taskConnection = 0;
+  std::uint64_t m_warningConnection = 0;
   std::uint64_t m_downloadBusyConnection = 0;
   std::uint64_t m_downloadProgressConnection = 0;
   std::uint64_t m_downloadFinishedConnection = 0;

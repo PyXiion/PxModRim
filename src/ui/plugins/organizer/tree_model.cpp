@@ -249,12 +249,12 @@ QHash<int, QByteArray> ModTreeModel::roleNames() const {
 
 bool ModTreeModel::filtering() const { return m_filtering; }
 
-void ModTreeModel::setTree(const organizer::FolderNode& root,
+void ModTreeModel::setTree(organizer::FolderNode root,
                            const organizer::ModsByUuid& mods,
                            const QHash<QString, QString>& providerColors,
                            bool filtering,
                            const QHash<qint64, organizer::Tag>& tags) {
-  auto payload = std::make_unique<organizer::FolderNode>(root);
+  auto payload = std::make_unique<organizer::FolderNode>(std::move(root));
   auto fresh = build(*payload, mods, filtering);
   m_providerColors = providerColors;
   m_tagRows.clear();

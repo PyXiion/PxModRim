@@ -52,6 +52,14 @@ struct ModInfoContext {
   }
 };
 
+ModInfo buildInfo(const ModInfoContext& context, const ListedMod& mod,
+                  const QList<view::ModIssueView>& issues = {}) {
+  auto data = buildModInfo(*context.ctx, mod);
+  updateActiveState(context.ctx->activeUuids(), mod.uuid(), data);
+  updateIssues(issues, data.info);
+  return data;
+}
+
 }  // namespace
 
 TEST_CASE("Mod info autolinks bare URLs without changing markup",
@@ -184,8 +192,7 @@ TEST_CASE(
   addDependency(*main, "a.gone");
   ModInfoContext context({main, active, inactive, alternative},
                          {active->uuid()});
-  const auto needs =
-      buildModInfo(*context.ctx, *main, {}).value("needs").toList();
+  const auto needs = buildInfo(context, *main).info.value("needs").toList();
   const QVariantList expected{
       QVariantMap{
           {"name", "a.active"}, {"state", "active"}, {"uuid", active->uuid()}},
@@ -209,9 +216,8 @@ TEST_CASE("Mod info conflicts include only active mods sorted by name",
       CaseInsensitiveSet(QStringList{"X.B", "x.a", "x.off", "x.no"});
   ModInfoContext context({main, alpha, beta, off},
                          {alpha->uuid(), beta->uuid()});
-  CHECK(
-      buildModInfo(*context.ctx, *main, {}).value("conflicts").toStringList() ==
-      QStringList{"Alpha", "beta"});
+  CHECK(buildInfo(context, *main).info.value("conflicts").toStringList() ==
+        QStringList{"Alpha", "beta"});
 }
 
 TEST_CASE("Mod info needed by matches alternatives and sorts dependents",
@@ -227,7 +233,7 @@ TEST_CASE("Mod info needed by matches alternatives and sorts dependents",
   const QVariantList expected{
       QVariantMap{{"name", "Apple"}, {"uuid", apple->uuid()}},
       QVariantMap{{"name", "zed"}, {"uuid", zed->uuid()}}};
-  CHECK(buildModInfo(*context.ctx, *target, {}).value("neededBy").toList() ==
+  CHECK(buildInfo(context, *target).info.value("neededBy").toList() ==
         expected);
 }
 
@@ -242,7 +248,8 @@ TEST_CASE(
   auto other = makeMod("Other", "o.other");
   ModInfoContext context({dep, main, other}, {other->uuid(), main->uuid()});
   const view::ModIssueView issue{"Cat", std::nullopt, false};
-  const auto info = buildModInfo(*context.ctx, *main, {issue});
+  const auto data = buildInfo(context, *main, {issue});
+  const auto& info = data.info;
   CHECK(info.value("name").toString() == "Main");
   CHECK(info.value("author").toString() == "Ann");
   const auto status = info.value("status").toMap();
@@ -257,9 +264,7 @@ TEST_CASE(
   const QVariantList expectedNeeds{QVariantMap{
       {"name", "d.dep"}, {"state", "inactive"}, {"uuid", dep->uuid()}}};
   CHECK(info.value("needs").toList() == expectedNeeds);
-  CHECK(info.value("description")
-            .toString()
-            .contains("<a href=\"https://a.com/x\">"));
+  CHECK(data.description.contains("<a href=\"https://a.com/x\">"));
   const QVariantMap expectedVersion{
       {"known", false}, {"ok", false}, {"target", "1.5"}};
   CHECK(info.value("version").toMap() == expectedVersion);
@@ -269,13 +274,82 @@ TEST_CASE("Mod info builds inactive mod without description or dependents",
           "[ui][mod-info]") {
   auto mod = makeMod("Solo", "s.solo");
   ModInfoContext context({mod}, {});
-  const auto info = buildModInfo(*context.ctx, *mod, {});
+  const auto data = buildInfo(context, *mod);
+  const auto& info = data.info;
   const auto status = info.value("status").toMap();
   CHECK(status.value("level").toString() == "ok");
   CHECK_FALSE(status.value("active").toBool());
   CHECK(status.value("position").toInt() == 0);
-  CHECK(info.value("description").toString().isEmpty());
+  CHECK(data.description.isEmpty());
   CHECK(info.value("neededBy").toList().isEmpty());
+}
+
+TEST_CASE("Mod info issue updates leave metadata and dependency state alone",
+          "[ui][mod-info]") {
+  auto dep = makeMod("Dep", "d.dep");
+  auto main = makeMod("Main", "m.main");
+  addDependency(*main, "d.dep");
+  main->description = "https://a.com/x";
+  ModInfoContext context({dep, main}, {main->uuid()});
+  const auto data = buildInfo(context, *main);
+  auto info = data.info;
+  updateIssues({view::ModIssueView{"Cat", QStringLiteral("Detail"), true}},
+               info);
+  const auto status = info.value("status").toMap();
+  CHECK(status.value("level").toString() == "error");
+  CHECK(status.value("title").toString() == "1 error");
+  const QVariantList expectedIssues{
+      QVariantMap{{"title", "Cat"}, {"detail", "Detail"}, {"isError", true}}};
+  CHECK(status.value("issues").toList() == expectedIssues);
+  CHECK(status.value("active").toBool());
+  CHECK(status.value("position").toInt() == 1);
+  CHECK(info.value("needs") == data.info.value("needs"));
+  CHECK(info.value("details") == data.info.value("details"));
+  CHECK(info.value("author") == data.info.value("author"));
+  CHECK(info.value("conflicts") == data.info.value("conflicts"));
+}
+
+TEST_CASE("Mod info active updates refresh positions states and conflicts",
+          "[ui][mod-info]") {
+  auto dep = makeMod("Dep", "d.dep");
+  auto alpha = makeMod("Alpha", "c.a");
+  auto main = makeMod("Main", "m.main");
+  addDependency(*main, "d.dep");
+  main->aboutRules.incompatibleWith = CaseInsensitiveSet(QStringList{"c.a"});
+  ModInfoContext context({dep, alpha, main}, {main->uuid()});
+  auto data = buildModInfo(*context.ctx, *main);
+  updateActiveState(context.ctx->activeUuids(), main->uuid(), data);
+  CHECK(data.info.value("status").toMap().value("position").toInt() == 1);
+  CHECK(data.info.value("conflicts").toStringList().isEmpty());
+  const auto description = data.description;
+  updateActiveState({alpha->uuid(), dep->uuid(), main->uuid()}, main->uuid(),
+                    data);
+  const auto status = data.info.value("status").toMap();
+  CHECK(status.value("active").toBool());
+  CHECK(status.value("position").toInt() == 3);
+  CHECK(status.value("total").toInt() == 3);
+  CHECK(data.info.value("conflicts").toStringList() == QStringList{"Alpha"});
+  CHECK(data.info.value("needs").toList() ==
+        QVariantList{QVariantMap{
+            {"name", "d.dep"}, {"uuid", dep->uuid()}, {"state", "active"}}});
+  CHECK(data.description == description);
+}
+
+TEST_CASE("Mod info metadata rebuild refreshes description and authors",
+          "[ui][mod-info]") {
+  auto mod = makeMod("Old", "r.mod");
+  mod->description = "old";
+  mod->authors = {"Ann"};
+  ModInfoContext context({mod}, {});
+  const auto before = buildInfo(context, *mod);
+  mod->name = "New";
+  mod->description = "new https://a.com/x";
+  mod->authors = {"Ann", "Bob"};
+  const auto after = buildInfo(context, *mod);
+  CHECK(before.description == "old");
+  CHECK(after.description.contains("<a href=\"https://a.com/x\">"));
+  CHECK(after.info.value("name").toString() == "New");
+  CHECK(after.info.value("author").toString() == "Ann, Bob");
 }
 
 TEST_CASE("Mod info age formatting has deterministic boundaries and plurals",

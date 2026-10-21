@@ -23,6 +23,7 @@
 
 #include "core/downloads/manager.hpp"
 #include "core/mod_service.hpp"
+#include "core/services/diagnostics_service.hpp"
 #include "core/services/startup_impact_service/labels.hpp"
 #include "ui/components/procedural_preview.hpp"
 #include "ui/config.hpp"
@@ -171,9 +172,29 @@ ModInfoPanel::ModInfoPanel(CoreContext& ctx, QQmlEngine* engine, UiPrefs& prefs,
     setQml("downloadsBusy", busy);
     syncUpdating();
   });
+  m_activeConnection =
+      m_ctx.activeStateChanged().connect([this](const QStringList&) {
+        if (!m_mod) return;
+        updateActiveState(m_ctx.activeUuids(), m_mod->uuid(), m_info);
+        setQml("info", m_info.info);
+      });
+  m_finishedConnection =
+      m_ctx.downloads().downloadFinished.connect([this](const DownloadResult&) {
+        if (m_mod)
+          rebuildInfo(m_ctx.diagnosticsService().issuesFor(m_mod->uuid()));
+      });
+  m_modsConnection = m_ctx.modService().modsChanged.connect(
+      [this](const std::monostate&) { refreshSelectedMod(); });
+  m_configConnection = m_ctx.configChanged().connect([this](const AppConfig&) {
+    if (m_mod) rebuildInfo(m_ctx.diagnosticsService().issuesFor(m_mod->uuid()));
+  });
 }
 ModInfoPanel::~ModInfoPanel() {
   m_ctx.downloads().busyChanged.disconnect(m_busyConnection);
+  m_ctx.downloads().downloadFinished.disconnect(m_finishedConnection);
+  m_ctx.activeStateChanged().disconnect(m_activeConnection);
+  m_ctx.modService().modsChanged.disconnect(m_modsConnection);
+  m_ctx.configChanged().disconnect(m_configConnection);
 }
 void ModInfoPanel::setQml(const char* name, const QVariant& value) {
   if (auto* root = m_qml->rootObject()) root->setProperty(name, value);
@@ -185,31 +206,49 @@ void ModInfoPanel::showMod(ListedModPtr mod,
   m_placeholder->hide();
   m_banner->show();
   m_qml->show();
-  const auto* about = dynamic_cast<const AboutXmlMod*>(m_mod.get());
-  m_banner->setTitle(m_mod->name, !m_mod->description.isEmpty()
-                                      ? firstSentence(m_mod->description)
-                                  : about ? about->packageId.str()
-                                          : QString{});
   ++m_startupToken;
   setQml("startup", QVariant{});
-  setIssues(issues);
+  rebuildInfo(issues);
   syncUpdating();
   if (auto* root = m_qml->rootObject())
     QMetaObject::invokeMethod(root, "resetScroll");
   loadPreview(m_mod->modPath(), m_mod->name, token);
 }
+void ModInfoPanel::rebuildInfo(const QList<view::ModIssueView>& issues) {
+  m_info = buildModInfo(m_ctx, *m_mod);
+  updateActiveState(m_ctx.activeUuids(), m_mod->uuid(), m_info);
+  updateIssues(issues, m_info.info);
+  const auto* about = dynamic_cast<const AboutXmlMod*>(m_mod.get());
+  m_banner->setTitle(m_mod->name, !m_mod->description.isEmpty()
+                                      ? firstSentence(m_mod->description)
+                                  : about ? about->packageId.str()
+                                          : QString{});
+  setQml("info", m_info.info);
+  if (m_info.description != m_description) {
+    m_description = m_info.description;
+    setQml("description", m_description);
+  }
+}
+void ModInfoPanel::refreshSelectedMod() {
+  if (!m_mod) return;
+  const QString uuid = m_mod->uuid();
+  const auto found = m_ctx.allMods().constFind(uuid);
+  if (found == m_ctx.allMods().cend()) {
+    clear();
+    return;
+  }
+  m_mod = found.value();
+  rebuildInfo(m_ctx.diagnosticsService().issuesFor(uuid));
+  syncUpdating();
+}
 void ModInfoPanel::setIssues(const QList<view::ModIssueView>& issues) {
   if (!m_mod) return;
-  auto data = buildModInfo(m_ctx, *m_mod, issues);
-  const QString description = data.take("description").toString();
-  setQml("info", data);
-  if (description != m_description) {
-    m_description = description;
-    setQml("description", description);
-  }
+  updateIssues(issues, m_info.info);
+  setQml("info", m_info.info);
 }
 void ModInfoPanel::clear() {
   m_mod.reset();
+  m_info = ModInfo{};
   ++m_previewToken;
   ++m_startupToken;
   m_placeholder->show();

@@ -2,8 +2,11 @@
 #include <QPointer>
 #include <QVariant>
 #include <QWidget>
+#include <variant>
 
+#include "core/downloads/types.hpp"
 #include "ui/mod_selection.hpp"
+#include "ui/panels/mod_info_data.hpp"
 #include "ui/ui_prefs.hpp"
 class QQmlEngine;
 class QQuickWidget;
@@ -36,6 +39,8 @@ class ModInfoPanel : public QWidget, public ModInfoSink {
  private:
   void setQml(const char* name, const QVariant& value);
   void syncUpdating();
+  void rebuildInfo(const QList<view::ModIssueView>& issues);
+  void refreshSelectedMod();
   QCoro::Task<void> loadPreview(std::optional<QString> path, QString title,
                                 quint64 token);
   QCoro::Task<void> performUpdate(QString id);
@@ -44,6 +49,7 @@ class ModInfoPanel : public QWidget, public ModInfoSink {
   QQmlEngine* m_engine;
   UiPrefs& m_prefs;
   ListedModPtr m_mod;
+  ModInfo m_info;
   ModInfoBanner* m_banner;
   QLabel* m_placeholder;
   QQuickWidget* m_qml;
@@ -54,5 +60,9 @@ class ModInfoPanel : public QWidget, public ModInfoSink {
   QStringList m_startupActivePids;
   QPointer<StartupImpactDialog> m_startupDialog;
   Event<bool>::Id m_busyConnection;
+  Event<DownloadResult>::Id m_finishedConnection;
+  Event<QStringList>::Id m_activeConnection;
+  Event<std::monostate>::Id m_modsConnection;
+  Event<AppConfig>::Id m_configConnection;
 };
 }  // namespace px::modrim

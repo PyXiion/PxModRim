@@ -130,16 +130,13 @@ QCoro::Task<Result<void>> ModService::runRefreshPipeline(const QString& label,
   auto impact = m_startupImpact.load();
 
   const auto discovered = co_await discovery;
-  const auto initialized = co_await diagnostics;
+  co_await diagnostics;
   const auto loaded = co_await impact;
   timer.adopt(discoverTimer);
   timer.adopt(diagnosticsTimer);
 
   if (!discovered) {
     co_return std::unexpected(discovered.error());
-  }
-  if (!initialized) {
-    co_return std::unexpected(initialized.error());
   }
   if (!loaded) {
     co_return std::unexpected(loaded.error());

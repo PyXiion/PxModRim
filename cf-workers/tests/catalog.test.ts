@@ -426,6 +426,41 @@ test('an authoritative empty Steam collection clears stored and cached dependenc
   }
 });
 
+test('a Steam detail outage keeps a stored collection root membership', async () => {
+  const rootId = '80011';
+  const memberId = '80012';
+  files[rootId] = { ...mod(rootId, 'Stored collection', [memberId]), file_type: 2 };
+  const now = Date.now();
+  await db.batch([
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind(rootId, 'Stored collection', 1, 'OK', now, '', memberId),
+    db.prepare('INSERT INTO items (id,title,is_collection,status,updated_at,package_id,deps) VALUES (?,?,?,?,?,?,?)').bind(memberId, 'Stored member', 0, 'OK', now, '', ''),
+  ]);
+  detailFailures.set(rootId, 'http');
+  try {
+    const response = await request(`/deps?id=${rootId}`);
+    assert.equal(response.status, 200);
+    const value = await response.json() as { isComplete: boolean; items: Record<string, { deps: string[] }> };
+    assert.equal(value.isComplete, true);
+    assert.deepEqual(value.items[rootId]?.deps, [memberId]);
+  } finally {
+    detailFailures.delete(rootId);
+    delete files[rootId];
+    await db.prepare('DELETE FROM items WHERE id IN (?, ?)').bind(rootId, memberId).run();
+  }
+});
+
+test('a Steam detail outage without a scraper is not reported as a successful dependency graph', async () => {
+  const rootId = '80021';
+  detailFailures.set(rootId, 'http');
+  try {
+    const response = await request(`/deps?id=${rootId}`);
+    assert.equal(response.status, 500);
+    assert.equal(await db.prepare('SELECT id FROM items WHERE id = ?').bind(rootId).first(), null);
+  } finally {
+    detailFailures.delete(rootId);
+  }
+});
+
 test('queue continuations are acknowledged only after sending succeeds and retried on send failure', async (t) => {
   const roots = ['80101', '80111'];
   const detailCalls = new Map<string, number>();

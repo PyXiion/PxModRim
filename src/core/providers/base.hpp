@@ -98,11 +98,10 @@ QList<ModDirectory> scanModDirectory(const QString& modsPath);
 
 class BaseModProvider {
  public:
-  // `path` is the root this provider scans. `pool` and `metadata_cache` are
-  // optional and not owned; they must outlive the provider.
+  // `path` is the root this provider scans. `pool` is optional and not owned;
+  // it must outlive the provider.
   BaseModProvider(QString providerId, QString color, QString path,
-                  QThreadPool* pool = nullptr,
-                  MetadataCacheStore* metadataCache = nullptr);
+                  QThreadPool* pool = nullptr);
   BaseModProvider(const BaseModProvider&) = delete;
   BaseModProvider& operator=(const BaseModProvider&) = delete;
   virtual ~BaseModProvider() = default;
@@ -111,8 +110,7 @@ class BaseModProvider {
   const QString& color() const noexcept { return m_color; }
   const QString& path() const noexcept { return m_path; }
 
-  // `metadata_cache` overrides the cache given at construction for this call
-  // only.
+  // `metadataCache` serves this call only; null parses everything.
   QCoro::Task<Result<ModMap>> discover(
       QString targetVersion, Profiler* timer = nullptr,
       MetadataCacheStore* metadataCache = nullptr, bool forceReparse = false);
@@ -136,7 +134,6 @@ class BaseModProvider {
   QString m_color;
   QString m_path;
   QThreadPool* m_pool;
-  MetadataCacheStore* m_metadataCache;
 };
 
 }  // namespace px::modrim::providers

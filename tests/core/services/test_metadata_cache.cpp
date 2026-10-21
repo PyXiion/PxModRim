@@ -298,11 +298,10 @@ CREATE TABLE mod_metadata (
     CHECK(legacy.cached.isEmpty());
     REQUIRE(legacy.missing.size() == 1);
     FolderModProvider provider(QStringLiteral("local"),
-                               QStringLiteral("#2ecc71"), modsRoot, false,
-                               nullptr, &cache);
+                               QStringLiteral("#2ecc71"), modsRoot, false);
     for (int pass = 0; pass < 2; ++pass) {
       const auto discovered =
-          runAsync(provider.discover(QStringLiteral("1.5")));
+          runAsync(provider.discover(QStringLiteral("1.5"), nullptr, &cache));
       REQUIRE(discovered.has_value());
       REQUIRE(discovered->contains(modDir));
       const auto mod =
@@ -404,9 +403,10 @@ TEST_CASE("providers reuse cached metadata and reparse when the file changes") {
   const ModCandidate original = candidateFor(modDir);
   MetadataCache cache(metadataCachePath(root.path()));
   FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
-                             modsRoot, false, nullptr, &cache);
+                             modsRoot, false);
 
-  auto first = runAsync(provider.discover(QStringLiteral("1.5")));
+  auto first =
+      runAsync(provider.discover(QStringLiteral("1.5"), nullptr, &cache));
   REQUIRE(first.has_value());
   REQUIRE(first->contains(modDir));
   CHECK((*first)[modDir]->name == QStringLiteral("Sample Mod One"));
@@ -415,17 +415,19 @@ TEST_CASE("providers reuse cached metadata and reparse when the file changes") {
   // reparse does not.
   REQUIRE(writeText(about, kAboutSameSize));
   setAboutMtime(original, original.mtime);
-  auto cached = runAsync(provider.discover(QStringLiteral("1.5")));
+  auto cached =
+      runAsync(provider.discover(QStringLiteral("1.5"), nullptr, &cache));
   REQUIRE(cached.has_value());
   CHECK((*cached)[modDir]->name == QStringLiteral("Sample Mod One"));
-  auto forced = runAsync(
-      provider.discover(QStringLiteral("1.5"), nullptr, nullptr, true));
+  auto forced =
+      runAsync(provider.discover(QStringLiteral("1.5"), nullptr, &cache, true));
   REQUIRE(forced.has_value());
   CHECK((*forced)[modDir]->name == QStringLiteral("Sample Mod Two"));
 
   // A new mtime invalidates the entry even though the cache is consulted.
   setAboutMtime(original, original.mtime + 5.0);
-  auto changed = runAsync(provider.discover(QStringLiteral("1.5")));
+  auto changed =
+      runAsync(provider.discover(QStringLiteral("1.5"), nullptr, &cache));
   REQUIRE(changed.has_value());
   CHECK((*changed)[modDir]->name == QStringLiteral("Sample Mod Two"));
   // mtime lives on AboutXmlMod; ListedMod has no such field.
@@ -449,14 +451,15 @@ TEST_CASE("providers keep their identity when they share one cache") {
                 kAboutTwo, true);
   MetadataCache cache(metadataCachePath(root.path()));
   FolderModProvider local(QStringLiteral("local"), QStringLiteral("#2ecc71"),
-                          localRoot, false, nullptr, &cache);
+                          localRoot, false);
   FolderModProvider downloaded(QStringLiteral("downloaded"),
-                               QStringLiteral("#3498db"), downloadedRoot, true,
-                               nullptr, &cache);
+                               QStringLiteral("#3498db"), downloadedRoot, true);
 
   for (int pass = 0; pass < 2; ++pass) {
-    auto localMods = runAsync(local.discover(QStringLiteral("1.5")));
-    auto steamMods = runAsync(downloaded.discover(QStringLiteral("1.5")));
+    auto localMods =
+        runAsync(local.discover(QStringLiteral("1.5"), nullptr, &cache));
+    auto steamMods =
+        runAsync(downloaded.discover(QStringLiteral("1.5"), nullptr, &cache));
     REQUIRE(localMods.has_value());
     REQUIRE(steamMods.has_value());
     REQUIRE(localMods->contains(localMod));

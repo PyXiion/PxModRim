@@ -253,11 +253,12 @@ void OrganizerViewPanel::rebuild() {
   m_dirty = false;
   m_filters->update(m_service.treeFilters());
   const auto query = m_filters->forKey(m_filterKey).query(m_searchText);
-  const auto tree = m_service.tree(query);
-  m_model->setTree(tree, m_ctx.allMods(), m_ctx.modService().providerColors(),
-                   !query.isEmpty(), m_service.state().tags);
+  auto tree = m_service.tree(query);
   const auto ungrouped =
       query.isEmpty() ? tree.mods.size() : m_service.tree().mods.size();
+  m_model->setTree(std::move(tree), m_ctx.allMods(),
+                   m_ctx.modService().providerColors(), !query.isEmpty(),
+                   m_service.state().tags);
   m_status->setText(
       QStringLiteral("%1 · %2 active · %3 · %4 ungrouped")
           .arg(plural(m_ctx.allMods().size(), QStringLiteral("mod")))

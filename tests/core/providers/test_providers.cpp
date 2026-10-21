@@ -204,9 +204,9 @@ TEST_CASE("cached metadata is returned without parsing") {
   REQUIRE(cache.cachedMod->setModPath(plain));
 
   FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
-                             root.path(), false, nullptr, &cache);
-  const auto discovered =
-      runToCompletion(provider.discover(QStringLiteral("1.5")));
+                             root.path(), false);
+  const auto discovered = runToCompletion(
+      provider.discover(QStringLiteral("1.5"), nullptr, &cache));
   REQUIRE(discovered.has_value());
   REQUIRE(discovered->size() == 1);
   CHECK(discovered->constBegin().value() == cache.cachedMod);
@@ -222,9 +222,9 @@ TEST_CASE("newly parsed About.xml data is stored in the cache") {
 
   FakeCache cache;
   FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
-                             root.path(), false, nullptr, &cache);
-  const auto discovered =
-      runToCompletion(provider.discover(QStringLiteral("1.5")));
+                             root.path(), false);
+  const auto discovered = runToCompletion(
+      provider.discover(QStringLiteral("1.5"), nullptr, &cache));
   REQUIRE(discovered.has_value());
   CHECK(discovered->contains(plain));
 
@@ -244,9 +244,9 @@ TEST_CASE("force_reparse bypasses the cache lookup") {
   cache.cachedMod = std::make_shared<px::modrim::AboutXmlMod>();
 
   FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
-                             root.path(), false, nullptr, &cache);
+                             root.path(), false);
   const auto discovered = runToCompletion(provider.discover(
-      QStringLiteral("1.5"), nullptr, nullptr, /*force_reparse=*/true));
+      QStringLiteral("1.5"), nullptr, &cache, /*force_reparse=*/true));
   REQUIRE(discovered.has_value());
   CHECK(cache.getCalls == 0);
   CHECK(discovered->size() == 1);

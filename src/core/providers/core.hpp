@@ -8,8 +8,7 @@ namespace px::modrim::providers {
 class CoreModProvider final : public BaseModProvider {
  public:
   // `gamePath` is the RimWorld install root; `Data/` is resolved inside it.
-  explicit CoreModProvider(QString gamePath,
-                           MetadataCacheStore* metadataCache = nullptr);
+  explicit CoreModProvider(QString gamePath);
 
  protected:
   QList<ModDirectory> scanDirectories() const override;

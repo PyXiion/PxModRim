@@ -2,12 +2,12 @@
 
 #include <QLocale>
 #include <QRegularExpression>
-#include <QSet>
 #include <QUrl>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <type_traits>
+#include <utility>
 
 #include "ui/panels/mod_info_data.hpp"
 
@@ -15,12 +15,168 @@ namespace px::modrim::workshop {
 namespace {
 using namespace workshop;
 
-constexpr std::array<const char*, 25> kRoles = {
-    "itemId",      "kind",        "title",       "author",       "previewUrl",
-    "collage",     "sourceLabel", "versions",    "tags",         "state",
-    "active",      "stateLabel",  "actionLabel", "incompatible", "memberCount",
-    "description", "workshopUrl", "fileSize",    "votes",        "votesUp",
-    "votesDown",   "queued",      "favourite",   "summary",      "compatLabel"};
+enum Role {
+  kItemIdRole = Qt::UserRole + 1,
+  kKindRole,
+  kTitleRole,
+  kAuthorRole,
+  kPreviewUrlRole,
+  kCollageRole,
+  kSourceLabelRole,
+  kVersionsRole,
+  kTagsRole,
+  kStateRole,
+  kActiveRole,
+  kStateLabelRole,
+  kActionLabelRole,
+  kIncompatibleRole,
+  kMemberCountRole,
+  kDescriptionRole,
+  kWorkshopUrlRole,
+  kFileSizeRole,
+  kVotesRole,
+  kVotesUpRole,
+  kVotesDownRole,
+  kQueuedRole,
+  kFavouriteRole,
+  kSummaryRole,
+  kCompatLabelRole,
+};
+
+constexpr std::array<std::pair<int, const char*>, 25> kRoles{{
+    {kItemIdRole, "itemId"},
+    {kKindRole, "kind"},
+    {kTitleRole, "title"},
+    {kAuthorRole, "author"},
+    {kPreviewUrlRole, "previewUrl"},
+    {kCollageRole, "collage"},
+    {kSourceLabelRole, "sourceLabel"},
+    {kVersionsRole, "versions"},
+    {kTagsRole, "tags"},
+    {kStateRole, "state"},
+    {kActiveRole, "active"},
+    {kStateLabelRole, "stateLabel"},
+    {kActionLabelRole, "actionLabel"},
+    {kIncompatibleRole, "incompatible"},
+    {kMemberCountRole, "memberCount"},
+    {kDescriptionRole, "description"},
+    {kWorkshopUrlRole, "workshopUrl"},
+    {kFileSizeRole, "fileSize"},
+    {kVotesRole, "votes"},
+    {kVotesUpRole, "votesUp"},
+    {kVotesDownRole, "votesDown"},
+    {kQueuedRole, "queued"},
+    {kFavouriteRole, "favourite"},
+    {kSummaryRole, "summary"},
+    {kCompatLabelRole, "compatLabel"},
+}};
+
+QString kindName(CardKind kind) {
+  return kind == CardKind::kCollection ? QStringLiteral("collection")
+                                       : QStringLiteral("mod");
+}
+
+QString stateName(CardState state) {
+  switch (state) {
+    case CardState::kMissing:
+      return QStringLiteral("missing");
+    case CardState::kInstalled:
+      return QStringLiteral("installed");
+    case CardState::kOutdated:
+      return QStringLiteral("outdated");
+  }
+  return {};
+}
+
+QString stateLabel(CardState state) {
+  switch (state) {
+    case CardState::kMissing:
+      return QStringLiteral("Not installed");
+    case CardState::kInstalled:
+      return QStringLiteral("Installed");
+    case CardState::kOutdated:
+      return QStringLiteral("Update available");
+  }
+  return {};
+}
+
+QString actionLabel(CardAction action) {
+  switch (action) {
+    case CardAction::kDownload:
+      return QStringLiteral("Download");
+    case CardAction::kInstalled:
+      return QStringLiteral("Installed");
+    case CardAction::kUpdate:
+      return QStringLiteral("Update");
+    case CardAction::kDownloadAll:
+      return QStringLiteral("Download all");
+    case CardAction::kCompleteDownload:
+      return QStringLiteral("Complete download");
+    case CardAction::kPreparing:
+      return QStringLiteral("Preparing…");
+    case CardAction::kDownloading:
+      return QStringLiteral("Downloading");
+    case CardAction::kQueued:
+      return QStringLiteral("Queued");
+  }
+  return {};
+}
+
+QVariant roleValue(const CatalogCard& card, int role) {
+  switch (role) {
+    case kItemIdRole:
+      return card.itemId;
+    case kKindRole:
+      return kindName(card.kind);
+    case kTitleRole:
+      return card.title;
+    case kAuthorRole:
+      return card.author;
+    case kPreviewUrlRole:
+      return card.previewUrl;
+    case kCollageRole:
+      return card.collage;
+    case kSourceLabelRole:
+      return card.sourceLabel;
+    case kVersionsRole:
+      return card.versions;
+    case kTagsRole:
+      return card.tags;
+    case kStateRole:
+      return stateName(card.state);
+    case kActiveRole:
+      return card.active;
+    case kStateLabelRole:
+      return stateLabel(card.state);
+    case kActionLabelRole:
+      return actionLabel(card.action);
+    case kIncompatibleRole:
+      return card.incompatible;
+    case kMemberCountRole:
+      return card.memberCount;
+    case kDescriptionRole:
+      return QString{};
+    case kWorkshopUrlRole:
+      return card.workshopUrl;
+    case kFileSizeRole:
+      return card.fileSize;
+    case kVotesRole:
+      return card.votes;
+    case kVotesUpRole:
+      return card.votesUp;
+    case kVotesDownRole:
+      return card.votesDown;
+    case kQueuedRole:
+      return card.queued;
+    case kFavouriteRole:
+      return card.favourite;
+    case kSummaryRole:
+      return card.summary;
+    case kCompatLabelRole:
+      return card.compatLabel;
+  }
+  return {};
+}
 
 QString sizeLabel(const std::optional<std::string>& bytes) {
   return bytes ? QString::number(
@@ -37,6 +193,38 @@ QString compatLabel(const QSet<QString>& versions, const QString& game,
   if (incompatible) return "Not for " + game;
   if (versions.isEmpty()) return QStringLiteral("Version not stated");
   return "Works with " + game;
+}
+
+QSet<QString> idsOf(const std::vector<std::string>& ids) {
+  QSet<QString> result;
+  for (const auto& id : ids) result.insert(QString::fromStdString(id));
+  return result;
+}
+
+CardState cardState(InstallState state) {
+  switch (state) {
+    case InstallState::kMissing:
+      return CardState::kMissing;
+    case InstallState::kInstalled:
+      return CardState::kInstalled;
+    case InstallState::kOutdated:
+      return CardState::kOutdated;
+  }
+  return CardState::kMissing;
+}
+
+QString descriptionHtml(const CatalogEntry& entry) {
+  return std::visit(
+      [](const auto& item) {
+        using Item = std::decay_t<decltype(item)>;
+        QString format = QStringLiteral("bbcode");
+        if constexpr (std::is_same_v<Item, CatalogCollection>)
+          if (item.description_format == CollectionDescriptionFormat::kText)
+            format = QStringLiteral("text");
+        return px::modrim::descriptionToHtml(
+            QString::fromStdString(item.description), format);
+      },
+      entry);
 }
 }  // namespace
 
@@ -74,14 +262,15 @@ QString summarize(const QString& text, const QString& format) {
   return result + QChar(0x2026);
 }
 
-QVariantMap itemRow(
-    const CatalogEntry& entry,
-    const std::function<InstallState(const CatalogMod&)>& installState,
-    const QString& gameVersion, bool detail) {
+CatalogCard makeCard(const CatalogEntry& entry, const CardContext& context) {
   return std::visit(
       [&](const auto& item) {
         using Item = std::decay_t<decltype(item)>;
         constexpr bool kCollection = std::is_same_v<Item, CatalogCollection>;
+        CatalogCard card;
+        card.itemId = QString::fromStdString(item.id);
+        card.kind = kCollection ? CardKind::kCollection : CardKind::kMod;
+        card.title = QString::fromStdString(item.title);
         QSet<QString> versions;
         for (const auto& version : item.supported_versions)
           versions.insert(QString::fromStdString(version));
@@ -93,22 +282,19 @@ QVariantMap itemRow(
             if (versionTag.match(value).hasMatch()) versions.insert(value);
           }
         }
-        bool incompatible = !gameVersion.isEmpty() && !versions.isEmpty() &&
-                            !versions.contains(gameVersion);
+        bool incompatible = !context.gameVersion.isEmpty() &&
+                            !versions.isEmpty() &&
+                            !versions.contains(context.gameVersion);
         bool noCommon = false;
-        InstallState state = InstallState::kMissing;
-        QString source, action, size, votes = QStringLiteral("Unrated"),
-                                      up = "0", down = "0";
+        QString votes = QStringLiteral("Unrated"), up = "0", down = "0";
         QString workshopUrl, format = QStringLiteral("bbcode");
-        QStringList collage;
-        qlonglong memberCount = 0;
         if constexpr (kCollection) {
-          source = item.source == CollectionSource::kPicked
-                       ? "PxModRim pick"
-                       : "Steam collection";
-          action = QStringLiteral("Download all");
-          memberCount = item.member_count;
-          size = sizeLabel(item.total_size);
+          card.sourceLabel = item.source == CollectionSource::kPicked
+                                 ? "PxModRim pick"
+                                 : "Steam collection";
+          card.action = CardAction::kDownloadAll;
+          card.memberCount = static_cast<int>(item.member_count);
+          card.fileSize = sizeLabel(item.total_size);
           noCommon = item.no_common_version && versions.isEmpty();
           incompatible = incompatible || noCommon;
           if (item.workshop_url)
@@ -117,24 +303,24 @@ QVariantMap itemRow(
             format = QStringLiteral("text");
           for (const auto& preview : item.member_previews) {
             const QString url = safeUrl(QString::fromStdString(preview));
-            if (!url.isEmpty()) collage.append(url);
+            if (!url.isEmpty()) card.collage.append(url);
           }
         } else {
-          state = installState(item);
+          card.state = cardState(context.installState(item));
           incompatible = incompatible || item.incompatible;
-          source = QStringLiteral("Steam Workshop");
-          switch (state) {
-            case InstallState::kMissing:
-              action = QStringLiteral("Download");
+          card.sourceLabel = QStringLiteral("Steam Workshop");
+          switch (card.state) {
+            case CardState::kMissing:
+              card.action = CardAction::kDownload;
               break;
-            case InstallState::kInstalled:
-              action = QStringLiteral("Installed");
+            case CardState::kInstalled:
+              card.action = CardAction::kInstalled;
               break;
-            case InstallState::kOutdated:
-              action = QStringLiteral("Update");
+            case CardState::kOutdated:
+              card.action = CardAction::kUpdate;
               break;
           }
-          size = sizeLabel(item.file_size);
+          card.fileSize = sizeLabel(item.file_size);
           workshopUrl = QString::fromStdString(item.workshop_url);
           if (item.votes) {
             const QLocale locale(QLocale::English, QLocale::UnitedStates);
@@ -148,21 +334,6 @@ QVariantMap itemRow(
                       std::nearbyint(100.0 * item.votes->up / total), 'f', 0) +
                   '%';
           }
-        }
-        QString stateName, stateLabel;
-        switch (state) {
-          case InstallState::kMissing:
-            stateName = "missing";
-            stateLabel = "Not installed";
-            break;
-          case InstallState::kInstalled:
-            stateName = "installed";
-            stateLabel = "Installed";
-            break;
-          case InstallState::kOutdated:
-            stateName = "outdated";
-            stateLabel = "Update available";
-            break;
         }
         QString preview = item.preview_url
                               ? QString::fromStdString(*item.preview_url)
@@ -197,55 +368,97 @@ QVariantMap itemRow(
           if (!versions.contains(value)) tagLabels.append(value);
         }
         const QString description = QString::fromStdString(item.description);
-        return QVariantMap{
-            {"itemId", QString::fromStdString(item.id)},
-            {"kind", kCollection ? "collection" : "mod"},
-            {"title", QString::fromStdString(item.title)},
-            {"author", author},
-            {"previewUrl", safeUrl(preview)},
-            {"collage", collage},
-            {"sourceLabel", source},
-            {"versions", versionLabels.isEmpty()
-                             ? QStringLiteral("Not specified")
-                             : versionLabels.join(", ")},
-            {"tags", tagLabels.join(QStringLiteral(" · "))},
-            {"state", stateName},
-            {"active", false},
-            {"queued", false},
-            {"favourite", false},
-            {"stateLabel", stateLabel},
-            {"actionLabel", action},
-            {"incompatible", incompatible},
-            {"memberCount", memberCount},
-            {"description",
-             detail ? px::modrim::descriptionToHtml(description, format)
-                    : QString{}},
-            {"workshopUrl", safeUrl(workshopUrl)},
-            {"fileSize", size},
-            {"votes", votes},
-            {"votesUp", up},
-            {"votesDown", down},
-            {"summary", summarize(description, format)},
-            {"compatLabel",
-             compatLabel(versions, gameVersion, incompatible, noCommon)}};
+        card.author = author;
+        card.previewUrl = safeUrl(preview);
+        card.versions = versionLabels.isEmpty()
+                            ? QStringLiteral("Not specified")
+                            : versionLabels.join(", ");
+        card.tags = tagLabels.join(QStringLiteral(" · "));
+        card.workshopUrl = safeUrl(workshopUrl);
+        card.votes = votes;
+        card.votesUp = up;
+        card.votesDown = down;
+        card.summary = summarize(description, format);
+        card.compatLabel =
+            compatLabel(versions, context.gameVersion, incompatible, noCommon);
+        card.incompatible = incompatible;
+
+        // Installation, activation and queue state, resolved exactly once from
+        // the refresh-wide snapshot.
+        if constexpr (kCollection) {
+          if (!context.detail) {
+            qsizetype installed = 0;
+            for (const auto& member : item.member_ids)
+              installed +=
+                  context.installedIds.contains(QString::fromStdString(member));
+            if (!item.member_ids.empty() &&
+                installed == static_cast<qsizetype>(item.member_ids.size())) {
+              card.state = CardState::kInstalled;
+              card.action = CardAction::kInstalled;
+            } else if (installed) {
+              card.action = CardAction::kCompleteDownload;
+            }
+          }
+          card.favourite =
+              context.favouriteIds.contains(QString::fromStdString(item.id));
+        } else {
+          card.active = context.activeIds.contains(card.itemId);
+        }
+        if constexpr (kCollection) {
+          if (context.preparingIds.contains(card.itemId)) {
+            card.queued = true;
+            card.action = CardAction::kPreparing;
+          } else {
+            QSet<QString> candidates = idsOf(item.member_ids);
+            candidates.unite(context.plannedMembers.value(card.itemId));
+            if (context.packId == card.itemId)
+              candidates.unite(context.packIds);
+            if (candidates.intersects(context.downloadingIds)) {
+              card.queued = true;
+              card.action = CardAction::kDownloading;
+            } else if (candidates.intersects(context.queuedIds)) {
+              card.queued = true;
+              card.action = CardAction::kQueued;
+            }
+          }
+        } else if (card.state != CardState::kInstalled) {
+          if (context.preparingIds.contains(card.itemId)) {
+            card.queued = true;
+            card.action = CardAction::kPreparing;
+          } else if (context.downloadingIds.contains(card.itemId)) {
+            card.queued = true;
+            card.action = CardAction::kDownloading;
+          } else if (context.queuedIds.contains(card.itemId)) {
+            card.queued = true;
+            card.action = CardAction::kQueued;
+          }
+        }
+        return card;
       },
       entry);
+}
+
+QVariantMap cardDetail(const CatalogCard& card, const CatalogEntry& item) {
+  QVariantMap result;
+  for (const auto& [role, name] : kRoles)
+    result.insert(QString::fromLatin1(name), roleValue(card, role));
+  result.insert(QStringLiteral("description"), descriptionHtml(item));
+  return result;
 }
 
 CatalogListModel::CatalogListModel(QObject* parent)
     : QAbstractListModel(parent) {}
 
-void CatalogListModel::setPage(QList<QVariantMap> rows, int total,
+void CatalogListModel::setPage(QList<CatalogCard> cards, int total,
                                std::optional<QString> cursor, bool append) {
   if (append) {
     QSet<QString> known;
-    for (const auto& row : m_rows) known.insert(row.value("itemId").toString());
-    QList<QVariantMap> additions;
-    for (auto& row : rows) {
-      const QString id = row.value("itemId").toString();
-      if (!known.contains(id)) {
-        known.insert(id);
-        additions.append(std::move(row));
+    for (const auto& card : m_rows) known.insert(card.itemId);
+    QList<CatalogCard> additions;
+    for (auto& card : cards) {
+      if (!known.contains(card.itemId)) {
+        known.insert(card.itemId);
+        additions.append(std::move(card));
       }
     }
     if (!additions.isEmpty()) {
@@ -254,21 +467,21 @@ void CatalogListModel::setPage(QList<QVariantMap> rows, int total,
       m_rows.append(std::move(additions));
       endInsertRows();
     }
-  } else if (rows.size() == m_rows.size() &&
-             std::equal(rows.cbegin(), rows.cend(), m_rows.cbegin(),
+  } else if (cards.size() == m_rows.size() &&
+             std::equal(cards.cbegin(), cards.cend(), m_rows.cbegin(),
                         [](const auto& a, const auto& b) {
-                          return a.value("itemId") == b.value("itemId");
+                          return a.itemId == b.itemId;
                         })) {
-    for (qsizetype i = 0; i < rows.size(); ++i) {
-      if (rows.at(i) != m_rows.at(i)) {
-        m_rows[i] = std::move(rows[i]);
+    for (qsizetype i = 0; i < cards.size(); ++i) {
+      if (cards.at(i) != m_rows.at(i)) {
+        m_rows[i] = std::move(cards[i]);
         emit dataChanged(index(static_cast<int>(i)),
                          index(static_cast<int>(i)));
       }
     }
   } else {
     beginResetModel();
-    m_rows = std::move(rows);
+    m_rows = std::move(cards);
     endResetModel();
   }
   m_total = total;
@@ -276,9 +489,9 @@ void CatalogListModel::setPage(QList<QVariantMap> rows, int total,
   emit changed();
 }
 
-void CatalogListModel::refreshRows(
-    const std::function<QVariantMap(const QVariantMap&)>& convert) {
-  for (auto& row : m_rows) row = convert(row);
+void CatalogListModel::refresh(
+    const std::function<CatalogCard(const CatalogCard&)>& convert) {
+  for (auto& card : m_rows) card = convert(card);
   if (!m_rows.isEmpty()) emit dataChanged(index(0), index(count() - 1));
 }
 
@@ -287,17 +500,13 @@ int CatalogListModel::rowCount(const QModelIndex& parent) const {
 }
 
 QVariant CatalogListModel::data(const QModelIndex& index, int role) const {
-  const int offset = role - Qt::UserRole - 1;
-  if (!index.isValid() || index.row() < 0 || index.row() >= count() ||
-      offset < 0 || offset >= static_cast<int>(kRoles.size()))
-    return {};
-  return m_rows.at(index.row()).value(QString::fromLatin1(kRoles[offset]));
+  if (!index.isValid() || index.row() < 0 || index.row() >= count()) return {};
+  return roleValue(m_rows.at(index.row()), role);
 }
 
 QHash<int, QByteArray> CatalogListModel::roleNames() const {
   QHash<int, QByteArray> names;
-  for (std::size_t i = 0; i < kRoles.size(); ++i)
-    names.insert(Qt::UserRole + static_cast<int>(i) + 1, kRoles[i]);
+  for (const auto& [role, name] : kRoles) names.insert(role, name);
   return names;
 }
 

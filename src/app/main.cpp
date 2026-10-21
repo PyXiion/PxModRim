@@ -261,6 +261,18 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
   co_return window->restartRequested() ? AppExit::kRestart : AppExit::kSuccess;
 }
 
+// Ends the Qt event loop as soon as the run finishes. main() only enters the
+// loop after the run has suspended, so a failure that happens later (a mod load
+// or plugin init failure, say) would otherwise leave the app open with a dead
+// task.
+QCoro::Task<AppExit> runAppAndQuit(QApplication& qtApp, QSet<QString> disabled,
+                                   px::modrim::ResolvedScale initialScale) {
+  const AppExit exit =
+      co_await runApp(qtApp, std::move(disabled), std::move(initialScale));
+  QCoreApplication::quit();
+  co_return exit;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -298,9 +310,9 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  auto run = runApp(qtApp, std::move(*disabled), initialScale);
-  // An early failure has already finished the run; otherwise run the event loop
-  // until quit.
+  auto run = runAppAndQuit(qtApp, std::move(*disabled), initialScale);
+  // A failure before the first suspension has already finished the run;
+  // otherwise run the event loop until the run finishes and quits it.
   if (!run.isReady()) {
     qtApp.exec();
   }

@@ -35,6 +35,14 @@ struct Batch {
 };
 // NOLINTEND(readability-identifier-naming)
 
+QVariant card(const CatalogListModel& model, const char* name, int row = 0) {
+  const auto names = model.roleNames();
+  for (auto it = names.cbegin(); it != names.cend(); ++it)
+    if (it.value() == name) return model.data(model.index(row), it.key());
+  FAIL("Missing role " << name);
+  return {};
+}
+
 class DownloaderFixture : public Downloader {
  public:
   explicit DownloaderFixture(DownloadManager& manager)
@@ -288,21 +296,17 @@ TEST_CASE(
   f.collection.member_count = 2;
   f.install(QStringLiteral("1"));
   run(f.view->selectTabAsync(QStringLiteral("Collections")));
-  auto row = f.view->collectionsModel->rows().front();
-  CHECK(row.value(QStringLiteral("actionLabel")) ==
+  const auto& model = *f.view->collectionsModel;
+  CHECK(card(model, "actionLabel").toString() ==
         QStringLiteral("Complete download"));
-  CHECK(row.value(QStringLiteral("state")) == QStringLiteral("missing"));
+  CHECK(card(model, "state").toString() == QStringLiteral("missing"));
   f.install(QStringLiteral("2"));
-  row = f.view->collectionsModel->rows().front();
-  CHECK(row.value(QStringLiteral("actionLabel")) ==
-        QStringLiteral("Installed"));
-  CHECK(row.value(QStringLiteral("state")) == QStringLiteral("installed"));
+  CHECK(card(model, "actionLabel").toString() == QStringLiteral("Installed"));
+  CHECK(card(model, "state").toString() == QStringLiteral("installed"));
   f.downloader.active = {QStringLiteral("1")};
   f.core->downloads().busyChanged.notify(true);
-  row = f.view->collectionsModel->rows().front();
-  CHECK(row.value(QStringLiteral("queued")).toBool());
-  CHECK(row.value(QStringLiteral("actionLabel")) ==
-        QStringLiteral("Downloading"));
+  CHECK(card(model, "queued").toBool());
+  CHECK(card(model, "actionLabel").toString() == QStringLiteral("Downloading"));
 }
 
 TEST_CASE("disabled workshop catalog does not issue requests") {
@@ -368,14 +372,8 @@ TEST_CASE(
   run(f.view->openItemAsync(QStringLiteral("1"), QStringLiteral("mod")));
   f.core->setActive({first, second});
   CHECK(f.view->detail().value(QStringLiteral("active")).toBool());
-  CHECK(f.view->modsModel->rows()
-            .front()
-            .value(QStringLiteral("active"))
-            .toBool());
-  CHECK(f.view->membersModel->rows()
-            .front()
-            .value(QStringLiteral("active"))
-            .toBool());
+  CHECK(card(*f.view->modsModel, "active").toBool());
+  CHECK(card(*f.view->membersModel, "active").toBool());
 }
 
 TEST_CASE("workshop tags accumulate excluding supported version tags") {
@@ -432,10 +430,7 @@ TEST_CASE("workshop starred collections stay in favourites until unstarred") {
   f.view->toggleFavourite(QStringLiteral("picked:test"));
   run(f.view->selectTabAsync(QStringLiteral("Favourites")));
   REQUIRE(f.view->collectionsModel->count() == 1);
-  CHECK(f.view->collectionsModel->rows()
-            .front()
-            .value(QStringLiteral("favourite"))
-            .toBool());
+  CHECK(card(*f.view->collectionsModel, "favourite").toBool());
   run(f.view->filterItems(QStringLiteral("not present"), {},
                           QStringLiteral("all"), QStringLiteral("popular"),
                           {}));

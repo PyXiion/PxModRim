@@ -4,6 +4,7 @@
 #include <QList>
 #include <QSet>
 #include <QStringList>
+#include <optional>
 
 #include <QCoro/QCoroTask>
 
@@ -21,8 +22,9 @@ class SortService {
   SortService(CoreContext& ctx, DiagnosticsService& diagnostics);
 
   // Orders the active mods by tier, dependencies and load-order rules. Resolves
-  // to their uuids in that order.
-  QCoro::Task<QStringList> sortActiveMods();
+  // to their uuids in that order, or to nullopt when any input changed while
+  // the worker ran, so a stale order never overwrites newer state.
+  QCoro::Task<std::optional<QStringList>> sortActiveMods();
 
   // Uuids of inactive mods that the active mods need and that are not already
   // covered.

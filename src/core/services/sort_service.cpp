@@ -6,6 +6,8 @@
 
 #include <QCoro/QCoroFuture>
 
+#include <spdlog/spdlog.h>
+
 #include "core/checker/sort.hpp"
 #include "core/context.hpp"
 #include "core/profiler.hpp"
@@ -19,26 +21,45 @@ std::shared_ptr<AboutXmlMod> aboutXml(const ListedModPtr& mod) {
   return std::dynamic_pointer_cast<AboutXmlMod>(mod);
 }
 
+// Everything the sort worker reads, so it never touches live service state.
+struct SortInputs {
+  QHash<sort::PackageId, checker::AboutXmlModPtr> activeMods;
+  checker::ConstraintGraph graph;
+  sort::CommunityRules rules;
+  sort::SortSettings settings;
+  QHash<QString, ListedModPtr> allMods;
+  QStringList activeUuids;
+};
+
 }  // namespace
 
 SortService::SortService(CoreContext& ctx, DiagnosticsService& diagnostics)
     : m_ctx(ctx), m_diagnostics(diagnostics) {}
 
-// Python: asyncio.to_thread(topological_sort, ...) -> QtConcurrent::run +
-// co_await. The inputs are copies or borrowed from the diagnostics service,
-// which is not mutated while awaiting.
-QCoro::Task<QStringList> SortService::sortActiveMods() {
-  ProfileSession session(QStringLiteral("sort"));
-  Profiler& timer = session.timer();
-  const auto activeMods = m_diagnostics.activeModsByPid();
-  const auto& graph = m_diagnostics.constraintGraph();
-  const sort::SortSettings settings = m_ctx.config().sort;
-  const sort::CommunityRules* rules = &m_diagnostics.communityRules();
+QCoro::Task<std::optional<QStringList>> SortService::sortActiveMods() {
+  // Read before the snapshot: any later mutation bumps the revision and
+  // invalidates whatever the worker produces.
+  const quint64 revision = m_ctx.sortInputsRevision();
+  const SortInputs inputs{
+      .activeMods = m_diagnostics.activeModsByPid(),
+      .graph = m_diagnostics.constraintGraph(),
+      .rules = m_diagnostics.communityRules(),
+      .settings = m_ctx.config().sort,
+      .allMods = m_ctx.allMods(),
+      .activeUuids = m_ctx.activeUuids(),
+  };
 
-  const QList<sort::PackageId> sorted = co_await QtConcurrent::run([&] {
-    return checker::topologicalSort(activeMods, graph, settings, rules, &timer);
+  const QList<sort::PackageId> sorted = co_await QtConcurrent::run([inputs] {
+    ProfileSession session(QStringLiteral("sort"));
+    return checker::topologicalSort(inputs.activeMods, inputs.graph,
+                                    inputs.settings, &inputs.rules,
+                                    &session.timer());
   });
-  co_return orderUuids(sorted, m_ctx.allMods(), m_ctx.activeUuids());
+  if (m_ctx.sortInputsRevision() != revision) {
+    spdlog::warn("Sort discarded: the mod list changed while sorting");
+    co_return std::nullopt;
+  }
+  co_return orderUuids(sorted, inputs.allMods, inputs.activeUuids);
 }
 
 QStringList SortService::resolveMissingDependencies(

@@ -9,8 +9,7 @@ namespace px::modrim::providers {
 class FolderModProvider final : public BaseModProvider {
  public:
   FolderModProvider(QString providerId, QString color, QString path,
-                    bool hasPublishedFileId, QThreadPool* pool = nullptr,
-                    MetadataCacheStore* metadataCache = nullptr);
+                    bool hasPublishedFileId, QThreadPool* pool = nullptr);
 
  protected:
   QList<ModDirectory> scanDirectories() const override;

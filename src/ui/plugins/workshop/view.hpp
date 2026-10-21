@@ -129,14 +129,19 @@ class WorkshopViewPanel : public BaseViewPanel {
   QCoro::Task<void> installedChanged();
   QCoro::Task<void> urlChanged();
   void refreshModIds();
-  QVariantMap row(const workshop::CatalogEntry& item, bool detail = false);
-  QVariantMap detailRow(const Detail& detail);
+  void remember(const workshop::CatalogEntry& item);
+  CardContext cardContext();
+  QVariantMap detailRow(const Detail& detail, const CardContext& context);
   template <class T>
-  QList<QVariantMap> rows(const std::vector<T>& items) {
-    refreshModIds();
-    QList<QVariantMap> result;
+  QList<CatalogCard> cards(const std::vector<T>& items,
+                           const CardContext& context) {
+    QList<CatalogCard> result;
     result.reserve(static_cast<qsizetype>(items.size()));
-    for (const auto& item : items) result.append(row(item));
+    for (const auto& item : items) {
+      CatalogEntry entry{item};
+      remember(entry);
+      result.append(makeCard(entry, context));
+    }
     return result;
   }
   void refreshRows();

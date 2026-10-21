@@ -143,27 +143,10 @@ QString formatAge(double mtime, std::optional<double> now) {
     }
   return "just now";
 }
-QVariantMap buildModInfo(CoreContext& ctx, const ListedMod& mod,
-                         const QList<view::ModIssueView>& issues) {
+ModInfo buildModInfo(CoreContext& ctx, const ListedMod& mod) {
   const auto* about = dynamic_cast<const AboutXmlMod*>(&mod);
-  const auto& active = ctx.activeUuids();
-  const auto position = active.indexOf(mod.uuid());
-  QVariantList issueRows, needs, neededBy, details;
-  QStringList conflicts;
-  int errors = 0;
-  for (const auto& issue : issues) {
-    errors += issue.isError;
-    issueRows.append(QVariantMap{{"title", issue.categoryDisplayName},
-                                 {"detail", issue.detail.value_or(QString{})},
-                                 {"isError", issue.isError}});
-  }
-  const auto warnings = issues.size() - errors;
-  const QString level = errors ? "error" : warnings ? "warning" : "ok";
-  const auto count = errors ? errors : warnings;
-  const QString title = count ? QString::number(count) +
-                                    (errors ? " error" : " warning") +
-                                    (count == 1 ? "" : "s")
-                              : QStringLiteral("No issues");
+  ModInfo data;
+  QVariantList needs, neededBy, details;
   if (about) {
     QHash<QString, const AboutXmlMod*> index;
     for (const auto& entry : ctx.allMods())
@@ -179,19 +162,18 @@ QVariantMap buildModInfo(CoreContext& ctx, const ListedMod& mod,
         }
       needs.append(QVariantMap{
           {"name", dep.name.isEmpty() ? dep.packageId.str() : dep.name},
-          {"state", !found                           ? "missing"
-                    : active.contains(found->uuid()) ? "active"
-                                                     : "inactive"},
           {"uuid", found ? found->uuid() : QString{}}});
     }
-    for (const auto& pid : about->aboutRules.incompatibleWith) {
-      const auto* other = index.value(pid.str(), nullptr);
-      if (other && active.contains(other->uuid()))
-        conflicts.append(other->name);
-    }
-    std::sort(
-        conflicts.begin(), conflicts.end(),
-        [](const auto& a, const auto& b) { return a.toLower() < b.toLower(); });
+    QList<const AboutXmlMod*> incompatible;
+    for (const auto& pid : about->aboutRules.incompatibleWith)
+      if (const auto* other = index.value(pid.str(), nullptr))
+        incompatible.append(other);
+    std::sort(incompatible.begin(), incompatible.end(), [](auto* a, auto* b) {
+      return a->name.toLower() < b->name.toLower();
+    });
+    for (const auto* other : incompatible)
+      data.conflictingMods.append(
+          QVariantMap{{"name", other->name}, {"uuid", other->uuid()}});
     QList<const AboutXmlMod*> dependents;
     for (const auto& entry : ctx.allMods()) {
       const auto* other = dynamic_cast<const AboutXmlMod*>(entry.get());
@@ -234,29 +216,72 @@ QVariantMap buildModInfo(CoreContext& ctx, const ListedMod& mod,
   if (mod.modPath()) row("Path", *mod.modPath(), true);
   const QString target = ctx.targetVersion();
   const bool known = !mod.supportedVersions.isEmpty() && target != "Unknown";
-  return {{"name", mod.name},
-          {"author", authors},
-          {"provider", provider},
-          {"status", QVariantMap{{"level", level},
-                                 {"title", title},
-                                 {"active", position >= 0},
-                                 {"position", position >= 0 ? position + 1 : 0},
-                                 {"total", active.size()},
-                                 {"issues", issueRows},
-                                 {"obsolete", mod.obsolete},
-                                 {"valid", mod.valid}}},
-          {"version",
-           QVariantMap{{"known", known},
-                       {"ok", known && mod.supportedVersions.contains(target)},
-                       {"target", target}}},
-          {"needs", needs},
-          {"conflicts", conflicts},
-          {"neededBy", neededBy},
-          {"description", descriptionToHtml(mod.description)},
-          {"details", details},
-          {"canOpenFolder", mod.modPath() && QFileInfo::exists(*mod.modPath())},
-          {"canUpdate", source != nullptr},
-          {"updateSource", source ? source->label() : QString{}},
-          {"url", about ? about->url : QString{}}};
+  data.description = descriptionToHtml(mod.description);
+  data.info = {
+      {"name", mod.name},
+      {"author", authors},
+      {"provider", provider},
+      {"status", QVariantMap{{"obsolete", mod.obsolete}, {"valid", mod.valid}}},
+      {"version",
+       QVariantMap{{"known", known},
+                   {"ok", known && mod.supportedVersions.contains(target)},
+                   {"target", target}}},
+      {"needs", needs},
+      {"conflicts", QStringList{}},
+      {"neededBy", neededBy},
+      {"details", details},
+      {"canOpenFolder", mod.modPath() && QFileInfo::exists(*mod.modPath())},
+      {"canUpdate", source != nullptr},
+      {"updateSource", source ? source->label() : QString{}},
+      {"url", about ? about->url : QString{}}};
+  return data;
+}
+
+void updateActiveState(const QStringList& activeUuids, const QString& uuid,
+                       ModInfo& data) {
+  const auto position = activeUuids.indexOf(uuid);
+  auto status = data.info.value("status").toMap();
+  status.insert("active", position >= 0);
+  status.insert("position", position >= 0 ? position + 1 : 0);
+  status.insert("total", activeUuids.size());
+  data.info.insert("status", status);
+  auto needs = data.info.value("needs").toList();
+  for (auto& entry : needs) {
+    auto need = entry.toMap();
+    const auto target = need.value("uuid").toString();
+    need.insert("state", target.isEmpty()               ? "missing"
+                         : activeUuids.contains(target) ? "active"
+                                                        : "inactive");
+    entry = need;
+  }
+  data.info.insert("needs", needs);
+  QStringList conflicts;
+  for (const auto& entry : data.conflictingMods) {
+    const auto candidate = entry.toMap();
+    if (activeUuids.contains(candidate.value("uuid").toString()))
+      conflicts.append(candidate.value("name").toString());
+  }
+  data.info.insert("conflicts", conflicts);
+}
+
+void updateIssues(const QList<view::ModIssueView>& issues, QVariantMap& info) {
+  QVariantList issueRows;
+  int errors = 0;
+  for (const auto& issue : issues) {
+    errors += issue.isError;
+    issueRows.append(QVariantMap{{"title", issue.categoryDisplayName},
+                                 {"detail", issue.detail.value_or(QString{})},
+                                 {"isError", issue.isError}});
+  }
+  const auto warnings = issues.size() - errors;
+  const auto count = errors ? errors : warnings;
+  auto status = info.value("status").toMap();
+  status.insert("level", errors ? "error" : warnings ? "warning" : "ok");
+  status.insert("title", count ? QString::number(count) +
+                                     (errors ? " error" : " warning") +
+                                     (count == 1 ? "" : "s")
+                               : QStringLiteral("No issues"));
+  status.insert("issues", issueRows);
+  info.insert("status", status);
 }
 }  // namespace px::modrim

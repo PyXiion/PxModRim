@@ -29,6 +29,15 @@ namespace services {
 class GameLauncher;
 }
 
+// Outcome of CoreContext::autoSort(). A stale sort was discarded because a
+// running sort's inputs changed; the previous order is still in place and
+// `count` is zero.
+struct AutoSortResult {
+  int count = 0;
+  double elapsedMs = 0;
+  bool stale = false;
+};
+
 // Centralised application state: mods, active load order, config and game
 // version, plus the services that act on them. Services hold a reference back
 // to the context, so it is built only through create() and never moved.
@@ -47,9 +56,10 @@ class CoreContext {
   // Replaces all mods and the active list, taking ownership of the data.
   void load(QHash<QString, ListedModPtr> mods, QStringList activeUuids);
   void setActive(QStringList uuids);
-  // Enables missing dependencies, then sorts the active mods. Resolves to the
-  // number of active mods and the time the sort took in milliseconds.
-  QCoro::Task<std::pair<int, double>> autoSort();
+  // Enables missing dependencies, then sorts the active mods. A sort whose
+  // inputs changed while its worker ran is discarded, leaving the current
+  // order untouched.
+  QCoro::Task<AutoSortResult> autoSort();
   // Replaces the live config and refreshes derived values (game version).
   void updateConfig(AppConfig cfg);
   // Rebuilds the providers for new paths.
@@ -80,6 +90,13 @@ class CoreContext {
   }
   Event<AppConfig>& configChanged() noexcept { return m_configChanged; }
 
+  // Incremented whenever something a running sort reads changes: the active
+  // order or membership, the discovered mods, the config or the checker's graph
+  // and rules. A sort captures the value before it reads its inputs and drops
+  // its result if the value moved on.
+  void invalidateSortInputs() noexcept { ++m_sortInputsRevision; }
+  quint64 sortInputsRevision() const noexcept { return m_sortInputsRevision; }
+
   ConfigService& configService() const noexcept { return m_configService; }
   QNetworkAccessManager& network() noexcept { return m_network; }
 
@@ -105,6 +122,7 @@ class CoreContext {
   QString m_gameVersion;
   Event<QStringList> m_activeStateChanged;
   Event<AppConfig> m_configChanged;
+  quint64 m_sortInputsRevision = 0;
   // Shared by providers and the network; declared before the services so they
   // outlive them.
   QThreadPool m_pool;

@@ -60,13 +60,11 @@ QList<ModDirectory> scanModDirectory(const QString& modsPath) {
 }
 
 BaseModProvider::BaseModProvider(QString providerId, QString color,
-                                 QString path, QThreadPool* pool,
-                                 MetadataCacheStore* metadataCache)
+                                 QString path, QThreadPool* pool)
     : m_providerId(std::move(providerId)),
       m_color(std::move(color)),
       m_path(std::move(path)),
-      m_pool(pool),
-      m_metadataCache(metadataCache) {}
+      m_pool(pool) {}
 
 QCoro::Task<Result<ModMap>> BaseModProvider::discover(
     QString targetVersion, Profiler* timer, MetadataCacheStore* metadataCache,
@@ -95,17 +93,16 @@ QCoro::Task<Result<ModMap>> BaseModProvider::discover(
 QCoro::Task<Result<ModMap>> BaseModProvider::loadMods(
     QList<ModDirectory> dirs, QString targetVersion, Profiler& timer,
     MetadataCacheStore* metadataCache, bool forceReparse) {
-  MetadataCacheStore* cache = metadataCache ? metadataCache : m_metadataCache;
-
   const QList<ModCandidate> candidates =
       co_await runOnPool<QList<ModCandidate>>(
           nullptr, [dirs = std::move(dirs)] { return statCandidates(dirs); });
 
   ModMap result;
   QList<ModCandidate> missing;
-  if (cache && !forceReparse) {
+  if (metadataCache && !forceReparse) {
     auto scope = timer("cache_lookup");
-    CacheLookup lookup = co_await cache->getMods(candidates, targetVersion);
+    CacheLookup lookup =
+        co_await metadataCache->getMods(candidates, targetVersion);
     for (ListedModPtr& mod : lookup.cached) {
       mod->providerId = m_providerId;
       result.insert(mod->uuid(), mod);
@@ -122,7 +119,7 @@ QCoro::Task<Result<ModMap>> BaseModProvider::loadMods(
     if (!parsed) {
       co_return std::unexpected(parsed.error());
     }
-    if (cache) {
+    if (metadataCache) {
       QList<CachedMod> cacheItems;
       for (const ParsedMod& item : *parsed) {
         if (auto about = std::dynamic_pointer_cast<AboutXmlMod>(item.mod)) {
@@ -130,7 +127,7 @@ QCoro::Task<Result<ModMap>> BaseModProvider::loadMods(
         }
       }
       if (!cacheItems.isEmpty()) {
-        co_await cache->putMods(std::move(cacheItems), targetVersion);
+        co_await metadataCache->putMods(std::move(cacheItems), targetVersion);
       }
     }
     for (ParsedMod& item : *parsed) {

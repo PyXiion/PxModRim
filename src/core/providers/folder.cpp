@@ -9,10 +9,9 @@ namespace px::modrim::providers {
 
 FolderModProvider::FolderModProvider(QString providerId, QString color,
                                      QString path, bool hasPublishedFileId,
-                                     QThreadPool* pool,
-                                     MetadataCacheStore* metadataCache)
+                                     QThreadPool* pool)
     : BaseModProvider(std::move(providerId), std::move(color), std::move(path),
-                      pool, metadataCache),
+                      pool),
       m_hasPublishedFileId(hasPublishedFileId) {}
 
 QList<ModDirectory> FolderModProvider::scanDirectories() const {

@@ -21,8 +21,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pinned third-party CI and release actions to immutable commits without changing their selected versions.
 - Removed unused Workshop injection imports and discarded callback results explicitly to satisfy static analysis.
 - Removed dead code and collapsed single-use abstractions across core and UI (unused dialogs, widgets, QSS rules, test-only helpers, duplicate cached-database and mod-provider classes, nullable `ConfigService` paths); user-visible behaviour is unchanged. The undocumented `PX_SMOKE_EXIT_MS` environment variable is gone, and the app version now comes from `project(VERSION)` in CMake.
+- Workshop cards are built from typed card data in one pass instead of repeatedly patching row maps, the mod information panel refreshes only the parts that changed (metadata, active order or diagnostics), providers take their metadata cache per discovery instead of through two channels, and the Organizer tree model takes ownership of the tree it displays instead of copying it.
 
 ### Fixed
+- Malformed or unreadable community rules are ignored with a warning instead of failing the mod load, and rules that are no longer used are dropped so they cannot keep affecting diagnostics and sorting.
+- Auto-sort no longer reads the live checker graph and rules from its worker thread, and a sort whose inputs change while it runs is discarded with a warning instead of overwriting newer user changes.
+- An asynchronous startup failure (mod load or plugin init) now ends the application instead of leaving an open window with no running logic behind it.
+- Workshop backend: Steam HTTP failures no longer reset the dependency crawler's cursor or pass for a complete dependency graph, and the legacy resolver uses the catalog's Steam transport and error classification.
 - Moving from the Python app preserves dependency declaration order by rebuilding legacy metadata-cache rows from About.xml once.
 - Snapshot discovery and retention follow Python's platform-specific filename matching, leaving unrelated case-mismatched files untouched on POSIX.
 - Windows and macOS builds no longer fail on the renamed `Platform` enumerators; the UI-off configuration no longer builds UI tests; presets work with CMake 3.24; `just run*` launches the macOS app bundle; CI/release QCoro builds no longer require Qt WebSockets.

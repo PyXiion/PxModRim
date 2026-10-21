@@ -124,9 +124,8 @@ void WorkshopViewPanel::refreshAndNotify() {
   emit changed();
 }
 
-QVariantMap WorkshopViewPanel::row(const CatalogEntry& item, bool detail) {
-  const auto id = idOf(item);
-  m_items.insert(id, item);
+void WorkshopViewPanel::remember(const CatalogEntry& item) {
+  m_items.insert(idOf(item), item);
   std::visit(
       [this](const auto& value) {
         auto tags = idsOf(value.tags);
@@ -134,63 +133,36 @@ QVariantMap WorkshopViewPanel::row(const CatalogEntry& item, bool detail) {
         m_knownTags.unite(tags);
       },
       item);
-  auto result = itemRow(
-      item,
-      [this](const CatalogMod& mod) { return m_catalog.installState(mod); },
-      gameVersion(), detail);
-  const auto* mod = std::get_if<CatalogMod>(&item);
-  const auto* collection = std::get_if<CatalogCollection>(&item);
-  result[QStringLiteral("active")] = mod && m_activeIds.contains(id);
-  if (collection) {
-    if (!detail) {
-      qsizetype count = 0;
-      for (const auto& member : collection->member_ids)
-        count += m_installedIds.contains(QString::fromStdString(member));
-      if (!collection->member_ids.empty() &&
-          count == static_cast<qsizetype>(collection->member_ids.size())) {
-        result[QStringLiteral("state")] = QStringLiteral("installed");
-        result[QStringLiteral("stateLabel")] = QStringLiteral("Installed");
-        result[QStringLiteral("actionLabel")] = QStringLiteral("Installed");
-      } else if (count)
-        result[QStringLiteral("actionLabel")] =
-            QStringLiteral("Complete download");
-    }
-    if (m_favourites.contains(collection->id)) {
-      result[QStringLiteral("favourite")] = true;
+  if (const auto* collection = std::get_if<CatalogCollection>(&item))
+    if (m_favourites.contains(collection->id))
       m_favourites.remember(*collection);
-    }
-  }
-  if (collection || result.value(QStringLiteral("state")).toString() !=
-                        QStringLiteral("installed")) {
-    if (m_preparing.contains(id)) {
-      result[QStringLiteral("queued")] = true;
-      result[QStringLiteral("actionLabel")] = QStringLiteral("Preparing…");
-    } else {
-      QSet<QString> ids =
-          mod ? QSet<QString>{id}
-              : idsOf(collection->member_ids) | m_collectionMods.value(id);
-      if (collection && m_detailData && idOf(m_detailData->item) == id)
-        ids.unite(m_packIds);
-      if (ids.intersects(m_downloads.activeIds())) {
-        result[QStringLiteral("queued")] = true;
-        result[QStringLiteral("actionLabel")] = QStringLiteral("Downloading");
-      } else if (ids.intersects(m_catalog.queuedIds())) {
-        result[QStringLiteral("queued")] = true;
-        result[QStringLiteral("actionLabel")] = QStringLiteral("Queued");
-      }
-    }
-  }
-  return result;
 }
 
-QVariantMap WorkshopViewPanel::detailRow(const Detail& detail) {
-  auto result = row(detail.item, true);
-  result[QStringLiteral("complete")] = detail.complete;
-  result[QStringLiteral("warning")] = QString::fromStdString(detail.warning);
+CardContext WorkshopViewPanel::cardContext() {
+  refreshModIds();
+  QSet<QString> favouriteIds;
+  for (const auto& item : m_favourites.items())
+    favouriteIds.insert(QString::fromStdString(item.id));
+  return CardContext{
+      .gameVersion = gameVersion(),
+      .installState =
+          [this](const CatalogMod& mod) { return m_catalog.installState(mod); },
+      .installedIds = m_installedIds,
+      .activeIds = m_activeIds,
+      .favouriteIds = std::move(favouriteIds),
+      .preparingIds = m_preparing,
+      .downloadingIds = m_downloads.activeIds(),
+      .queuedIds = m_catalog.queuedIds(),
+      .plannedMembers = m_collectionMods,
+      .packId = m_detailData ? idOf(m_detailData->item) : QString{},
+      .packIds = m_packIds};
+}
+
+QVariantMap WorkshopViewPanel::detailRow(const Detail& detail,
+                                         const CardContext& context) {
+  auto card = makeCard(detail.item, context);
   if (std::holds_alternative<CatalogCollection>(detail.item)) {
-    auto collage = result.value(QStringLiteral("collage")).toStringList();
-    if (result.value(QStringLiteral("previewUrl")).toString().isEmpty() &&
-        collage.isEmpty()) {
+    if (card.previewUrl.isEmpty() && card.collage.isEmpty()) {
       for (const auto& member : detail.members) {
         const auto* mod = std::get_if<CatalogMod>(&member);
         if (!mod) continue;
@@ -203,39 +175,41 @@ QVariantMap WorkshopViewPanel::detailRow(const Detail& detail) {
             }
           }
         preview = safeUrl(preview);
-        if (!preview.isEmpty()) collage.append(preview);
-        if (collage.size() == 4) break;
+        if (!preview.isEmpty()) card.collage.append(preview);
+        if (card.collage.size() == 4) break;
       }
-      result[QStringLiteral("collage")] = collage;
     }
     bool started = false;
     for (const auto& member : detail.members)
       if (auto* mod = std::get_if<CatalogMod>(&member))
         started |= m_catalog.installState(*mod) != InstallState::kMissing;
-    if (!result.value(QStringLiteral("queued")).toBool())
-      result[QStringLiteral("actionLabel")] =
-          started ? QStringLiteral("Complete download")
-                  : QStringLiteral("Download all");
+    if (!card.queued)
+      card.action =
+          started ? CardAction::kCompleteDownload : CardAction::kDownloadAll;
     if (auto copies = packCopies()) {
-      result[QStringLiteral("state")] = QStringLiteral("installed");
-      result[QStringLiteral("stateLabel")] = QStringLiteral("Installed");
-      if (!result.value(QStringLiteral("queued")).toBool())
-        result[QStringLiteral("actionLabel")] = QStringLiteral("Installed");
-      result[QStringLiteral("active")] =
-          std::ranges::all_of(*copies, [this](const auto& uuid) {
-            return m_ctx.activeUuids().contains(uuid);
-          });
+      card.state = CardState::kInstalled;
+      card.active = std::ranges::all_of(*copies, [this](const auto& uuid) {
+        return m_ctx.activeUuids().contains(uuid);
+      });
+      if (!card.queued) card.action = CardAction::kInstalled;
     }
   }
+  auto result = cardDetail(card, detail.item);
+  result.insert(QStringLiteral("complete"), detail.complete);
+  result.insert(QStringLiteral("warning"),
+                QString::fromStdString(detail.warning));
   return result;
 }
 void WorkshopViewPanel::refreshRows() {
+  auto context = cardContext();
   for (auto* model : {modsModel, collectionsModel, membersModel})
-    model->refreshRows([this](const QVariantMap& value) {
-      return row(
-          m_items.value(value.value(QStringLiteral("itemId")).toString()));
+    model->refresh([this, &context](const CatalogCard& card) {
+      return makeCard(m_items.value(card.itemId), context);
     });
-  if (m_detailData) m_detail = detailRow(*m_detailData);
+  if (m_detailData) {
+    context.detail = true;
+    m_detail = detailRow(*m_detailData, context);
+  }
 }
 void WorkshopViewPanel::clearDetail() {
   m_detail.clear();
@@ -296,9 +270,10 @@ QCoro::Task<void> WorkshopViewPanel::load(bool append) {
     co_await runCached<Discover>(
         QStringLiteral("discover"), [catalog] { return catalog->discover(); },
         [this](const Discover& value) {
-          modsModel->setPage(rows(value.mods.items),
+          const auto context = cardContext();
+          modsModel->setPage(cards(value.mods.items, context),
                              static_cast<int>(value.mods.total), std::nullopt);
-          collectionsModel->setPage(rows(value.collections.items),
+          collectionsModel->setPage(cards(value.collections.items, context),
                                     static_cast<int>(value.collections.total),
                                     std::nullopt);
         });
@@ -309,8 +284,8 @@ QCoro::Task<void> WorkshopViewPanel::load(bool append) {
     showFavourites();
   } else if (m_tab == QStringLiteral("Installed")) {
     if (append) {
-      modsModel->setPage(rows(m_installed.nextPage()), m_installed.total(),
-                         installedCursor(), true);
+      modsModel->setPage(cards(m_installed.nextPage(), cardContext()),
+                         m_installed.total(), installedCursor(), true);
       co_return;
     }
     m_installedDirty = false;
@@ -348,7 +323,8 @@ QCoro::Task<void> WorkshopViewPanel::load(bool append) {
       co_await runCached<CatalogPage<CatalogCollection>>(
           key, [catalog, query] { return catalog->collections(query); },
           [this, model, append](const CatalogPage<CatalogCollection>& value) {
-            model->setPage(rows(value.items), static_cast<int>(value.total),
+            model->setPage(cards(value.items, cardContext()),
+                           static_cast<int>(value.total),
                            cursorOf(value.next_cursor), append);
           },
           !append);
@@ -356,7 +332,8 @@ QCoro::Task<void> WorkshopViewPanel::load(bool append) {
       co_await runCached<CatalogPage<CatalogMod>>(
           key, [catalog, query] { return catalog->mods(query); },
           [this, model, append](const CatalogPage<CatalogMod>& value) {
-            model->setPage(rows(value.items), static_cast<int>(value.total),
+            model->setPage(cards(value.items, cardContext()),
+                           static_cast<int>(value.total),
                            cursorOf(value.next_cursor), append);
           },
           !append);
@@ -370,8 +347,8 @@ void WorkshopViewPanel::showFavourites() {
   for (const auto& item : m_favourites.items())
     if (QString::fromStdString(item.title).toCaseFolded().contains(query))
       matches.push_back(item);
-  collectionsModel->setPage(rows(matches), static_cast<int>(matches.size()),
-                            std::nullopt);
+  collectionsModel->setPage(cards(matches, cardContext()),
+                            static_cast<int>(matches.size()), std::nullopt);
   emit changed();
 }
 std::optional<QString> WorkshopViewPanel::installedCursor() const {
@@ -380,8 +357,8 @@ std::optional<QString> WorkshopViewPanel::installedCursor() const {
 }
 void WorkshopViewPanel::showInstalled() {
   clearDetail();
-  modsModel->setPage(rows(m_installed.visible()), m_installed.total(),
-                     installedCursor());
+  modsModel->setPage(cards(m_installed.visible(), cardContext()),
+                     m_installed.total(), installedCursor());
   emit changed();
 }
 void WorkshopViewPanel::recount() {
@@ -471,10 +448,13 @@ QCoro::Task<void> WorkshopViewPanel::openItemAsync(QString itemId, QString kind,
                 m_detail.value(QStringLiteral("title")).toString());
         }
         m_current = ref;
-        auto members = rows(value.members);
         m_detailData = value;
-        m_detail = detailRow(value);
-        membersModel->setPage(std::move(members),
+        remember(value.item);
+        auto context = cardContext();
+        context.detail = true;
+        m_detail = detailRow(value, context);
+        context.detail = false;
+        membersModel->setPage(cards(value.members, context),
                               static_cast<int>(value.members.size()),
                               std::nullopt);
       });

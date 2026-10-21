@@ -1,5 +1,8 @@
 import { handleCatalogRequest } from './catalog';
 import { indexTick } from './indexer';
+import { fetchSteamFileDetails, querySteamIds, STEAM_DETAILS_BATCH } from './steam';
+import type { SteamDetailsOptions } from './steam';
+import { HttpError } from './types';
 import type { DependencyMessage, Env, SteamFile } from './types';
 
 interface DependencyItem {
@@ -34,16 +37,14 @@ interface DependencyRow {
   deps: string;
 }
 
-interface SteamDetailsEnvelope {
-  response?: { publishedfiledetails?: SteamFile[] };
-}
-
-interface SteamQueryEnvelope {
-  response?: {
-    publishedfiledetails?: Array<Pick<SteamFile, 'publishedfileid'>>;
-    next_cursor?: string;
-  };
-}
+/** GetDetails fields the dependency crawler consumes. */
+const DEPENDENCY_DETAILS: SteamDetailsOptions = {
+  includeChildren: true,
+  includeTags: false,
+  includeKvTags: true,
+  includeVotes: false,
+  includeAdditionalPreviews: false,
+};
 
 interface CrawlState {
   cursor: string;
@@ -99,7 +100,6 @@ const CACHE_TTL_OK_COLLECTION = 1 * 60 * 60 * 1000;
 const CACHE_TTL_ERROR = 1 * 60 * 60 * 1000;
 const QUEUE_DEDUP_TTL_MS = 60 * 1000;
 const MAX_INLINE_SCRAPE = 200*4;
-const STEAM_API_BATCH_SIZE = 200;
 const QUERY_MODS_PAGE_SIZE = 3000;
 const CRAWL_BATCH_SIZE = 200;
 
@@ -139,10 +139,9 @@ function parseRequiredDeps(htmlBlock: string): string[] {
 // ============================================================================
 
 async function fetchSteamPageHtml(
-  apiKey: string | undefined,
+  apiKey: string,
   modId: string
 ): Promise<{ html: string | null; httpStatus: number; error: string | null }> {
-  if (!apiKey) return { html: null, httpStatus: 0, error: 'SCRAPI not configured' };
   const targetUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${modId}`;
   const apiUrl = `https://api.scrapingant.com/v2/general?url=${encodeURIComponent(targetUrl)}&browser=false`;
 
@@ -290,45 +289,6 @@ function buildTree(targetId: string): { itemsMap: Record<string, DependencyItem>
   return { itemsMap, missingIds };
 }
 
-async function fetchSteamApiDetails(apiKey: string | undefined, modIds: string[]): Promise<SteamFile[] | null> {
-  if (!apiKey) return null;
-  const jsonPayload = {
-    publishedfileids: modIds,
-    includechildren: true,
-    includetags: false,
-    includekvtags: true
-  };
-  const url = `https://api.steampowered.com/IPublishedFileService/GetDetails/v1/?key=${apiKey}&input_json=${encodeURIComponent(JSON.stringify(jsonPayload))}`;
-
-  const startTime = Date.now();
-  try {
-    const response = await fetch(url, { method: 'GET' });
-    const duration = Date.now() - startTime;
-
-    if (response.status === 429) {
-      console.warn(`[STEAM API RATE LIMITED] Batch of ${modIds.length} IDs returned 429`);
-      return null;
-    }
-
-    if (!response.ok) {
-      console.error(`[STEAM API FAIL] HTTP ${response.status} (${duration}ms)`);
-      return null;
-    }
-
-    const data = await response.json<SteamDetailsEnvelope>();
-    const details = data?.response?.publishedfiledetails;
-    if (!Array.isArray(details)) {
-      console.error(`[STEAM API FAIL] Unexpected response shape`);
-      return null;
-    }
-
-    return details;
-  } catch (err) {
-    console.error(`[STEAM API EXCEPTION] Batch of ${modIds.length}:`, err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
 function processApiResults(details: SteamFile[]): ApiDependencyItem[] {
   const processed: ApiDependencyItem[] = [];
 
@@ -362,43 +322,6 @@ function processApiResults(details: SteamFile[]): ApiDependencyItem[] {
 // ============================================================================
 // 4. CRAWL — STALE MOD DISCOVERY VIA QueryFiles
 // ============================================================================
-
-async function queryMods(apiKey: string, cursor: string): Promise<{ ids: string[]; next_cursor: string }> {
-  const params = new URLSearchParams({
-    key: apiKey,
-    query_type: '1',
-    page: '1',
-    cursor: cursor,
-    numperpage: String(QUERY_MODS_PAGE_SIZE),
-    creator_appid: '294100',
-    appid: '294100',
-    filetype: '0',
-    ids_only: 'true',
-    return_children: 'false',
-    return_vote_data: 'false',
-    return_tags: 'false',
-    return_kv_tags: 'false',
-    return_previews: 'false',
-    return_short_description: 'false',
-    return_metadata: 'false',
-    return_playtime_stats: 'false'
-  });
-  const url = `https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?${params.toString()}`;
-
-  const response = await fetch(url, { method: 'GET' });
-  if (!response.ok) {
-    console.error(`[CRAWL] QueryFiles HTTP ${response.status}`);
-    return { ids: [], next_cursor: '' };
-  }
-
-  const data = await response.json<SteamQueryEnvelope>();
-  const details = data?.response?.publishedfiledetails;
-  const nextCursor = data?.response?.next_cursor || '';
-
-  const ids = Array.isArray(details) ? details.map(d => d.publishedfileid).filter(Boolean) : [];
-
-  return { ids, next_cursor: nextCursor };
-}
 
 async function findStaleIds(db: D1Database, ids: string[]): Promise<string[]> {
   const stale: string[] = [];
@@ -459,7 +382,12 @@ async function saveCrawlState(db: D1Database, state: CrawlState): Promise<void> 
   ).run();
 }
 
-async function crawlTick(env: Env): Promise<void> {
+function steamFailure(error: unknown): string {
+  if (error instanceof HttpError) return `HTTP ${error.status}: ${error.message}`;
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function crawlTick(env: Env): Promise<void> {
   if (!env.STEAM_API_KEY) {
     console.warn('[CRAWL] No STEAM_API_KEY, skipping tick');
     return;
@@ -470,7 +398,14 @@ async function crawlTick(env: Env): Promise<void> {
   if (state.todo_ids.length === 0) {
     console.log(`[CRAWL] Fetching page, cursor=${state.cursor || '(start)'}`);
 
-    const { ids, next_cursor } = await queryMods(env.STEAM_API_KEY, state.cursor);
+    // A transport or shape fault is not exhaustion: leaving the saved state untouched
+    // makes the next tick resume the same cursor instead of restarting the cycle.
+    const page = await querySteamIds(env, QUERY_MODS_PAGE_SIZE, state.cursor).catch(error => {
+      console.error(`[CRAWL] QueryFiles failed (${steamFailure(error)}), keeping cursor ${JSON.stringify(state.cursor)}`);
+      return null;
+    });
+    if (!page) return;
+    const { ids, next_cursor } = page;
 
     if (ids.length === 0) {
       console.log('[CRAWL] Empty page, resetting cursor');
@@ -517,7 +452,11 @@ async function ensureCollectionRootDeps(env: Env, rootId: string): Promise<boole
   const cached = GLOBAL_RAM_CACHE.get(rootId);
   if (!cached || !cached.data.is_collection) return false;
 
-  const details = await fetchSteamApiDetails(env.STEAM_API_KEY, [rootId]);
+  const details = await fetchSteamFileDetails(env, [rootId], DEPENDENCY_DETAILS).catch(error => {
+    // A detail outage keeps the stored membership; it does not empty the root collection.
+    console.error(`[ROOT COLLECTION] Steam details unavailable for ${rootId} (${steamFailure(error)})`);
+    return null;
+  });
   if (!details) return false;
 
   const rootDetail = details.find(d => d.publishedfileid === rootId);
@@ -543,11 +482,11 @@ async function ensureCollectionRootDeps(env: Env, rootId: string): Promise<boole
   return true;
 }
 
-async function scrapeViaScrapingAnt(env: Env, modId: string): Promise<ScrapeResult> {
+async function scrapeViaScrapingAnt(env: Env, apiKey: string, modId: string): Promise<ScrapeResult> {
   const now = Date.now();
   console.log(`[SCRAPINGANT FALLBACK] Scraping Steam page for ID: ${modId}...`);
 
-  const { html, httpStatus, error } = await fetchSteamPageHtml(env.SCRAPI, modId);
+  const { html, httpStatus, error } = await fetchSteamPageHtml(apiKey, modId);
 
   if (httpStatus === 409 || httpStatus === 429) {
     console.warn(`[SCRAPINGANT FALLBACK] Rate limited on ${modId}`);
@@ -615,18 +554,27 @@ async function scrapeInline(env: Env, missingIds: Set<string>, rootId: string | 
 
   while (toScrape.length > 0 && scrapedCount < MAX_INLINE_SCRAPE) {
     const batch: string[] = [];
-    while (batch.length < STEAM_API_BATCH_SIZE && toScrape.length > 0 && scrapedCount + batch.length < MAX_INLINE_SCRAPE) {
+    while (batch.length < STEAM_DETAILS_BATCH && toScrape.length > 0 && scrapedCount + batch.length < MAX_INLINE_SCRAPE) {
       const id = toScrape.shift()!;
       if (!scraped.has(id)) batch.push(id);
     }
     if (batch.length === 0) break;
 
-    const apiDetails = await fetchSteamApiDetails(env.STEAM_API_KEY, batch);
+    let apiDetails: SteamFile[] | null = null;
+    try {
+      apiDetails = await fetchSteamFileDetails(env, batch, DEPENDENCY_DETAILS);
+    } catch (error) {
+      // Exact fallback boundary: only a Steam fault reaches the paid scraper, and only when
+      // one is configured. Otherwise the fault propagates to /deps and the queue.
+      console.error(`[STEAM API FAIL] Batch of ${batch.length}: ${steamFailure(error)}`);
+    }
 
     if (!apiDetails) {
+      const scrapi = env.SCRAPI;
+      if (!scrapi) throw new HttpError(502, 'Steam API is unavailable and SCRAPI is not configured');
       for (const id of batch) {
         if (scrapedCount >= MAX_INLINE_SCRAPE) break;
-        const result = await scrapeViaScrapingAnt(env, id);
+        const result = await scrapeViaScrapingAnt(env, scrapi, id);
         if (result.isRateLimited) {
           for (const remaining of toScrape) scraped.add(remaining);
           break;
@@ -849,7 +797,7 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(crawlTick(env));
+    ctx.waitUntil(crawlTick(env).catch(error => console.error('[CRAWL] Tick failed', error instanceof Error ? error.message : error)));
     ctx.waitUntil(indexTick(env).catch(error => console.error('[INDEX] Tick failed', error instanceof Error ? error.message : error)));
   },
 

@@ -70,6 +70,7 @@ void CoreContext::load(QHash<QString, ListedModPtr> mods,
   m_mods = std::move(mods);
   m_loadedActiveUuids = activeUuids;
   m_activeUuids = std::move(activeUuids);
+  invalidateSortInputs();
 }
 
 void CoreContext::setActive(QStringList uuids) {
@@ -85,10 +86,11 @@ void CoreContext::setActive(QStringList uuids) {
   } else {
     m_diagnosticsService->reorder(m_activeUuids);
   }
+  invalidateSortInputs();
   m_activeStateChanged.notify(m_activeUuids);
 }
 
-QCoro::Task<std::pair<int, double>> CoreContext::autoSort() {
+QCoro::Task<AutoSortResult> CoreContext::autoSort() {
   const QSet<QString> active(m_activeUuids.cbegin(), m_activeUuids.cend());
   const QStringList deps = m_sortService->resolveMissingDependencies(active);
   if (!deps.isEmpty()) {
@@ -99,21 +101,30 @@ QCoro::Task<std::pair<int, double>> CoreContext::autoSort() {
   }
 
   const auto started = std::chrono::steady_clock::now();
-  m_activeUuids = co_await m_sortService->sortActiveMods();
+  std::optional<QStringList> order = co_await m_sortService->sortActiveMods();
   const double elapsedMs = std::chrono::duration<double, std::milli>(
                                std::chrono::steady_clock::now() - started)
                                .count();
+  if (!order) {
+    co_return AutoSortResult{.count = 0, .elapsedMs = elapsedMs, .stale = true};
+  }
+  m_activeUuids = std::move(*order);
   m_diagnosticsService->reorder(m_activeUuids);
+  // A sort applied here is itself a change to the active order, so any other
+  // sort still running must not overwrite it.
+  invalidateSortInputs();
   m_activeStateChanged.notify(m_activeUuids);
   const int count = static_cast<int>(m_activeUuids.size());
   spdlog::info("auto-sort: {} mods sorted in {:.0f}ms", count, elapsedMs);
-  co_return std::pair{count, elapsedMs};
+  co_return AutoSortResult{
+      .count = count, .elapsedMs = elapsedMs, .stale = false};
 }
 
 void CoreContext::updateConfig(AppConfig cfg) {
   m_cfg = std::move(cfg);
   refreshGameVersion();
   m_configChanged.notify(m_cfg);
+  invalidateSortInputs();
 }
 
 void CoreContext::resetProviders(const PathConfig& paths) {

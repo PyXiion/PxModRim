@@ -10,6 +10,8 @@
 #include <QCoro/QCoroFuture>
 #include <QtConcurrent/QtConcurrentRun>
 
+#include <spdlog/spdlog.h>
+
 #include "core/config.hpp"
 #include "core/context.hpp"
 #include "core/providers/labels.hpp"
@@ -57,7 +59,7 @@ DiagnosticsService::DiagnosticsService(CoreContext& ctx,
                   onCheckerDiagnosticsChanged(diagnostics);
                 }) {}
 
-QCoro::Task<Result<void>> DiagnosticsService::initialize(Profiler* timer) {
+QCoro::Task<void> DiagnosticsService::initialize(Profiler* timer) {
   Profiler local;
   Profiler& t = timer != nullptr ? *timer : local;
   auto initScope = t("diagnostics.init");
@@ -66,22 +68,26 @@ QCoro::Task<Result<void>> DiagnosticsService::initialize(Profiler* timer) {
     co_await ensureDatabases();
   }
 
-  std::optional<sort::CommunityRules> rules;
+  sort::CommunityRules rules;
   {
     auto scope = t("load_community_rules");
     if (const auto path = communityRulesPath()) {
       auto loaded = co_await QtConcurrent::run(
           [p = *path] { return sort::loadCommunityRules(p); });
-      if (!loaded) {
-        co_return std::unexpected(loaded.error());
+      if (loaded) {
+        rules = std::move(*loaded);
+      } else {
+        spdlog::warn("Ignoring community rules: {}",
+                     loaded.error().message.toStdString());
+        warningRaised.notify(
+            QStringLiteral("Community rules are invalid and were ignored"));
       }
-      rules = std::move(*loaded);
     }
   }
-  if (rules && !rules->isEmpty()) {
-    m_checker.setCommunityRules(std::move(*rules));
-  }
-  co_return {};
+  // Applied even when empty, so rules that are no longer configured, missing,
+  // unreadable or empty stop influencing diagnostics and sorting.
+  m_checker.setCommunityRules(std::move(rules));
+  m_ctx.invalidateSortInputs();
 }
 
 QCoro::Task<void> DiagnosticsService::ensureDatabases() {

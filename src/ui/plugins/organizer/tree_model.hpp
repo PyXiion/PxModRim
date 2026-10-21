@@ -72,8 +72,7 @@ class ModTreeModel : public QAbstractItemModel {
   QHash<int, QByteArray> roleNames() const override;
 
   bool filtering() const;
-  void setTree(const organizer::FolderNode& root,
-               const organizer::ModsByUuid& mods,
+  void setTree(organizer::FolderNode root, const organizer::ModsByUuid& mods,
                const QHash<QString, QString>& providerColors, bool filtering,
                const QHash<qint64, organizer::Tag>& tags = {});
   void refreshDiagnostics();

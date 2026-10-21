@@ -259,6 +259,8 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
       [this](const QString& message) { m_toasts->info(message); });
   m_taskConnection = diagnostics.backgroundTaskChanged.connect(
       [this](const QString& text) { m_headerController->setTaskText(text); });
+  m_warningConnection = diagnostics.warningRaised.connect(
+      [this](const QString& message) { m_toasts->warning(message); });
   auto& downloads = m_ctx.downloads();
   if (downloads.available()) {
     m_downloadBusyConnection = downloads.busyChanged.connect([this](bool busy) {
@@ -300,6 +302,7 @@ MainWindow::~MainWindow() {
   diagnostics.diagnosticsSummaryChanged.disconnect(m_diagnosticsConnection);
   diagnostics.statusMessageChanged.disconnect(m_statusConnection);
   diagnostics.backgroundTaskChanged.disconnect(m_taskConnection);
+  diagnostics.warningRaised.disconnect(m_warningConnection);
   auto& downloads = m_ctx.downloads();
   downloads.busyChanged.disconnect(m_downloadBusyConnection);
   downloads.downloadProgress.disconnect(m_downloadProgressConnection);
@@ -534,10 +537,15 @@ QCoro::Task<void> MainWindow::reloadMods(bool full) {
 }
 
 QCoro::Task<void> MainWindow::autoSort() {
-  const auto [count, elapsed] = co_await m_ctx.autoSort();
+  const auto result = co_await m_ctx.autoSort();
+  if (result.stale) {
+    m_toasts->warning(
+        QStringLiteral("Mods changed while sorting; the order was left as is"));
+    co_return;
+  }
   m_toasts->success(QStringLiteral("Sorted %1 mods in %2ms")
-                        .arg(count)
-                        .arg(elapsed, 0, 'f', 0));
+                        .arg(result.count)
+                        .arg(result.elapsedMs, 0, 'f', 0));
 }
 
 QCoro::Task<void> MainWindow::updateMods() {

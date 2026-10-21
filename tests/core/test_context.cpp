@@ -1,12 +1,17 @@
 #include <QDir>
 #include <QFile>
+#include <QFuture>
 #include <QHash>
+#include <QSemaphore>
 #include <QString>
 #include <QStringList>
 #include <QTemporaryDir>
+#include <QThreadPool>
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -47,6 +52,40 @@ void writeVersion(const QString& gameDir, const QString& version) {
   REQUIRE(file.open(QIODevice::WriteOnly));
   file.write(version.toUtf8());
 }
+
+// Keeps QtConcurrent jobs queued: the global pool is reduced to one thread and
+// that thread is blocked until release(). A sort started in between cannot
+// finish, so its coroutine is still suspended when the test mutates the mods.
+class GatedGlobalPool {
+ public:
+  GatedGlobalPool() : m_pool(QThreadPool::globalInstance()) {
+    m_previousMax = m_pool->maxThreadCount();
+    m_pool->setMaxThreadCount(1);
+    m_blocker = QtConcurrent::run([this] {
+      m_started.release();
+      m_gate.acquire();
+    });
+    m_started.acquire();
+  }
+
+  ~GatedGlobalPool() {
+    release();
+    m_blocker.waitForFinished();
+    m_pool->setMaxThreadCount(m_previousMax);
+  }
+
+  GatedGlobalPool(const GatedGlobalPool&) = delete;
+  GatedGlobalPool& operator=(const GatedGlobalPool&) = delete;
+
+  void release() { m_gate.release(); }
+
+ private:
+  QThreadPool* m_pool;
+  int m_previousMax = 0;
+  QSemaphore m_started;
+  QSemaphore m_gate;
+  QFuture<void> m_blocker;
+};
 
 }  // namespace
 
@@ -117,10 +156,50 @@ TEST_CASE("autoSort enables a missing dependency and orders it first") {
              {QStringLiteral("uuid-b"), about(QStringLiteral("mod.b"))}},
             {QStringLiteral("uuid-a")});
 
-  const auto [count, elapsedMs] = runAsync(ctx->autoSort());
-  CHECK(count == 2);
-  CHECK(elapsedMs >= 0.0);
+  const auto result = runAsync(ctx->autoSort());
+  CHECK(result.count == 2);
+  CHECK(result.elapsedMs >= 0.0);
+  CHECK_FALSE(result.stale);
   REQUIRE(ctx->activeUuids().size() == 2);
   CHECK(ctx->activeUuids().indexOf(QStringLiteral("uuid-b")) <
         ctx->activeUuids().indexOf(QStringLiteral("uuid-a")));
+}
+
+TEST_CASE("autoSort keeps the current order when the active list changes") {
+  EventLoop loop;
+  auto ctx = makeContext();
+  ctx->load({{QStringLiteral("uuid-a"), about(QStringLiteral("mod.a"))},
+             {QStringLiteral("uuid-b"), about(QStringLiteral("mod.b"))}},
+            {QStringLiteral("uuid-a")});
+
+  GatedGlobalPool pool;
+  auto sorting = ctx->autoSort();
+  REQUIRE_FALSE(sorting.isReady());
+  ctx->setActive({QStringLiteral("uuid-a"), QStringLiteral("uuid-b")});
+  pool.release();
+
+  const auto result = runAsync(std::move(sorting));
+  CHECK(result.stale);
+  CHECK(ctx->activeUuids() ==
+        QStringList{QStringLiteral("uuid-a"), QStringLiteral("uuid-b")});
+}
+
+TEST_CASE("autoSort keeps the current order when the sort settings change") {
+  EventLoop loop;
+  auto ctx = makeContext();
+  ctx->load({{QStringLiteral("uuid-a"), about(QStringLiteral("mod.a"))},
+             {QStringLiteral("uuid-b"), about(QStringLiteral("mod.b"))}},
+            {QStringLiteral("uuid-a")});
+
+  GatedGlobalPool pool;
+  auto sorting = ctx->autoSort();
+  REQUIRE_FALSE(sorting.isReady());
+  AppConfig cfg = ctx->config();
+  cfg.sort.use_alternative_package_ids = false;
+  ctx->updateConfig(std::move(cfg));
+  pool.release();
+
+  const auto result = runAsync(std::move(sorting));
+  CHECK(result.stale);
+  CHECK(ctx->activeUuids() == QStringList{QStringLiteral("uuid-a")});
 }

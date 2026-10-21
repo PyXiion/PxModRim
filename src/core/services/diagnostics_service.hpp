@@ -14,7 +14,6 @@
 #include "core/checker/databases.hpp"
 #include "core/checker/graph.hpp"
 #include "core/checker/models.hpp"
-#include "core/error.hpp"
 #include "core/events.hpp"
 #include "core/models/view/diagnostics.hpp"
 #include "core/models/view/sidebar.hpp"
@@ -38,12 +37,15 @@ class DiagnosticsService {
   Event<QHash<QString, view::ModDiagnosticsView>> diagnosticsSummaryChanged;
   Event<QString> statusMessageChanged;
   Event<QString> backgroundTaskChanged;
+  // Optional data that had to be skipped, such as unreadable community rules.
+  Event<QString> warningRaised;
   Event<QList<view::SidebarEntry>> sidebarEntriesChanged;
 
   // Applies cached databases and community rules, and starts a background
-  // refresh of stale databases. Fails when the community rules file is
-  // malformed.
-  QCoro::Task<Result<void>> initialize(Profiler* timer = nullptr);
+  // refresh of stale databases. Unreadable community rules are reported through
+  // `warningRaised`; rules that are missing, disabled, empty or unreadable are
+  // dropped so no stale rules survive.
+  QCoro::Task<void> initialize(Profiler* timer = nullptr);
 
   // Rebuilds the checker for the context's active mods, or for `activeUuids`.
   void rebuild(Profiler* timer = nullptr);
