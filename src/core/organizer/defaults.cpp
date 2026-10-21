@@ -13,37 +13,20 @@ namespace {
 // libraries and performance precede the family prefixes that would swallow VE
 // Framework and Dubs Performance Analyzer.
 
-QList<StandardRule> exact(const QString& folder,
-                          std::initializer_list<const char*> ids) {
+QList<StandardRule> ids(const QString& folder, RuleOp op,
+                        std::initializer_list<const char*> patterns) {
   QList<StandardRule> rules;
-  for (const char* id : ids) {
-    rules.append({folder, RuleField::kPackageId, RuleOp::kEquals,
-                  QString::fromLatin1(id)});
-  }
-  return rules;
-}
-
-QList<StandardRule> prefixes(const QString& folder,
-                             std::initializer_list<const char*> prefixes) {
-  QList<StandardRule> rules;
-  for (const char* prefix : prefixes) {
-    rules.append({folder, RuleField::kPackageId, RuleOp::kPrefix,
-                  QString::fromLatin1(prefix)});
+  for (const char* pattern : patterns) {
+    rules.append(
+        {folder, RuleField::kPackageId, op, QString::fromLatin1(pattern)});
   }
   return rules;
 }
 
 QList<StandardRule> buildStandardRules() {
   QList<StandardRule> rules;
-  const auto append = [&rules](const QList<StandardRule>& more) {
-    rules.append(more);
-  };
-  const auto add = [&rules](StandardRule rule) {
-    rules.append(std::move(rule));
-  };
-
-  append(prefixes("Official", {"ludeon.rimworld"}));
-  append(exact("Frameworks & Libraries",
+  rules += ids("Official", RuleOp::kPrefix, {"ludeon.rimworld"});
+  rules += ids("Frameworks & Libraries", RuleOp::kEquals,
                {
                    "brrainz.harmony",
                    "unlimitedhugs.hugslib",
@@ -54,37 +37,41 @@ QList<StandardRule> buildStandardRules() {
                    "jecrell.jecstools",
                    "bs.fishery",
                    "smashphil.vehicleframework",
-               }));
-  append(exact("Performance", {
-                                  "bs.performance",
-                                  "krkr.rocketman",
-                                  "taranchuk.performanceoptimizer",
-                              }));
-  append(prefixes("Performance", {"dubwise.dubsperformanceanalyzer"}));
-  append(exact("Quality of Life", {
-                                      "brrainz.achtung",
-                                      "brrainz.cameraplus",
-                                      "unlimitedhugs.allowtool",
-                                      "jaxe.rimhud",
-                                      "mehni.pickupandhaul",
-                                      "avilmask.commonsense",
-                                      "dhultgren.smarterconstruction",
-                                      "roolo.searchanddestroy",
-                                  }));
-  append(prefixes("Vanilla Expanded", {
-                                          "vanillaexpanded.",
-                                          "oskarpotocki.",
-                                          "vanillaracesexpanded.",
-                                          "vanillaquestsexpanded.",
-                                          "vanillastorytellersexpanded.",
-                                      }));
-  add({"Vanilla Expanded", RuleField::kAuthor, RuleOp::kContains,
-       "oskar potocki"});
-  append(prefixes("Alpha Mods", {"sarg."}));
-  append(prefixes("Combat Extended", {"ceteam."}));
-  add({"Combat Extended", RuleField::kName, RuleOp::kContains,
-       "combat extended"});
-  append(prefixes("Dubs Mods", {"dubwise."}));
+               });
+  rules += ids("Performance", RuleOp::kEquals,
+               {
+                   "bs.performance",
+                   "krkr.rocketman",
+                   "taranchuk.performanceoptimizer",
+               });
+  rules +=
+      ids("Performance", RuleOp::kPrefix, {"dubwise.dubsperformanceanalyzer"});
+  rules += ids("Quality of Life", RuleOp::kEquals,
+               {
+                   "brrainz.achtung",
+                   "brrainz.cameraplus",
+                   "unlimitedhugs.allowtool",
+                   "jaxe.rimhud",
+                   "mehni.pickupandhaul",
+                   "avilmask.commonsense",
+                   "dhultgren.smarterconstruction",
+                   "roolo.searchanddestroy",
+               });
+  rules += ids("Vanilla Expanded", RuleOp::kPrefix,
+               {
+                   "vanillaexpanded.",
+                   "oskarpotocki.",
+                   "vanillaracesexpanded.",
+                   "vanillaquestsexpanded.",
+                   "vanillastorytellersexpanded.",
+               });
+  rules.append({"Vanilla Expanded", RuleField::kAuthor, RuleOp::kContains,
+                "oskar potocki"});
+  rules += ids("Alpha Mods", RuleOp::kPrefix, {"sarg."});
+  rules += ids("Combat Extended", RuleOp::kPrefix, {"ceteam."});
+  rules.append({"Combat Extended", RuleField::kName, RuleOp::kContains,
+                "combat extended"});
+  rules += ids("Dubs Mods", RuleOp::kPrefix, {"dubwise."});
   return rules;
 }
 

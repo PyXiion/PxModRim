@@ -36,8 +36,6 @@ class ModService {
 
   // Replaces the provider set.
   void resetProviders(providers::ProviderList providers);
-  // The provider with `provider_id`, or nullptr.
-  providers::BaseModProvider* getProvider(const QString& providerId) const;
   QHash<QString, QString> providerColors() const;
 
   // Runs all providers in parallel and loads the results into the context.
@@ -45,9 +43,6 @@ class ModService {
   QCoro::Task<Result<void>> discover(Profiler* timer = nullptr,
                                      bool forceReparse = false);
 
-  // One-time startup work: snapshot the mod list, discover, initialize
-  // diagnostics, load impact.
-  QCoro::Task<Result<void>> initialize();
   // Reparses About.xml files when `full` is set.
   QCoro::Task<Result<void>> reload(bool full = false);
 
@@ -69,7 +64,6 @@ class ModService {
       providers::BaseModProvider& provider, Profiler& timer, bool forceReparse);
   QCoro::Task<Result<void>> runRefreshPipeline(const QString& label,
                                                bool forceReparse);
-  void snapshotCurrentConfig();
   std::optional<QString> snapshotsDir() const;
 
   CoreContext& m_ctx;

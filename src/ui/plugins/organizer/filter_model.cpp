@@ -1,5 +1,7 @@
 #include "ui/plugins/organizer/filter_model.hpp"
 
+#include "ui/plugins/organizer/tree_model.hpp"
+
 namespace px::modrim {
 
 OrganizerFilterModel::OrganizerFilterModel(QObject* parent)
@@ -32,11 +34,7 @@ QVariant OrganizerFilterModel::data(const QModelIndex& index, int role) const {
       if (entry.key == "all") return QStringLiteral("grid");
       if (entry.key == "active") return QStringLiteral("check-circle");
       if (entry.key == "inactive") return QStringLiteral("ban");
-      if (entry.providerId == "steam" || entry.providerId == "downloaded")
-        return QStringLiteral("steam");
-      if (entry.providerId == "core") return QStringLiteral("grid");
-      if (entry.providerId == "git") return QStringLiteral("git");
-      return QStringLiteral("folder");
+      return providerIcon(entry.providerId.value_or(QString{}));
     default:
       return {};
   }

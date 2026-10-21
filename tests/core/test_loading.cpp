@@ -35,7 +35,7 @@ TEST_CASE(
   {
     auto outer = state.task(QStringLiteral("outer"), 4);
     REQUIRE(state.statuses() == QStringList{"outer"});
-    state.setProgress(1);
+    state.step(1);
     {
       auto inner = state.task(QStringLiteral("inner"));
       REQUIRE(state.statuses() == QStringList{"outer", "inner"});
@@ -58,25 +58,8 @@ TEST_CASE("percent truncates the float quotient, as the legacy progress did") {
                      emissions.append(Emission{status, pct, current, total});
                    });
   state.push(QStringLiteral("p"), 100);
-  state.setProgress(29);
+  state.step(29);
   REQUIRE(emissions.last() == Emission{QStringLiteral("p"), 28, 29, 100});
-}
-
-TEST_CASE(
-    "set_total clamps to at least one step and progress stays within bounds") {
-  px::modrim::LoadingState state;
-  QList<Emission> emissions;
-  QObject::connect(&state, &px::modrim::LoadingState::changed,
-                   [&](const QString& status, int pct, int current, int total) {
-                     emissions.append(Emission{status, pct, current, total});
-                   });
-  state.push(QStringLiteral("t"), 10);
-  state.setTotal(0);
-  REQUIRE(emissions.last() == Emission{QStringLiteral("t"), 0, 0, 1});
-  state.setProgress(50);
-  REQUIRE(emissions.last() == Emission{QStringLiteral("t"), 100, 1, 1});
-  state.setProgress(-5);
-  REQUIRE(emissions.last() == Emission{QStringLiteral("t"), 0, 0, 1});
 }
 
 TEST_CASE("popping an empty stack still reports completion") {

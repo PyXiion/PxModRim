@@ -23,7 +23,6 @@ class Theme : public QObject {
   Q_PROPERTY(QString textMuted READ textMuted CONSTANT)
   Q_PROPERTY(QString textDim READ textDim CONSTANT)
   Q_PROPERTY(QString onAccent READ onAccent CONSTANT)
-  Q_PROPERTY(QString neutral READ neutral CONSTANT)
 
   Q_PROPERTY(QString primary READ primary CONSTANT)
   Q_PROPERTY(QString primaryHover READ primaryHover CONSTANT)
@@ -53,10 +52,7 @@ class Theme : public QObject {
   Q_PROPERTY(int tooltipDelay READ tooltipDelay CONSTANT)
   Q_PROPERTY(double disabledOpacity READ disabledOpacity CONSTANT)
   Q_PROPERTY(QString overlay READ overlay CONSTANT)
-  Q_PROPERTY(int railMinWidth READ railMinWidth CONSTANT)
-  Q_PROPERTY(int railMaxWidth READ railMaxWidth CONSTANT)
   Q_PROPERTY(int railCollapseWidth READ railCollapseWidth CONSTANT)
-  Q_PROPERTY(int sidebarWidth READ sidebarWidth CONSTANT)
 
   Q_PROPERTY(QStringList logoVariants READ logoVariants CONSTANT)
   Q_PROPERTY(QString logoFileDataUri READ logoFileDataUri CONSTANT)
@@ -76,7 +72,6 @@ class Theme : public QObject {
   QString textMuted() const;
   QString textDim() const;
   QString onAccent() const;
-  QString neutral() const;
 
   QString primary() const;
   QString primaryHover() const;
@@ -106,10 +101,7 @@ class Theme : public QObject {
   int tooltipDelay() const;
   double disabledOpacity() const;
   QString overlay() const;
-  int railMinWidth() const;
-  int railMaxWidth() const;
   int railCollapseWidth() const;
-  int sidebarWidth() const;
 
   QStringList logoVariants() const;
   QString logoFileDataUri() const;

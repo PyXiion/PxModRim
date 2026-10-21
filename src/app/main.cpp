@@ -7,7 +7,6 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStyleHints>
-#include <QTimer>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -102,12 +101,6 @@ void configureLogging(const QString& logsDir) {
   }
 }
 
-int smokeExitMs() {
-  bool ok = false;
-  const int ms = qEnvironmentVariableIntValue("PX_SMOKE_EXIT_MS", &ok);
-  return ok ? ms : 0;
-}
-
 QStringList commandLine(int argc, char* argv[]) {
   QStringList arguments;
   arguments.reserve(argc);
@@ -183,21 +176,22 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
   spdlog::info("Starting PxModRim");
 
   px::modrim::ConfigService configService(px::modrim::configDir());
-  px::modrim::AppConfigService appConfigService(configService);
-  px::modrim::UiPrefsService uiPrefsService(configService);
 
-  if (auto setup = co_await appConfigService.setup(); !setup) {
+  auto loadedCfg =
+      configService.load<px::modrim::AppConfig>(px::modrim::kConfigFile);
+  if (!loadedCfg) {
     spdlog::error("Failed to initialize configuration: {}",
-                  setup.error().message.toStdString());
+                  loadedCfg.error().message.toStdString());
     co_return AppExit::kFailure;
   }
-  if (auto setup = co_await uiPrefsService.setup(); !setup) {
+  auto uiPrefs = px::modrim::loadUiPrefs(configService);
+  if (!uiPrefs) {
     spdlog::error("Failed to initialize UI preferences: {}",
-                  setup.error().message.toStdString());
+                  uiPrefs.error().message.toStdString());
     co_return AppExit::kFailure;
   }
 
-  px::modrim::AppConfig cfg = appConfigService.cfg();
+  px::modrim::AppConfig cfg = std::move(*loadedCfg);
   spdlog::info("Configuration loaded: game={}, local={}, workshop={}",
                cfg.paths.game, cfg.paths.local, cfg.paths.workshop);
 
@@ -205,7 +199,7 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
     spdlog::info("No game path in config, attempting auto-detect");
     if (auto detected = px::modrim::detectGamePaths(); !detected.game.empty()) {
       cfg.paths = detected;
-      if (auto saved = configService.save(QStringLiteral("config.json"), cfg);
+      if (auto saved = configService.save(px::modrim::kConfigFile, cfg);
           !saved) {
         spdlog::warn("Cannot save detected game paths: {}",
                      saved.error().message.toStdString());
@@ -221,7 +215,7 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
   const QStringList downloaders = px::modrim::registerCorePlugins(
       *ctx, configService, organizerDb, disabled);
 
-  px::modrim::AppContext appContext(*ctx, uiPrefsService.prefs(), initialScale);
+  px::modrim::AppContext appContext(*ctx, *uiPrefs, initialScale);
   px::modrim::PluginSelection selection{std::move(disabled), downloaders};
   px::modrim::registerUiPlugins(appContext, selection);
 
@@ -261,7 +255,7 @@ QCoro::Task<AppExit> runApp(QApplication& qtApp, QSet<QString> disabled,
     window->startStartupUpdateCheck();
   }
 
-  // Runs until the application quits (window close, or PX_SMOKE_EXIT_MS).
+  // Runs until the application quits (window close).
   co_await qCoro(&qtApp, &QCoreApplication::aboutToQuit);
   co_await teardown(appContext, *ctx);
   co_return window->restartRequested() ? AppExit::kRestart : AppExit::kSuccess;
@@ -293,10 +287,6 @@ int main(int argc, char* argv[]) {
   configureLogging(
       QDir(px::modrim::configDir()).filePath(QStringLiteral("logs")));
   warnInvalidScaleOverrides(cliScale, envScale);
-
-  if (const int smokeMs = smokeExitMs(); smokeMs > 0) {
-    QTimer::singleShot(smokeMs, &qtApp, &QCoreApplication::quit);
-  }
 
   const QString manifest =
       QDir(QCoreApplication::applicationDirPath())

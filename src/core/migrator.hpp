@@ -20,10 +20,9 @@ using MigrationSteps = std::map<int, MigrationStep>;
 // database (version 0) gets `schema_sql`; an older one runs the steps in order,
 // and a file copy of `backup_path` is taken first. Runs synchronously: call it
 // on the thread that owns `db`.
-Result<void> ensureSchema(
-    QSqlDatabase& db, const QString& schemaSql, int schemaVersion,
-    const MigrationSteps& steps,
-    const std::optional<QString>& backupPath = std::nullopt,
-    const QString& label = QStringLiteral("schema"));
+Result<void> ensureSchema(QSqlDatabase& db, const QString& schemaSql,
+                          int schemaVersion, const MigrationSteps& steps,
+                          const std::optional<QString>& backupPath,
+                          const QString& label);
 
 }  // namespace px::modrim

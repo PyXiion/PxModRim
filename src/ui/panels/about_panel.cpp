@@ -229,10 +229,8 @@ AboutPanel::AboutPanel(QWidget* parent, CoreContext& ctx, Notifier& toast)
   actions->addWidget(github);
   auto* issues = new QPushButton(tr("Report issue"), this);
   issues->setObjectName(QStringLiteral("appBtn"));
-  connect(issues, &QPushButton::clicked, this, [] {
-    QDesktopServices::openUrl(
-        QUrl(QStringLiteral("https://github.com/PyXiion/PxModRim/issues")));
-  });
+  connect(issues, &QPushButton::clicked, this,
+          [] { QDesktopServices::openUrl(QUrl(QString(kIssuesUrl))); });
   actions->addWidget(issues);
   auto* copy = new QPushButton(tr("Copy system info"), this);
   copy->setObjectName(QStringLiteral("appBtn"));

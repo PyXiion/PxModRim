@@ -20,7 +20,5 @@ class ModsViewPanel : public BaseViewPanel {
  signals:
   void entrySelected(const px::modrim::view::SidebarEntry& entry);
   void modSelected(const QString& uuid);
-  void activeModsChanged();
-  void orderChanged();
 };
 }  // namespace px::modrim

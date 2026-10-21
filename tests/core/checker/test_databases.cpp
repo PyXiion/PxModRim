@@ -46,18 +46,17 @@ void writeFile(const QString& path, std::string_view content) {
 
 }  // namespace
 
-TEST_CASE(
-    "NoVersionWarningService load_if_exists on missing file returns empty") {
+TEST_CASE("NoVersionWarningDb load_if_exists on missing file returns empty") {
   QTemporaryDir dir;
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  NoVersionWarningService service(config, network);
+  NoVersionWarningDb service(config, network);
 
   CHECK(!service.cacheAgeS().has_value());
   CHECK(service.loadIfExists().isEmpty());
 }
 
-TEST_CASE("NoVersionWarningService parses ModIdsToFix.xml") {
+TEST_CASE("NoVersionWarningDb parses ModIdsToFix.xml") {
   QTemporaryDir dir;
   const QString xmlPath =
       QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
@@ -69,7 +68,7 @@ TEST_CASE("NoVersionWarningService parses ModIdsToFix.xml") {
 
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  NoVersionWarningService service(config, network);
+  NoVersionWarningDb service(config, network);
 
   CHECK(service.cacheAgeS().has_value());
   CHECK(*service.cacheAgeS() >= 0.0);
@@ -80,7 +79,7 @@ TEST_CASE("NoVersionWarningService parses ModIdsToFix.xml") {
   CHECK(pids.contains(PackageId(QStringLiteral("unlimitedhugs.hugslib"))));
 }
 
-TEST_CASE("NoVersionWarningService parses single-item li") {
+TEST_CASE("NoVersionWarningDb parses single-item li") {
   QTemporaryDir dir;
   const QString xmlPath =
       QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
@@ -88,14 +87,14 @@ TEST_CASE("NoVersionWarningService parses single-item li") {
 
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  NoVersionWarningService service(config, network);
+  NoVersionWarningDb service(config, network);
 
   const auto pids = service.loadIfExists();
   CHECK(pids.size() == 1);
   CHECK(pids.contains(PackageId(QStringLiteral("lone.mod"))));
 }
 
-TEST_CASE("NoVersionWarningService handles malformed XML gracefully") {
+TEST_CASE("NoVersionWarningDb handles malformed XML gracefully") {
   QTemporaryDir dir;
   const QString xmlPath =
       QDir(dir.path()).filePath(QStringLiteral("ModIdsToFix.xml"));
@@ -103,23 +102,22 @@ TEST_CASE("NoVersionWarningService handles malformed XML gracefully") {
 
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  NoVersionWarningService service(config, network);
+  NoVersionWarningDb service(config, network);
 
   CHECK(service.loadIfExists().isEmpty());
 }
 
-TEST_CASE(
-    "UseThisInsteadService load_if_exists on missing file returns empty") {
+TEST_CASE("UseThisInsteadDb load_if_exists on missing file returns empty") {
   QTemporaryDir dir;
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  UseThisInsteadService service(config, network);
+  UseThisInsteadDb service(config, network);
 
   CHECK(!service.cacheAgeS().has_value());
   CHECK(service.loadIfExists().isEmpty());
 }
 
-TEST_CASE("UseThisInsteadService parses gzipped replacements JSON") {
+TEST_CASE("UseThisInsteadDb parses gzipped replacements JSON") {
   QTemporaryDir dir;
   const QString gzPath =
       QDir(dir.path()).filePath(QStringLiteral("replacements.json.gz"));
@@ -139,7 +137,7 @@ TEST_CASE("UseThisInsteadService parses gzipped replacements JSON") {
 
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  UseThisInsteadService service(config, network);
+  UseThisInsteadDb service(config, network);
 
   CHECK(service.cacheAgeS().has_value());
   const auto entries = service.loadIfExists();
@@ -150,13 +148,9 @@ TEST_CASE("UseThisInsteadService parses gzipped replacements JSON") {
   CHECK(info.name == QStringLiteral("New Mod"));
   CHECK(info.author == QStringLiteral("Author Guy"));
   CHECK(info.packageid == QStringLiteral("author.newmod"));
-  CHECK(info.pfid == QStringLiteral("654321"));
-  CHECK(info.supportedversions ==
-        QStringList{QStringLiteral("1.4"), QStringLiteral("1.5")});
-  CHECK(info.source == QStringLiteral("database"));
 }
 
-TEST_CASE("UseThisInsteadService handles corrupt gzip gracefully") {
+TEST_CASE("UseThisInsteadDb handles corrupt gzip gracefully") {
   QTemporaryDir dir;
   const QString gzPath =
       QDir(dir.path()).filePath(QStringLiteral("replacements.json.gz"));
@@ -164,7 +158,7 @@ TEST_CASE("UseThisInsteadService handles corrupt gzip gracefully") {
 
   ConfigService config(dir.path());
   QNetworkAccessManager network;
-  UseThisInsteadService service(config, network);
+  UseThisInsteadDb service(config, network);
 
   CHECK(service.loadIfExists().isEmpty());
 }

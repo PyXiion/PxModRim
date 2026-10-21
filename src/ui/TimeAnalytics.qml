@@ -19,11 +19,9 @@ Rectangle {
     property string sortBy: "time"
     property bool includeBase: true
 
-    // JS objects are not observable; bump the revision to re-evaluate bindings.
     property var expandedMods: ({})
     property var expandedPhases: ({})
     property var showAllPhases: ({})
-    property int expandRev: 0
 
     readonly property real slowThreshold: 3.0
     readonly property int phasePreview: 6
@@ -53,15 +51,15 @@ Rectangle {
         expandedMods = key ? { [key]: true } : {}
         expandedPhases = {}
         showAllPhases = {}
-        expandRev++
         filterText = ""
         activeOnly = sourceData.active_count > 0 && (!selectedRow || selectedRow.active)
         Qt.callLater(scrollToMod, key)
     }
 
-    function toggle(map, key) {
-        map[key] = !map[key]
-        expandRev++
+    function toggle(name, key) {
+        const next = Object.assign({}, root[name])
+        next[key] = !next[key]
+        root[name] = next
     }
 
     function scrollToMod(key) {
@@ -80,8 +78,7 @@ Rectangle {
         slowOnly = false
         if (!row.active)
             activeOnly = false
-        expandedMods[key] = true
-        expandRev++
+        expandedMods = Object.assign({}, expandedMods, { [key]: true })
         view = "mods"
         Qt.callLater(scrollToMod, key)
     }
@@ -364,12 +361,12 @@ Rectangle {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: root.visibleMods
-                ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+                ScrollBar.vertical: PxScrollBar {}
 
                 delegate: Item {
                     id: modRow
                     required property var modelData
-                    readonly property bool expanded: root.expandRev >= 0 && root.expandedMods[modelData.key] === true
+                    readonly property bool expanded: root.expandedMods[modelData.key] === true
 
                     width: ListView.view.width
                     height: rowContent.implicitHeight
@@ -454,7 +451,7 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.toggle(root.expandedMods, modRow.modelData.key)
+                                onClicked: root.toggle("expandedMods", modRow.modelData.key)
                             }
                         }
 
@@ -563,7 +560,7 @@ Rectangle {
                 model: root.phases
                 topMargin: 8
                 bottomMargin: 8
-                ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+                ScrollBar.vertical: PxScrollBar {}
 
                 header: RowLayout {
                     width: ListView.view.width
@@ -577,8 +574,8 @@ Rectangle {
                 delegate: Item {
                     id: phaseRow
                     required property var modelData
-                    readonly property bool expanded: root.expandRev >= 0 && root.expandedPhases[modelData.label] === true
-                    readonly property bool showAll: root.expandRev >= 0 && root.showAllPhases[modelData.label] === true
+                    readonly property bool expanded: root.expandedPhases[modelData.label] === true
+                    readonly property bool showAll: root.showAllPhases[modelData.label] === true
                     readonly property var shownMods: showAll ? modelData.mods : modelData.mods.slice(0, root.phasePreview)
 
                     width: ListView.view.width
@@ -653,7 +650,7 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.toggle(root.expandedPhases, phaseRow.modelData.label)
+                                onClicked: root.toggle("expandedPhases", phaseRow.modelData.label)
                             }
                             PxToolTip {
                                 visible: phaseMouse.containsMouse && phaseRow.modelData.tooltip.length > 0
@@ -729,7 +726,7 @@ Rectangle {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.toggle(root.showAllPhases, phaseRow.modelData.label)
+                                    onClicked: root.toggle("showAllPhases", phaseRow.modelData.label)
                                 }
                             }
                         }

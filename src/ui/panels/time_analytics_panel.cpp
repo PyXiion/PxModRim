@@ -11,7 +11,7 @@
 #include "ui/theme/palette.hpp"
 namespace px::modrim {
 TimeAnalyticsPanel::TimeAnalyticsPanel(
-    startup_impact::StartupImpactService* service, QQmlEngine* engine,
+    startup_impact::StartupImpactService& service, QQmlEngine* engine,
     QWidget* parent)
     : QWidget(parent),
       m_service(service),
@@ -30,12 +30,8 @@ QCoro::Task<void> TimeAnalyticsPanel::setData(std::optional<QString> pid,
   const auto token = ++m_requestToken;
   QPointer<QQuickItem> root = m_qml->rootObject();
   if (!root) co_return;
-  if (!m_service) {
-    root->setProperty("sourceData", QVariant{});
-    co_return;
-  }
   QPointer<TimeAnalyticsPanel> guard(this);
-  auto result = co_await m_service->snapshot(activePids);
+  auto result = co_await m_service.snapshot(activePids);
   if (!guard || !root || token != guard->m_requestToken) co_return;
   if (!result || !result->report) {
     root->setProperty("sourceData", QVariant{});
@@ -48,13 +44,8 @@ QCoro::Task<void> TimeAnalyticsPanel::setData(std::optional<QString> pid,
       "sourceData",
       buildStartupImpact(*result->report, activePids, pid, estimated));
 }
-void TimeAnalyticsPanel::clear() {
-  ++m_requestToken;
-  if (auto* root = m_qml->rootObject())
-    root->setProperty("sourceData", QVariant{});
-}
 StartupImpactDialog::StartupImpactDialog(
-    startup_impact::StartupImpactService* service, QQmlEngine* engine,
+    startup_impact::StartupImpactService& service, QQmlEngine* engine,
     QWidget* parent)
     : QDialog(parent), panel(new TimeAnalyticsPanel(service, engine, this)) {
   setWindowTitle(QStringLiteral("Startup impact"));

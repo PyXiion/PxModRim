@@ -59,10 +59,7 @@ FolderNameDialog::FolderNameDialog(const QString& title, const QString& initial,
   m_edit = new QLineEdit(initial, this);
   layout->addWidget(m_edit);
 
-  const QString primaryText =
-      verb.isEmpty() ? title.section(u' ', 0, 0, QString::SectionSkipEmpty)
-                     : verb;
-  auto* ok = makeButton(primaryText, this, QStringLiteral("primaryAction"));
+  auto* ok = makeButton(verb, this, QStringLiteral("primaryAction"));
   ok->setDefault(true);
   auto* cancel =
       makeButton(QStringLiteral("Cancel"), this, QStringLiteral("appBtn"));
@@ -100,7 +97,7 @@ DeleteFolderDialog::DeleteFolderDialog(const QString& name, QWidget* parent)
 FolderPickerDialog::FolderPickerDialog(const FolderNode& tree,
                                        const QString& title,
                                        const QSet<qint64>& allowed,
-                                       QWidget* parent, const QString& verb)
+                                       QWidget* parent)
     : QDialog(parent) {
   setWindowTitle(title);
   resize(380, 450);
@@ -122,7 +119,8 @@ FolderPickerDialog::FolderPickerDialog(const FolderNode& tree,
   }
   m_tree->expandAll();
 
-  auto* ok = makeButton(verb, this, QStringLiteral("primaryAction"));
+  auto* ok =
+      makeButton(QStringLiteral("Move"), this, QStringLiteral("primaryAction"));
   ok->setDefault(true);
   ok->setEnabled(false);
   auto* cancel =

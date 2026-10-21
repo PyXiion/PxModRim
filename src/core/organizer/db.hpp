@@ -1,9 +1,11 @@
 #pragma once
 
+#include <QFuture>
 #include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QThreadPool>
+#include <utility>
 
 #include <QCoro/QCoroTask>
 
@@ -32,7 +34,9 @@ class OrganizerDb {
 
   QCoro::Task<Result<OrganizerState>> load();
 
-  QCoro::Task<Result<Folder>> createFolder(qint64 parentId, QString name);
+  QCoro::Task<Result<Folder>> createFolder(qint64 parentId, QString name) {
+    return createFolderWith(parentId, std::move(name), {});
+  }
   QCoro::Task<Result<Folder>> createFolderWith(qint64 parentId, QString name,
                                                QStringList packageIds);
   QCoro::Task<Result<void>> renameFolder(qint64 folderId, QString name);
@@ -51,7 +55,7 @@ class OrganizerDb {
   QCoro::Task<Result<void>> setModTags(QStringList packageIds, QSet<qint64> add,
                                        QSet<qint64> remove);
 
-  QCoro::Task<Result<QList<Rule>>> replaceRules(QList<RuleSpec> specs);
+  QCoro::Task<Result<void>> replaceRules(QList<RuleSpec> specs);
   // Creates `new_folders` under `parent_id`, then appends `rules` after the
   // existing ones, resolving each rule's folder by name among the children of
   // `parent_id`.
@@ -62,6 +66,9 @@ class OrganizerDb {
   QCoro::Task<void> close();
 
  private:
+  // Closes and removes the connection on the worker thread.
+  QFuture<void> discard();
+
   // Runs `fn(QSqlDatabase&)` on the worker, opening the connection first if
   // needed.
   template <class F>

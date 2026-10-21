@@ -21,7 +21,6 @@ namespace px::modrim {
 
 namespace {
 
-const QString kConfigFile = QStringLiteral("config.json");
 const QString kUiPrefsFile = QStringLiteral("ui_prefs.json");
 
 // Schema versions above this are far beyond any real file; clamping keeps them
@@ -39,16 +38,28 @@ QString joinPath(QString path, std::initializer_list<QString> parts) {
 
 bool isDir(const QString& path) { return QFileInfo(path).isDir(); }
 
+QString gameDirIn(const QString& root) {
+  return joinPath(root, {QStringLiteral("steamapps"), QStringLiteral("common"),
+                         QStringLiteral("RimWorld")});
+}
+
+QString workshopDirIn(const QString& root, const QString& steamId) {
+  return joinPath(root,
+                  {QStringLiteral("steamapps"), QStringLiteral("workshop"),
+                   QStringLiteral("content"), steamId});
+}
+
 QString findRimworldInSteamRoot(const QString& root, const QString& steamId);
 
 // Parses a libraryfolders.vdf for an alternate library holding RimWorld.
 QString vdfFindRimworld(const QString& vdfPath, const QString& steamId) {
-  QFile file(vdfPath);
-  if (!file.open(QIODevice::ReadOnly)) {
+  auto bytes = readFileBytes(vdfPath);
+  if (!bytes) {
     spdlog::warn("Failed to parse libraryfolders.vdf");
     return {};
   }
-  const QString text = QString::fromUtf8(file.readAll());
+  const QString text =
+      QString::fromUtf8(bytes->data(), static_cast<qsizetype>(bytes->size()));
 
   // Matches `"path" "<library>"` and `"<appid>" {` lines of libraryfolders.vdf.
   static const QRegularExpression pathPattern(
@@ -65,9 +76,7 @@ QString vdfFindRimworld(const QString& vdfPath, const QString& steamId) {
       continue;
     }
     if (!currentPath.isEmpty() && appPattern.match(line).hasMatch()) {
-      const QString game = joinPath(
-          currentPath, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                        QStringLiteral("RimWorld")});
+      const QString game = gameDirIn(currentPath);
       if (isDir(game)) {
         return game;
       }
@@ -77,9 +86,7 @@ QString vdfFindRimworld(const QString& vdfPath, const QString& steamId) {
 }
 
 QString findRimworldInSteamRoot(const QString& root, const QString& steamId) {
-  const QString game =
-      joinPath(root, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                      QStringLiteral("RimWorld")});
+  const QString game = gameDirIn(root);
   if (isDir(game)) {
     return game;
   }
@@ -114,9 +121,7 @@ QString workshopPathFromGame(const QString& game, const QString& steamRoot,
       return workshop;
     }
   }
-  return joinPath(steamRoot,
-                  {QStringLiteral("steamapps"), QStringLiteral("workshop"),
-                   QStringLiteral("content"), steamId});
+  return workshopDirIn(steamRoot, steamId);
 }
 
 struct GamePaths {
@@ -164,15 +169,10 @@ GamePaths findGamePaths(QString& foundRoot) {
 
   const QString fallbackRoot =
       joinPath(home, {QStringLiteral(".steam"), QStringLiteral("steam")});
-  const QString fallback = joinPath(
-      fallbackRoot, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                     QStringLiteral("RimWorld")});
+  const QString fallback = gameDirIn(fallbackRoot);
   if (isDir(fallback)) {
     foundRoot = isDir(fallbackRoot) ? fallbackRoot : QString();
-    return gamePathsFor(
-        fallback, joinPath(fallbackRoot, {QStringLiteral("steamapps"),
-                                          QStringLiteral("workshop"),
-                                          QStringLiteral("content"), steamId}));
+    return gamePathsFor(fallback, workshopDirIn(fallbackRoot, steamId));
   }
   return {};
 }
@@ -200,17 +200,13 @@ GamePaths findGamePaths(QString& foundRoot) {
       !game.isEmpty()) {
     return gamePathsFor(game, workshopPathFromGame(game, steamRoot, steamId));
   }
-  const QString fallback = joinPath(
-      steamRoot, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                  QStringLiteral("RimWorld")});
+  const QString fallback = gameDirIn(steamRoot);
   if (const QString app_bundle = find_mac_app(fallback);
       !app_bundle.isEmpty()) {
     return GamePaths{
         .game = app_bundle,
         .local = joinPath(fallback, {QStringLiteral("Mods")}),
-        .workshop = joinPath(
-            steamRoot, {QStringLiteral("steamapps"), QStringLiteral("workshop"),
-                        QStringLiteral("content"), steamId}),
+        .workshop = workshopDirIn(steamRoot, steamId),
     };
   }
   return {};
@@ -240,14 +236,8 @@ GamePaths findGamePaths(QString& foundRoot) {
   }
 
   const QString fallback = QStringLiteral("C:/Program Files (x86)/Steam");
-  const QString game =
-      joinPath(fallback, {QStringLiteral("steamapps"), QStringLiteral("common"),
-                          QStringLiteral("RimWorld")});
-  if (isDir(game)) {
-    return gamePathsFor(
-        game, joinPath(fallback,
-                       {QStringLiteral("steamapps"), QStringLiteral("workshop"),
-                        QStringLiteral("content"), steamId}));
+  if (const QString game = gameDirIn(fallback); isDir(game)) {
+    return gamePathsFor(game, workshopDirIn(fallback, steamId));
   }
   return {};
 }
@@ -342,40 +332,42 @@ std::string ConfigService::withSchemaMarker(std::string prettyObject) {
   return prettyObject;
 }
 
-JsonObject ConfigService::loadRaw(const QString& filename) const {
-  auto bytes = readFileBytes(filePath(filename));
+namespace {
+
+Result<JsonObject> readJsonObject(const QString& path) {
+  auto bytes = readFileBytes(path);
   if (!bytes) {
-    return {};
+    return std::unexpected(bytes.error());
   }
   glz::json_t document;
-  if (glz::read_json(document, *bytes) || !document.is_object()) {
-    return {};
+  if (auto error = glz::read_json(document, *bytes)) {
+    return std::unexpected(
+        Error{QString::fromStdString(glz::format_error(error, *bytes))});
+  }
+  if (!document.is_object()) {
+    return std::unexpected(
+        Error{QStringLiteral("top-level value is not an object")});
   }
   return std::move(document.get_object());
+}
+
+}  // namespace
+
+JsonObject ConfigService::loadRaw(const QString& filename) const {
+  auto raw = readJsonObject(filePath(filename));
+  return raw ? std::move(*raw) : JsonObject{};
 }
 
 Result<std::optional<JsonObject>> ConfigService::loadVersioned(
     const QString& filename) const {
   const QString path = filePath(filename);
-  auto bytes = readFileBytes(path);
-  if (!bytes) {
+  auto loaded = readJsonObject(path);
+  if (!loaded) {
     spdlog::warn("Failed to load {}: {}", filename.toStdString(),
-                 bytes.error().message.toStdString());
+                 loaded.error().message.toStdString());
     return std::optional<JsonObject>{};
   }
-
-  glz::json_t document;
-  if (auto error = glz::read_json(document, *bytes)) {
-    spdlog::warn("Failed to load {}: {}", filename.toStdString(),
-                 glz::format_error(error, *bytes));
-    return std::optional<JsonObject>{};
-  }
-  if (!document.is_object()) {
-    spdlog::warn("Failed to load {}: top-level value is not an object",
-                 filename.toStdString());
-    return std::optional<JsonObject>{};
-  }
-  JsonObject raw = std::move(document.get_object());
+  JsonObject raw = std::move(*loaded);
 
   // A missing marker or an explicit null means schema version 0.
   std::int64_t version = 0;
@@ -484,29 +476,6 @@ PathConfig detectGamePaths() {
   result.config_folder = detectConfigFolder(foundRoot).toStdString();
   result.community_rules_file = communityRulesFile().toStdString();
   return result;
-}
-
-AppConfigService::AppConfigService(ConfigService& svc) : m_svc(svc) {}
-
-QCoro::Task<Result<void>> AppConfigService::setup() {
-  auto loaded = m_svc.load<AppConfig>(kConfigFile);
-  if (!loaded) {
-    co_return std::unexpected(loaded.error());
-  }
-  m_cfg = std::move(*loaded);
-  co_return {};
-}
-
-const AppConfig& AppConfigService::cfg() const {
-  Q_ASSERT(m_cfg.has_value());
-  return *m_cfg;
-}
-
-Result<void> AppConfigService::saveCfg() const {
-  if (!m_cfg) {
-    return {};
-  }
-  return m_svc.save(kConfigFile, *m_cfg);
 }
 
 }  // namespace px::modrim

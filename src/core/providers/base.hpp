@@ -113,12 +113,15 @@ class BaseModProvider {
 
   // `metadata_cache` overrides the cache given at construction for this call
   // only.
-  virtual QCoro::Task<Result<ModMap>> discover(
+  QCoro::Task<Result<ModMap>> discover(
       QString targetVersion, Profiler* timer = nullptr,
-      MetadataCacheStore* metadataCache = nullptr,
-      bool forceReparse = false) = 0;
+      MetadataCacheStore* metadataCache = nullptr, bool forceReparse = false);
 
  protected:
+  // The mod directories this provider offers. Blocking: runs on the thread
+  // pool.
+  virtual QList<ModDirectory> scanDirectories() const = 0;
+
   // Loads metadata for `dirs`, using the cache where entries are still valid.
   QCoro::Task<Result<ModMap>> loadMods(QList<ModDirectory> dirs,
                                        QString targetVersion, Profiler& timer,

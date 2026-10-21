@@ -18,19 +18,4 @@ QHash<PackageId, Tier> assignTiers(const QSet<PackageId>& canonicalIds,
                                    const QSet<PackageId>& loadLast,
                                    const TierConfig& tierConfig);
 
-// Transitive closure over `deps`, excluding `start` itself unless it is
-// reachable from itself.
-QSet<PackageId> getDepsRecursive(const PackageId& start,
-                                 const PackageGraph& deps);
-
-// Transitive closure over `rev_deps`, excluding `start` itself unless it is
-// reachable from itself.
-QSet<PackageId> getReverseDepsRecursive(const PackageId& start,
-                                        const PackageGraph& revDeps);
-
-// Returns one cycle among `nodes` as a closed path (first == last), or nullopt
-// when the nodes form a DAG. Edges leaving `nodes` are ignored.
-std::optional<QList<PackageId>> findCycle(const QSet<PackageId>& nodes,
-                                          const PackageGraph& deps);
-
 }  // namespace px::modrim::sort

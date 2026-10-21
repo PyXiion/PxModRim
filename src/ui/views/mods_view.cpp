@@ -21,10 +21,6 @@ ModsViewPanel::ModsViewPanel(CoreContext& ctx, QQmlEngine* engine,
   modList = new ModListPanel(ctx, engine, content);
   modList->setObjectName(QStringLiteral("modListPanel"));
   connect(modList, &ModListPanel::modPicked, this, &ModsViewPanel::modSelected);
-  connect(modList, &ModListPanel::activeModsChanged, this,
-          &ModsViewPanel::activeModsChanged, Qt::QueuedConnection);
-  connect(modList, &ModListPanel::orderChanged, this,
-          &ModsViewPanel::orderChanged, Qt::QueuedConnection);
   layout->addWidget(modList, 3);
   modInfo = new ModInfoPanel(ctx, engine, app.uiPrefs(), content);
   modInfo->setObjectName(QStringLiteral("modInfoPanel"));

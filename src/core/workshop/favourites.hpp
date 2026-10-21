@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "core/config.hpp"
@@ -44,7 +43,6 @@ class FavouriteCollections {
   void save(std::vector<CatalogCollection> collections);
 
   PluginConfig<FavouritesState> m_config;
-  std::unordered_set<std::string> m_ids;
 };
 
 }  // namespace px::modrim::workshop

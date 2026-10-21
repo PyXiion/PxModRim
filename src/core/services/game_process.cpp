@@ -272,8 +272,8 @@ std::optional<QString> findExecutable(const QString& gamePath,
   return std::nullopt;
 }
 
-void ensureSteamAppid(const QString& gamePath, Platform platform) {
-  const QString targetDir = platform == Platform::kMacOs
+void ensureSteamAppid(const QString& gamePath) {
+  const QString targetDir = currentPlatform() == Platform::kMacOs
                                 ? QFileInfo(gamePath).dir().absolutePath()
                                 : gamePath;
   const QString path =
@@ -398,6 +398,8 @@ std::vector<ProcessInfo> hostProcessLister() {
   return procs;
 }
 
+namespace {
+
 QSet<qint64> liveGamePids(const ProcessLister& lister) {
   QSet<qint64> pids;
   for (const ProcessInfo& proc : lister()) {
@@ -407,6 +409,8 @@ QSet<qint64> liveGamePids(const ProcessLister& lister) {
   }
   return pids;
 }
+
+}  // namespace
 
 bool isGameRunning(const ProcessLister& lister) {
   return !liveGamePids(lister).isEmpty();

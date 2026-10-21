@@ -27,22 +27,8 @@ MenuItem {
         opacity: control.enabled ? 1 : Theme.disabledOpacity
     }
 
-    arrow: Image {
-        x: control.width - width - control.rightPadding
-        y: (control.height - height) / 2
-        visible: control.subMenu !== null
-        width: 12
-        height: 12
-        sourceSize.width: 12
-        sourceSize.height: 12
-        rotation: -90
-        opacity: control.enabled ? 1 : Theme.disabledOpacity
-        source: visible ? "image://icons/chevron-down?color=" + encodeURIComponent(Theme.textDim) : ""
-    }
-
     contentItem: Text {
         leftPadding: control.checkable ? control.indicator.width + control.spacing : 0
-        rightPadding: control.subMenu !== null ? control.arrow.width + control.spacing : 0
         text: control.text
         font: control.font
         color: Theme.textMain

@@ -68,6 +68,30 @@ BaseModProvider::BaseModProvider(QString providerId, QString color,
       m_pool(pool),
       m_metadataCache(metadataCache) {}
 
+QCoro::Task<Result<ModMap>> BaseModProvider::discover(
+    QString targetVersion, Profiler* timer, MetadataCacheStore* metadataCache,
+    bool forceReparse) {
+  Profiler ownTimer;
+  Profiler& tm = timer ? *timer : ownTimer;
+
+  spdlog::debug("{} scanning: {}", m_providerId.toStdString(),
+                m_path.toStdString());
+  QList<ModDirectory> dirs;
+  {
+    auto scope = tm("scan_dir");
+    dirs = co_await runOnPool<QList<ModDirectory>>(
+        nullptr, [this] { return scanDirectories(); });
+  }
+
+  auto discovered = co_await loadMods(std::move(dirs), std::move(targetVersion),
+                                      tm, metadataCache, forceReparse);
+  if (discovered) {
+    spdlog::info("{} discovered {} mods", m_providerId.toStdString(),
+                 discovered->size());
+  }
+  co_return discovered;
+}
+
 QCoro::Task<Result<ModMap>> BaseModProvider::loadMods(
     QList<ModDirectory> dirs, QString targetVersion, Profiler& timer,
     MetadataCacheStore* metadataCache, bool forceReparse) {
@@ -127,23 +151,6 @@ QCoro::Task<Result<ModMap>> BaseModProvider::loadMods(
 
 QCoro::Task<Result<QList<ParsedMod>>> BaseModProvider::parseCandidates(
     QList<ModCandidate> missing, QString targetVersion) {
-  if (m_pool == nullptr || missing.size() <= 1) {
-    co_return co_await runOnPool<Result<QList<ParsedMod>>>(
-        nullptr, [missing = std::move(missing),
-                  targetVersion = std::move(targetVersion)] {
-          QList<ParsedMod> parsed;
-          parsed.reserve(missing.size());
-          for (const ModCandidate& candidate : missing) {
-            Result<ParsedMod> item = parseOne(candidate, targetVersion);
-            if (!item) {
-              return Result<QList<ParsedMod>>(std::unexpected(item.error()));
-            }
-            parsed.append(std::move(*item));
-          }
-          return Result<QList<ParsedMod>>(std::move(parsed));
-        });
-  }
-
   QList<QFuture<Result<ParsedMod>>> pending;
   pending.reserve(missing.size());
   for (const ModCandidate& candidate : missing) {

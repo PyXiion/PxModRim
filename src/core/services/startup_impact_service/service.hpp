@@ -28,13 +28,7 @@ class StartupImpactService {
   // Resolves to nullopt when no config folder is set or no report can be read.
   QCoro::Task<Result<std::optional<StartupImpactReport>>> load();
 
-  QCoro::Task<Result<std::optional<StartupImpactReport>>> getLatestReport();
-  QCoro::Task<Result<double>> estimatedImpactFor(QString packageId);
-  // Base-game average plus the on-thread and off-thread averages of each active
-  // mod.
-  QCoro::Task<Result<double>> estimatedTotal(QStringList activePids);
   QCoro::Task<Result<QHash<QString, double>>> getAllAverages();
-  QCoro::Task<Result<double>> baseGameAverage();
   QCoro::Task<Result<LatestWithAverages>> snapshot(
       QStringList activePids, std::optional<QString> selectedPid = {});
   QCoro::Task<Result<void>> clear();

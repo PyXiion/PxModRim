@@ -90,18 +90,6 @@ TEST_CASE("normalize_package_id lowercases and strips the steam suffix") {
         QStringLiteral("author.mod"));
 }
 
-TEST_CASE("format_impact rounds seconds to whole milliseconds") {
-  CHECK(formatImpact(1.234) == QStringLiteral("1234ms"));
-  CHECK(formatImpact(0.05) == QStringLiteral("50ms"));
-  CHECK(formatImpact(0.0) == QStringLiteral("0ms"));
-}
-
-TEST_CASE("format_impact rounds half to even like Python's round") {
-  CHECK(formatImpact(0.0005) == QStringLiteral("0ms"));
-  CHECK(formatImpact(0.0015) == QStringLiteral("2ms"));
-  CHECK(formatImpact(0.0025) == QStringLiteral("2ms"));
-}
-
 TEST_CASE("get_startup_impact_path sits beside the config folder") {
   CHECK(getStartupImpactPath(QStringLiteral("/home/user/Config")) ==
         QStringLiteral("/home/user/StartupImpactData.json"));
@@ -124,7 +112,6 @@ TEST_CASE("parse_startup_impact reads the full report") {
         Catch::Approx(10.2));
   CHECK(report->metrics.value(QStringLiteral("ResolveReferences")) ==
         Catch::Approx(1.5));
-  CHECK(report->totalImpact == 0.0);
   CHECK(report->mods.size() == 4);
 }
 
@@ -134,26 +121,7 @@ TEST_CASE("base game time is the sum of the base-game metrics") {
   const auto report =
       parseText(dir, QStringLiteral("StartupImpactData.json"), kSampleJson);
   REQUIRE(report.has_value());
-  // Not loading time minus mod impacts: loading time includes unaccounted time.
   CHECK_THAT(report->baseGameTime(), WithinAbs(11.7, kEps));
-  CHECK(std::abs(report->loadingTimeS - report->totalTime()) > 1.0);
-}
-
-TEST_CASE("mods_total_time includes off-thread impact") {
-  QTemporaryDir dir;
-  REQUIRE(dir.isValid());
-  const auto report =
-      parseText(dir, QStringLiteral("StartupImpactData.json"), kSampleJson);
-  REQUIRE(report.has_value());
-  const StartupImpactMod& harmony = report->mods[0];
-  CHECK(harmony.totalImpactS == Catch::Approx(1.2305));
-  CHECK(harmony.offThreadTotalImpactS == Catch::Approx(0.3));
-  // total_time counts on-thread impact only; mods_total_time adds off-thread
-  // impact.
-  CHECK_THAT(report->totalTime(), WithinAbs(1.2305 + 4.5 + 0.05 + 0.2, kEps));
-  CHECK_THAT(report->offThreadTotalTime(), WithinAbs(0.3, kEps));
-  CHECK_THAT(report->modsTotalTime(),
-             WithinAbs(report->totalTime() + 0.3, kEps));
 }
 
 TEST_CASE("parse_startup_impact reads mod values") {
@@ -239,33 +207,6 @@ TEST_CASE("parse_startup_impact accepts an object without known keys") {
   CHECK(report->mods.isEmpty());
 }
 
-TEST_CASE("total_time sums on-thread mod impact") {
-  QTemporaryDir dir;
-  REQUIRE(dir.isValid());
-  const auto report = parseText(dir, QStringLiteral("total.json"), R"({
-        "loadingTime": 50000.0,
-        "mods": [
-            {"modName": "A", "modPackageId": "a.a",
-             "totalImpact": 2000.0, "metrics": {},
-             "offThreadMetrics": {}, "offThreadTotalImpact": 0.0},
-            {"modName": "B", "modPackageId": "b.b",
-             "totalImpact": 3000.0, "metrics": {},
-             "offThreadMetrics": {}, "offThreadTotalImpact": 0.0}
-        ]
-    })");
-  REQUIRE(report.has_value());
-  CHECK(report->totalTime() == Catch::Approx(5.0));
-}
-
-TEST_CASE("total_time of an empty report is zero") {
-  QTemporaryDir dir;
-  REQUIRE(dir.isValid());
-  const auto report = parseText(dir, QStringLiteral("total_empty.json"),
-                                R"({"loadingTime": 1000.0, "mods": []})");
-  REQUIRE(report.has_value());
-  CHECK(report->totalTime() == 0.0);
-}
-
 TEST_CASE("parse_startup_impact reads off-thread mod fields") {
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
@@ -289,7 +230,7 @@ TEST_CASE("parse_startup_impact reads off-thread mod fields") {
   CHECK(mod.offThreadTotalImpactS == Catch::Approx(0.5));
 }
 
-TEST_CASE("find matches by package id, then by mod name") {
+TEST_CASE("find matches by normalized package id") {
   StartupImpactReport report;
   StartupImpactMod m1;
   m1.modName = QStringLiteral("Harmony");
@@ -301,15 +242,10 @@ TEST_CASE("find matches by package id, then by mod name") {
   report.mods.append(std::move(m2));
 
   const StartupImpactMod* byId =
-      report.find(QStringLiteral("Brrainz.Harmony_steam"), {});
+      report.find(QStringLiteral("Brrainz.Harmony_steam"));
   REQUIRE(byId != nullptr);
   CHECK(byId->modName == QStringLiteral("Harmony"));
 
-  const StartupImpactMod* byName = report.find({}, QStringLiteral("OTHER"));
-  REQUIRE(byName != nullptr);
-  CHECK(byName->packageId == QStringLiteral("other.mod"));
-
-  CHECK(report.find(QStringLiteral("missing.mod"), QStringLiteral("Missing")) ==
-        nullptr);
-  CHECK(report.find(QString(), QString()) == nullptr);
+  CHECK(report.find(QStringLiteral("missing.mod")) == nullptr);
+  CHECK(report.find(QString()) == nullptr);
 }

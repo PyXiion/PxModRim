@@ -9,6 +9,8 @@ Rectangle {
 
     property bool keyboardActive: modListHasFocus && listView.activeFocus
     readonly property bool compactMode: Boolean(modListPanel && modListPanel.compactMode)
+    readonly property int rowHeight: compactMode ? 32 : 52
+    readonly property int rowStride: compactMode ? 34 : 54
     ListView {
         id: listView
         objectName: "listView"
@@ -36,8 +38,6 @@ Rectangle {
         property string currentUuid: ""
 
         ScrollBar.vertical: PxScrollBar {
-            id: scrollBar
-            policy: ScrollBar.AsNeeded
             active: true
         }
         section.property: "sectionName"
@@ -84,7 +84,6 @@ Rectangle {
     }
 
     EmptyState {
-        id: emptyStateText
         objectName: "emptyStateText"
         anchors.fill: parent
         visible: listView.count === 0
@@ -124,7 +123,7 @@ Rectangle {
         objectName: "dragProxy"
         visible: false
         width: listView.width
-        height: root.compactMode ? 32 : 52
+        height: root.rowHeight
         radius: Theme.radiusMd
         color: Theme.elevate3
         opacity: 0.92
@@ -183,7 +182,7 @@ Rectangle {
             if (targetItem) {
                 return targetItem.y - listView.contentY
             }
-            var rowH = root.compactMode ? 34 : 54
+            var rowH = root.rowStride
             return Math.max(0, Math.min(
                 listView.height - height,
                 listView.dragTargetIndex * rowH - listView.contentY
@@ -201,7 +200,7 @@ Rectangle {
         Rectangle {
             id: delegateRect
             width: listView.width
-            height: root.compactMode ? 32 : 52
+            height: root.rowHeight
             radius: Theme.radiusMd
 
             color: {
@@ -587,13 +586,7 @@ Rectangle {
         onActivated: navigate(true, 1)
     }
     Shortcut {
-        sequence: "Return"
-        context: Qt.WindowShortcut
-        enabled: root.keyboardActive
-        onActivated: modListPanel.toggleChecked(listView.selectedIndices)
-    }
-    Shortcut {
-        sequence: "Space"
+        sequences: ["Return", "Space"]
         context: Qt.WindowShortcut
         enabled: root.keyboardActive
         onActivated: modListPanel.toggleChecked(listView.selectedIndices)
@@ -615,10 +608,22 @@ Rectangle {
             listView.anchorUuid = uuids.length > 0 ? uuids[uuids.length - 1] : ""
             listView.currentIndex = listView.count - 1
             listView.currentUuid = listView.anchorUuid
-            modListPanel.selectionChanged(uuids)
             if (listView.currentUuid)
                 modListPanel.modSelected(listView.currentUuid)
         }
+    }
+
+    function selectRange(index) {
+        var start = Math.min(listView.anchorIndex, index)
+        var end = Math.max(listView.anchorIndex, index)
+        var range = []
+        var rangeUuids = []
+        for (var row = start; row <= end; ++row) {
+            range.push(row)
+            rangeUuids.push(modListPanel.uuidAt(row))
+        }
+        listView.selectedIndices = range
+        listView.selectedUuids = rangeUuids
     }
 
     function selectRow(index, uuid, modifiers) {
@@ -639,16 +644,7 @@ Rectangle {
             listView.anchorIndex = index
             listView.anchorUuid = uuid
         } else if (modifiers & Qt.ShiftModifier && listView.anchorIndex >= 0) {
-            var start = Math.min(listView.anchorIndex, index)
-            var end = Math.max(listView.anchorIndex, index)
-            var range = []
-            var rangeUuids = []
-            for (var row = start; row <= end; ++row) {
-                range.push(row)
-                rangeUuids.push(modListPanel.uuidAt(row))
-            }
-            listView.selectedIndices = range
-            listView.selectedUuids = rangeUuids
+            selectRange(index)
         } else {
             listView.selectedIndices = [index]
             listView.selectedUuids = [uuid]
@@ -658,7 +654,6 @@ Rectangle {
 
         listView.currentIndex = index
         listView.currentUuid = uuid
-        modListPanel.selectionChanged(listView.selectedUuids)
         modListPanel.modSelected(uuid)
     }
 
@@ -678,16 +673,7 @@ Rectangle {
                 listView.anchorIndex = newIndex
                 listView.anchorUuid = uuid
             }
-            var start = Math.min(listView.anchorIndex, newIndex)
-            var end = Math.max(listView.anchorIndex, newIndex)
-            var range = []
-            var rangeUuids = []
-            for (var row = start; row <= end; ++row) {
-                range.push(row)
-                rangeUuids.push(modListPanel.uuidAt(row))
-            }
-            listView.selectedIndices = range
-            listView.selectedUuids = rangeUuids
+            selectRange(newIndex)
         } else {
             listView.selectedIndices = [newIndex]
             listView.selectedUuids = [uuid]
@@ -698,7 +684,6 @@ Rectangle {
         listView.currentIndex = newIndex
         listView.currentUuid = uuid
         listView.positionViewAtIndex(newIndex, ListView.Contain)
-        modListPanel.selectionChanged(listView.selectedUuids)
         modListPanel.modSelected(uuid)
     }
 
@@ -726,7 +711,6 @@ Rectangle {
             listView.currentUuid = ""
             listView.anchorIndex = -1
             listView.anchorUuid = ""
-            modListPanel.selectionChanged([])
             modListPanel.modSelected("")
             return
         }
@@ -738,7 +722,6 @@ Rectangle {
             listView.anchorUuid = listView.currentUuid
         }
         listView.anchorIndex = anchorRow
-        modListPanel.selectionChanged(uuids)
     }
 
     function targetIndexForPoint(x, y) {
@@ -758,7 +741,7 @@ Rectangle {
         idx = listView.indexAt(x, y - 16)
         if (idx >= 0)
             return Math.max(0, Math.min(idx, maxActiveTarget))
-        var rowH = root.compactMode ? 34 : 54
+        var rowH = root.rowStride
         return Math.max(0, Math.min(Math.floor(y / rowH), maxActiveTarget))
     }
 }

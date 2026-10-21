@@ -13,8 +13,10 @@ namespace px::modrim {
 
 inline const QString kUngroupedKey = QStringLiteral("ungrouped");
 
+QString providerIcon(const QString& id);
+
 struct TreeNode {
-  QString kind;
+  QString kind = QStringLiteral("root");
   QString key;
   TreeNode* parent = nullptr;
   const organizer::FolderNode* folder = nullptr;
@@ -28,10 +30,6 @@ struct TreeNode {
   void add(std::unique_ptr<TreeNode> child);
   QList<TreeNode*> walk() const;
   qint64 folderId() const;
-  TreeNode(QString kind = QStringLiteral("root"), QString key = {},
-           TreeNode* parent = nullptr,
-           const organizer::FolderNode* folder = nullptr,
-           const organizer::ModLeaf* leaf = nullptr, QString providerId = {});
   bool isContainer() const;
 };
 
@@ -61,7 +59,6 @@ class ModTreeModel : public QAbstractItemModel {
     kProviderLabelRole,
     kModVersionRole
   };
-  Q_ENUM(Role)
   using SummaryFor =
       std::function<std::optional<view::ModDiagnosticsView>(const QString&)>;
   explicit ModTreeModel(SummaryFor summaryFor, QObject* parent = nullptr);
@@ -88,7 +85,6 @@ class ModTreeModel : public QAbstractItemModel {
   bool isSelected(const QModelIndex& index) const;
   void select(const QList<QModelIndex>& indexes,
               const QString& mode = QStringLiteral("replace"));
-  void clearSelection();
 
  private:
   TreeNode* node(const QModelIndex& index) const;

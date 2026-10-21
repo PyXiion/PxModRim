@@ -115,17 +115,23 @@ QString baseLabel(const QString& key) {
   return key;
 }
 
-}  // namespace
-
 QString stripMetricPrefix(const QString& key) {
   return key.startsWith(kPrefix) ? key.mid(kPrefix.size()) : key;
 }
 
-QString metricLabel(const QString& key) {
+}  // namespace
+
+MetricKey splitMetricKey(const QString& key) {
   const QString stripped = stripMetricPrefix(key);
   const qsizetype bar = stripped.indexOf(u'|');
-  const QString base = bar < 0 ? stripped : stripped.left(bar);
-  const QString target = bar < 0 ? QString() : stripped.mid(bar + 1);
+  if (bar < 0) {
+    return {.name = stripped, .target = {}};
+  }
+  return {.name = stripped.left(bar), .target = stripped.mid(bar + 1)};
+}
+
+QString metricLabel(const QString& key) {
+  const auto [base, target] = splitMetricKey(key);
   const QString label = baseLabel(base);
   if (target.isEmpty()) {
     return label;

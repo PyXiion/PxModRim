@@ -88,44 +88,6 @@ void ModChecker::rebuild(const QHash<QString, ListedModPtr>& mods,
   emitDiagnostics();
 }
 
-void ModChecker::toggleMod(const ListedMod& mod,
-                           const QStringList& orderedUuids) {
-  if (dynamic_cast<const AboutXmlMod*>(&mod) == nullptr) {
-    emitDiagnostics();
-    return;
-  }
-  rebuild(m_allMods, orderedUuids);
-}
-
-void ModChecker::moveMod(const QString& uuid, int oldIndex, int newIndex) {
-  if (m_orderedPids.isEmpty()) {
-    return;
-  }
-  const auto uuidIt = m_uuidToPid.constFind(uuid);
-  if (uuidIt == m_uuidToPid.cend()) {
-    return;
-  }
-  const PackageId pid = uuidIt.value();
-
-  m_orderedPids.insert(newIndex, m_orderedPids.takeAt(oldIndex));
-  m_graph.updateOrder(m_orderedPids);
-
-  const CheckContext ctx = buildContext(m_cachedCycles);
-  // Only neighbours are rechecked, so cached results no longer match the order.
-  m_checkerResults.reset();
-
-  QSet<PackageId> affected{pid};
-  affected.unite(m_graph.neighbors(pid));
-  for (const PackageId& currentPid : affected) {
-    if (const auto mod = m_activeMods.constFind(currentPid);
-        mod != m_activeMods.cend()) {
-      m_diagnostics.insert(currentPid, checkMod(*mod.value(), ctx));
-    }
-  }
-
-  emitDiagnostics();
-}
-
 void ModChecker::reorder(const QStringList& orderedUuids) {
   const QHash<PackageId, AboutXmlModPtr> previous = m_activeMods;
   const QHash<PackageId, int> previousIndex = m_graph.pidToIndex();
@@ -249,16 +211,6 @@ void ModChecker::checkAll(const CheckContext& ctx) {
   m_diagnostics = std::move(diagnostics);
 }
 
-ModDiagnostics ModChecker::checkMod(const AboutXmlMod& mod,
-                                    const CheckContext& ctx) const {
-  std::vector<QList<ModIssue>> perChecker;
-  perChecker.reserve(m_checkers.size());
-  for (const auto& checker : m_checkers) {
-    perChecker.push_back(runChecker(*checker, mod, ctx));
-  }
-  return compose(perChecker);
-}
-
 QList<ModIssue> ModChecker::runChecker(const ModIssueChecker& checker,
                                        const AboutXmlMod& mod,
                                        const CheckContext& ctx) const {
@@ -279,12 +231,12 @@ void ModChecker::emitDiagnostics() const {
   if (!m_onDiagnosticsChanged) {
     return;
   }
-  DiagnosticsByUuid byUuid;
-  for (auto it = m_uuidToPid.cbegin(); it != m_uuidToPid.cend(); ++it) {
-    const auto diagnostics = m_diagnostics.constFind(it.value());
-    if (diagnostics != m_diagnostics.cend() &&
-        (diagnostics->hasErrors() || diagnostics->hasWarnings())) {
-      byUuid.insert(it.key(), diagnostics.value());
+  DiagnosticsByUuid byUuid = activeModDiagnostics();
+  for (auto it = byUuid.begin(); it != byUuid.end();) {
+    if (it->hasErrors() || it->hasWarnings()) {
+      ++it;
+    } else {
+      it = byUuid.erase(it);
     }
   }
   m_onDiagnosticsChanged(byUuid);

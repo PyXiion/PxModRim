@@ -55,7 +55,7 @@ class Resolver {
  public:
   explicit Resolver(const OrganizerState& state)
       : m_placements(state.placements) {
-    for (const Rule& rule : state.rules) {
+    for (const RuleSpec& rule : state.rules) {
       if (state.folders.contains(rule.folderId) && rule.folderId != kRootId) {
         m_rules.append(FieldRule{rule.field, makeMatcher(rule.op, rule.pattern),
                                  rule.folderId});
@@ -229,12 +229,16 @@ std::optional<QString> modPackageId(const ListedMod& mod) {
   return std::nullopt;
 }
 
+namespace {
+
 QString modAuthor(const ListedMod& mod) {
   if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) {
     return about->authors.join(QStringLiteral(", "));
   }
   return {};
 }
+
+}  // namespace
 
 Resolution folderFor(const OrganizerState& state,
                      const std::optional<QString>& packageId,
@@ -247,7 +251,7 @@ RulePreview previewRuleMatches(const OrganizerState& state,
                                const QList<RuleSpec>& specs) {
   const Resolver current(state);
   // A spec with a blank pattern, an unknown folder or the root matches nothing.
-  // The matcher still uses the raw pattern, as the legacy preview did.
+  // The matcher still uses the raw pattern.
   std::vector<std::optional<FieldRule>> candidates;
   candidates.reserve(static_cast<std::size_t>(specs.size()));
   for (const RuleSpec& spec : specs) {
@@ -289,7 +293,7 @@ RulePreview previewRuleMatches(const OrganizerState& state,
 
 QList<TreeFilter> treeFilters(const ModsByUuid& mods,
                               const QSet<QString>& active,
-                              const OrganizerState* state) {
+                              const OrganizerState& state) {
   const int total = static_cast<int>(mods.size());
   int enabled = 0;
   QHash<QString, int> perProvider;
@@ -328,25 +332,20 @@ QList<TreeFilter> treeFilters(const ModsByUuid& mods,
     filters.append(std::move(provider));
   }
 
-  if (state && !state->tags.isEmpty()) {
+  if (!state.tags.isEmpty()) {
     QHash<qint64, int> tagCounts;
-    for (const auto& [id, tag] : state->tags.asKeyValueRange()) {
-      tagCounts.insert(id, 0);
-    }
     for (const ListedModPtr& mod : mods) {
       const auto pid = modPackageId(*mod);
       if (!pid) {
         continue;
       }
-      for (qint64 tagId : state->modTags.value(*pid)) {
-        if (tagCounts.contains(tagId)) {
-          tagCounts[tagId] += 1;
-        }
+      for (qint64 tagId : state.modTags.value(*pid)) {
+        tagCounts[tagId] += 1;
       }
     }
 
     std::vector<Tag> sortedTags;
-    for (const Tag& tag : state->tags) {
+    for (const Tag& tag : state.tags) {
       sortedTags.push_back(tag);
     }
     std::sort(sortedTags.begin(), sortedTags.end(),
@@ -405,7 +404,7 @@ FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods,
     }
   }
   QSet<qint64> ruled;
-  for (const Rule& rule : state.rules) {
+  for (const RuleSpec& rule : state.rules) {
     ruled.insert(rule.folderId);
   }
 

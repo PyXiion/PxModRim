@@ -18,10 +18,6 @@
 #include "core/organizer/resolve.hpp"
 #include "core/plugin.hpp"
 
-namespace px::modrim {
-class CoreContext;
-}
-
 namespace px::modrim::organizer {
 
 struct FolderToggle {
@@ -116,7 +112,6 @@ class OrganizerService : public Plugin {
   const QStringList& activeUuids() const;
   QSet<QString> activeSet() const;
 
-  CoreContext* m_ctx = nullptr;
   AllModsFn m_allModsFn;
   ActiveUuidsFn m_activeUuidsFn;
   OrganizerDb& m_db;

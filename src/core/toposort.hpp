@@ -12,7 +12,7 @@
 
 namespace px::modrim {
 
-// Kahn's algorithm, layered the way the `toposort` package lays levels: level 0
+// Kahn's algorithm, layered: level 0
 // holds nodes without dependencies, and each later level holds nodes whose
 // dependencies all sit in earlier levels. Names within a level are ascending,
 // so the result is deterministic. Self-dependencies and dependencies that are

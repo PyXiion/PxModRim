@@ -23,11 +23,8 @@ class ModListPanel : public QWidget {
  public:
   ModListPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent = nullptr);
   ~ModListPanel() override;
-  void loadMods(const QHash<QString, ListedModPtr>& mods,
-                const QStringList& active);
   QStringList activeUuids() const;
   ModListModel* model() const { return m_model; }
-  ModListProxyModel* proxyModel() const { return m_proxy; }
   QQuickWidget* qmlWidget() const { return m_qml; }
   void setSidebarFilter(std::optional<QSet<QString>> uuids);
   void setSearchFilter(const QString& text);
@@ -38,25 +35,19 @@ class ModListPanel : public QWidget {
   QCoro::Task<void> toggleRows(QList<int> rows);
   QCoro::Task<void> refresh();
   QLineEdit* searchInput;
-  Q_INVOKABLE void setCompactMode(bool enabled);
+  void setCompactMode(bool enabled);
   Q_INVOKABLE bool isHighlighted(const QString& uuid) const;
   Q_INVOKABLE void modSelected(const QString& uuid);
-  Q_INVOKABLE void clearSelection();
+  void clearSelection();
   Q_INVOKABLE QString uuidAt(int row) const;
   Q_INVOKABLE int rowForUuid(const QString& uuid) const;
   Q_INVOKABLE QCoro::QmlTask toggleCheck(int row) { return toggleRows({row}); }
   Q_INVOKABLE QCoro::QmlTask toggleChecked(const QVariantList& rows);
   Q_INVOKABLE void showContextMenu(const QVariantList& uuids);
-  Q_INVOKABLE bool isChecked(int row) const;
-  Q_INVOKABLE void commitOrder(const QStringList& uuids);
   Q_INVOKABLE void moveRow(int source, int target);
   Q_INVOKABLE void dragEnded();
-  Q_INVOKABLE void selectionChanged(const QVariantList& uuids);
  signals:
   void modPicked(const QString& uuid);
-  void activeModsChanged();
-  void orderChanged();
-  void selectionUpdated(const QStringList& uuids);
   void compactModeChanged(bool enabled);
   void highlightedChanged();
 

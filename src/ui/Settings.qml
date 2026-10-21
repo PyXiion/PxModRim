@@ -46,6 +46,20 @@ Rectangle {
         }
     }
 
+    component FormLabel: Text {
+        Layout.preferredWidth: 150
+        color: Theme.textMuted
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSizeMd
+    }
+    component FormHint: Text {
+        Layout.fillWidth: true
+        wrapMode: Text.Wrap
+        color: Theme.textDim
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSizeXs
+    }
+
     component Group: Rectangle {
         default property alias content: body.data
         property string title: ""
@@ -85,13 +99,7 @@ Rectangle {
         Layout.fillWidth: true
         spacing: 8
 
-        Text {
-            Layout.preferredWidth: 150
-            text: parent.label
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeMd
-        }
+        FormLabel { text: parent.label }
         PxTextField {
             id: field
             Layout.fillWidth: true
@@ -206,13 +214,7 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            Text {
-                                Layout.preferredWidth: 150
-                                text: "Arguments"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeMd
-                            }
+                            FormLabel { text: "Arguments" }
                             PxTextField {
                                 id: launchArgs
                                 Layout.fillWidth: true
@@ -222,24 +224,11 @@ Rectangle {
                                 Accessible.name: "Game launch arguments"
                             }
                         }
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Passed to the game. With the Steam strategy they go through steam://run."
-                            wrapMode: Text.Wrap
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                        }
+                        FormHint { text: "Passed to the game. With the Steam strategy they go through steam://run." }
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            Text {
-                                Layout.preferredWidth: 150
-                                text: "Wrapper"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeMd
-                            }
+                            FormLabel { text: "Wrapper" }
                             PxTextField {
                                 id: launchWrapper
                                 Layout.fillWidth: true
@@ -249,24 +238,11 @@ Rectangle {
                                 Accessible.name: "Launch wrapper command"
                             }
                         }
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Direct launch only. Leading KEY=VALUE tokens set environment variables; %command% marks where the game goes, otherwise the wrapper is a prefix."
-                            wrapMode: Text.Wrap
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                        }
+                        FormHint { text: "Direct launch only. Leading KEY=VALUE tokens set environment variables; %command% marks where the game goes, otherwise the wrapper is a prefix." }
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            Text {
-                                Layout.preferredWidth: 150
-                                text: "After launch"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeMd
-                            }
+                            FormLabel { text: "After launch" }
                             PxComboBox {
                                 id: afterLaunch
                                 Layout.preferredWidth: 220
@@ -303,13 +279,7 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            Text {
-                                Layout.preferredWidth: 150
-                                text: "Interface scale"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeMd
-                            }
+                            FormLabel { text: "Interface scale" }
                             PxComboBox {
                                 id: uiScale
                                 objectName: "interfaceScale"
@@ -327,14 +297,7 @@ Rectangle {
                                 Component.onCompleted: currentIndex = indexOfValue(root.initial.uiScale)
                             }
                         }
-                        Text {
-                            Layout.fillWidth: true
-                            text: settings.scaleOverrideNote || "Takes effect after restart."
-                            wrapMode: Text.Wrap
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                        }
+                        FormHint { text: settings.scaleOverrideNote || "Takes effect after restart." }
                         PxCheckBox {
                             id: compact
                             text: "Compact mod list"

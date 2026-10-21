@@ -15,7 +15,6 @@ class DownloadQueueModel final : public QAbstractListModel {
  public:
   enum Role {
     kIdRole = Qt::UserRole + 1,
-    kTitleRole,
     kDisplayRole,
     kStatusRole,
     kProgressRole
@@ -26,14 +25,13 @@ class DownloadQueueModel final : public QAbstractListModel {
                 int role = Qt::DisplayRole) const override;
   QHash<int, QByteArray> roleNames() const override;
   void syncFrom(const CheckedDownloads& checked,
-                const QHash<QString, QString>& statuses = {});
-  void updateStatus(const QString& id, const QString& status, qint64 done = 0,
-                    qint64 total = 0);
+                const QHash<QString, QString>& statuses);
+  void updateStatus(const QString& id, const QString& status, qint64 done,
+                    qint64 total);
 
  private:
   struct Item {
     QString id;
-    QString title;
     QString display;
     QString status;
     double progress = 0;

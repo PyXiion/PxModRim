@@ -56,15 +56,6 @@ inline constexpr std::array<RimWorldDlc, 6> kRimworldDlcMetadata{{
      QLatin1StringView{"DLC #5"}},
 }};
 
-inline const QStringList kRimworldPackageIds = [] {
-  QStringList result;
-  result.reserve(kRimworldDlcMetadata.size());
-  for (const auto& release : kRimworldDlcMetadata) {
-    result.push_back(QString(release.packageId));
-  }
-  return result;
-}();
-
 inline const RimWorldDlc* findRimWorldDlcByPackageId(QStringView packageId) {
   for (const auto& release : kRimworldDlcMetadata) {
     if (packageId == release.packageId) return &release;

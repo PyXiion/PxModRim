@@ -83,7 +83,7 @@ void DownloadsModel::setPhase(const QString& phase) {
   emit phaseChanged();
 }
 
-void DownloadsModel::finish(const DownloadResult&) {
+void DownloadsModel::finish() {
   for (auto& row : m_rows) {
     if (isActive(row.state)) {
       row.state = QStringLiteral("cancelled");

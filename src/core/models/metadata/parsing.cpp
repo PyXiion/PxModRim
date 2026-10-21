@@ -118,6 +118,13 @@ void applyOfficialMetadata(AboutXmlMod& mod, const QString& declaredName) {
   }
 }
 
+template <typename Target>
+void assignIfPresent(Target& target, const QString& text) {
+  if (!text.isEmpty()) {
+    target = text;
+  }
+}
+
 }  // namespace
 
 std::shared_ptr<AboutXmlMod> createAboutModFromElement(
@@ -139,6 +146,11 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(
       "forceLoadAfter"};
   constexpr std::array<const char*, 3> kVersionRuleTags{
       "loadBeforeByVersion", "loadAfterByVersion", "incompatibleWithByVersion"};
+  constexpr size_t kLoadBefore = 0;
+  constexpr size_t kLoadAfter = 1;
+  constexpr size_t kIncompatibleWith = 2;
+  constexpr size_t kForceLoadBefore = 3;
+  constexpr size_t kForceLoadAfter = 4;
   std::array<QStringList, 5> ruleLists;
   std::array<pugi::xml_node, 3> versionRules;
 
@@ -166,20 +178,15 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(
         }
       }
     } else if (tag == QLatin1StringView("name")) {
-      const auto text = scalarText(child);
-      if (!text.isEmpty()) declaredName = text;
+      assignIfPresent(declaredName, scalarText(child));
     } else if (tag == QLatin1StringView("description")) {
-      const auto text = scalarText(child);
-      if (!text.isEmpty()) description = text;
+      assignIfPresent(description, scalarText(child));
     } else if (tag == QLatin1StringView("modVersion")) {
-      const auto text = scalarText(child);
-      if (!text.isEmpty()) mod->modVersion = text;
+      assignIfPresent(mod->modVersion, scalarText(child));
     } else if (tag == QLatin1StringView("url")) {
-      const auto text = scalarText(child);
-      if (!text.isEmpty()) mod->url = text;
+      assignIfPresent(mod->url, scalarText(child));
     } else if (tag == QLatin1StringView("modIconPath")) {
-      const auto text = scalarText(child);
-      if (!text.isEmpty()) mod->modIconPath = text;
+      assignIfPresent(mod->modIconPath, scalarText(child));
     } else if (tag == QLatin1StringView("author")) {
       const auto text = scalarText(child);
       if (!text.isEmpty()) mod->authors.append(text);
@@ -199,8 +206,8 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(
       }
     } else if (tag == QLatin1StringView("descriptionsByVersion")) {
       // Descriptions select their version independently of rule preferences.
-      const auto text = rawText(versionSection(child, shortVersion)).trimmed();
-      if (!text.isEmpty()) versionDescription = text;
+      assignIfPresent(versionDescription,
+                      rawText(versionSection(child, shortVersion)).trimmed());
     } else {
       for (size_t index = 0; index < kRuleTags.size(); ++index) {
         if (tag == QLatin1StringView(kRuleTags[index])) {
@@ -234,11 +241,12 @@ std::shared_ptr<AboutXmlMod> createAboutModFromElement(
       ruleLists[index] = std::move(*list);
     }
   }
-  ruleLists[0].append(ruleLists[3]);
-  ruleLists[1].append(ruleLists[4]);
-  mod->aboutRules.loadBefore = CaseInsensitiveSet(ruleLists[0]);
-  mod->aboutRules.loadAfter = CaseInsensitiveSet(ruleLists[1]);
-  mod->aboutRules.incompatibleWith = CaseInsensitiveSet(ruleLists[2]);
+  ruleLists[kLoadBefore].append(ruleLists[kForceLoadBefore]);
+  ruleLists[kLoadAfter].append(ruleLists[kForceLoadAfter]);
+  mod->aboutRules.loadBefore = CaseInsensitiveSet(ruleLists[kLoadBefore]);
+  mod->aboutRules.loadAfter = CaseInsensitiveSet(ruleLists[kLoadAfter]);
+  mod->aboutRules.incompatibleWith =
+      CaseInsensitiveSet(ruleLists[kIncompatibleWith]);
   readDependencies(versionDependencies ? versionDependencies : dependencies,
                    mod->aboutRules);
   applyOfficialMetadata(*mod, declaredName);

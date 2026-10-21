@@ -43,7 +43,7 @@ StartupImpactService::load() {
   std::optional<StartupImpactReport> report = parseStartupImpact(jsonPath);
   if (report) {
     const double base = std::max(0.0, report->baseGameTime());
-    QList<StartupImpactMod> entries = report->mods;
+    StartupImpactReport full = *report;
     if (base > kMinBaseGameTimeS) {
       StartupImpactMod baseGame;
       baseGame.modName = QString(kBaseGamePid);
@@ -54,49 +54,17 @@ StartupImpactService::load() {
       baseGame.offThreadTotalImpactS =
           std::accumulate(report->offThreadMetrics.cbegin(),
                           report->offThreadMetrics.cend(), 0.0);
-      entries.push_back(std::move(baseGame));
+      full.mods.push_back(std::move(baseGame));
     }
-    StartupImpactReport full;
-    full.path = report->path;
-    full.loadingTimeS = report->loadingTimeS;
-    full.mods = std::move(entries);
-    full.timestamp = report->timestamp;
     auto stored = co_await m_db.storeReport(dbPath, std::move(full));
     if (!stored) co_return std::unexpected(stored.error());
   }
   co_return report;
 }
 
-QCoro::Task<Result<std::optional<StartupImpactReport>>>
-StartupImpactService::getLatestReport() {
-  co_return co_await m_db.getLatestReport(dbPathFor(m_ctx));
-}
-
-QCoro::Task<Result<double>> StartupImpactService::estimatedImpactFor(
-    QString packageId) {
-  co_return co_await m_db.getAverage(dbPathFor(m_ctx),
-                                     normalizePackageId(packageId));
-}
-
-QCoro::Task<Result<double>> StartupImpactService::estimatedTotal(
-    QStringList activePids) {
-  const QString dbPath = dbPathFor(m_ctx);
-  auto base = co_await m_db.getAverage(dbPath, QString(kBaseGamePid));
-  if (!base) co_return std::unexpected(base.error());
-  auto totals = co_await m_db.getTotalsFor(dbPath, normalized(activePids));
-  if (!totals) co_return std::unexpected(totals.error());
-  double modSum = 0.0;
-  for (const ThreadAverages& t : *totals) modSum += t.onThread + t.offThread;
-  co_return *base + modSum;
-}
-
 QCoro::Task<Result<QHash<QString, double>>>
 StartupImpactService::getAllAverages() {
   co_return co_await m_db.getAllAverages(dbPathFor(m_ctx));
-}
-
-QCoro::Task<Result<double>> StartupImpactService::baseGameAverage() {
-  co_return co_await m_db.getAverage(dbPathFor(m_ctx), QString(kBaseGamePid));
 }
 
 QCoro::Task<Result<LatestWithAverages>> StartupImpactService::snapshot(

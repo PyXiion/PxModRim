@@ -44,7 +44,7 @@ QString expandTokens(const QString& raw) {
 
 QString paletteValue(QStringView name) {
   for (const auto& entry : kPaletteEntries) {
-    if (QString(entry.name) == name) {
+    if (entry.name == name) {
       return QString(entry.value);
     }
   }
@@ -57,17 +57,17 @@ QColor paletteColor(QStringView name) {
 }
 
 const QColor& panelBgQ() {
-  static const QColor color = paletteColor(QStringView{u"ELEVATE_2"});
+  static const QColor color = paletteColor(u"ELEVATE_2");
   return color;
 }
 
 const QColor& textMainQ() {
-  static const QColor color = paletteColor(QStringView{u"TEXT_MAIN"});
+  static const QColor color = paletteColor(u"TEXT_MAIN");
   return color;
 }
 
 const QColor& textMutedQ() {
-  static const QColor color = paletteColor(QStringView{u"TEXT_MUTED"});
+  static const QColor color = paletteColor(u"TEXT_MUTED");
   return color;
 }
 
@@ -84,26 +84,19 @@ void applyAppTheme(QApplication& app) {
   app.setStyle(QStringLiteral("Fusion"));
 
   QPalette palette;
-  palette.setColor(QPalette::Window, paletteColor(QStringView{u"ELEVATE_0"}));
-  palette.setColor(QPalette::WindowText,
-                   paletteColor(QStringView{u"TEXT_MAIN"}));
-  palette.setColor(QPalette::Base, paletteColor(QStringView{u"ELEVATE_1"}));
-  palette.setColor(QPalette::AlternateBase,
-                   paletteColor(QStringView{u"ELEVATE_2"}));
-  palette.setColor(QPalette::Text, paletteColor(QStringView{u"TEXT_MAIN"}));
-  palette.setColor(QPalette::Button, paletteColor(QStringView{u"ELEVATE_2"}));
-  palette.setColor(QPalette::ButtonText,
-                   paletteColor(QStringView{u"TEXT_MAIN"}));
-  palette.setColor(QPalette::BrightText,
-                   paletteColor(QStringView{u"TEXT_MAIN"}));
-  palette.setColor(QPalette::Highlight, paletteColor(QStringView{u"PRIMARY"}));
-  palette.setColor(QPalette::HighlightedText,
-                   paletteColor(QStringView{u"ELEVATE_0"}));
-  palette.setColor(QPalette::Link, paletteColor(QStringView{u"PRIMARY"}));
-  palette.setColor(QPalette::ToolTipBase,
-                   paletteColor(QStringView{u"ELEVATE_2"}));
-  palette.setColor(QPalette::ToolTipText,
-                   paletteColor(QStringView{u"TEXT_MAIN"}));
+  palette.setColor(QPalette::Window, paletteColor(u"ELEVATE_0"));
+  palette.setColor(QPalette::WindowText, paletteColor(u"TEXT_MAIN"));
+  palette.setColor(QPalette::Base, paletteColor(u"ELEVATE_1"));
+  palette.setColor(QPalette::AlternateBase, paletteColor(u"ELEVATE_2"));
+  palette.setColor(QPalette::Text, paletteColor(u"TEXT_MAIN"));
+  palette.setColor(QPalette::Button, paletteColor(u"ELEVATE_2"));
+  palette.setColor(QPalette::ButtonText, paletteColor(u"TEXT_MAIN"));
+  palette.setColor(QPalette::BrightText, paletteColor(u"TEXT_MAIN"));
+  palette.setColor(QPalette::Highlight, paletteColor(u"PRIMARY"));
+  palette.setColor(QPalette::HighlightedText, paletteColor(u"ELEVATE_0"));
+  palette.setColor(QPalette::Link, paletteColor(u"PRIMARY"));
+  palette.setColor(QPalette::ToolTipBase, paletteColor(u"ELEVATE_2"));
+  palette.setColor(QPalette::ToolTipText, paletteColor(u"TEXT_MAIN"));
   app.setPalette(palette);
 
   const QString qss = getStylesheet();

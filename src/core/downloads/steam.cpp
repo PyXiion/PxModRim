@@ -2,6 +2,7 @@
 
 #include "core/downloads/steam.hpp"
 
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QHash>
@@ -22,6 +23,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "core/downloads/manager.hpp"
 #include "core/utils.hpp"
 
 namespace px::modrim {
@@ -47,24 +49,6 @@ std::optional<std::uint64_t> parseItemId(const QString& text) {
 
 QString itemIdText(std::uint64_t id) {
   return QString::number(static_cast<qulonglong>(id));
-}
-
-double unixNow() {
-  return std::chrono::duration<double>(
-             std::chrono::system_clock::now().time_since_epoch())
-      .count();
-}
-
-// Settings used to live in config.json under `workshop_<field>` keys.
-QHash<QString, QString> legacySettingsKeys() {
-  QHash<QString, QString> keys;
-  for (const char* field :
-       {"auto_update_hours", "parallel_items", "threads_per_item", "proxy",
-        "connect_timeout", "stall_timeout"}) {
-    keys.insert(QStringLiteral("workshop_") + QString::fromLatin1(field),
-                QString::fromLatin1(field));
-  }
-  return keys;
 }
 
 // The real client; pxsteamdl::Client is thread-safe, so the batch worker may
@@ -96,8 +80,7 @@ QCoro::Task<Result<std::shared_ptr<WorkshopClient>>> loginWithPxsteamdl(
         native.connect_timeout = std::chrono::seconds(options.connectTimeout);
         native.stall_timeout = std::chrono::seconds(options.stallTimeout);
         try {
-          return std::shared_ptr<WorkshopClient>(
-              std::make_shared<PxSteamDlClient>(native));
+          return std::make_shared<PxSteamDlClient>(native);
         } catch (const std::exception& e) {
           return std::unexpected(Error{QString::fromUtf8(e.what())});
         }
@@ -149,7 +132,12 @@ SteamDownloader::SteamDownloader(SteamDownloaderDeps deps)
       m_installedMods(std::move(deps.installedMods)),
       m_clientFactory(std::move(deps.clientFactory)),
       m_settings(&deps.config, QStringLiteral("steam_downloader"),
-                 legacySettingsKeys()) {
+                 {{"workshop_auto_update_hours", "auto_update_hours"},
+                  {"workshop_parallel_items", "parallel_items"},
+                  {"workshop_threads_per_item", "threads_per_item"},
+                  {"workshop_proxy", "proxy"},
+                  {"workshop_connect_timeout", "connect_timeout"},
+                  {"workshop_stall_timeout", "stall_timeout"}}) {
   m_autoTimer.setSingleShot(true);
   QObject::connect(&m_autoTimer, &QTimer::timeout, &m_autoTimer,
                    [this] { runScheduledAutoUpdate(); });
@@ -222,10 +210,12 @@ QStringList SteamDownloader::staleIds(double maxAgeS, double now) const {
     return syncedAt(id).value_or(0.0);
   };
   QStringList stale;
-  for (const auto& id : updatableIds(m_installedMods())) {
-    if (syncedOrZero(id) < cutoff) {
-      stale.append(id);
-    }
+  QSet<QString> seen;
+  for (const auto& mod : m_installedMods()) {
+    const auto id = updatableId(*mod);
+    if (!id || seen.contains(*id)) continue;
+    seen.insert(*id);
+    if (syncedOrZero(*id) < cutoff) stale.append(*id);
   }
   std::stable_sort(stale.begin(), stale.end(),
                    [&](const QString& a, const QString& b) {
@@ -244,11 +234,16 @@ QCoro::Task<Result<DownloadResult>> SteamDownloader::downloadMods(
     co_return std::unexpected(
         Error{QStringLiteral("No mods selected for download.")});
   }
+  modIds.removeDuplicates();
+  std::vector<std::uint64_t> itemIds;
+  itemIds.reserve(modIds.size());
   for (const auto& id : modIds) {
-    if (!parseItemId(id)) {
+    const auto parsed = parseItemId(id);
+    if (!parsed) {
       co_return std::unexpected(Error{QStringLiteral(
           "Published file IDs must be ASCII decimal numbers within uint64.")});
     }
+    itemIds.push_back(*parsed);
   }
   const QString root = localPath();
   if (root.isEmpty()) {
@@ -260,8 +255,6 @@ QCoro::Task<Result<DownloadResult>> SteamDownloader::downloadMods(
         Error{QStringLiteral("A download is already running.")});
   }
 
-  modIds.removeDuplicates();
-
   auto batch = std::make_shared<SteamBatch>(static_cast<int>(modIds.size()));
   m_stop.emplace();
   QPromise<void> completion;
@@ -269,14 +262,14 @@ QCoro::Task<Result<DownloadResult>> SteamDownloader::downloadMods(
   m_batchFinished = completion.future();
   const auto finish = qScopeGuard([&completion] { completion.finish(); });
   m_activeIds = QSet<QString>(modIds.begin(), modIds.end());
-  busyChanged.notify(true);
-  batchStarted.notify(modIds);
+  manager().notifyBusy(true);
+  manager().batchStarted.notify(modIds);
   spdlog::info("[workshop] downloading {} items into {} (first ids: {})",
                modIds.size(), root.toStdString(),
                modIds.mid(0, 5).join(QStringLiteral(", ")).toStdString());
 
   try {
-    co_await runBatch(std::move(modIds), root, batch);
+    co_await runBatch(std::move(modIds), std::move(itemIds), root, batch);
   } catch (...) {
     finishBatch(batch);
     throw;
@@ -320,7 +313,8 @@ SteamDownloader::ensureClient() {
     m_client.reset();
   }
   if (!m_client) {
-    statusMessageChanged.notify(QStringLiteral(u"Logging in to Steam\u2026"));
+    manager().statusMessageChanged.notify(
+        QStringLiteral(u"Logging in to Steam\u2026"));
     auto loggedIn = co_await m_clientFactory(options);
     if (!loggedIn) {
       co_return std::unexpected(loggedIn.error());
@@ -334,7 +328,9 @@ SteamDownloader::ensureClient() {
   co_return result;
 }
 
-QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
+QCoro::Task<void> SteamDownloader::runBatch(QStringList ids,
+                                            std::vector<std::uint64_t> itemIds,
+                                            QString root,
                                             std::shared_ptr<SteamBatch> batch) {
   const std::stop_token stop = m_stop->get_token();
   const auto failItems = [&](const QString& error) {
@@ -357,13 +353,13 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
         QStringLiteral("Cannot create %1: %2")
             .arg(root, QString::fromStdString(mkdirError.message()));
     spdlog::error("[workshop] {}", message.toStdString());
-    statusMessageChanged.notify(message);
+    manager().statusMessageChanged.notify(message);
     failItems(message);
     co_return;
   }
 
   if (!m_client) {
-    downloadPhaseChanged.notify(QStringLiteral("login"));
+    manager().downloadPhaseChanged.notify(QStringLiteral("login"));
   }
   const auto loginStarted = std::chrono::steady_clock::now();
   auto login = co_await ensureClient();
@@ -375,7 +371,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
     const QString message =
         QStringLiteral("Steam login failed: %1").arg(login.error().message);
     spdlog::error("[workshop] {}", message.toStdString());
-    statusMessageChanged.notify(message);
+    manager().statusMessageChanged.notify(message);
     failItems(message);
     co_return;
   }
@@ -393,12 +389,6 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
   spdlog::debug(
       "[workshop] client.download start: {} items, {} parallel x {} threads",
       ids.size(), parallelItems, threadsPerItem);
-
-  std::vector<std::uint64_t> itemIds;
-  itemIds.reserve(ids.size());
-  for (const auto& id : ids) {
-    itemIds.push_back(*parseItemId(id));  // validated by download_mods
-  }
 
   // PxSteamDL calls these on its worker threads. Their state lives on the main
   // thread, so each call is posted there.
@@ -427,7 +417,7 @@ QCoro::Task<void> SteamDownloader::runBatch(QStringList ids, QString root,
         Qt::QueuedConnection);
   };
 
-  downloadPhaseChanged.notify(QStringLiteral("query"));
+  manager().downloadPhaseChanged.notify(QStringLiteral("query"));
   QFuture<Outcome> call = QtConcurrent::run(
       [client, itemIds = std::move(itemIds), rootPath, options]() -> Outcome {
         try {
@@ -485,7 +475,7 @@ DownloadResult SteamDownloader::finishBatch(
     const std::shared_ptr<SteamBatch>& batch) {
   m_stop.reset();
   m_activeIds.clear();
-  busyChanged.notify(false);
+  manager().notifyBusy(false);
 
   DownloadResult result{
       .succeeded = batch->succeeded,
@@ -504,7 +494,7 @@ DownloadResult SteamDownloader::finishBatch(
                                                  .toStdString() +
                                              ")");
   recordSynced(result.succeeded);
-  downloadFinished.notify(result);
+  manager().downloadFinished.notify(result);
   return result;
 }
 
@@ -534,15 +524,15 @@ void SteamDownloader::finishItem(SteamBatch& batch, const QString& modId,
         .error = {},
     };
   }
-  downloadItemStatusChanged.notify(status);
-  downloadProgress.notify(batch.progress());
+  manager().downloadItemStatusChanged.notify(status);
+  manager().downloadProgress.notify(batch.progress());
 }
 
 void SteamDownloader::recordSynced(const QStringList& ids) {
   if (ids.isEmpty()) {
     return;
   }
-  const double now = unixNow();
+  const double now = QDateTime::currentMSecsSinceEpoch() / 1000.0;
   for (const auto& id : ids) {
     m_sync.synced[id.toStdString()] = now;
   }
@@ -556,11 +546,11 @@ void SteamDownloader::onResolved(SteamBatch& batch, const QString& modId,
                                  const QString& title) {
   ++batch.resolved;
   if (!title.isEmpty()) {
-    downloadItemTitled.notify(
+    manager().downloadItemTitled.notify(
         DownloadItemTitle{.modId = modId, .title = title});
   }
   if (batch.resolved >= batch.total) {
-    downloadPhaseChanged.notify(QStringLiteral("run"));
+    manager().downloadPhaseChanged.notify(QStringLiteral("run"));
   }
 }
 
@@ -595,14 +585,14 @@ void SteamDownloader::onProgress(SteamBatch& batch, const QString& modId,
 
 void SteamDownloader::emitItemProgress(SteamBatch& batch, const QString& modId,
                                        qint64 done, qint64 total) {
-  downloadItemStatusChanged.notify(DownloadItemStatus{
+  manager().downloadItemStatusChanged.notify(DownloadItemStatus{
       .modId = modId,
       .status = QStringLiteral("downloading"),
       .bytesDone = done,
       .bytesTotal = total,
       .error = {},
   });
-  downloadProgress.notify(batch.progress());
+  manager().downloadProgress.notify(batch.progress());
 }
 
 QCoro::Task<void> SteamDownloader::autoUpdateOnce() {
@@ -613,7 +603,8 @@ QCoro::Task<void> SteamDownloader::autoUpdateOnce() {
   if (hours <= 0) {
     co_return;
   }
-  const QStringList ids = staleIds(hours * 3600.0, unixNow());
+  const QStringList ids =
+      staleIds(hours * 3600.0, QDateTime::currentMSecsSinceEpoch() / 1000.0);
   if (ids.isEmpty()) {
     co_return;
   }

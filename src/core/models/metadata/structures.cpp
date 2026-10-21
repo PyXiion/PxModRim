@@ -1,16 +1,13 @@
 #include "core/models/metadata/structures.hpp"
 
-#include <QDateTime>
 #include <QDir>
-#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QStringDecoder>
 #include <QUuid>
-#include <algorithm>
 #include <utility>
 
-#include "core/constants.hpp"
+#include "core/utils.hpp"
 
 namespace px::modrim {
 namespace {
@@ -31,12 +28,6 @@ QString pathLeaf(QStringView path) {
   return path.mid(path.lastIndexOf(QLatin1Char('/')) + 1).toString();
 }
 
-bool isWorkshopNumber(QStringView text) {
-  return !text.isEmpty() && std::ranges::all_of(text, [](QChar character) {
-    return character >= QLatin1Char('0') && character <= QLatin1Char('9');
-  });
-}
-
 std::optional<QString> readWorkshopNumber(const QString& directory) {
   QFile declaration(
       QDir(directory).filePath(QStringLiteral("About/PublishedFileId.txt")));
@@ -52,7 +43,7 @@ std::optional<QString> readWorkshopNumber(const QString& directory) {
       return std::nullopt;
     }
     const QString candidate = text.trimmed();
-    if (isWorkshopNumber(candidate)) {
+    if (isAsciiDigits(candidate)) {
       return candidate;
     }
   } else if (declaration.error() == QFileDevice::PermissionsError ||
@@ -61,8 +52,7 @@ std::optional<QString> readWorkshopNumber(const QString& directory) {
   }
 
   const QString folder = pathLeaf(directory);
-  return isWorkshopNumber(folder) ? std::optional<QString>(folder)
-                                  : std::nullopt;
+  return isAsciiDigits(folder) ? std::optional<QString>(folder) : std::nullopt;
 }
 
 }  // namespace
@@ -76,9 +66,6 @@ CaseInsensitiveSet::CaseInsensitiveSet(const QStringList& values) {
     add(value);
   }
 }
-
-CaseInsensitiveSet::CaseInsensitiveSet(const QList<CaseInsensitiveStr>& values)
-    : m_members(values.cbegin(), values.cend()) {}
 
 bool CaseInsensitiveSet::contains(QStringView value) const {
   return contains(CaseInsensitiveStr(value));
@@ -94,21 +81,6 @@ void CaseInsensitiveSet::add(QStringView value) {
 
 void CaseInsensitiveSet::add(const CaseInsensitiveStr& value) {
   m_members.insert(value);
-}
-
-void CaseInsensitiveSet::discard(QStringView value) {
-  discard(CaseInsensitiveStr(value));
-}
-
-void CaseInsensitiveSet::discard(const CaseInsensitiveStr& value) {
-  m_members.remove(value);
-}
-
-CaseInsensitiveSet CaseInsensitiveSet::operator|(
-    const CaseInsensitiveSet& other) const {
-  CaseInsensitiveSet combined = *this;
-  combined.m_members.unite(other.m_members);
-  return combined;
 }
 
 const DependencyMod* BaseRules::findDependency(
@@ -148,26 +120,6 @@ Result<void> ListedMod::setModPath(const QString& path) {
   return {};
 }
 
-std::optional<QString> ListedMod::modFolder() const {
-  if (!m_directory) {
-    return std::nullopt;
-  }
-  QString folder = pathLeaf(*m_directory);
-  const qsizetype extension = folder.lastIndexOf(QLatin1Char('.'));
-  if (extension > 0 && folder != QLatin1StringView("..")) {
-    folder.truncate(extension);
-  }
-  return folder;
-}
-
-qint64 ListedMod::internalTimeTouched() const {
-  if (!m_directory) {
-    return -1;
-  }
-  const QDateTime modified = QFileInfo(*m_directory).lastModified();
-  return modified.isValid() ? modified.toSecsSinceEpoch() : -1;
-}
-
 std::optional<QString> ListedMod::publishedFileId() const {
   if (!m_workshopIdReady) {
     m_workshopId =
@@ -175,85 +127,6 @@ std::optional<QString> ListedMod::publishedFileId() const {
     m_workshopIdReady = true;
   }
   return m_workshopId;
-}
-
-bool ListedMod::cSharpMod() const {
-  if (!m_hasAssemblies) {
-    bool found = false;
-    if (m_directory) {
-      QDirIterator entries(
-          QDir(*m_directory).filePath(QStringLiteral("Assemblies")),
-          QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden |
-              QDir::System);
-      found = entries.hasNext();
-    }
-    m_hasAssemblies = found;
-  }
-  return *m_hasAssemblies;
-}
-
-bool ListedMod::xmlPatchMod() const {
-  if (!m_hasPatches) {
-    bool found = false;
-    if (m_directory) {
-      QDirIterator entries(
-          QDir(*m_directory).filePath(QStringLiteral("Patches")),
-          QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden |
-              QDir::System);
-      while (entries.hasNext()) {
-        entries.next();
-        const QString name = entries.fileName();
-        if (name.size() > 4 && name.endsWith(QLatin1StringView(".xml"))) {
-          found = true;
-          break;
-        }
-      }
-    }
-    m_hasPatches = found;
-  }
-  return *m_hasPatches;
-}
-
-std::optional<QString> ListedMod::previewImgPath() const {
-  if (m_directory) {
-    const QString preview =
-        QDir(*m_directory).filePath(QStringLiteral("About/Preview.png"));
-    if (QFileInfo::exists(preview)) {
-      return preview;
-    }
-  }
-  return std::nullopt;
-}
-
-std::optional<QString> AboutXmlMod::getDlcName() const {
-  if (const RimWorldDlc* dlc = findRimWorldDlcByPackageId(packageId.str())) {
-    return QString(dlc->name);
-  }
-  return std::nullopt;
-}
-
-bool ModsConfig::checkActiveDuplicates() const {
-  QSet<CaseInsensitiveStr> visited;
-  visited.reserve(activeMods.size());
-  for (const CaseInsensitiveStr& packageId : activeMods) {
-    if (visited.contains(packageId)) {
-      return true;
-    }
-    visited.insert(packageId);
-  }
-  return false;
-}
-
-bool ModsConfig::checkExpansionsDuplicates() const {
-  QSet<CaseInsensitiveStr> visited;
-  visited.reserve(knownExpansions.size());
-  for (const CaseInsensitiveStr& packageId : knownExpansions) {
-    if (visited.contains(packageId)) {
-      return true;
-    }
-    visited.insert(packageId);
-  }
-  return false;
 }
 
 }  // namespace px::modrim

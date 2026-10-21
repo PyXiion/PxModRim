@@ -29,7 +29,6 @@ struct ModItem {
 
 class ModListModel : public QAbstractListModel {
   Q_OBJECT
-  Q_PROPERTY(int activeCount READ activeCount NOTIFY activeCountChanged)
  public:
   enum Role {
     kCheckStateRole = Qt::UserRole + 1,
@@ -65,17 +64,12 @@ class ModListModel : public QAbstractListModel {
   void loadMods(const QHash<QString, ListedModPtr>& mods,
                 const QStringList& activeUuids);
   QStringList activeUuids() const;
-  int activeCount() const { return m_activeCount; }
   const ModItem* getItem(int row) const;
-  const ModItem* getItemByUuid(const QString& uuid) const;
   bool moveRow(int sourceRow, int targetRow);
   void commitOrder(const QStringList& uuids);
   void setCheckable(const QSet<QString>& uuids, bool checked);
   void setCheckStates(const QList<int>& rows, bool checked);
-  void setStartupImpact(const QHash<QString, double>& impacts = {});
- signals:
-  void activeModsChanged();
-  void activeCountChanged();
+  void setStartupImpact(const QHash<QString, double>& impacts);
 
  private:
   std::pair<int, int> updateLoadIndices();

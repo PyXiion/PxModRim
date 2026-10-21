@@ -20,31 +20,25 @@ namespace px::modrim::services {
 
 namespace {
 
-Result<QStringList> directArgv(const QString& exe, const AppConfig& cfg,
-                               QHash<QString, QString>& env) {
+Result<DirectCommand> directCommand(const QString& exe, const AppConfig& cfg) {
   const QString args = QString::fromStdString(cfg.launch_args);
   if (currentPlatform() == Platform::kMacOs) {
     auto split = splitArguments(args);
     if (!split) {
       return std::unexpected(split.error());
     }
-    return QStringList{QStringLiteral("open"), exe, QStringLiteral("--args")} +
-           *split;
+    return DirectCommand{.argv = QStringList{QStringLiteral("open"), exe,
+                                             QStringLiteral("--args")} +
+                                 *split,
+                         .env = {}};
   }
-  auto command =
-      buildDirectCommand(exe, QString::fromStdString(cfg.launch_wrapper), args);
-  if (!command) {
-    return std::unexpected(command.error());
-  }
-  env = std::move(command->env);
-  return std::move(command->argv);
+  return buildDirectCommand(exe, QString::fromStdString(cfg.launch_wrapper),
+                            args);
 }
 
 }  // namespace
 
-GameLauncher::GameLauncher(CoreContext& ctx, ProcessLister lister,
-                           MonitorTiming timing)
-    : m_ctx(ctx), m_lister(lister), m_monitor(std::move(lister), timing) {}
+GameLauncher::GameLauncher(CoreContext& ctx) : m_ctx(ctx) {}
 
 QCoro::Task<Result<QString>> GameLauncher::launch(LaunchStrategy strategy) {
   if (m_ctx.config().paths.game.empty()) {
@@ -62,7 +56,7 @@ QCoro::Task<Result<QString>> GameLauncher::launch(LaunchStrategy strategy) {
   co_return co_await launchSteam();
 }
 
-bool GameLauncher::isRunning() const { return isGameRunning(m_lister); }
+bool GameLauncher::isRunning() const { return isGameRunning(); }
 
 QCoro::Task<bool> GameLauncher::waitForStart(
     std::chrono::milliseconds timeout) {
@@ -85,21 +79,21 @@ QCoro::Task<Result<QString>> GameLauncher::launchDirect() {
 
   ensureSteamAppid(game);
 
-  QHash<QString, QString> env;
-  auto argv = directArgv(*exe, m_ctx.config(), env);
-  if (!argv) {
+  auto command = directCommand(*exe, m_ctx.config());
+  if (!command) {
     spdlog::warn("Invalid launch arguments: {}",
-                 argv.error().message.toStdString());
+                 command.error().message.toStdString());
     co_return std::unexpected(
         Error{QStringLiteral("Invalid launch arguments: %1")
-                  .arg(argv.error().message)});
+                  .arg(command.error().message)});
   }
+  const auto& [argv, env] = *command;
 
   spdlog::info("Spawning process: {} (cwd: {})",
-               argv->join(QLatin1Char(' ')).toStdString(), game.toStdString());
+               argv.join(QLatin1Char(' ')).toStdString(), game.toStdString());
   auto proc = std::make_unique<QProcess>();
-  proc->setProgram(argv->front());
-  proc->setArguments(argv->mid(1));
+  proc->setProgram(argv.front());
+  proc->setArguments(argv.mid(1));
   proc->setWorkingDirectory(game);
   QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
   for (auto it = env.cbegin(); it != env.cend(); ++it) {

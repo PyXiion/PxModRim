@@ -35,7 +35,7 @@ DownloadsViewPanel::DownloadsViewPanel(CoreContext& ctx, QQmlEngine* engine,
   m_phaseId = m_downloads.downloadPhaseChanged.connect(
       [this](const QString& phase) { m_model->setPhase(phase); });
   m_finishedId = m_downloads.downloadFinished.connect(
-      [this](const DownloadResult& result) { m_model->finish(result); });
+      [this](const DownloadResult&) { m_model->finish(); });
   m_busyId = m_downloads.busyChanged.connect(
       [this](bool busy) { m_model->setBusy(busy); });
 }

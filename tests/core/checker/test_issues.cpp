@@ -102,7 +102,7 @@ TEST_CASE("DependencyIssueChecker reports missing dependency") {
   CHECK(checker.shouldCheck(*a, storage.ctx()));
   auto issues = checker.check(*a, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("missing_dependency"));
+  CHECK(issues[0].shortMessage == QStringLiteral("Missing dependencies"));
   CHECK(issues[0].severity == IssueSeverity::kError);
 }
 
@@ -135,7 +135,7 @@ TEST_CASE("IncompatibilityIssueChecker self-declared incompatibility") {
   IncompatibilityIssueChecker checker;
   auto issues = checker.check(*a, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("incompatibility"));
+  CHECK(issues[0].shortMessage == QStringLiteral("Incompatibilities detected"));
   CHECK(issues[0].severity == IssueSeverity::kError);
 }
 
@@ -149,9 +149,7 @@ TEST_CASE("IncompatibilityIssueChecker reverse-declared incompatibility") {
   IncompatibilityIssueChecker checker;
   auto issues = checker.check(*target, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("incompatibility"));
-  CHECK(issues[0].relatedPackageIds ==
-        QList<PackageId>{PackageId(QStringLiteral("mod.declarer"))});
+  CHECK(issues[0].shortMessage == QStringLiteral("Incompatibilities detected"));
 }
 
 TEST_CASE(
@@ -187,7 +185,6 @@ TEST_CASE(
 
   auto issues = IncompatibilityIssueChecker().check(*target, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].relatedPackageIds == QList<PackageId>{declarerPid});
 }
 
 TEST_CASE("LoadOrderIssueChecker no violations when order satisfies rules") {
@@ -213,7 +210,7 @@ TEST_CASE("LoadOrderIssueChecker load-after violation reported") {
   LoadOrderIssueChecker checker;
   auto issues = checker.check(*a, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("load_order"));
+  CHECK(issues[0].shortMessage == QStringLiteral("Load order violated"));
   CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
@@ -229,7 +226,7 @@ TEST_CASE("LoadOrderIssueChecker load-before violation reported") {
   LoadOrderIssueChecker checker;
   auto issues = checker.check(*a, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("load_order"));
+  CHECK(issues[0].shortMessage == QStringLiteral("Load order violated"));
   CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
@@ -250,7 +247,7 @@ TEST_CASE("CycleIssueChecker reports cycle membership") {
   CycleIssueChecker checker;
   auto issues = checker.check(*a, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("cycle"));
+  CHECK(issues[0].shortMessage == QStringLiteral("Dependency cycle detected"));
   CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 
@@ -296,7 +293,7 @@ TEST_CASE("GameVersionIssueChecker mismatch reported as warning") {
   GameVersionIssueChecker checker;
   auto issues = checker.check(*a, storage.ctx());
   REQUIRE(issues.size() == 1);
-  CHECK(issues[0].category == QStringLiteral("version_mismatch"));
+  CHECK(issues[0].shortMessage == QStringLiteral("Version mismatch"));
   CHECK(issues[0].severity == IssueSeverity::kWarning);
 }
 

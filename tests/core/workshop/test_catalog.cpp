@@ -96,11 +96,11 @@ struct FakeDownloader : public Downloader {
     if (gate) {
       isBusy = true;
       active = QSet<QString>(ids.begin(), ids.end());
-      busyChanged.notify(true);
+      manager().notifyBusy(true);
       co_await *gate;
       isBusy = false;
       active.clear();
-      busyChanged.notify(false);
+      manager().notifyBusy(false);
     }
     co_return DownloadResult{.succeeded = ids, .failed = {}, .changed = {}};
   }
@@ -224,7 +224,6 @@ TEST_CASE("workshop plan keeps dependency order and incomplete flags") {
   CHECK(plan->incomplete_collection_ids ==
         QStringList{QStringLiteral("picked:starter")});
   CHECK_FALSE(plan->is_complete);
-  CHECK(plan->titles.value(QStringLiteral("2")) == QStringLiteral("Title 2"));
 
   const auto payload =
       glz::read_json<ResolvePayload>(server.requests.back().body);
@@ -263,16 +262,13 @@ TEST_CASE("workshop installed metadata uses batch") {
 TEST_CASE("workshop download delegates without side effects") {
   TestApplication app;
   ContextFixture fixture;
-  WorkshopCatalog catalog(fixture.config.get(), fixture.downloads,
-                          [&] { return fixture.mods; });
 
   DownloadPlan plan{
       .to_download = {QStringLiteral("2")},
       .already_current = {QStringLiteral("1")},
-      .titles = {{QStringLiteral("2"), QStringLiteral("Mod")}},
       .is_complete = true,
   };
-  const auto result = run(catalog.download(plan));
+  const auto result = run(fixture.downloads.downloadMods(plan.to_download));
   REQUIRE(result.has_value());
   CHECK(result->succeeded == QStringList{QStringLiteral("2")});
   REQUIRE(fixture.downloader->recordedCalls.size() == 1);

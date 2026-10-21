@@ -87,7 +87,6 @@ struct RulePreview {
 
 // Lowercased package id for About.xml mods; nullopt for mods without one.
 std::optional<QString> modPackageId(const ListedMod& mod);
-QString modAuthor(const ListedMod& mod);
 
 Resolution folderFor(const OrganizerState& state,
                      const std::optional<QString>& packageId,
@@ -97,10 +96,9 @@ RulePreview previewRuleMatches(const OrganizerState& state,
                                const ModsByUuid& mods,
                                const QList<RuleSpec>& specs);
 
-// `state` may be null, in which case no tag filters are produced.
 QList<TreeFilter> treeFilters(const ModsByUuid& mods,
                               const QSet<QString>& active,
-                              const OrganizerState* state);
+                              const OrganizerState& state);
 
 FolderNode buildTree(const OrganizerState& state, const ModsByUuid& mods,
                      const QSet<QString>& active,

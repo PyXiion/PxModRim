@@ -48,11 +48,11 @@ TEST_CASE("ConstraintGraph build no edges") {
       mods,
       {PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))},
       settings());
-  CHECK(g.hasNode(PackageId(QStringLiteral("mod.a"))));
-  CHECK(g.hasNode(PackageId(QStringLiteral("mod.b"))));
+  CHECK(g.nodes().contains(PackageId(QStringLiteral("mod.a"))));
+  CHECK(g.nodes().contains(PackageId(QStringLiteral("mod.b"))));
   CHECK(g.nodes().size() == 2);
-  CHECK(g.indexOf(PackageId(QStringLiteral("mod.a"))) == 0);
-  CHECK(g.indexOf(PackageId(QStringLiteral("mod.b"))) == 1);
+  CHECK(g.pidToIndex().value(PackageId(QStringLiteral("mod.a"))) == 0);
+  CHECK(g.pidToIndex().value(PackageId(QStringLiteral("mod.b"))) == 1);
 }
 
 TEST_CASE("ConstraintGraph dependency edge") {
@@ -269,26 +269,6 @@ TEST_CASE("ConstraintGraph load before edge") {
   CHECK(edges.cbegin()->target == PackageId(QStringLiteral("mod.b")));
 }
 
-TEST_CASE("ConstraintGraph neighbors") {
-  ConstraintGraph g;
-  auto a = makeMod(QStringLiteral("mod.a"));
-  auto b = makeMod(QStringLiteral("mod.b"));
-  a->aboutRules.incompatibleWith.add(QStringLiteral("mod.b"));
-  QHash<PackageId, std::shared_ptr<AboutXmlMod>> mods{
-      {PackageId(QStringLiteral("mod.a")), a},
-      {PackageId(QStringLiteral("mod.b")), b},
-  };
-  g.build(
-      mods,
-      {PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))},
-      settings());
-
-  auto nbrs = g.neighbors(PackageId(QStringLiteral("mod.a")));
-  CHECK(nbrs.contains(PackageId(QStringLiteral("mod.b"))));
-  auto nbrsB = g.neighbors(PackageId(QStringLiteral("mod.b")));
-  CHECK(nbrsB.contains(PackageId(QStringLiteral("mod.a"))));
-}
-
 TEST_CASE("ConstraintGraph incoming") {
   ConstraintGraph g;
   auto a = makeMod(QStringLiteral("mod.a"));
@@ -308,26 +288,6 @@ TEST_CASE("ConstraintGraph incoming") {
   CHECK(inc.cbegin()->source == PackageId(QStringLiteral("mod.a")));
 }
 
-TEST_CASE("ConstraintGraph remove mod") {
-  ConstraintGraph g;
-  auto a = makeMod(QStringLiteral("mod.a"));
-  auto b = makeMod(QStringLiteral("mod.b"));
-  a->aboutRules.incompatibleWith.add(QStringLiteral("mod.b"));
-  QHash<PackageId, std::shared_ptr<AboutXmlMod>> mods{
-      {PackageId(QStringLiteral("mod.a")), a},
-      {PackageId(QStringLiteral("mod.b")), b},
-  };
-  g.build(
-      mods,
-      {PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))},
-      settings());
-  CHECK(g.hasNode(PackageId(QStringLiteral("mod.b"))));
-
-  g.removeMod(PackageId(QStringLiteral("mod.b")));
-  CHECK(!g.hasNode(PackageId(QStringLiteral("mod.b"))));
-  CHECK(g.outgoing(PackageId(QStringLiteral("mod.a"))).isEmpty());
-}
-
 TEST_CASE("ConstraintGraph update order") {
   ConstraintGraph g;
   auto a = makeMod(QStringLiteral("mod.a"));
@@ -340,13 +300,13 @@ TEST_CASE("ConstraintGraph update order") {
       mods,
       {PackageId(QStringLiteral("mod.a")), PackageId(QStringLiteral("mod.b"))},
       settings());
-  CHECK(g.indexOf(PackageId(QStringLiteral("mod.a"))) == 0);
-  CHECK(g.indexOf(PackageId(QStringLiteral("mod.b"))) == 1);
+  CHECK(g.pidToIndex().value(PackageId(QStringLiteral("mod.a"))) == 0);
+  CHECK(g.pidToIndex().value(PackageId(QStringLiteral("mod.b"))) == 1);
 
   g.updateOrder(
       {PackageId(QStringLiteral("mod.b")), PackageId(QStringLiteral("mod.a"))});
-  CHECK(g.indexOf(PackageId(QStringLiteral("mod.a"))) == 1);
-  CHECK(g.indexOf(PackageId(QStringLiteral("mod.b"))) == 0);
+  CHECK(g.pidToIndex().value(PackageId(QStringLiteral("mod.a"))) == 1);
+  CHECK(g.pidToIndex().value(PackageId(QStringLiteral("mod.b"))) == 0);
 }
 
 TEST_CASE("ConstraintGraph cycle detection") {

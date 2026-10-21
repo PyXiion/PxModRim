@@ -170,11 +170,11 @@ TEST_CASE("averages weight the newest session most") {
 
   // Older session weighs 9, newest weighs 10: (1.0*9 + 3.0*10) / 19 and (0.5*9
   // + 1.5*10) / 19.
-  CHECK_THAT(ok(db.getAverage(path, pid)), WithinAbs(39.0 / 19.0, 1e-9));
-  const auto totals = ok(db.getTotalsFor(path, {pid}));
-  REQUIRE(totals.contains(pid));
-  CHECK_THAT(totals.value(pid).onThread, WithinAbs(39.0 / 19.0, 1e-9));
-  CHECK_THAT(totals.value(pid).offThread, WithinAbs(19.5 / 19.0, 1e-9));
+  const auto snap = ok(db.getLatestWithAverages(path, {pid}, pid));
+  CHECK_THAT(snap.selectedAvg, WithinAbs(39.0 / 19.0, 1e-9));
+  REQUIRE(snap.totals.contains(pid));
+  CHECK_THAT(snap.totals.value(pid).onThread, WithinAbs(39.0 / 19.0, 1e-9));
+  CHECK_THAT(snap.totals.value(pid).offThread, WithinAbs(19.5 / 19.0, 1e-9));
   CHECK(ok(db.getAllAverages(path)).value(pid) == Catch::Approx(39.0 / 19.0));
 }
 
@@ -191,8 +191,10 @@ TEST_CASE("only the most recent sessions contribute to averages") {
   }
 
   // Five sessions are kept, so the old one is gone from history entirely.
-  CHECK(ok(db.getAverage(path, QStringLiteral("old.mod"))) == 0.0);
-  CHECK_THAT(ok(db.getAverage(path, QStringLiteral("new.mod"))),
+  const auto snap = ok(db.getLatestWithAverages(
+      path, {QStringLiteral("old.mod"), QStringLiteral("new.mod")}, {}));
+  CHECK(snap.totals.value(QStringLiteral("old.mod")).onThread == 0.0);
+  CHECK_THAT(snap.totals.value(QStringLiteral("new.mod")).onThread,
              WithinAbs(1.0, 1e-9));
   CHECK_FALSE(ok(db.getAllAverages(path)).contains(QStringLiteral("old.mod")));
 }
@@ -234,7 +236,6 @@ TEST_CASE(
   const QString path = dbFile(dir);
 
   CHECK_FALSE(ok(db.getLatestReport(path)).has_value());
-  CHECK(ok(db.getAverage(path, QStringLiteral("a.a"))) == 0.0);
   CHECK(ok(db.getAllAverages(path)).isEmpty());
 
   const auto snap =

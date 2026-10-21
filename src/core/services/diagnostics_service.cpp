@@ -12,6 +12,7 @@
 
 #include "core/config.hpp"
 #include "core/context.hpp"
+#include "core/providers/labels.hpp"
 #include "core/sort/community.hpp"
 
 namespace px::modrim {
@@ -36,13 +37,11 @@ std::vector<std::unique_ptr<checker::ModIssueChecker>> defaultCheckers() {
 }
 
 view::SidebarEntry makeEntry(view::SidebarEntry::Kind kind, QString label,
-                             QSet<QString> visibleUuids,
-                             QString providerId = {}) {
+                             QSet<QString> visibleUuids) {
   view::SidebarEntry entry;
   entry.kind = kind;
   entry.label = std::move(label);
   entry.visibleUuids = std::move(visibleUuids);
-  entry.providerId = std::move(providerId);
   return entry;
 }
 
@@ -57,8 +56,6 @@ DiagnosticsService::DiagnosticsService(CoreContext& ctx,
                 [this](const checker::DiagnosticsByUuid& diagnostics) {
                   onCheckerDiagnosticsChanged(diagnostics);
                 }) {}
-
-// ── Lifecycle ──────────────────────────────────────────────
 
 QCoro::Task<Result<void>> DiagnosticsService::initialize(Profiler* timer) {
   Profiler local;
@@ -152,8 +149,6 @@ std::optional<QString> DiagnosticsService::communityRulesPath() const {
   return path;
 }
 
-// ── Mutations ──────────────────────────────────────────────
-
 void DiagnosticsService::rebuild(Profiler* timer) {
   rebuild(m_ctx.activeUuids(), timer);
 }
@@ -172,8 +167,6 @@ void DiagnosticsService::reorder(const QStringList& activeUuids) {
   m_checker.reorder(activeUuids);
 }
 
-// ── Queries ────────────────────────────────────────────────
-
 QHash<checker::PackageId, checker::AboutXmlModPtr>
 DiagnosticsService::activeModsByPid() const {
   return m_checker.activeMods();
@@ -181,10 +174,6 @@ DiagnosticsService::activeModsByPid() const {
 
 const checker::ConstraintGraph& DiagnosticsService::constraintGraph() const {
   return m_checker.graph();
-}
-
-QList<checker::PackageId> DiagnosticsService::activeOrderedPids() const {
-  return m_checker.orderedPids();
 }
 
 const sort::CommunityRules& DiagnosticsService::communityRules() const {
@@ -206,16 +195,19 @@ std::optional<view::ModDiagnosticsView> DiagnosticsService::summaryFor(
   return it.value();
 }
 
-int DiagnosticsService::activeErrorCount() const {
+DiagnosticsService::ActiveCounts DiagnosticsService::activeCounts() const {
   const auto diagnostics = m_checker.activeModDiagnostics();
-  int count = 0;
+  ActiveCounts counts;
   for (const auto& [uuid, diag] : diagnostics.asKeyValueRange()) {
-    count += diag.hasErrors() ? 1 : 0;
+    counts.errors += diag.hasErrors() ? 1 : 0;
+    counts.warnings += diag.hasWarnings() ? 1 : 0;
   }
-  return count;
+  return counts;
 }
 
-// ── Conversions ────────────────────────────────────────────
+int DiagnosticsService::activeErrorCount() const {
+  return activeCounts().errors;
+}
 
 QList<view::ModIssueView> DiagnosticsService::toIssueViews(
     const checker::ModDiagnostics& diag) {
@@ -224,10 +216,7 @@ QList<view::ModIssueView> DiagnosticsService::toIssueViews(
                                bool isError) {
     for (const checker::ModIssue& issue : issues) {
       view::ModIssueView view;
-      view.category = issue.category;
-      view.categoryDisplayName = issue.categoryDisplayName.isEmpty()
-                                     ? issue.category
-                                     : issue.categoryDisplayName;
+      view.categoryDisplayName = issue.categoryDisplayName;
       if (!issue.detailMessage.isEmpty()) {
         view.detail = issue.detailMessage;
       }
@@ -250,8 +239,6 @@ view::ModDiagnosticsView DiagnosticsService::toView(
   return view;
 }
 
-// ── Checker callback ───────────────────────────────────────
-
 void DiagnosticsService::onCheckerDiagnosticsChanged(
     const checker::DiagnosticsByUuid& diagnostics) {
   QHash<QString, view::ModDiagnosticsView> summary;
@@ -267,16 +254,8 @@ void DiagnosticsService::onCheckerDiagnosticsChanged(
   statusMessageChanged.notify(formatStatus());
 }
 
-// ── Status ─────────────────────────────────────────────────
-
 QString DiagnosticsService::formatStatus() const {
-  const auto diagnostics = m_checker.activeModDiagnostics();
-  int errCount = 0;
-  int warnCount = 0;
-  for (const auto& [uuid, diag] : diagnostics.asKeyValueRange()) {
-    errCount += diag.hasErrors() ? 1 : 0;
-    warnCount += diag.hasWarnings() ? 1 : 0;
-  }
+  const auto [errCount, warnCount] = activeCounts();
 
   QStringList parts{QString::number(m_lastActiveUuids.size()) +
                     QStringLiteral(" active")};
@@ -289,17 +268,21 @@ QString DiagnosticsService::formatStatus() const {
   return parts.join(QStringLiteral(" | "));
 }
 
-// ── Sidebar ────────────────────────────────────────────────
-
 QList<view::SidebarEntry> DiagnosticsService::buildSidebarEntries() {
   const QHash<QString, ListedModPtr>& mods = m_ctx.allMods();
-  if (!m_sidebarBase || !m_sidebarBase->matches(mods)) {
-    m_sidebarBase.emplace(mods);
-  }
-  const SidebarBase& base = *m_sidebarBase;
 
-  QSet<QString> errors = base.invalid;
+  QSet<QString> allUuids;
+  QSet<QString> errors;
   QSet<QString> warnings;
+  QMap<QString, QSet<QString>> byProvider;
+  for (auto it = mods.cbegin(); it != mods.cend(); ++it) {
+    allUuids.insert(it.key());
+    byProvider[it.value()->providerId].insert(it.key());
+    if (!it.value()->valid) {
+      errors.insert(it.key());
+    }
+  }
+
   const auto diagnostics = m_checker.activeModDiagnostics();
   for (auto it = diagnostics.cbegin(); it != diagnostics.cend(); ++it) {
     if (!mods.contains(it.key())) {
@@ -315,12 +298,12 @@ QList<view::SidebarEntry> DiagnosticsService::buildSidebarEntries() {
 
   const QSet<QString> active(m_lastActiveUuids.cbegin(),
                              m_lastActiveUuids.cend());
-  QSet<QString> inactive = base.allUuids;
+  QSet<QString> inactive = allUuids;
   inactive.subtract(active);
 
   using Kind = view::SidebarEntry::Kind;
   QList<view::SidebarEntry> entries{
-      makeEntry(Kind::kAll, QStringLiteral("All"), base.allUuids),
+      makeEntry(Kind::kAll, QStringLiteral("All"), std::move(allUuids)),
       makeEntry(Kind::kActive, QStringLiteral("Active"), active),
       makeEntry(Kind::kInactive, QStringLiteral("Inactive"),
                 std::move(inactive)),
@@ -329,38 +312,11 @@ QList<view::SidebarEntry> DiagnosticsService::buildSidebarEntries() {
       makeEntry(Kind::kWithWarnings, QStringLiteral("With warnings"),
                 std::move(warnings)),
   };
-  for (auto it = base.byProvider.cbegin(); it != base.byProvider.cend(); ++it) {
-    entries.append(makeEntry(Kind::kProvider, view::providerLabel(it.key()),
-                             it.value(), it.key()));
+  for (auto it = byProvider.cbegin(); it != byProvider.cend(); ++it) {
+    entries.append(
+        makeEntry(Kind::kProvider, providerLabel(it.key()), it.value()));
   }
   return entries;
-}
-
-DiagnosticsService::SidebarBase::SidebarBase(
-    const QHash<QString, ListedModPtr>& current)
-    : mods(current) {
-  for (auto it = current.cbegin(); it != current.cend(); ++it) {
-    allUuids.insert(it.key());
-    byProvider[it.value()->providerId].insert(it.key());
-    if (!it.value()->valid) {
-      invalid.insert(it.key());
-    }
-  }
-}
-
-// Compares by mod identity: the same uuids mapping to the same objects.
-bool DiagnosticsService::SidebarBase::matches(
-    const QHash<QString, ListedModPtr>& current) const {
-  if (mods.size() != current.size()) {
-    return false;
-  }
-  for (auto it = current.cbegin(); it != current.cend(); ++it) {
-    const auto cached = mods.constFind(it.key());
-    if (cached == mods.cend() || cached.value() != it.value()) {
-      return false;
-    }
-  }
-  return true;
 }
 
 }  // namespace px::modrim

@@ -65,25 +65,6 @@ QSet<ConstraintEdge> ConstraintGraph::incoming(const PackageId& pid) const {
   return result;
 }
 
-QSet<PackageId> ConstraintGraph::neighbors(const PackageId& pid) const {
-  QSet<PackageId> result;
-  if (const auto it = m_outgoing.constFind(pid); it != m_outgoing.cend()) {
-    for (const auto& edges : it.value()) {
-      for (const auto& edge : edges) {
-        result.insert(edge.target);
-      }
-    }
-  }
-  if (const auto it = m_incoming.constFind(pid); it != m_incoming.cend()) {
-    for (const auto& edges : it.value()) {
-      for (const auto& edge : edges) {
-        result.insert(edge.source);
-      }
-    }
-  }
-  return result;
-}
-
 QSet<ConstraintEdge> ConstraintGraph::edgesOfType(const PackageId& pid,
                                                   EdgeType type) const {
   if (const auto it = m_outgoing.constFind(pid); it != m_outgoing.cend()) {
@@ -134,25 +115,6 @@ void ConstraintGraph::build(const QHash<PackageId, AboutXmlModPtr>& activeMods,
                    alternatives);
     }
   }
-}
-
-void ConstraintGraph::removeMod(const PackageId& pid) {
-  m_cycleComponents.reset();
-  const EdgesByType outgoingEdges = m_outgoing.take(pid);
-  for (const auto& edges : outgoingEdges) {
-    for (const auto& edge : edges) {
-      m_incoming[edge.target][indexOfType(edge.type)].remove(edge);
-    }
-  }
-  const EdgesByType incomingEdges = m_incoming.take(pid);
-  for (const auto& edges : incomingEdges) {
-    for (const auto& edge : edges) {
-      m_outgoing[edge.source][indexOfType(edge.type)].remove(edge);
-    }
-  }
-  m_nodes.remove(pid);
-  m_orderedPids.removeAll(pid);
-  rebuildIndex();
 }
 
 void ConstraintGraph::updateOrder(const QList<PackageId>& orderedPids) {

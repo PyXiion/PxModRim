@@ -9,13 +9,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "core/loading.hpp"
-#include "ui/components/progress_dialog.hpp"
 #include "ui/components/toast.hpp"
 
 namespace {
 
-using px::modrim::ProgressDialog;
 using px::modrim::Toast;
 using px::modrim::ToastLevel;
 using px::modrim::ToastManager;
@@ -25,7 +22,7 @@ QApplication& application() {
     return *app;
   }
   static int argc = 1;
-  static char name[] = "test_toast_and_progress";
+  static char name[] = "test_toast";
   static char* argv[] = {name, nullptr};
   static QApplication app(argc, argv);
   return app;
@@ -67,25 +64,4 @@ TEST_CASE("timed toast dismisses itself after its duration") {
   waitMs(600);
 
   REQUIRE(manager.layout()->count() == 0);
-}
-
-TEST_CASE(
-    "progress dialog stays visible when a new task starts before it hides") {
-  application();
-  QWidget parent;
-  px::modrim::LoadingState loading(&parent);
-  ProgressDialog dialog(loading, &parent);
-
-  {
-    auto first = loading.task(QStringLiteral("first"));
-  }
-  {
-    auto second = loading.task(QStringLiteral("second"));
-    waitMs(500);
-    REQUIRE(dialog.isVisible());
-    REQUIRE(dialog.windowTitle() == QStringLiteral("second"));
-  }
-
-  waitMs(800);
-  REQUIRE_FALSE(dialog.isVisible());
 }

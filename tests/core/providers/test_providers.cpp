@@ -10,7 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/providers/core.hpp"
-#include "core/providers/local.hpp"
+#include "core/providers/folder.hpp"
 
 using namespace px::modrim::providers;
 using px::modrim::ListedModPtr;
@@ -105,7 +105,8 @@ TEST_CASE("workshop provider discovers mods that carry a published file id") {
   const QString modPath = makeMod(workshop, QStringLiteral("123456"),
                                   QStringLiteral("author.workshop"), true);
 
-  SteamWorkshopModProvider provider(workshop);
+  FolderModProvider provider(QStringLiteral("steam"), QStringLiteral("#3498db"),
+                             workshop, true);
   CHECK(provider.providerId() == QStringLiteral("steam"));
   CHECK(provider.path() == workshop);
 
@@ -128,8 +129,10 @@ TEST_CASE(
   const QString downloaded = makeMod(local, QStringLiteral("downloaded"),
                                      QStringLiteral("dl.mod"), true);
 
-  LocalModProvider localProvider(local);
-  DownloadedModProvider downloadedProvider(local);
+  FolderModProvider localProvider(QStringLiteral("local"),
+                                  QStringLiteral("#2ecc71"), local, false);
+  FolderModProvider downloadedProvider(QStringLiteral("downloaded"),
+                                       QStringLiteral("#3498db"), local, true);
   CHECK(localProvider.providerId() == QStringLiteral("local"));
   CHECK(downloadedProvider.providerId() == QStringLiteral("downloaded"));
 
@@ -155,7 +158,8 @@ TEST_CASE("providers parse several mods through the thread pool") {
   }
 
   QThreadPool pool;
-  LocalModProvider provider(root.path(), &pool);
+  FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
+                             root.path(), false, &pool);
   const auto discovered =
       runToCompletion(provider.discover(QStringLiteral("1.5")));
   REQUIRE(discovered.has_value());
@@ -199,7 +203,8 @@ TEST_CASE("cached metadata is returned without parsing") {
   cache.cachedMod = std::make_shared<px::modrim::AboutXmlMod>();
   REQUIRE(cache.cachedMod->setModPath(plain));
 
-  LocalModProvider provider(root.path(), nullptr, &cache);
+  FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
+                             root.path(), false, nullptr, &cache);
   const auto discovered =
       runToCompletion(provider.discover(QStringLiteral("1.5")));
   REQUIRE(discovered.has_value());
@@ -216,7 +221,8 @@ TEST_CASE("newly parsed About.xml data is stored in the cache") {
                                 QStringLiteral("parsed.mod"), false);
 
   FakeCache cache;
-  LocalModProvider provider(root.path(), nullptr, &cache);
+  FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
+                             root.path(), false, nullptr, &cache);
   const auto discovered =
       runToCompletion(provider.discover(QStringLiteral("1.5")));
   REQUIRE(discovered.has_value());
@@ -237,7 +243,8 @@ TEST_CASE("force_reparse bypasses the cache lookup") {
   cache.serveCached = true;
   cache.cachedMod = std::make_shared<px::modrim::AboutXmlMod>();
 
-  LocalModProvider provider(root.path(), nullptr, &cache);
+  FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
+                             root.path(), false, nullptr, &cache);
   const auto discovered = runToCompletion(provider.discover(
       QStringLiteral("1.5"), nullptr, nullptr, /*force_reparse=*/true));
   REQUIRE(discovered.has_value());

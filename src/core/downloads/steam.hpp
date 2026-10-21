@@ -151,9 +151,6 @@ class SteamDownloader : public Downloader {
   void cancel() override;
 
   PluginConfig<SteamSettings>& settings() noexcept { return m_settings; }
-  const PluginConfig<SteamSettings>& settings() const noexcept {
-    return m_settings;
-  }
 
   // Loads workshop_sync.json off the UI thread; called by init(), exposed for
   // tests.
@@ -177,7 +174,8 @@ class SteamDownloader : public Downloader {
   LoginOptions wantedOptions() const;
   QCoro::Task<Result<std::shared_ptr<WorkshopClient>>> ensureClient();
 
-  QCoro::Task<void> runBatch(QStringList ids, QString root,
+  QCoro::Task<void> runBatch(QStringList ids,
+                             std::vector<std::uint64_t> itemIds, QString root,
                              std::shared_ptr<SteamBatch> batch);
   DownloadResult finishBatch(const std::shared_ptr<SteamBatch>& batch);
   void finishItem(SteamBatch& batch, const QString& modId,

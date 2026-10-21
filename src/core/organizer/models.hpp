@@ -82,17 +82,6 @@ struct RuleSpec {
   friend bool operator==(const RuleSpec&, const RuleSpec&) = default;
 };
 
-struct Rule {
-  qint64 id = 0;
-  qint64 position = 0;
-  RuleField field = RuleField::kName;
-  RuleOp op = RuleOp::kEquals;
-  QString pattern;
-  qint64 folderId = 0;
-
-  friend bool operator==(const Rule&, const Rule&) = default;
-};
-
 // Everything the organizer keeps in memory, as loaded from organizer.db.
 // Package ids are lowercase keys.
 struct OrganizerState {
@@ -100,7 +89,7 @@ struct OrganizerState {
   QHash<QString, qint64> placements;
   QHash<qint64, Tag> tags;
   QHash<QString, QSet<qint64>> modTags;
-  QList<Rule> rules;
+  QList<RuleSpec> rules;
 
   friend bool operator==(const OrganizerState&,
                          const OrganizerState&) = default;

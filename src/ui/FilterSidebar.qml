@@ -9,7 +9,6 @@ Rectangle {
     id: root
 
     property var model: null
-    property alias currentIndex: filters.currentIndex
     signal activated(int index)
 
     color: Theme.elevate2
@@ -48,7 +47,7 @@ Rectangle {
                 font.letterSpacing: 0.5
             }
         }
-        ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: PxScrollBar {}
 
         delegate: Rectangle {
             id: row

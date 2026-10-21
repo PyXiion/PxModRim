@@ -201,7 +201,6 @@ struct DownloadPlan {
   QStringList already_current{};
   QStringList unavailable_ids{};
   QStringList incomplete_collection_ids{};
-  QHash<QString, QString> titles{};
   bool is_complete = false;
 };
 // NOLINTEND(readability-identifier-naming)

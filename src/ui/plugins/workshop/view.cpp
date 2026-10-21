@@ -28,7 +28,11 @@ QSet<QString> idsOf(const std::vector<std::string>& ids) {
   return result;
 }
 std::optional<QString> cursorOf(const std::optional<std::string>& cursor) {
-  return cursor ? std::optional(QString::fromStdString(*cursor)) : std::nullopt;
+  return cursor.transform(
+      [](const std::string& value) { return QString::fromStdString(value); });
+}
+std::optional<QString> nonEmpty(const QString& text) {
+  return text.isEmpty() ? std::nullopt : std::optional(text);
 }
 WorkshopCatalog& catalogOf(CoreContext& ctx) {
   return *static_cast<WorkshopCatalog*>(
@@ -64,14 +68,10 @@ WorkshopViewPanel::WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine,
                                            collectionsModel);
   m_qml->rootContext()->setContextProperty(QStringLiteral("catalogMembers"),
                                            membersModel);
-  m_busyId = m_downloads.busyChanged.connect([this](bool) {
-    refreshRows();
-    emit changed();
-  });
-  m_queueId = m_catalog.queueChanged.connect([this](const std::monostate&) {
-    refreshRows();
-    emit changed();
-  });
+  m_busyId =
+      m_downloads.busyChanged.connect([this](bool) { refreshAndNotify(); });
+  m_queueId = m_catalog.queueChanged.connect(
+      [this](const std::monostate&) { refreshAndNotify(); });
   m_urlId = m_catalog.catalogUrlChanged.connect(
       [this](const QString&) { urlChanged(); });
   m_installedId = m_catalog.installedChanged.connect(
@@ -80,15 +80,12 @@ WorkshopViewPanel::WorkshopViewPanel(CoreContext& ctx, QQmlEngine* engine,
       m_favourites.changed().connect([this](const FavouritesState&) {
         if (m_tab == QStringLiteral("Favourites") && !m_detailData)
           showFavourites();
-        else {
-          refreshRows();
-          emit changed();
-        }
+        else
+          refreshAndNotify();
       });
   m_activeId = m_ctx.activeStateChanged().connect([this](const QStringList&) {
     refreshModIds();
-    refreshRows();
-    emit changed();
+    refreshAndNotify();
   });
   m_qml->setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/Workshop.qml")));
   m_root->addWidget(m_qml, 1);
@@ -118,16 +115,13 @@ QString WorkshopViewPanel::gameVersion() const {
   return version == QStringLiteral("Unknown") ? QString{} : version;
 }
 void WorkshopViewPanel::refreshModIds() {
-  m_installedIds.clear();
-  m_activeIds.clear();
-  const auto& mods = m_ctx.allMods();
-  for (const auto& mod : mods)
-    if (auto id = mod->publishedFileId()) m_installedIds.insert(*id);
-  for (const auto& uuid : m_ctx.activeUuids()) {
-    auto mod = mods.value(uuid);
-    if (mod)
-      if (auto id = mod->publishedFileId()) m_activeIds.insert(*id);
-  }
+  auto ids = publishedIds(m_ctx);
+  m_installedIds = std::move(ids.installed);
+  m_activeIds = std::move(ids.active);
+}
+void WorkshopViewPanel::refreshAndNotify() {
+  refreshRows();
+  emit changed();
 }
 
 QVariantMap WorkshopViewPanel::row(const CatalogEntry& item, bool detail) {
@@ -285,8 +279,7 @@ QCoro::Task<void> WorkshopViewPanel::loadPack() {
     self->m_packIds.unite(QSet<QString>(result->already_current.cbegin(),
                                         result->already_current.cend()));
   }
-  self->refreshRows();
-  emit self->changed();
+  self->refreshAndNotify();
 }
 
 QCoro::Task<void> WorkshopViewPanel::load(bool append) {
@@ -408,12 +401,11 @@ QCoro::Task<void> WorkshopViewPanel::selectTabAsync(QString tab) {
 QCoro::Task<void> WorkshopViewPanel::filterItems(QString query, QString version,
                                                  QString source, QString sort,
                                                  QString tag) {
-  m_criteria = CatalogQuery{
-      .query = query,
-      .tag = tag.isEmpty() ? std::nullopt : std::optional(tag),
-      .version = version.isEmpty() ? std::nullopt : std::optional(version),
-      .sort = sort,
-      .source = source};
+  m_criteria = CatalogQuery{.query = query,
+                            .tag = nonEmpty(tag),
+                            .version = nonEmpty(version),
+                            .sort = sort,
+                            .source = source};
   m_installed.search(query);
   if (m_tab == QStringLiteral("Installed") && m_installed.loaded()) {
     showInstalled();
@@ -579,14 +571,12 @@ QCoro::Task<void> WorkshopViewPanel::download(QStringList ids,
   auto requested = QSet<QString>(ids.cbegin(), ids.cend());
   requested.unite(QSet<QString>(collections.cbegin(), collections.cend()));
   m_preparing.unite(requested);
-  refreshRows();
-  emit changed();
+  refreshAndNotify();
   auto result = co_await m_catalog.plan(ids, collections);
   if (!self || self->m_tornDown) co_return;
   --self->m_planning;
   self->m_preparing.subtract(requested);
-  self->refreshRows();
-  emit self->changed();
+  self->refreshAndNotify();
   if (!result) {
     self->m_notice = QStringLiteral("Could not prepare the download: ") +
                      result.error().message;
@@ -646,15 +636,9 @@ QCoro::Task<void> WorkshopViewPanel::installedChanged() {
   m_installedDirty = true;
   refreshModIds();
   recount();
-  refreshRows();
-  emit changed();
+  refreshAndNotify();
   if (m_tab == QStringLiteral("Installed") && !m_busy && !m_detailData)
     co_await load();
-}
-QString WorkshopViewPanel::url() const {
-  return buildRoute(QStringLiteral("workshop"),
-                    m_current ? QStringList{m_current->first, m_current->second}
-                              : QStringList{m_tab.toLower()});
 }
 QString WorkshopViewPanel::backLabel() const {
   return QStringLiteral("Back to ") +

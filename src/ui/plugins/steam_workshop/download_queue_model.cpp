@@ -16,8 +16,6 @@ QVariant DownloadQueueModel::data(const QModelIndex& index, int role) const {
   switch (role) {
     case kIdRole:
       return item.id;
-    case kTitleRole:
-      return item.title;
     case kDisplayRole:
       return item.display;
     case kStatusRole:
@@ -31,7 +29,6 @@ QVariant DownloadQueueModel::data(const QModelIndex& index, int role) const {
 
 QHash<int, QByteArray> DownloadQueueModel::roleNames() const {
   return {{kIdRole, "id"},
-          {kTitleRole, "title"},
           {kDisplayRole, "display"},
           {kStatusRole, "status"},
           {kProgressRole, "progress"}};
@@ -43,10 +40,10 @@ void DownloadQueueModel::syncFrom(const CheckedDownloads& checked,
   m_items.clear();
   m_items.reserve(checked.size());
   for (const auto& [id, title] : checked) {
-    m_items.append(
-        Item{id, title.isEmpty() ? id : title,
-             title.isEmpty() ? id : QStringLiteral("%1 (%2)").arg(title, id),
-             statuses.value(id)});
+    const bool titled = !title.isEmpty();
+    m_items.append(Item{id,
+                        titled ? QStringLiteral("%1 (%2)").arg(title, id) : id,
+                        statuses.value(id)});
   }
   endResetModel();
 }

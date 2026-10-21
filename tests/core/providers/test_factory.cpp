@@ -5,11 +5,11 @@
 
 #include "core/config.hpp"
 #include "core/providers/factory.hpp"
-#include "core/providers/local.hpp"
+#include "core/providers/folder.hpp"
 
 using px::modrim::PathConfig;
 using px::modrim::providers::createProviders;
-using px::modrim::providers::SteamWorkshopModProvider;
+using px::modrim::providers::FolderModProvider;
 
 TEST_CASE("no configured paths produce no providers") {
   CHECK(createProviders(PathConfig{}).empty());
@@ -33,7 +33,7 @@ TEST_CASE(
   CHECK(providers[1]->path() == QStringLiteral("/mods"));
   CHECK(providers[2]->path() == QStringLiteral("/mods"));
   CHECK(providers[3]->path() == QStringLiteral("/steam/workshop"));
-  CHECK(dynamic_cast<SteamWorkshopModProvider*>(providers[3].get()) != nullptr);
+  CHECK(dynamic_cast<FolderModProvider*>(providers[3].get()) != nullptr);
 }
 
 TEST_CASE("only the configured paths produce providers") {

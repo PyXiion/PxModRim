@@ -126,7 +126,7 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         reuseItems: false
         focus: true
-        ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: PxScrollBar {}
         Keys.onPressed: function(event) {
             var row = root.activeRow()
             if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {

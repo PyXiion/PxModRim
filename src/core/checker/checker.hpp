@@ -19,7 +19,7 @@
 
 namespace px::modrim::checker {
 
-// Diagnostics with at least one issue, keyed by mod uuid.
+// Diagnostics keyed by mod uuid. Mods without issues have empty entries.
 using DiagnosticsByUuid = QHash<QString, ModDiagnostics>;
 using DiagnosticsCallback = std::function<void(const DiagnosticsByUuid&)>;
 
@@ -28,8 +28,7 @@ using DiagnosticsCallback = std::function<void(const DiagnosticsByUuid&)>;
 class ModChecker {
  public:
   ModChecker(std::vector<std::unique_ptr<ModIssueChecker>> checkers,
-             sort::SortSettings settings,
-             QString targetVersion = QStringLiteral("1.5"),
+             sort::SortSettings settings, QString targetVersion,
              DiagnosticsCallback onDiagnosticsChanged = {});
 
   // ── Database config ───────────────────────────────────────
@@ -46,22 +45,16 @@ class ModChecker {
 
   // ── Incremental updates ───────────────────────────────────
 
-  // Rebuilds constraints and diagnostics after toggling `mod`. Non-About.xml
-  // mods only emit.
-  void toggleMod(const ListedMod& mod, const QStringList& orderedUuids);
-
-  // Moves a mod to a new position and rechecks it and its graph neighbours.
-  void moveMod(const QString& uuid, int oldIndex, int newIndex);
-
   // Reapplies the full active-mod order and regenerates the affected
   // diagnostics.
   void reorder(const QStringList& orderedUuids);
 
   // ── Query ─────────────────────────────────────────────────
 
-  QHash<PackageId, AboutXmlModPtr> activeMods() const { return m_activeMods; }
+  const QHash<PackageId, AboutXmlModPtr>& activeMods() const noexcept {
+    return m_activeMods;
+  }
   const ConstraintGraph& graph() const noexcept { return m_graph; }
-  QList<PackageId> orderedPids() const { return m_orderedPids; }
   const sort::CommunityRules& communityRules() const noexcept {
     return m_communityRules;
   }
@@ -78,8 +71,6 @@ class ModChecker {
                      const QStringList& orderedUuids);
   CheckContext buildContext(const QList<QList<PackageId>>& cycles) const;
   void checkAll(const CheckContext& ctx);
-  ModDiagnostics checkMod(const AboutXmlMod& mod,
-                          const CheckContext& ctx) const;
   QList<ModIssue> runChecker(const ModIssueChecker& checker,
                              const AboutXmlMod& mod,
                              const CheckContext& ctx) const;

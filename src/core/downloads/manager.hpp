@@ -30,7 +30,9 @@ class DownloadManager : public Plugin {
   // manager's use of it.
   void registerDownloader(Downloader& downloader);
 
-  const std::vector<Downloader*>& downloaders() const noexcept;
+  // Called by a downloader when its batch starts or ends.
+  void notifyBusy(bool busy);
+
   bool available() const noexcept;
   bool isDownloading() const;
   QSet<QString> activeIds() const;
@@ -61,8 +63,6 @@ class DownloadManager : public Plugin {
   Event<QStringList> batchStarted;
 
  private:
-  void onBusy(bool busy);
-
   std::vector<Downloader*> m_downloaders;
   bool m_cancelled = false;
 };

@@ -25,11 +25,11 @@ QCoro::Task<void> ModSelectionPresenter::show(QString uuid) {
     co_return;
   }
 
-  const ListedMod& mod = *found.value();
+  const ListedModPtr& mod = found.value();
   m_sink.showMod(mod, m_ctx.diagnosticsService().issuesFor(uuid));
 
   std::optional<QString> packageId;
-  if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod)) {
+  if (const auto* about = dynamic_cast<const AboutXmlMod*>(mod.get())) {
     packageId = about->packageId.str();
   }
   const QStringList activePackageIds = resolveActivePackageIds();

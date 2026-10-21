@@ -9,19 +9,20 @@ Rectangle {
 
     property int currentIndex: 0
     property bool collapsed: root.width < Theme.railCollapseWidth
-    property var tabModel: railModel
 
     signal tabSelected(int index)
     signal tabHovered(int index)
     signal settingsRequested()
     signal helpActionRequested(string actionId)
 
-    component RailButton: Item {
-        id: button
+    component RailItem: Item {
+        id: item
         property string iconName
         property string label
         property bool collapsed
+        property bool active: false
         signal clicked()
+        signal entered()
 
         width: parent ? parent.width : 0
         height: 44
@@ -30,35 +31,54 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: 4
             radius: Theme.radiusMd
-            color: area.containsMouse ? Theme.elevate3 : "transparent"
+            color: item.active
+                ? Theme.elevate4
+                : (area.containsMouse ? Theme.elevate3 : "transparent")
+
+            Behavior on color {
+                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+            }
+
+            Rectangle {
+                visible: item.active
+                width: 3
+                height: 18
+                radius: Theme.radiusXs
+                color: Theme.primary
+                anchors.left: parent.left
+                anchors.leftMargin: 3
+                anchors.verticalCenter: parent.verticalCenter
+            }
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: button.collapsed ? 0 : 12
-                anchors.rightMargin: button.collapsed ? 0 : 8
+                anchors.leftMargin: item.collapsed ? 0 : 12
+                anchors.rightMargin: item.collapsed ? 0 : 8
                 spacing: 10
 
                 Item {
                     Layout.preferredWidth: 18
                     Layout.preferredHeight: 18
-                    Layout.alignment: button.collapsed ? Qt.AlignCenter : Qt.AlignVCenter
-                    Layout.fillWidth: button.collapsed
+                    Layout.alignment: item.collapsed ? Qt.AlignCenter : Qt.AlignVCenter
+                    Layout.fillWidth: item.collapsed
 
                     Image {
                         anchors.centerIn: parent
-                        source: "image://icons/" + button.iconName + "?color=" + encodeURIComponent(Theme.textMuted)
+                        source: "image://icons/" + item.iconName + "?color=" +
+                            encodeURIComponent(item.active ? Theme.primary : Theme.textMuted)
                         sourceSize.width: 18; sourceSize.height: 18
                         fillMode: Image.PreserveAspectFit
                     }
                 }
 
                 Text {
-                    visible: !button.collapsed
+                    visible: !item.collapsed
                     Layout.fillWidth: true
-                    text: button.label
-                    color: Theme.textMuted
+                    text: item.label
+                    color: item.active ? Theme.primary : Theme.textMuted
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeMd
+                    font.weight: item.active ? Font.Medium : Font.Normal
                     elide: Text.ElideRight
                 }
             }
@@ -68,20 +88,21 @@ Rectangle {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: button.clicked()
+                onEntered: item.entered()
+                onClicked: item.clicked()
             }
 
             Loader {
-                active: button.collapsed && area.containsMouse
+                active: item.collapsed && area.containsMouse
                 sourceComponent: PxToolTip {
                     visible: true
-                    text: button.label
+                    text: item.label
                 }
             }
         }
 
         Accessible.role: Accessible.Button
-        Accessible.name: button.label
+        Accessible.name: item.label
     }
 
     ColumnLayout {
@@ -95,109 +116,19 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
             spacing: 4
-            model: root.tabModel
+            model: railModel
             currentIndex: root.currentIndex
 
-            delegate: Item {
-                id: delegate
+            delegate: RailItem {
                 width: listView.width
-                height: 44
-                property bool active: index === listView.currentIndex
-
-                Rectangle {
-                    id: bg
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    radius: Theme.radiusMd
-                    color: delegate.active
-                        ? Theme.elevate4
-                        : (hoverArea.containsMouse ? Theme.elevate3 : "transparent")
-
-                    Rectangle {
-                        visible: delegate.active
-                        width: 3
-                        height: 18
-                        radius: Theme.radiusXs
-                        color: Theme.primary
-                        anchors.left: parent.left
-                        anchors.leftMargin: 3
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: root.collapsed ? 0 : 12
-                        anchors.rightMargin: 8
-                        spacing: 10
-                        visible: !root.collapsed
-
-                        Item {
-                            width: 18; height: 18
-                            Layout.alignment: Qt.AlignVCenter
-
-                            Image {
-                                anchors.centerIn: parent
-                                source: "image://icons/" + (modelData.icon || "") + "?color=" +
-                                    encodeURIComponent(delegate.active ? Theme.primary : Theme.textMuted)
-                                sourceSize.width: 18; sourceSize.height: 18
-                                fillMode: Image.PreserveAspectFit
-                                opacity: 1
-                            }
-                        }
-
-                        Text {
-                            id: labelText
-                            Layout.fillWidth: true
-                            text: modelData.label || ""
-                            color: delegate.active ? Theme.primary : Theme.textMuted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeMd
-                            font.weight: delegate.active ? Font.Medium : Font.Normal
-                            elide: Text.ElideRight
-                            horizontalAlignment: Text.AlignLeft
-                            opacity: 1
-                        }
-                    }
-
-                    Item {
-                        anchors.fill: parent
-                        visible: root.collapsed
-
-                        Image {
-                            id: collapsedIcon
-                            width: 18; height: 18
-                            anchors.centerIn: parent
-                            source: "image://icons/" + (modelData.icon || "") + "?color=" +
-                                encodeURIComponent(delegate.active ? Theme.primary : Theme.textMuted)
-                            sourceSize.width: 18; sourceSize.height: 18
-                            fillMode: Image.PreserveAspectFit
-                            opacity: 1
-                        }
-                    }
-
-                    MouseArea {
-                        id: hoverArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onEntered: root.tabHovered(index)
-                        onClicked: {
-                            root.currentIndex = index
-                            root.tabSelected(index)
-                        }
-                    }
-
-                    Loader {
-                        active: root.collapsed && hoverArea.containsMouse
-                        sourceComponent: PxToolTip {
-                            visible: true
-                            text: modelData.label || ""
-                        }
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
-                    }
+                iconName: modelData.icon || ""
+                label: modelData.label || ""
+                collapsed: root.collapsed
+                active: index === listView.currentIndex
+                onEntered: root.tabHovered(index)
+                onClicked: {
+                    root.currentIndex = index
+                    root.tabSelected(index)
                 }
             }
         }
@@ -212,14 +143,14 @@ Rectangle {
             Layout.topMargin: 4
             Layout.bottomMargin: 4
 
-            RailButton {
+            RailItem {
                 iconName: "settings"
                 label: "Settings"
                 collapsed: root.collapsed
                 onClicked: root.settingsRequested()
             }
 
-            RailButton {
+            RailItem {
                 id: helpButton
                 iconName: "help"
                 label: "Help"

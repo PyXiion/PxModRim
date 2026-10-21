@@ -17,6 +17,12 @@ Rectangle {
     property bool updatingThis: false
     property bool neededExpanded: false
 
+    component IconAction: PxButton {
+        implicitHeight: 24
+        implicitWidth: 24
+        variant: "ghost"
+    }
+
     signal openFolder()
     signal openUrl()
     signal updateMods()
@@ -120,7 +126,7 @@ Rectangle {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: PxScrollBar {}
 
         ColumnLayout {
             id: page
@@ -457,31 +463,22 @@ Rectangle {
                     spacing: 4
 
                     CardLabel { text: "Details" }
-                    PxButton {
+                    IconAction {
                         visible: root.hasInfo && root.info.canOpenFolder
-                        implicitHeight: 24
-                        implicitWidth: 24
-                        variant: "ghost"
                         iconName: "folder"
                         ToolTip.text: "Open mod folder"
                         onClicked: root.openFolder()
                     }
-                    PxButton {
+                    IconAction {
                         visible: root.hasInfo && root.info.url.length > 0
-                        implicitHeight: 24
-                        implicitWidth: 24
-                        variant: "ghost"
                         iconName: "link"
                         ToolTip.text: root.hasInfo ? "Open mod URL: " + root.info.url : "Open mod URL"
                         onClicked: root.openUrl()
                     }
 
-                    PxButton {
+                    IconAction {
                         visible: root.hasInfo && root.info.canUpdate && !root.updatingThis
                         enabled: !root.downloadsBusy
-                        implicitHeight: 24
-                        implicitWidth: 24
-                        variant: "ghost"
                         iconName: "download"
                         ToolTip.text: root.downloadsBusy ? "Download in progress" : "Update from " + (root.hasInfo ? root.info.updateSource : "source")
                         onClicked: root.updateMods()
@@ -520,13 +517,8 @@ Rectangle {
                             font.pixelSize: Theme.fontSizeMd
                             wrapMode: Text.WrapAnywhere
                         }
-                        PxButton {
+                        IconAction {
                             visible: modelData.copy === true
-                            Layout.preferredHeight: 24
-                            Layout.preferredWidth: 24
-                            implicitHeight: 24
-                            implicitWidth: 24
-                            variant: "ghost"
                             iconName: "copy"
                             ToolTip.text: "Copy"
                             onClicked: root.copyText(modelData.value)

@@ -1,6 +1,5 @@
 #include "core/services/mod_discovery.hpp"
 
-#include <QDir>
 #include <QHash>
 #include <algorithm>
 #include <memory>
@@ -25,8 +24,7 @@ QStringList resolveActiveUuids(const QHash<QString, ListedModPtr>& allMods,
   if (configFolder.isEmpty()) {
     return {};
   }
-  const QString path =
-      QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+  const QString path = modsConfigPath(configFolder);
   const auto data = parseModsConfig(path);
   if (!data) {
     return {};

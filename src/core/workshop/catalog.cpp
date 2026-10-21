@@ -28,11 +28,6 @@ QStringList toQstrings(const std::vector<std::string>& values) {
   return out;
 }
 
-const std::string& titleOf(const CatalogEntry& entry) {
-  return std::visit(
-      [](const auto& item) -> const std::string& { return item.title; }, entry);
-}
-
 }  // namespace
 
 namespace detail {
@@ -55,39 +50,6 @@ Result<void> writeCached(const QString& directory, const QString& path,
 
 }  // namespace detail
 
-WorkshopCatalog::WorkshopCatalog()
-    : Plugin(QStringLiteral("workshop_catalog"), {QStringLiteral("downloads")}),
-      m_settings(nullptr, QStringLiteral("workshop_catalog")),
-      m_baseUrl(
-          normalizeBaseUrl(QString::fromStdString(m_settings.value().url))),
-      m_favourites(nullptr) {
-  m_settings.changed.connect([this](const CatalogSettings& value) {
-    changeUrl(QString::fromStdString(value.url));
-  });
-}
-
-void WorkshopCatalog::setup(CoreContext& ctx) {
-  m_context = &ctx;
-  m_installedMods = [&ctx] { return ctx.allMods().values(); };
-  if (ctx.hasConfigService()) {
-    m_settings = PluginConfig<CatalogSettings>(
-        &ctx.configService(), QStringLiteral("workshop_catalog"),
-        {{QStringLiteral("workshop_catalog_url"), QStringLiteral("url")}});
-    m_settings.changed.connect([this](const CatalogSettings& value) {
-      changeUrl(QString::fromStdString(value.url));
-    });
-    changeUrl(QString::fromStdString(m_settings.value().url));
-    m_cacheDir =
-        ctx.configService().directory() + QStringLiteral("/workshop-cache");
-    m_favourites = FavouriteCollections(&ctx.configService());
-  }
-  bindDownloads(ctx.downloads());
-  m_modsChangedId = ctx.modService().modsChanged.connect(
-      [this](const std::monostate&) { invalidateInstalled(); });
-  m_configChangedId = ctx.configChanged().connect(
-      [this](const AppConfig&) { invalidateInstalled(); });
-}
-
 WorkshopCatalog::WorkshopCatalog(ConfigService* config,
                                  DownloadManager& downloads,
                                  InstalledModsProvider installedMods)
@@ -106,11 +68,6 @@ WorkshopCatalog::WorkshopCatalog(ConfigService* config,
   m_settings.changed.connect([this](const CatalogSettings& settings) {
     changeUrl(QString::fromStdString(settings.url));
   });
-  bindDownloads(downloads);
-}
-
-void WorkshopCatalog::bindDownloads(DownloadManager& downloads) {
-  m_downloads = &downloads;
   m_downloadFinishedId = m_downloads->downloadFinished.connect(
       [this](const DownloadResult&) { invalidateInstalled(); });
   m_busyChangedId = m_downloads->busyChanged.connect([this](bool busy) {
@@ -118,6 +75,14 @@ void WorkshopCatalog::bindDownloads(DownloadManager& downloads) {
       resumeIdleWaiters();
     }
   });
+}
+
+void WorkshopCatalog::setup(CoreContext& ctx) {
+  m_context = &ctx;
+  m_modsChangedId = ctx.modService().modsChanged.connect(
+      [this](const std::monostate&) { invalidateInstalled(); });
+  m_configChangedId = ctx.configChanged().connect(
+      [this](const AppConfig&) { invalidateInstalled(); });
 }
 
 void WorkshopCatalog::disconnectEvents() {
@@ -146,9 +111,7 @@ QCoro::Task<void> WorkshopCatalog::shutdown() {
   cancelQueue();
   auto runner = std::move(m_runner);
   m_runner.reset();
-  if (m_downloading) {
-    m_downloads->cancel();
-  }
+  if (m_downloading) m_downloads->cancel();
   resumeIdleWaiters();
   for (const auto& client : m_clients) {
     client->shutdown();
@@ -274,11 +237,7 @@ WorkshopCatalog::installedWithUpdates() {
   QStringList ids = installed().keys();
   // The index is a hash, so sort the ids to request them in a stable order.
   ids.sort();
-  auto batch = co_await client().modsBatch(std::move(ids));
-  if (!batch) {
-    co_return std::unexpected(batch.error());
-  }
-  co_return std::move(batch->items);
+  co_return co_await client().modsBatch(std::move(ids));
 }
 
 QCoro::Task<CatalogResult<DownloadPlan>> WorkshopCatalog::plan(
@@ -308,21 +267,11 @@ QCoro::Task<CatalogResult<DownloadPlan>> WorkshopCatalog::plan(
       result.to_download.append(qid);
     }
   }
-  for (const auto& [id, entry] : resolved->items) {
-    result.titles.insert(QString::fromStdString(id),
-                         QString::fromStdString(titleOf(entry)));
-  }
   result.unavailable_ids = toQstrings(resolved->unavailable_ids);
   result.incomplete_collection_ids =
       toQstrings(resolved->incomplete_collection_ids);
   result.is_complete = resolved->is_complete;
   co_return result;
-}
-
-QCoro::Task<Result<DownloadResult>> WorkshopCatalog::download(
-    DownloadPlan downloadPlan) {
-  co_return co_await m_downloads->downloadMods(
-      std::move(downloadPlan.to_download));
 }
 
 void WorkshopCatalog::enqueue(const DownloadPlan& downloadPlan) {

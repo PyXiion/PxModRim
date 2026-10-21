@@ -362,14 +362,12 @@ TEST_CASE("workshop batch requests split ids into chunks of 100") {
   CHECK(glz::read_json<IdsRequest>(server.requests[0].body)->ids.size() == 100);
   CHECK(glz::read_json<IdsRequest>(server.requests[1].body)->ids.size() == 100);
   CHECK(glz::read_json<IdsRequest>(server.requests[2].body)->ids.size() == 5);
-  CHECK(result->items.size() == 204);
-  CHECK(result->items.front().id == "1");
-  CHECK(result->unavailableIds == std::vector<std::string>{"105"});
+  CHECK(result->size() == 204);
+  CHECK(result->front().id == "1");
 
   const auto empty = run(client.modsBatch({}));
   REQUIRE(empty.has_value());
-  CHECK(empty->items.empty());
-  CHECK(empty->unavailableIds.empty());
+  CHECK(empty->empty());
   CHECK(server.requests.size() == 3);
 }
 

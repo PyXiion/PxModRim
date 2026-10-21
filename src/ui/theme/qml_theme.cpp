@@ -53,7 +53,6 @@ QString Theme::textMain() const { return paletteValue(u"TEXT_MAIN"); }
 QString Theme::textMuted() const { return paletteValue(u"TEXT_MUTED"); }
 QString Theme::textDim() const { return paletteValue(u"TEXT_DIM"); }
 QString Theme::onAccent() const { return paletteValue(u"TEXT_ON_ACCENT"); }
-QString Theme::neutral() const { return paletteValue(u"NEUTRAL"); }
 
 QString Theme::primary() const { return paletteValue(u"PRIMARY"); }
 QString Theme::primaryHover() const { return paletteValue(u"PRIMARY_HOVER"); }
@@ -87,10 +86,7 @@ int Theme::scrollbarWidth() const { return 6; }
 int Theme::tooltipDelay() const { return kTooltipDelayMs; }
 double Theme::disabledOpacity() const { return 0.45; }
 QString Theme::overlay() const { return QStringLiteral("#8c000000"); }
-int Theme::railMinWidth() const { return kRailMinWidth; }
-int Theme::railMaxWidth() const { return kRailMaxWidth; }
 int Theme::railCollapseWidth() const { return kRailCollapseWidth; }
-int Theme::sidebarWidth() const { return kSidebarWidth; }
 
 QStringList Theme::logoVariants() const { return m_logoVariants; }
 QString Theme::logoFileDataUri() const { return m_logoDataUri; }

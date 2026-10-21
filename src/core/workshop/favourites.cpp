@@ -6,14 +6,12 @@
 namespace px::modrim::workshop {
 
 FavouriteCollections::FavouriteCollections(ConfigService* service)
-    : m_config(service, QStringLiteral("workshop_favourites")) {
-  for (const CatalogCollection& collection : m_config.value().collections) {
-    m_ids.insert(collection.id);
-  }
-}
+    : m_config(service, QStringLiteral("workshop_favourites")) {}
 
 bool FavouriteCollections::contains(const std::string& collectionId) const {
-  return m_ids.contains(collectionId);
+  return std::ranges::any_of(
+      m_config.value().collections,
+      [&](const CatalogCollection& item) { return item.id == collectionId; });
 }
 
 void FavouriteCollections::set(const CatalogCollection& collection,
@@ -51,10 +49,6 @@ void FavouriteCollections::remember(const CatalogCollection& collection) {
 }
 
 void FavouriteCollections::save(std::vector<CatalogCollection> collections) {
-  m_ids.clear();
-  for (const CatalogCollection& collection : collections) {
-    m_ids.insert(collection.id);
-  }
   m_config.update(FavouritesState{std::move(collections)});
 }
 

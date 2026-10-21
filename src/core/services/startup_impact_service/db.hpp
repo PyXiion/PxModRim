@@ -57,9 +57,6 @@ class StartupImpactDb {
                                         StartupImpactReport report);
   QCoro::Task<Result<std::optional<StartupImpactReport>>> getLatestReport(
       QString path);
-  QCoro::Task<Result<double>> getAverage(QString path, QString packageId);
-  QCoro::Task<Result<QHash<QString, ThreadAverages>>> getTotalsFor(
-      QString path, QStringList packageIds);
   QCoro::Task<Result<QHash<QString, double>>> getAllAverages(QString path);
   QCoro::Task<Result<LatestWithAverages>> getLatestWithAverages(
       QString path, QStringList activePids, std::optional<QString> selectedPid);
@@ -71,7 +68,7 @@ class StartupImpactDb {
   void closeSync();
 
  private:
-  // The destructor drains the pool through close_sync() before these members
+  // The destructor drains the pool through closeSync() before these members
   // are destroyed.
   QThreadPool m_pool;
   Connection m_conn;

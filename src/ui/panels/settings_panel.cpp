@@ -139,7 +139,7 @@ QCoro::Task<void> SettingsBackend::downloadCommunityRules() {
   sort::CommunityRulesService service(m_ctx.configService(), m_ctx.network());
   QPointer<SettingsBackend> guard(this);
   QPointer<QProgressDialog> progressGuard(progress);
-  const auto path = co_await service.ensureRules(loading, true);
+  const auto path = co_await service.ensureRules(loading);
   if (progressGuard) {
     progressGuard->close();
     progressGuard->deleteLater();

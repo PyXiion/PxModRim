@@ -21,7 +21,6 @@ namespace px::modrim::workshop {
 class WorkshopViewPanel : public BaseViewPanel {
   Q_OBJECT
   Q_PROPERTY(QString tab READ tab NOTIFY changed)
-  Q_PROPERTY(QString url READ url NOTIFY changed)
   Q_PROPERTY(QString backLabel READ backLabel NOTIFY changed)
   Q_PROPERTY(bool configured READ configured NOTIFY changed)
   Q_PROPERTY(bool busy READ busy NOTIFY changed)
@@ -48,7 +47,7 @@ class WorkshopViewPanel : public BaseViewPanel {
                     AppContext& app, workshop::WorkshopCatalog& catalog);
   ~WorkshopViewPanel() override;
   void openRoute(const QStringList& path) override;
-  Q_INVOKABLE void teardown() override;
+  void teardown() override;
   QCoro::Task<void> followRoute(QStringList path);
   QCoro::Task<void> load(bool append = false);
   QCoro::Task<void> selectTabAsync(QString tab);
@@ -94,7 +93,6 @@ class WorkshopViewPanel : public BaseViewPanel {
   Q_INVOKABLE void toggleFavourite(const QString& itemId);
 
   QString tab() const { return m_tab; }
-  QString url() const;
   QString backLabel() const;
   bool configured() const { return m_catalog.configured(); }
   bool busy() const { return m_busy; }
@@ -142,6 +140,7 @@ class WorkshopViewPanel : public BaseViewPanel {
     return result;
   }
   void refreshRows();
+  void refreshAndNotify();
   void clearDetail();
   std::optional<QStringList> packCopies() const;
   void showFavourites();

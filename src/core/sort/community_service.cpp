@@ -17,7 +17,6 @@
 #include <spdlog/spdlog.h>
 
 #include "core/file_io.hpp"
-#include "core/sort/community.hpp"
 
 namespace px::modrim::sort {
 
@@ -28,8 +27,7 @@ const QString kRulesUrl = QStringLiteral(
     "https://github.com/RimSort/Community-Rules-Database/archive/refs/heads/"
     "main.zip");
 
-// Matches the httpx timeouts of the original client: a stalled transfer fails
-// after these.
+// A stalled transfer fails after these.
 constexpr int kHeadTransferTimeoutMs = 10'000;
 constexpr int kGetTransferTimeoutMs = 30'000;
 constexpr int kExtractChunkBytes = 64 * 1024;
@@ -39,8 +37,7 @@ Error networkError(const QNetworkReply& reply) {
 }
 
 // Writes one archive entry under `dest`. Entries whose names would escape
-// `dest` are skipped, as the Python zipfile sanitiser also refuses to write
-// outside the target directory.
+// `dest` are skipped.
 Result<void> extractEntry(zip_t* archive, zip_uint64_t index,
                           const QDir& dest) {
   zip_stat_t stat;
@@ -142,22 +139,20 @@ CommunityRulesService::CommunityRulesService(const ConfigService& configService,
       m_network(network) {}
 
 QCoro::Task<std::optional<QString>> CommunityRulesService::ensureRules(
-    LoadingState& loading, bool force) {
-  if (QFileInfo::exists(m_jsonPath) && !force) {
-    co_return m_jsonPath;
-  }
-
+    LoadingState& loading) {
   auto result = co_await downloadRules(loading);
   if (!result) {
     spdlog::warn("Failed to download community rules: {}",
                  result.error().message.toStdString());
     co_return std::nullopt;
   }
-  co_return *result;
+  co_return *result ? std::optional<QString>(m_jsonPath) : std::nullopt;
 }
 
-QCoro::Task<Result<std::optional<QString>>>
-CommunityRulesService::downloadRules(LoadingState& loading) {
+// Returns false when the archive has no rules file: there is simply nothing to
+// cache.
+QCoro::Task<Result<bool>> CommunityRulesService::downloadRules(
+    LoadingState& loading) {
   if (!QDir().mkpath(m_cacheDir)) {
     co_return std::unexpected(
         Error{QStringLiteral("Cannot create %1").arg(m_cacheDir)});
@@ -172,7 +167,7 @@ CommunityRulesService::downloadRules(LoadingState& loading) {
                        QNetworkRequest::NoLessSafeRedirectPolicy);
 
   // The HEAD request only sizes the progress bar; a missing Content-Length
-  // falls back to 100 steps, which is what the original did.
+  // falls back to 100 steps.
   request.setTransferTimeout(kHeadTransferTimeoutMs);
   QNetworkReply* head = m_network.head(request);
   auto releaseHead = qScopeGuard([head] { head->deleteLater(); });
@@ -228,18 +223,14 @@ CommunityRulesService::downloadRules(LoadingState& loading) {
     if (!rules.hasNext()) {
       // An archive without the rules file is not an error: there is simply
       // nothing to cache.
-      co_return std::optional<QString>{};
+      co_return false;
     }
     if (auto copied = copyFileReplacing(rules.next(), m_jsonPath); !copied) {
       co_return std::unexpected(copied.error());
     }
     loading.step(50);
   }
-  co_return std::optional<QString>(m_jsonPath);
-}
-
-Result<CommunityRules> CommunityRulesService::loadRules() const {
-  return loadCommunityRules(m_jsonPath);
+  co_return true;
 }
 
 }  // namespace px::modrim::sort

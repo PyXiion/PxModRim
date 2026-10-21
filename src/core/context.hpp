@@ -15,7 +15,6 @@
 #include "core/events.hpp"
 #include "core/models/metadata/structures.hpp"
 #include "core/plugin.hpp"
-#include "core/structures.hpp"
 
 namespace px::modrim {
 
@@ -55,10 +54,7 @@ class CoreContext {
   void updateConfig(AppConfig cfg);
   // Rebuilds the providers for new paths.
   void resetProviders(const PathConfig& paths);
-  CollectionStats computeStats(
-      const std::optional<QStringList>& activeIds = std::nullopt) const;
 
-  QCoro::Task<Result<void>> initialize();
   QCoro::Task<void> close();
   // Synchronous teardown for use after the event loop has stopped.
   void closeSync();

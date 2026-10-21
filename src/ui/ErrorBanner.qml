@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Inline error strip; hidden while `message` is empty.
+// Inline error strip; hidden while `text` is empty.
 Rectangle {
     id: root
 

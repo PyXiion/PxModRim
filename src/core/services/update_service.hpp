@@ -3,7 +3,6 @@
 #include <QLatin1StringView>
 #include <QString>
 #include <optional>
-#include <vector>
 
 #include <QCoro/QCoroTask>
 
@@ -23,10 +22,6 @@ struct ReleaseInfo {
   QString url;
 };
 
-// The numeric components of `text` ("v1.2.3" -> 1, 2, 3), ignoring any suffix;
-// nullopt when the text does not start with a version.
-std::optional<std::vector<qint64>> parseVersion(const QString& text);
-
 // True when `tag` is a strictly higher release than `current`. A pre-release
 // suffix ("-rc1") sorts below the plain release with the same numbers. Versions
 // that do not parse are never reported as outdated.
@@ -35,7 +30,7 @@ bool isNewer(const QString& tag, const QString& current);
 // Looks up the newest published GitHub release.
 class UpdateService {
  public:
-  // `network` is not owned and must outlive the service. `release_url` is the
+  // `network` is not owned and must outlive the service. `releaseUrl` is the
   // latest-release endpoint; the default is the project's own.
   UpdateService(QString currentVersion, QNetworkAccessManager& network,
                 QString releaseUrl = QString(kLatestReleaseUrl));

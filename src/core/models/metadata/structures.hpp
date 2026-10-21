@@ -41,15 +41,11 @@ class CaseInsensitiveSet {
  public:
   CaseInsensitiveSet() = default;
   explicit CaseInsensitiveSet(const QStringList& values);
-  explicit CaseInsensitiveSet(const QList<CaseInsensitiveStr>& values);
 
   bool contains(QStringView value) const;
   bool contains(const CaseInsensitiveStr& value) const;
   void add(QStringView value);
   void add(const CaseInsensitiveStr& value);
-  void discard(QStringView value);
-  void discard(const CaseInsensitiveStr& value);
-  CaseInsensitiveSet operator|(const CaseInsensitiveSet& other) const;
 
   qsizetype size() const noexcept { return m_members.size(); }
   bool empty() const noexcept { return m_members.isEmpty(); }
@@ -87,8 +83,6 @@ struct BaseRules {
 class ListedMod {
  public:
   ListedMod() = default;
-  ListedMod(const ListedMod&) = default;
-  ListedMod& operator=(const ListedMod&) = default;
   virtual ~ListedMod() = default;
 
   QString name = QStringLiteral("Unknown Mod Name");
@@ -101,25 +95,17 @@ class ListedMod {
       "behind).");
   QString providerId;
   bool obsolete = false;
-  bool dbBuilderNoName = false;
 
-  virtual QString uuid() const;
+  QString uuid() const;
   const std::optional<QString>& modPath() const noexcept { return m_directory; }
   Result<void> setModPath(const QString& path);
-  std::optional<QString> modFolder() const;
-  qint64 internalTimeTouched() const;
   std::optional<QString> publishedFileId() const;
-  bool cSharpMod() const;
-  bool xmlPatchMod() const;
-  std::optional<QString> previewImgPath() const;
 
  private:
   QString m_identity = makeIdentity();
   std::optional<QString> m_directory;
   mutable bool m_workshopIdReady = false;
   mutable std::optional<QString> m_workshopId;
-  mutable std::optional<bool> m_hasAssemblies;
-  mutable std::optional<bool> m_hasPatches;
 
   static QString makeIdentity();
 };
@@ -134,13 +120,6 @@ class AboutXmlMod : public ListedMod {
   QString url;
   double mtime = 0.0;
   BaseRules aboutRules;
-
-  std::optional<QString> getDlcName() const;
-};
-
-class ScenarioMod : public ListedMod {
- public:
-  QString summary;
 };
 
 using ListedModPtr = std::shared_ptr<ListedMod>;
@@ -149,33 +128,12 @@ struct ModsConfig {
   QString version;
   QList<CaseInsensitiveStr> activeMods;
   QList<CaseInsensitiveStr> knownExpansions;
-
-  bool checkActiveDuplicates() const;
-  bool checkExpansionsDuplicates() const;
-  void clearActiveMods() { activeMods.clear(); }
-  void clearAll() {
-    activeMods.clear();
-    knownExpansions.clear();
-  }
 };
 
 struct ReplacementInfo {
   QString name;
   QString author;
   QString packageid;
-  QString pfid;
-  QStringList supportedversions;
-  QString source = QStringLiteral("database");
-};
-
-struct CompiledDependencyData {
-  QHash<QString, QSet<QString>> depsGraph;
-  QHash<QString, QSet<QString>> revDepsGraph;
-  QSet<QString> tierZeroMods;
-  QSet<QString> tierOneMods;
-  QSet<QString> tierThreeMods;
-  QHash<QString, QSet<QString>> incompatibilities;
-  QHash<QString, QSet<QString>> declaredIncompatibilities;
 };
 
 // NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or
@@ -211,66 +169,6 @@ struct ExternalRulesSchema {
   std::map<std::string, ExternalRule> rules;
 };
 // NOLINTEND(readability-identifier-naming)
-
-// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or
-// on the wire
-struct SteamDbEntryDependency {
-  std::string name;
-  std::string url;
-};
-// NOLINTEND(readability-identifier-naming)
-
-// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or
-// on the wire
-struct SteamDbEntryBlacklist {
-  bool value = false;
-  std::string comment;
-};
-// NOLINTEND(readability-identifier-naming)
-
-// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or
-// on the wire
-struct SteamDbEntry {
-  bool unpublished = false;
-  std::string url;
-  std::string packageId;
-  std::variant<std::vector<std::optional<std::string>>, std::string,
-               std::nullptr_t>
-      gameVersions = std::vector<std::optional<std::string>>{};
-  std::string steamName;
-  std::string name;
-  std::variant<std::vector<std::string>, std::string, std::nullptr_t> authors =
-      std::string{};
-  std::map<std::string,
-           std::variant<std::vector<std::string>, SteamDbEntryDependency>>
-      dependencies;
-  SteamDbEntryBlacklist blacklist;
-  std::vector<std::map<std::string, std::string>> tags;
-};
-// NOLINTEND(readability-identifier-naming)
-
-// NOLINTBEGIN(readability-identifier-naming): fields are JSON keys on disk or
-// on the wire
-struct SteamDbSchema {
-  std::int64_t version = 0;
-  std::map<std::string, SteamDbEntry> database;
-};
-// NOLINTEND(readability-identifier-naming)
-
-enum class WorkshopUpdateStatus {
-  kSuccess,
-  kNoWorkshopMods,
-  kPartial,
-  kFailed,
-};
-
-struct WorkshopUpdateResult {
-  WorkshopUpdateStatus status = WorkshopUpdateStatus::kFailed;
-  int modsChecked = 0;
-  int modsUpdated = 0;
-  QStringList failedPfids;
-  QStringList errors;
-};
 
 }  // namespace px::modrim
 

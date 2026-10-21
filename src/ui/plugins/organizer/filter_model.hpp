@@ -16,7 +16,6 @@ class OrganizerFilterModel : public QAbstractListModel {
     kSectionRole,
     kKeyRole
   };
-  Q_ENUM(Role)
   explicit OrganizerFilterModel(QObject* parent = nullptr);
   int rowCount(const QModelIndex& parent = {}) const override;
   QVariant data(const QModelIndex& index,

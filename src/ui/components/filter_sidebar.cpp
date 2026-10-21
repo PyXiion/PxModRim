@@ -1,7 +1,6 @@
 #include "ui/components/filter_sidebar.hpp"
 
 #include <QAbstractItemModel>
-#include <QQmlContext>
 #include <QQuickItem>
 
 #include "ui/theme/palette.hpp"
@@ -11,8 +10,6 @@ FilterSidebar::FilterSidebar(QQmlEngine* engine, QAbstractItemModel* model,
     : QQuickWidget(engine, parent) {
   setResizeMode(QQuickWidget::SizeRootObjectToView);
   setClearColor(paletteColor(u"ELEVATE_2"));
-  rootContext()->setContextProperty(QStringLiteral("filterSidebarModel"),
-                                    model);
   setInitialProperties({{QStringLiteral("model"), QVariant::fromValue(model)}});
   setSource(QUrl(QStringLiteral("qrc:/qt/qml/PxModRim/FilterSidebar.qml")));
   if (auto* root = rootObject())

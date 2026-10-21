@@ -16,8 +16,7 @@
 namespace test_support {
 
 // Qt resolves database driver plugins through the application instance, so
-// tests that open databases create one for their scope (one at a time, as
-// test_version does).
+// tests that open databases create one for their scope (one at a time).
 class TestApplication {
  public:
   TestApplication() : m_app(m_argc, nullptr) {}

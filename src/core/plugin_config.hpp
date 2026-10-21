@@ -15,11 +15,14 @@
 
 namespace px::modrim {
 
+template <class T>
+concept PluginSettings =
+    std::equality_comparable<T> && std::default_initializable<T>;
+
 // A plugin's own settings, kept in plugins/<name>.json. `legacy` maps keys of
 // the old shared config.json to fields of T; they seed the file the first time
 // it is created. Without a service the settings live in memory only.
-template <class T>
-  requires std::equality_comparable<T> && std::default_initializable<T>
+template <PluginSettings T>
 class PluginConfig {
  public:
   PluginConfig(ConfigService* service, const QString& name,
@@ -40,8 +43,7 @@ class PluginConfig {
   T m_value{};
 };
 
-template <class T>
-  requires std::equality_comparable<T> && std::default_initializable<T>
+template <PluginSettings T>
 PluginConfig<T>::PluginConfig(ConfigService* service, const QString& name,
                               const QHash<QString, QString>& legacy)
     : m_service(service),
@@ -57,13 +59,12 @@ PluginConfig<T>::PluginConfig(ConfigService* service, const QString& name,
   m_value = stored ? std::move(*stored) : seed(legacy);
 }
 
-template <class T>
-  requires std::equality_comparable<T> && std::default_initializable<T>
+template <PluginSettings T>
 T PluginConfig<T>::seed(const QHash<QString, QString>& legacy) const {
   if (!m_service || legacy.isEmpty()) {
     return T{};
   }
-  const auto raw = m_service->loadRaw("config.json");
+  const auto raw = m_service->loadRaw(kConfigFile);
   glz::json_t::object_t fields;
   for (auto it = legacy.cbegin(); it != legacy.cend(); ++it) {
     if (auto found = raw.find(it.key().toStdString()); found != raw.end()) {
@@ -89,8 +90,7 @@ T PluginConfig<T>::seed(const QHash<QString, QString>& legacy) const {
   return value;
 }
 
-template <class T>
-  requires std::equality_comparable<T> && std::default_initializable<T>
+template <PluginSettings T>
 void PluginConfig<T>::update(T value) {
   if (value == m_value) {
     return;
@@ -100,8 +100,7 @@ void PluginConfig<T>::update(T value) {
   changed.notify(m_value);
 }
 
-template <class T>
-  requires std::equality_comparable<T> && std::default_initializable<T>
+template <PluginSettings T>
 void PluginConfig<T>::store(const T& value) const {
   if (!m_service) {
     return;

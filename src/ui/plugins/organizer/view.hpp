@@ -1,10 +1,12 @@
 #pragma once
 
 #include <QPersistentModelIndex>
+#include <QSet>
 #include <QVariantList>
 #include <QVariantMap>
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include <QCoro/QCoroQmlTask>
 #include <QCoro/QCoroTask>
@@ -50,8 +52,8 @@ class OrganizerViewPanel final : public BaseViewPanel {
   QString editorError() const { return m_editorError; }
   Q_INVOKABLE QCoro::QmlTask requestRulePreview(const QVariantList&,
                                                 int revision);
-  Q_INVOKABLE void openTags();
-  Q_INVOKABLE void openRules();
+  void openTags();
+  void openRules();
   Q_INVOKABLE void closeRules();
   Q_INVOKABLE QCoro::QmlTask createTag(QString name, QString color);
   Q_INVOKABLE QCoro::QmlTask updateTag(qint64 id, QString name, QString color);
@@ -62,13 +64,12 @@ class OrganizerViewPanel final : public BaseViewPanel {
   Q_INVOKABLE QVariantList expandedIndexes() const;
   Q_INVOKABLE void selectRow(const QModelIndex&, int modifiers,
                              const QVariantList& range);
-  Q_INVOKABLE void selectSingle(const QModelIndex&);
+  void selectSingle(const QModelIndex&);
   Q_INVOKABLE QCoro::QmlTask persistAllCollapsed(bool);
   Q_INVOKABLE QCoro::QmlTask persistCollapsed(const QModelIndex&, bool);
   Q_INVOKABLE QCoro::QmlTask toggleCheck(const QModelIndex&);
   Q_INVOKABLE void contextMenu(const QModelIndex&);
-  Q_INVOKABLE QCoro::QmlTask selectionAction(const QString&);
-  Q_INVOKABLE QCoro::QmlTask newFolder();
+  QCoro::Task<void> newFolder();
   Q_INVOKABLE bool canDrop(const QModelIndex&, const QModelIndex&) const;
   Q_INVOKABLE QCoro::QmlTask dropOn(const QModelIndex&, const QModelIndex&);
   void rebuild();
@@ -93,16 +94,27 @@ class OrganizerViewPanel final : public BaseViewPanel {
   QStringList selectedUuids() const;
   Result<QList<organizer::RuleSpec>> ruleSpecs(const QVariantList&) const;
   QCoro::Task<void> calculateRulePreview(QVariantList, int);
-  QCoro::Task<void> mutateTag(QString operation, qint64 id, QString name = {},
-                              QString color = {}, bool add = false);
+  QCoro::Task<void> saveNewTag(QString name, QString color);
+  QCoro::Task<void> saveTag(qint64 id, QString name, QString color);
+  QCoro::Task<void> removeTag(qint64 id);
+  QCoro::Task<void> setTagAssigned(qint64 id, bool add);
   QCoro::Task<void> persistRules(QVariantList);
   QCoro::Task<void> standardRules();
   QCoro::Task<void> persistCollapse(QModelIndex, bool);
   QCoro::Task<void> persistAllCollapse(bool);
   QCoro::Task<void> toggle(QModelIndex);
   QCoro::Task<void> runSelectionAction(QString);
-  QCoro::Task<void> editFolder(QString action, qint64 id = organizer::kRootId,
-                               QStringList pids = {});
+  QCoro::Task<std::optional<QString>> askFolderName(QString title,
+                                                    QString initial,
+                                                    QString verb);
+  QCoro::Task<std::optional<qint64>> askFolder(QString title,
+                                               QSet<qint64> allowed);
+  QCoro::Task<void> createFolder(qint64 parent);
+  QCoro::Task<void> createFolderFrom(QStringList pids);
+  QCoro::Task<void> renameFolder(qint64 id);
+  QCoro::Task<void> moveMods(QStringList pids);
+  QCoro::Task<void> moveFolder(qint64 id);
+  QCoro::Task<void> deleteFolder(qint64 id);
   QCoro::Task<void> placeMods(QStringList, qint64);
   QCoro::Task<void> resetRules(QStringList);
   QCoro::Task<void> performDrop(QModelIndex, QModelIndex);

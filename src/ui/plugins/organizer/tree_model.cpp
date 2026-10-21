@@ -6,15 +6,15 @@
 #include "ui/theme/palette.hpp"
 
 namespace px::modrim {
-namespace {
-using namespace organizer;
-
 QString providerIcon(const QString& id) {
   if (id == "steam" || id == "downloaded") return QStringLiteral("steam");
   if (id == "core") return QStringLiteral("grid");
   if (id == "git") return QStringLiteral("git");
   return QStringLiteral("folder");
 }
+
+namespace {
+using namespace organizer;
 
 int checkState(CheckState state) {
   switch (state) {
@@ -31,7 +31,6 @@ int checkState(CheckState state) {
 std::unique_ptr<TreeNode> build(const FolderNode& root, const ModsByUuid& mods,
                                 bool filtering) {
   auto top = std::make_unique<TreeNode>();
-  top->kind = QStringLiteral("root");
   auto addMods = [&](TreeNode* parent, const QList<ModLeaf>& leaves) {
     for (const auto& leaf : leaves) {
       auto item = std::make_unique<TreeNode>();
@@ -113,16 +112,6 @@ QList<TreeNode*> TreeNode::walk() const {
   visit(visit, *this);
   return result;
 }
-TreeNode::TreeNode(QString kind, QString key, TreeNode* parent,
-                   const organizer::FolderNode* folder,
-                   const organizer::ModLeaf* leaf, QString providerId)
-    : kind(std::move(kind)),
-      key(std::move(key)),
-      parent(parent),
-      folder(folder),
-      leaf(leaf),
-      providerId(std::move(providerId)) {}
-
 qint64 TreeNode::folderId() const {
   if (kind == "folder" && folder) return folder->folder.id;
   if (kind == "mod" && parent) return parent->folderId();
@@ -136,9 +125,7 @@ bool TreeNode::isContainer() const {
 ModTreeModel::ModTreeModel(SummaryFor summaryFor, QObject* parent)
     : QAbstractItemModel(parent),
       m_summaryFor(std::move(summaryFor)),
-      m_root(std::make_unique<TreeNode>()) {
-  m_root->kind = QStringLiteral("root");
-}
+      m_root(std::make_unique<TreeNode>()) {}
 
 TreeNode* ModTreeModel::node(const QModelIndex& index) const {
   return index.isValid() ? static_cast<TreeNode*>(index.internalPointer())
@@ -375,11 +362,6 @@ void ModTreeModel::select(const QList<QModelIndex>& indexes,
   else
     m_selected.unite(keys);
   notifySelection((before - m_selected) | (m_selected - before));
-}
-void ModTreeModel::clearSelection() {
-  const auto before = m_selected;
-  m_selected.clear();
-  notifySelection(before);
 }
 void ModTreeModel::notifySelection(const QSet<QString>& changed) {
   if (changed.isEmpty()) return;

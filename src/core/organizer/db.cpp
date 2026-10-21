@@ -187,6 +187,10 @@ Error depthLimitError() {
                    .arg(kMaxDepth)};
 }
 
+Error missingFolderError() {
+  return Error{QStringLiteral("That folder no longer exists.")};
+}
+
 Result<int> folderDepth(QSqlDatabase& db, qint64 folderId,
                         std::optional<qint64> movingFolder = std::nullopt) {
   QSqlQuery query(db);
@@ -207,8 +211,7 @@ Result<int> folderDepth(QSqlDatabase& db, qint64 folderId,
       if (query.lastError().isValid()) {
         return std::unexpected(errorOf(query));
       }
-      return std::unexpected(
-          Error{QStringLiteral("That folder no longer exists.")});
+      return std::unexpected(missingFolderError());
     }
     if (query.value(0).isNull()) {
       return depth;
@@ -241,10 +244,20 @@ Result<void> checkFolderMove(QSqlDatabase& db, qint64 folderId,
     return std::unexpected(errorOf(*height));
   }
   if (height->value(0).isNull()) {
-    return std::unexpected(
-        Error{QStringLiteral("That folder no longer exists.")});
+    return std::unexpected(missingFolderError());
   }
   if (*parentDepth + height->value(0).toInt() > kMaxDepth) {
+    return std::unexpected(depthLimitError());
+  }
+  return {};
+}
+
+Result<void> checkChildDepth(QSqlDatabase& db, qint64 parentId) {
+  auto parentDepth = folderDepth(db, parentId);
+  if (!parentDepth) {
+    return std::unexpected(parentDepth.error());
+  }
+  if (*parentDepth + 1 > kMaxDepth) {
     return std::unexpected(depthLimitError());
   }
   return {};
@@ -303,22 +316,19 @@ Result<OrganizerState> loadState(QSqlDatabase& db) {
   bool corruptRule = false;
   auto rules = selectRows(
       db,
-      QStringLiteral(
-          "SELECT id, position, field, op, pattern, folder_id FROM rules "
-          "ORDER BY position ASC, id ASC"),
+      QStringLiteral("SELECT field, op, pattern, folder_id FROM rules "
+                     "ORDER BY position ASC, id ASC"),
       {}, [&state, &corruptRule](QSqlQuery& row) {
-        const auto field = parseRuleField(row.value(2).toString());
-        const auto op = parseRuleOp(row.value(3).toString());
+        const auto field = parseRuleField(row.value(0).toString());
+        const auto op = parseRuleOp(row.value(1).toString());
         if (!field || !op) {
           corruptRule = true;
           return;
         }
-        state.rules.append(Rule{.id = row.value(0).toLongLong(),
-                                .position = row.value(1).toLongLong(),
-                                .field = *field,
-                                .op = *op,
-                                .pattern = row.value(4).toString(),
-                                .folderId = row.value(5).toLongLong()});
+        state.rules.append(RuleSpec{.field = *field,
+                                    .op = *op,
+                                    .pattern = row.value(2).toString(),
+                                    .folderId = row.value(3).toLongLong()});
       });
   if (!rules) {
     return std::unexpected(rules.error());
@@ -332,12 +342,8 @@ Result<OrganizerState> loadState(QSqlDatabase& db) {
 
 Result<Folder> insertFolder(QSqlDatabase& db, qint64 parentId,
                             const QString& name) {
-  auto parentDepth = folderDepth(db, parentId);
-  if (!parentDepth) {
-    return std::unexpected(parentDepth.error());
-  }
-  if (*parentDepth + 1 > kMaxDepth) {
-    return std::unexpected(depthLimitError());
+  if (auto fits = checkChildDepth(db, parentId); !fits) {
+    return std::unexpected(fits.error());
   }
   auto inserted = runStatement(
       db, QStringLiteral("INSERT INTO folders (parent_id, name) VALUES (?, ?)"),
@@ -434,13 +440,11 @@ Result<void> setModTagRows(QSqlDatabase& db, const QStringList& packageIds,
   return {};
 }
 
-Result<QList<Rule>> replaceRuleRows(QSqlDatabase& db,
-                                    const QList<RuleSpec>& specs) {
+Result<void> replaceRuleRows(QSqlDatabase& db, const QList<RuleSpec>& specs) {
   if (auto deleted = runStatement(db, QStringLiteral("DELETE FROM rules"));
       !deleted) {
     return std::unexpected(deleted.error());
   }
-  QList<Rule> rules;
   for (qsizetype position = 0; position < specs.size(); ++position) {
     const RuleSpec& spec = specs[position];
     auto inserted = runStatement(
@@ -450,26 +454,16 @@ Result<QList<Rule>> replaceRuleRows(QSqlDatabase& db,
     if (!inserted) {
       return std::unexpected(inserted.error());
     }
-    rules.append(Rule{.id = inserted->lastInsertId().toLongLong(),
-                      .position = static_cast<qint64>(position),
-                      .field = spec.field,
-                      .op = spec.op,
-                      .pattern = spec.pattern,
-                      .folderId = spec.folderId});
   }
-  return rules;
+  return {};
 }
 
 Result<void> appendNamedRuleRows(QSqlDatabase& db, qint64 parentId,
                                  const QStringList& newFolders,
                                  const QList<StandardRule>& rules) {
   if (!newFolders.isEmpty()) {
-    auto parentDepth = folderDepth(db, parentId);
-    if (!parentDepth) {
-      return std::unexpected(parentDepth.error());
-    }
-    if (*parentDepth + 1 > kMaxDepth) {
-      return std::unexpected(depthLimitError());
+    if (auto fits = checkChildDepth(db, parentId); !fits) {
+      return fits;
     }
   }
   QList<QVariantList> folderRows;
@@ -592,9 +586,12 @@ OrganizerDb::OrganizerDb(QString path)
 OrganizerDb::~OrganizerDb() {
   // Blocks until the worker has released the connection; the pool cannot stop
   // before that.
-  QtConcurrent::run(&m_pool, [name = m_connectionName] {
-    discardConnection(name);
-  }).waitForFinished();
+  discard().waitForFinished();
+}
+
+QFuture<void> OrganizerDb::discard() {
+  return QtConcurrent::run(
+      &m_pool, [name = m_connectionName] { discardConnection(name); });
 }
 
 template <class F>
@@ -612,18 +609,7 @@ auto OrganizerDb::submit(F fn) {
 }
 
 QCoro::Task<Result<OrganizerState>> OrganizerDb::load() {
-  co_return co_await submit(
-      [](QSqlDatabase& db) -> Result<OrganizerState> { return loadState(db); });
-}
-
-QCoro::Task<Result<Folder>> OrganizerDb::createFolder(qint64 parentId,
-                                                      QString name) {
-  co_return co_await submit(
-      [parentId, name](QSqlDatabase& db) -> Result<Folder> {
-        return inTransaction(db, [&]() -> Result<Folder> {
-          return insertFolder(db, parentId, name);
-        });
-      });
+  co_return co_await submit(loadState);
 }
 
 QCoro::Task<Result<Folder>> OrganizerDb::createFolderWith(
@@ -791,12 +777,10 @@ QCoro::Task<Result<void>> OrganizerDb::setModTags(QStringList packageIds,
       });
 }
 
-QCoro::Task<Result<QList<Rule>>> OrganizerDb::replaceRules(
-    QList<RuleSpec> specs) {
-  co_return co_await submit([specs](QSqlDatabase& db) -> Result<QList<Rule>> {
-    return inTransaction(db, [&]() -> Result<QList<Rule>> {
-      return replaceRuleRows(db, specs);
-    });
+QCoro::Task<Result<void>> OrganizerDb::replaceRules(QList<RuleSpec> specs) {
+  co_return co_await submit([specs](QSqlDatabase& db) -> Result<void> {
+    return inTransaction(
+        db, [&]() -> Result<void> { return replaceRuleRows(db, specs); });
   });
 }
 
@@ -810,9 +794,6 @@ QCoro::Task<Result<void>> OrganizerDb::appendNamedRules(
       });
 }
 
-QCoro::Task<void> OrganizerDb::close() {
-  co_await QtConcurrent::run(
-      &m_pool, [name = m_connectionName] { discardConnection(name); });
-}
+QCoro::Task<void> OrganizerDb::close() { co_await discard(); }
 
 }  // namespace px::modrim::organizer

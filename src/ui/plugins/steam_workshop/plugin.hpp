@@ -50,6 +50,8 @@ class SteamWorkshopUiPlugin final : public UiPlugin {
  private:
   void disconnectEvents();
   void refreshCachedIds();
+  void refreshBadges();
+  void dropDownload(const QString& id);
   void notifySidebar();
   void onItemStatus(const DownloadItemStatus& status);
   void onDownloadFinished(const DownloadResult& result);

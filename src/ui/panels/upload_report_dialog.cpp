@@ -17,6 +17,19 @@
 #include "ui/context.hpp"
 
 namespace px::modrim {
+namespace {
+enum class UploadChoice { kCancel = QDialog::Rejected, kSaveToFile = 2 };
+class UploadConfirmDialog : public QDialog {
+ public:
+  explicit UploadConfirmDialog(QWidget* parent = nullptr);
+};
+class UploadFailedDialog : public QDialog {
+ public:
+  explicit UploadFailedDialog(const QString& errorMessage,
+                              QWidget* parent = nullptr);
+};
+}  // namespace
+
 UploadConfirmDialog::UploadConfirmDialog(QWidget* parent) : QDialog(parent) {
   setObjectName(QStringLiteral("uploadConfirmDialog"));
   setWindowTitle(tr("Upload Log & System Info"));

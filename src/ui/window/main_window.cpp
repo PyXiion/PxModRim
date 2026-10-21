@@ -71,6 +71,24 @@ UnsavedChangesDialog::UnsavedChangesDialog(QWidget* parent)
   setDefaultButton(Save);
 }
 
+namespace {
+const QList<QPair<QString, QString>> kQmlShortcuts{
+    {QStringLiteral("Up / Down"), QStringLiteral("Navigate mod list")},
+    {QStringLiteral("Shift+Up / Shift+Down"),
+     QStringLiteral("Extend mod selection")},
+    {QStringLiteral("Return / Space"), QStringLiteral("Toggle selected mods")},
+    {QStringLiteral("Ctrl+A"), QStringLiteral("Select all mods")},
+};
+
+class LaunchConfirmDialog : public QMessageBox {
+ public:
+  LaunchConfirmDialog(QWidget* parent, const QString& title,
+                      const QString& text, const QString& info,
+                      const QString& accept);
+  bool dontAskAgain() const;
+};
+}  // namespace
+
 LaunchConfirmDialog::LaunchConfirmDialog(QWidget* parent, const QString& title,
                                          const QString& text,
                                          const QString& info,
@@ -117,7 +135,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
       windowFlags().testFlag(Qt::FramelessWindowHint),
       static_cast<int>(m_app.uiPrefs().launch_strategy), appVersion(), tooltips,
       m_ctx.downloads().available(), this);
-  m_header = new HeaderPanel(*m_headerController, m_engine, this);
+  auto* header = new HeaderPanel(*m_headerController, m_engine, this);
   setupActions();
   m_menu = new MenuBar(m_actions, this);
   m_menu->hide();
@@ -157,7 +175,7 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
   auto* layout = new QVBoxLayout(outer);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
-  layout->addWidget(m_header);
+  layout->addWidget(header);
   layout->addWidget(m_menu);
   QVariantList tabs;
   for (const auto& view : m_app.railViews()) {
@@ -177,8 +195,6 @@ MainWindow::MainWindow(AppContext& app, QWidget* parent)
   m_splitter->setHandleWidth(1);
   m_rail = new ViewRailPanel(tabs, help, m_engine, m_splitter);
   m_rail->setObjectName(QStringLiteral("viewRail"));
-  m_rail->setMinimumWidth(kRailMinWidth);
-  m_rail->setMaximumWidth(kRailMaxWidth);
   m_stack = new QStackedWidget(m_splitter);
   m_stack->setObjectName(QStringLiteral("viewStack"));
   m_splitter->addWidget(m_rail);
@@ -317,18 +333,20 @@ void MainWindow::setupActions() {
   bind(ActionId::kPrevView, [this] { cycleView(-1); });
   bind(ActionId::kFullscreen,
        [this] { isFullScreen() ? showNormal() : showFullScreen(); });
-  bind(ActionId::kReportIssue, [] {
-    QDesktopServices::openUrl(
-        QUrl(QStringLiteral("https://github.com/PyXiion/PxModRim/issues")));
-  });
+  bind(ActionId::kReportIssue,
+       [] { QDesktopServices::openUrl(QUrl(QString(kIssuesUrl))); });
   bind(ActionId::kOpenLogs, [] {
     QDesktopServices::openUrl(QUrl::fromLocalFile(
         QDir(configDir()).filePath(QStringLiteral("logs"))));
   });
-  bind(ActionId::kUploadLogs, [this] { uploadReport(); });
-  bind(ActionId::kShortcuts, [this] { showShortcuts(); });
+  bind(ActionId::kUploadLogs,
+       [this] { handleUploadReport(this, m_ctx, *m_toasts); });
+  bind(ActionId::kShortcuts, [this] {
+    awaitDialog<KeyboardShortcutsDialog>(shortcutRows() + kQmlShortcuts, this);
+  });
   bind(ActionId::kCheckUpdates, [this] { checkUpdates(true); });
-  bind(ActionId::kAbout, [this] { showAbout(); });
+  bind(ActionId::kAbout,
+       [this] { awaitDialog<AboutPanel>(this, m_ctx, *m_toasts); });
   m_actions.at(ActionId::kUpdateMods)
       ->setEnabled(m_ctx.downloads().available());
   for (int index = 0; index < 9; ++index) {
@@ -613,17 +631,6 @@ QCoro::Task<void> MainWindow::openSettings() {
     startStartupUpdateCheck();
   }
   m_toasts->success(QStringLiteral("Settings saved"));
-}
-
-QCoro::Task<void> MainWindow::showAbout() {
-  co_await awaitDialog<AboutPanel>(this, m_ctx, *m_toasts);
-}
-QCoro::Task<void> MainWindow::showShortcuts() {
-  co_await awaitDialog<KeyboardShortcutsDialog>(shortcutRows() + kQmlShortcuts,
-                                                this);
-}
-QCoro::Task<void> MainWindow::uploadReport() {
-  co_await handleUploadReport(this, m_ctx, *m_toasts);
 }
 
 QCoro::Task<void> MainWindow::restoreSnapshot() {

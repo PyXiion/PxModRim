@@ -9,6 +9,9 @@
 
 namespace px::modrim {
 
+// <config folder>/ModsConfig.xml.
+QString modsConfigPath(const QString& configFolder);
+
 // Parses ModsConfig.xml. nullopt when the file is unreadable, malformed, or not
 // a ModsConfig document.
 std::optional<ModsConfig> parseModsConfig(const QString& path);

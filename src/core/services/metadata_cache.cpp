@@ -54,9 +54,6 @@ Result<void> exec(QSqlDatabase& db, const QString& sql) {
   return {};
 }
 
-// ---- Path normalization
-// -------------------------------------------------------------------
-
 QString joinPath(const QString& dir, const QString& name) {
   return dir.endsWith(u'/') ? dir + name : dir + u'/' + name;
 }
@@ -78,9 +75,11 @@ QString parentOf(const QString& resolved, const QString& root) {
   return parent.size() < root.size() ? root : parent;
 }
 
+}  // namespace
+
 // Resolves symlinks component by component, consuming ".." after the link
 // target has been followed, as Python's posixpath.realpath does.
-QString resolvePath(const QString& path) {
+QString normalizePath(const QString& path) {
   QString absolute = QDir::fromNativeSeparators(path);
   if (!QDir::isAbsolutePath(absolute)) {
     absolute = joinPath(QDir::currentPath(), absolute);
@@ -121,8 +120,7 @@ QString resolvePath(const QString& path) {
   return resolved;
 }
 
-// ---- Payload (de)serialization
-// ------------------------------------------------------------
+namespace {
 
 QJsonArray sortedArray(const CaseInsensitiveSet& set) {
   QStringList values;
@@ -192,27 +190,8 @@ QStringList stringList(const QJsonValue& value) {
   return values;
 }
 
-void addDependency(BaseRules& rules, const QJsonObject& data) {
-  DependencyMod dep;
-  dep.packageId = CaseInsensitiveStr(
-      stringOr(data, "package_id", QStringLiteral("invalid.mod")));
-  dep.name = stringOr(data, "name", QString());
-  dep.workshopUrl = stringOr(data, "workshop_url", QString());
-  dep.alternativePackageIds = CaseInsensitiveSet(
-      stringList(data.value(QLatin1StringView("alternative_package_ids"))));
-  rules.setDependency(std::move(dep));
-}
-
-void readDependencies(BaseRules& rules, const QJsonValue& value) {
-  for (const QJsonValue& item : value.toArray()) {
-    if (item.isObject()) {
-      addDependency(rules, item.toObject());
-    }
-  }
-}
-
-// The payload as a fresh AboutXmlMod, without a mod path; the caller sets it.
-Result<std::shared_ptr<AboutXmlMod>> deserializeMod(const QString& payload) {
+Result<std::shared_ptr<AboutXmlMod>> deserializeMod(const QString& payload,
+                                                    const QString& modPath) {
   const QJsonDocument document = QJsonDocument::fromJson(payload.toUtf8());
   if (document.isNull() || !document.isObject()) {
     return std::unexpected(
@@ -253,12 +232,25 @@ Result<std::shared_ptr<AboutXmlMod>> deserializeMod(const QString& payload) {
       stringList(rulesData.value(QLatin1StringView("load_after"))));
   mod->aboutRules.incompatibleWith = CaseInsensitiveSet(
       stringList(rulesData.value(QLatin1StringView("incompatible_with"))));
-  readDependencies(mod->aboutRules, dependencies);
+  for (const QJsonValue& item : dependencies.toArray()) {
+    if (!item.isObject()) {
+      continue;
+    }
+    const QJsonObject depData = item.toObject();
+    DependencyMod dep;
+    dep.packageId = CaseInsensitiveStr(
+        stringOr(depData, "package_id", QStringLiteral("invalid.mod")));
+    dep.name = stringOr(depData, "name", QString());
+    dep.workshopUrl = stringOr(depData, "workshop_url", QString());
+    dep.alternativePackageIds = CaseInsensitiveSet(stringList(
+        depData.value(QLatin1StringView("alternative_package_ids"))));
+    mod->aboutRules.setDependency(std::move(dep));
+  }
+  if (auto set = mod->setModPath(modPath); !set) {
+    return std::unexpected(set.error());
+  }
   return mod;
 }
-
-// ---- Batch bookkeeping
-// --------------------------------------------------------------------
 
 // Candidates keyed by normalized mod path. Like Python's dict, a repeated key
 // keeps its first position and takes the later value.
@@ -336,8 +328,6 @@ QString metadataCachePath(const QString& configDir) {
   return QDir(configDir).filePath(QStringLiteral("metadata-cache.db"));
 }
 
-QString normalizePath(const QString& path) { return resolvePath(path); }
-
 QStringList normalizePaths(const QStringList& paths) {
   QHash<QString, QString> resolvedParents;
   QStringList out;
@@ -348,13 +338,13 @@ QStringList normalizePaths(const QStringList& paths) {
     const QString tail = slash < 0 ? QString() : path.mid(slash + 1);
     if (slash < 0 || tail.isEmpty() || tail == QLatin1String(".") ||
         tail == QLatin1String("..") || QFileInfo(raw).isSymLink()) {
-      out.append(resolvePath(path));
+      out.append(normalizePath(path));
       continue;
     }
     const QString head = slash == 0 ? QStringLiteral("/") : path.left(slash);
     auto memo = resolvedParents.constFind(head);
     if (memo == resolvedParents.constEnd()) {
-      memo = resolvedParents.insert(head, resolvePath(head));
+      memo = resolvedParents.insert(head, normalizePath(head));
     }
     out.append(joinPath(*memo, tail));
   }
@@ -530,14 +520,11 @@ CacheLookup MetadataCache::lookup(const QList<ModCandidate>& candidates,
         row.fileSize != candidate.size || row.targetVersion != targetVersion) {
       continue;
     }
-    auto mod = deserializeMod(row.payload);
+    auto mod = deserializeMod(row.payload, candidate.modPath);
     if (!mod) {
       spdlog::warn("Corrupted metadata cache payload for {}: {}",
                    row.modPath.toStdString(),
                    mod.error().message.toStdString());
-      continue;
-    }
-    if (auto set = (*mod)->setModPath(candidate.modPath); !set) {
       continue;
     }
     result.cached.append(*mod);

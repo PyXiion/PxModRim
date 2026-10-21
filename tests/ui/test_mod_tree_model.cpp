@@ -179,7 +179,7 @@ TEST_CASE(
   CHECK(one.isValid());
   CHECK(model.data(one).toString() == "One");
   CHECK(model.data(one, ModTreeModel::kSelectedRole).toBool());
-  model.clearSelection();
+  model.select({});
   CHECK(model.selectedNodes().isEmpty());
   model.select({model.indexForUuid("u3")});
   TreeQuery query;

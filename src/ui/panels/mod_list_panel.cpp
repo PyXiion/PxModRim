@@ -45,12 +45,10 @@ ModListPanel::ModListPanel(CoreContext& ctx, QQmlEngine* engine,
   searchInput->setClearButtonEnabled(true);
   connect(searchInput, &QLineEdit::textChanged, this,
           &ModListPanel::setSearchFilter);
-  if (const auto searchIcon = icon(u"search", 16, paletteValue(u"TEXT_DIM")))
-    searchInput->addAction(*searchIcon, QLineEdit::LeadingPosition);
+  searchInput->addAction(icon(u"search", 16, paletteValue(u"TEXT_DIM")),
+                         QLineEdit::LeadingPosition);
   searchLayout->addWidget(searchInput);
   layout->addWidget(search);
-  connect(m_model, &ModListModel::activeModsChanged, this,
-          &ModListPanel::activeModsChanged);
   m_qml->setResizeMode(QQuickWidget::SizeRootObjectToView);
   m_qml->setAttribute(Qt::WA_AlwaysStackOnTop, false);
   m_qml->setClearColor(paletteColor(u"ELEVATE_1"));
@@ -83,10 +81,6 @@ ModListPanel::~ModListPanel() {
   // QML bindings refer to the models and panel during destruction.
   delete m_qml;
 }
-void ModListPanel::loadMods(const QHash<QString, ListedModPtr>& mods,
-                            const QStringList& active) {
-  m_model->loadMods(mods, active);
-}
 QStringList ModListPanel::activeUuids() const { return m_model->activeUuids(); }
 void ModListPanel::setSidebarFilter(std::optional<QSet<QString>> uuids) {
   m_proxy->setSidebarFilter(std::move(uuids));
@@ -113,10 +107,6 @@ QString ModListPanel::uuidAt(int row) const {
 int ModListPanel::rowForUuid(const QString& uuid) const {
   return m_proxy->proxyRowForUuid(uuid);
 }
-bool ModListPanel::isChecked(int row) const {
-  const auto* item = m_model->getItem(proxyToSourceRow(row));
-  return item && item->checked;
-}
 bool ModListPanel::selectUuid(const QString& uuid) {
   const int row = rowForUuid(uuid);
   auto* root = m_qml->rootObject();
@@ -137,7 +127,6 @@ void ModListPanel::clearSelection() {
     view->setProperty("currentUuid", QString{});
     view->setProperty("anchorUuid", QString{});
   }
-  emit selectionUpdated({});
   emit modPicked({});
 }
 QCoro::Task<void> ModListPanel::refresh() {
@@ -209,24 +198,10 @@ void ModListPanel::coreStateChanged(const QStringList& uuids) {
   m_model->setCheckable(current - next, false);
   m_model->commitOrder(uuids);
 }
-void ModListPanel::commitOrder(const QStringList& uuids) {
-  m_model->commitOrder(uuids);
-  m_ctx.setActive(m_model->activeUuids());
-  emit orderChanged();
-}
 void ModListPanel::moveRow(int source, int target) {
   m_proxy->moveRow(source, target, true);
 }
-void ModListPanel::dragEnded() {
-  m_ctx.setActive(m_model->activeUuids());
-  emit orderChanged();
-}
-void ModListPanel::selectionChanged(const QVariantList& values) {
-  QStringList uuids;
-  for (const auto& value : values)
-    if (!value.toString().isEmpty()) uuids.append(value.toString());
-  emit selectionUpdated(uuids);
-}
+void ModListPanel::dragEnded() { m_ctx.setActive(m_model->activeUuids()); }
 bool ModListPanel::eventFilter(QObject* object, QEvent* event) {
   if (object == m_qml &&
       (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut))

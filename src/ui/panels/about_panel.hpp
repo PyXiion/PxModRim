@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QLatin1StringView>
 #include <QStringList>
 
 #include <QCoro/QCoroTask>
@@ -11,14 +12,16 @@ class CoreContext;
 }
 namespace px::modrim {
 class Notifier;
+inline constexpr QLatin1StringView kIssuesUrl{
+    "https://github.com/PyXiion/PxModRim/issues"};
 class AboutPanel : public QDialog {
  public:
   AboutPanel(QWidget* parent, CoreContext& ctx, Notifier& toast);
-  static QStringList environment();
   QString systemInformation() const;
-  static QString creditsHtml();
 
  private:
+  static QStringList environment();
+  static QString creditsHtml();
   QCoro::Task<void> uploadReport();
   CoreContext& m_ctx;
   Notifier& m_toast;

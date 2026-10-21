@@ -1,5 +1,6 @@
 #pragma once
 #include <QMessageBox>
+#include <QSet>
 #include <QStringList>
 
 #include <QCoro/QCoroTask>
@@ -16,4 +17,9 @@ QCoro::Task<bool> applyActivation(CoreContext& ctx, QWidget* parent,
                                   const QStringList& disable = {});
 QCoro::Task<bool> toggleMods(CoreContext& ctx, QWidget* parent,
                              const QStringList& uuids);
+struct PublishedIds {
+  QSet<QString> installed;
+  QSet<QString> active;
+};
+PublishedIds publishedIds(const CoreContext& ctx);
 }  // namespace px::modrim

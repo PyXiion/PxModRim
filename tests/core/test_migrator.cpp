@@ -95,7 +95,7 @@ TEST_CASE("fresh database is initialised and stamped without running steps") {
                          QStringLiteral("CREATE TABLE state (value TEXT "
                                         "DEFAULT 'a;b'); -- note; ignored\n"
                                         "CREATE TABLE other (x INTEGER);"),
-                         2, steps, path)
+                         2, steps, path, QStringLiteral("schema"))
                 .has_value());
     REQUIRE(db.userVersion() == 2);
     REQUIRE(db.column(QStringLiteral("SELECT name FROM sqlite_master WHERE "
@@ -142,7 +142,7 @@ TEST_CASE("migrations checkpoint the WAL before backing up") {
     REQUIRE(ensureSchema(db.get(),
                          QStringLiteral(
                              "CREATE TABLE IF NOT EXISTS state (value TEXT);"),
-                         3, steps, path)
+                         3, steps, path, QStringLiteral("schema"))
                 .has_value());
     REQUIRE(db.userVersion() == 3);
     REQUIRE(db.column(QStringLiteral(
@@ -182,7 +182,7 @@ TEST_CASE("missing migration step fails without advancing the version") {
     const auto result = ensureSchema(
         db.get(),
         QStringLiteral("CREATE TABLE IF NOT EXISTS state (value TEXT);"), 3,
-        MigrationSteps{{2, noop}}, path);
+        MigrationSteps{{2, noop}}, path, QStringLiteral("schema"));
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error().message.contains("Missing migration step"));
     REQUIRE(db.userVersion() == 1);
@@ -214,7 +214,7 @@ TEST_CASE("current schema is a no-op") {
         ensureSchema(
             db.get(),
             QStringLiteral("CREATE TABLE should_not_be_created (value TEXT);"),
-            1, steps, path)
+            1, steps, path, QStringLiteral("schema"))
             .has_value());
     REQUIRE(db.userVersion() == 1);
   }
@@ -243,7 +243,7 @@ TEST_CASE("newer schema is a no-op") {
         ensureSchema(
             db.get(),
             QStringLiteral("CREATE TABLE should_not_be_created (value TEXT);"),
-            1, steps, path)
+            1, steps, path, QStringLiteral("schema"))
             .has_value());
     REQUIRE(db.userVersion() == 2);
   }

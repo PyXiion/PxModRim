@@ -40,8 +40,6 @@ class LoadingState : public QObject {
   void push(const QString& status, int totalSteps = 100);
   void pop();
   void step(int amount = 1);
-  void setTotal(int total);
-  void setProgress(int value);
 
   [[nodiscard]] TaskScope task(const QString& status, int totalSteps = 100);
 

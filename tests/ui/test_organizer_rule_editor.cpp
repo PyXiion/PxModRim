@@ -166,7 +166,7 @@ struct Harness {
   }
 };
 
-void checkRule(const Rule& rule, RuleOp op, const QString& pattern,
+void checkRule(const RuleSpec& rule, RuleOp op, const QString& pattern,
                qint64 folder) {
   CHECK(rule.field == RuleField::kPackageId);
   CHECK(rule.op == op);

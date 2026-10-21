@@ -1,7 +1,6 @@
 #include "core/mod_service.hpp"
 
 #include <QDir>
-#include <QFileInfo>
 #include <QSet>
 #include <algorithm>
 #include <utility>
@@ -38,16 +37,6 @@ ModService::ModService(CoreContext& ctx, providers::ProviderList providers,
 
 void ModService::resetProviders(providers::ProviderList providers) {
   m_providers = std::move(providers);
-}
-
-providers::BaseModProvider* ModService::getProvider(
-    const QString& providerId) const {
-  for (const auto& provider : m_providers) {
-    if (provider->providerId() == providerId) {
-      return provider.get();
-    }
-  }
-  return nullptr;
 }
 
 QHash<QString, QString> ModService::providerColors() const {
@@ -170,30 +159,6 @@ std::optional<QString> ModService::snapshotsDir() const {
       .filePath(QStringLiteral("snapshots"));
 }
 
-void ModService::snapshotCurrentConfig() {
-  const QString configFolder = configFolderOf(m_ctx);
-  const auto snapshots = snapshotsDir();
-  if (configFolder.isEmpty() || !snapshots) {
-    return;
-  }
-  const QString configPath =
-      QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
-  if (!QFileInfo(configPath).isFile()) {
-    return;
-  }
-  if (auto created =
-          createSnapshot(configPath, *snapshots, m_ctx.config().max_snapshots);
-      !created) {
-    spdlog::warn("Failed to snapshot ModsConfig.xml: {}",
-                 created.error().message.toStdString());
-  }
-}
-
-QCoro::Task<Result<void>> ModService::initialize() {
-  snapshotCurrentConfig();
-  co_return co_await runRefreshPipeline(QStringLiteral("initialize"), false);
-}
-
 QCoro::Task<Result<void>> ModService::reload(bool full) {
   co_return co_await runRefreshPipeline(QStringLiteral("reload"), full);
 }
@@ -211,8 +176,7 @@ QCoro::Task<bool> ModService::restoreSnapshot(QString snapshotPath) {
     co_return false;
   }
 
-  const QString configPath =
-      QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+  const QString configPath = modsConfigPath(configFolder);
   auto restored = px::modrim::restoreSnapshot(
       snapshotPath, configPath, *snapshots, m_ctx.config().max_snapshots);
   if (!restored) {
@@ -243,8 +207,7 @@ QCoro::Task<bool> ModService::saveActiveLayout(QStringList activeIds) {
       packageIds.append(about->packageId);
     }
   }
-  const QString configPath =
-      QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+  const QString configPath = modsConfigPath(configFolder);
   const QString targetVersion = m_ctx.targetVersion();
   const int maxSnapshots = m_ctx.config().max_snapshots;
   const QString snapshotsPath = *snapshots;

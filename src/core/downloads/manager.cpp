@@ -10,34 +10,13 @@ DownloadManager::DownloadManager() : Plugin(kDownloadsManagerName) {}
 
 void DownloadManager::registerDownloader(Downloader& downloader) {
   m_downloaders.push_back(&downloader);
-  downloader.statusMessageChanged.connect(
-      [this](const QString& v) { statusMessageChanged.notify(v); });
-  downloader.downloadProgress.connect(
-      [this](const DownloadProgress& v) { downloadProgress.notify(v); });
-  downloader.downloadItemStatusChanged.connect(
-      [this](const DownloadItemStatus& v) {
-        downloadItemStatusChanged.notify(v);
-      });
-  downloader.downloadItemTitled.connect(
-      [this](const DownloadItemTitle& v) { downloadItemTitled.notify(v); });
-  downloader.downloadPhaseChanged.connect(
-      [this](const QString& v) { downloadPhaseChanged.notify(v); });
-  downloader.downloadFinished.connect(
-      [this](const DownloadResult& v) { downloadFinished.notify(v); });
-  downloader.batchStarted.connect(
-      [this](const QStringList& v) { batchStarted.notify(v); });
-  downloader.busyChanged.connect([this](bool busy) { onBusy(busy); });
 }
 
-void DownloadManager::onBusy(bool busy) {
+void DownloadManager::notifyBusy(bool busy) {
   if (busy) {
     m_cancelled = false;
   }
   busyChanged.notify(isDownloading());
-}
-
-const std::vector<Downloader*>& DownloadManager::downloaders() const noexcept {
-  return m_downloaders;
 }
 
 bool DownloadManager::available() const noexcept {
@@ -68,20 +47,23 @@ Downloader* DownloadManager::sourceOf(const ListedMod& mod) const {
 
 std::optional<QString> DownloadManager::updatableId(
     const ListedMod& mod) const {
-  const Downloader* source = sourceOf(mod);
-  return source ? source->updatableId(mod) : std::nullopt;
+  for (const auto* downloader : m_downloaders) {
+    if (auto id = downloader->updatableId(mod)) {
+      return id;
+    }
+  }
+  return std::nullopt;
 }
 
 QStringList DownloadManager::updatableIds(
     const QList<ListedModPtr>& mods) const {
   QStringList ids;
   QSet<QString> seen;
-  for (const auto* downloader : m_downloaders) {
-    for (const auto& id : downloader->updatableIds(mods)) {
-      if (!seen.contains(id)) {
-        seen.insert(id);
-        ids.append(id);
-      }
+  for (const auto& mod : mods) {
+    auto id = updatableId(*mod);
+    if (id && !seen.contains(*id)) {
+      seen.insert(*id);
+      ids.append(std::move(*id));
     }
   }
   return ids;

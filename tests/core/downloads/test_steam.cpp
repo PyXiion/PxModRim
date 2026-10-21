@@ -338,9 +338,9 @@ TEST_CASE("downloads into local mods and splits results",
 
   std::vector<DownloadItemStatus> statuses;
   std::vector<DownloadResult> finished;
-  svc.steam->downloadItemStatusChanged.connect(
+  svc.manager.downloadItemStatusChanged.connect(
       [&](const auto& s) { statuses.push_back(s); });
-  svc.steam->downloadFinished.connect(
+  svc.manager.downloadFinished.connect(
       [&](const auto& r) { finished.push_back(r); });
 
   auto result = runLoop(svc.steam->downloadMods({"111", "222", "111"}));
@@ -420,7 +420,7 @@ TEST_CASE("login failure fails every item and retries next time",
   TestApplication app;
   Service svc({});
   std::vector<QString> messages;
-  svc.steam->statusMessageChanged.connect(
+  svc.manager.statusMessageChanged.connect(
       [&](const QString& m) { messages.push_back(m); });
 
   auto first = runLoop(svc.steam->downloadMods({"111", "222"}));
@@ -506,14 +506,14 @@ TEST_CASE("shutdown waits for a batch suspended in login",
       ++eventsAfterShutdown;
     }
   };
-  svc.steam->busyChanged.connect(observe);
-  svc.steam->batchStarted.connect(observe);
-  svc.steam->statusMessageChanged.connect(observe);
-  svc.steam->downloadPhaseChanged.connect(observe);
-  svc.steam->downloadProgress.connect(observe);
-  svc.steam->downloadItemStatusChanged.connect(observe);
-  svc.steam->downloadItemTitled.connect(observe);
-  svc.steam->downloadFinished.connect(observe);
+  svc.manager.busyChanged.connect(observe);
+  svc.manager.batchStarted.connect(observe);
+  svc.manager.statusMessageChanged.connect(observe);
+  svc.manager.downloadPhaseChanged.connect(observe);
+  svc.manager.downloadProgress.connect(observe);
+  svc.manager.downloadItemStatusChanged.connect(observe);
+  svc.manager.downloadItemTitled.connect(observe);
+  svc.manager.downloadFinished.connect(observe);
 
   std::optional<Result<DownloadResult>> downloadOut;
   auto download = test_support::awaitInto(
@@ -647,7 +647,7 @@ TEST_CASE("updatable_id only for downloads in local mods",
   REQUIRE(svc.steam->updatableId(*m3) == std::optional<QString>("333"));
   REQUIRE(svc.steam->updatableId(*m4) == std::nullopt);
 
-  REQUIRE(svc.steam->updatableIds(svc.mods) == QStringList{"111", "333"});
+  REQUIRE(svc.manager.updatableIds(svc.mods) == QStringList{"111", "333"});
 }
 
 TEST_CASE("updatable_id none without local path", "[downloads][steam]") {
@@ -662,9 +662,9 @@ TEST_CASE("busy changed brackets download", "[downloads][steam]") {
   auto client = std::make_shared<FakeClient>();
   Service svc({client});
   std::vector<QString> events;
-  svc.steam->busyChanged.connect(
+  svc.manager.busyChanged.connect(
       [&](bool busy) { events.push_back(busy ? "busy:1" : "busy:0"); });
-  svc.steam->downloadFinished.connect(
+  svc.manager.downloadFinished.connect(
       [&](const auto&) { events.push_back("finished"); });
 
   REQUIRE(runLoop(svc.steam->downloadMods({"111"})).has_value());
@@ -677,7 +677,7 @@ TEST_CASE("invalid ids do not toggle busy", "[downloads][steam]") {
   TestApplication app;
   Service svc({std::make_shared<FakeClient>()});
   std::vector<bool> busy;
-  svc.steam->busyChanged.connect([&](bool b) { busy.push_back(b); });
+  svc.manager.busyChanged.connect([&](bool b) { busy.push_back(b); });
 
   auto result = runLoop(svc.steam->downloadMods({"12a"}));
   REQUIRE_FALSE(result.has_value());
@@ -704,7 +704,7 @@ TEST_CASE("updatable_ids limited to given mods and deduplicated",
   const auto b = makeModAt(svc.localPath + "/222", "222");
   const auto other = makeModAt(svc.configDir.path() + "/Other/9", "9");
 
-  REQUIRE(svc.steam->updatableIds({b, b, other}) == QStringList{"222"});
+  REQUIRE(svc.manager.updatableIds({b, b, other}) == QStringList{"222"});
 }
 
 TEST_CASE("result changed excludes up to date items", "[downloads][steam]") {
@@ -792,10 +792,10 @@ TEST_CASE("titles from steam are emitted", "[downloads][steam]") {
   auto client = std::make_shared<FakeClient>();
   Service svc({client});
   QHash<QString, QString> titles;
-  svc.steam->downloadItemTitled.connect(
+  svc.manager.downloadItemTitled.connect(
       [&](const auto& t) { titles.insert(t.modId, t.title); });
   std::vector<QString> phases;
-  svc.steam->downloadPhaseChanged.connect(
+  svc.manager.downloadPhaseChanged.connect(
       [&](const auto& p) { phases.push_back(p); });
 
   REQUIRE(runLoop(svc.steam->downloadMods({"111", "222"})).has_value());

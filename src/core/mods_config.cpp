@@ -39,16 +39,6 @@ QString fromFs(const std::filesystem::path& path) {
   return QString::fromStdU16String(path.u16string());
 }
 
-// Packages listed in RIMWORLD_DLC_METADATA; used when a file declares no known
-// expansions.
-QList<CaseInsensitiveStr> dlcPackageIds() {
-  QList<CaseInsensitiveStr> ids;
-  for (const auto& id : kRimworldPackageIds) {
-    ids.append(CaseInsensitiveStr(id));
-  }
-  return ids;
-}
-
 std::optional<ModsConfig> parseModsConfigBytes(std::string_view data,
                                                const QString& source) {
   pugi::xml_document doc;
@@ -90,7 +80,9 @@ std::optional<ModsConfig> parseModsConfigBytes(std::string_view data,
     }
   }
   if (config.knownExpansions.isEmpty()) {
-    config.knownExpansions = dlcPackageIds();
+    for (const auto& dlc : kRimworldDlcMetadata) {
+      config.knownExpansions.append(CaseInsensitiveStr(QString(dlc.packageId)));
+    }
   }
   return config;
 }
@@ -182,10 +174,8 @@ void replaceListItems(pugi::xml_node root, const char* name,
   if (!node) {
     node = root.append_child(name);
   }
-  for (pugi::xml_node li = node.child("li"); li;) {
-    const pugi::xml_node next = li.next_sibling("li");
+  while (const pugi::xml_node li = node.child("li")) {
     node.remove_child(li);
-    li = next;
   }
   for (const auto& item : items) {
     node.append_child("li").text().set(item.str().toUtf8().constData());
@@ -204,10 +194,11 @@ std::optional<ModsConfig> parseModsConfig(const QString& path) {
   return parseModsConfigBytes(*data, path);
 }
 
+QString modsConfigPath(const QString& configFolder) {
+  return QDir(configFolder).filePath(QStringLiteral("ModsConfig.xml"));
+}
+
 QStringList getSnapshots(const QString& snapshotsDir) {
-  if (!QFileInfo::exists(snapshotsDir)) {
-    return {};
-  }
   return snapshotFiles(snapshotsDir);
 }
 

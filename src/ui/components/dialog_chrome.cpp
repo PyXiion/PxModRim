@@ -29,14 +29,6 @@ constexpr int kBorder = 1;
 constexpr int kGripSize = 16;
 constexpr int kCloseSize = 26;
 
-// Every icon name used here is in the icon table; a miss is a programming
-// error.
-QIcon requireIcon(QStringView name, int size, QStringView color) {
-  auto found = icon(name, size, color);
-  Q_ASSERT(found.has_value());
-  return found.value_or(QIcon());
-}
-
 // Soft-red close button that fills solid on hover, like the main window's.
 class CloseButton : public QPushButton {
  public:
@@ -52,8 +44,9 @@ class CloseButton : public QPushButton {
     setToolTip(QStringLiteral("Close"));
     setCursor(Qt::PointingHandCursor);
     setFocusPolicy(Qt::NoFocus);
-    m_normalIcon = requireIcon(u"close", 12, paletteValue(u"DANGER"));
-    m_hoverIcon = requireIcon(u"close", 12, paletteValue(u"TEXT_ON_ACCENT"));
+    m_normalIcon = px::modrim::icon(u"close", 12, paletteValue(u"DANGER"));
+    m_hoverIcon =
+        px::modrim::icon(u"close", 12, paletteValue(u"TEXT_ON_ACCENT"));
     setIcon(m_normalIcon);
   }
 
@@ -91,7 +84,7 @@ void closeLikeEscape(QDialog* dialog) {
 
 class TitleBar : public QWidget {
  public:
-  TitleBar(QDialog* dialog, bool closable) : QWidget(dialog) {
+  explicit TitleBar(QDialog* dialog) : QWidget(dialog) {
     setObjectName(QStringLiteral("dialogTitleBar"));
     setAttribute(Qt::WA_StyledBackground, true);
     auto* layout = new QHBoxLayout(this);
@@ -103,12 +96,10 @@ class TitleBar : public QWidget {
     layout->addWidget(title, 1);
     connect(dialog, &QWidget::windowTitleChanged, title, &QLabel::setText);
 
-    if (closable) {
-      auto* close = new CloseButton(this);
-      connect(close, &QPushButton::clicked, dialog,
-              [dialog] { closeLikeEscape(dialog); });
-      layout->addWidget(close);
-    }
+    auto* close = new CloseButton(this);
+    connect(close, &QPushButton::clicked, dialog,
+            [dialog] { closeLikeEscape(dialog); });
+    layout->addWidget(close);
   }
 
  protected:
@@ -127,9 +118,8 @@ class TitleBar : public QWidget {
 // Keeps the overlay title bar and size grip pinned to the dialog frame.
 class Chrome : public QObject {
  public:
-  Chrome(QDialog* dialog, bool closable, bool resizable)
-      : QObject(dialog), m_dialog(dialog) {
-    m_bar = new TitleBar(dialog, closable);
+  Chrome(QDialog* dialog, bool resizable) : QObject(dialog), m_dialog(dialog) {
+    m_bar = new TitleBar(dialog);
     m_grip = resizable ? new QSizeGrip(dialog) : nullptr;
     dialog->installEventFilter(this);
     place();
@@ -164,14 +154,13 @@ class Chrome : public QObject {
 
 }  // namespace
 
-void installDialogChrome(QDialog* dialog, bool closable,
-                         std::optional<bool> resizable) {
+void installDialogChrome(QDialog* dialog) {
   if (qobject_cast<QFileDialog*>(dialog) ||
       dialog->property("chromed").toBool()) {
     return;
   }
-  const bool grip = resizable.value_or(
-      !(qobject_cast<QMessageBox*>(dialog) || dialog->isSizeGripEnabled()));
+  const bool grip =
+      !(qobject_cast<QMessageBox*>(dialog) || dialog->isSizeGripEnabled());
 
   const Qt::WindowFlags keep = dialog->windowFlags() & Qt::WindowStaysOnTopHint;
   dialog->setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint | keep);
@@ -183,7 +172,7 @@ void installDialogChrome(QDialog* dialog, bool closable,
                                m.top() + kTitleBarHeight + kBorder,
                                m.right() + kBorder, m.bottom() + kBorder);
   }
-  new Chrome(dialog, closable, grip);
+  new Chrome(dialog, grip);
 }
 
 }  // namespace px::modrim

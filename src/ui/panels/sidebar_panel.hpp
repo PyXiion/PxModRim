@@ -12,18 +12,16 @@ class SidebarPanel : public FilterSidebar {
  public:
   SidebarPanel(CoreContext& ctx, QQmlEngine* engine, QWidget* parent = nullptr);
   ~SidebarPanel() override;
-  void setEntries(const QList<view::SidebarEntry>& entries);
   std::optional<view::SidebarEntry> currentEntry() const;
   void selectAllEntry();
-  SidebarModel* model() const { return m_model; }
  signals:
   void entrySelected(const px::modrim::view::SidebarEntry& entry);
 
  private:
+  void setEntries(const QList<view::SidebarEntry>& entries);
   void onActivated(int row);
   CoreContext& m_ctx;
   SidebarModel* m_model;
-  QList<view::SidebarEntry> m_entries;
   std::uint64_t m_sidebarConnection;
 };
 }  // namespace px::modrim

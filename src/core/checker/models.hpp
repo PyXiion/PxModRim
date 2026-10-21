@@ -20,12 +20,10 @@ class ConstraintGraph;
 enum class IssueSeverity : std::uint8_t { kError, kWarning };
 
 struct ModIssue {
-  QString category;
   IssueSeverity severity;
   QString shortMessage;
   QString categoryDisplayName;
   QString detailMessage;
-  QList<PackageId> relatedPackageIds;
 
   bool operator==(const ModIssue&) const = default;
 };
@@ -51,7 +49,7 @@ struct CheckContext {
   const QHash<PackageId, int>& pidToIndex;
   const ConstraintGraph& graph;
   const sort::SortSettings& settings;
-  QString targetVersion = QStringLiteral("1.5");
+  QString targetVersion;
   const QSet<PackageId>& noVersionWarning;
   const QHash<QString, ReplacementInfo>& useThisInstead;
   const QList<QList<PackageId>>& cycles;

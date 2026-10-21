@@ -17,7 +17,7 @@ class ModInfoPanel : public QWidget, public ModInfoSink {
   ModInfoPanel(CoreContext& ctx, QQmlEngine* engine, UiPrefs& prefs,
                QWidget* parent = nullptr);
   ~ModInfoPanel() override;
-  void showMod(const ListedMod& mod,
+  void showMod(ListedModPtr mod,
                const QList<view::ModIssueView>& issues) override;
   void setIssues(const QList<view::ModIssueView>& issues);
   void clear() override;

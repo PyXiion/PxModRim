@@ -13,7 +13,9 @@
 
 #include <QCoro/QCoroNetworkReply>
 
+#include "core/downloads/manager.hpp"
 #include "core/mod_service.hpp"
+#include "ui/components/mod_activation.hpp"
 #include "ui/navigation.hpp"
 #include "ui/plugins/steam_workshop/view.hpp"
 
@@ -30,22 +32,16 @@ void SteamWorkshopUiPlugin::setup(AppContext& ctx) {
   m_service = static_cast<SteamDownloader*>(
       m_core->plugins().get(QStringLiteral("steam_downloader")));
   ctx.addRailView<SteamWorkshopViewPanel>();
-  m_modsId =
-      m_core->modService().modsChanged.connect([this](const std::monostate&) {
-        refreshCachedIds();
-        badgesRefreshRequested.notify(m_installedIds.values());
-        activeRefreshRequested.notify(m_activeIds.values());
-      });
-  m_activeId = m_core->activeStateChanged().connect([this](const QStringList&) {
-    refreshCachedIds();
-    badgesRefreshRequested.notify(m_installedIds.values());
-    activeRefreshRequested.notify(m_activeIds.values());
-  });
-  m_statusId = m_service->downloadItemStatusChanged.connect(
+  m_modsId = m_core->modService().modsChanged.connect(
+      [this](const std::monostate&) { refreshBadges(); });
+  m_activeId = m_core->activeStateChanged().connect(
+      [this](const QStringList&) { refreshBadges(); });
+  auto& downloads = m_core->downloads();
+  m_statusId = downloads.downloadItemStatusChanged.connect(
       [this](const DownloadItemStatus& status) { onItemStatus(status); });
-  m_finishedId = m_service->downloadFinished.connect(
+  m_finishedId = downloads.downloadFinished.connect(
       [this](const DownloadResult& result) { onDownloadFinished(result); });
-  m_busyId = m_service->busyChanged.connect(
+  m_busyId = downloads.busyChanged.connect(
       [this](bool busy) { downloadBusyChanged.notify(busy); });
 }
 
@@ -63,9 +59,10 @@ void SteamWorkshopUiPlugin::disconnectEvents() {
   if (!m_core) return;
   m_core->modService().modsChanged.disconnect(m_modsId);
   m_core->activeStateChanged().disconnect(m_activeId);
-  m_service->downloadItemStatusChanged.disconnect(m_statusId);
-  m_service->downloadFinished.disconnect(m_finishedId);
-  m_service->busyChanged.disconnect(m_busyId);
+  auto& downloads = m_core->downloads();
+  downloads.downloadItemStatusChanged.disconnect(m_statusId);
+  downloads.downloadFinished.disconnect(m_finishedId);
+  downloads.busyChanged.disconnect(m_busyId);
   m_core = nullptr;
   m_app = nullptr;
 }
@@ -73,17 +70,7 @@ void SteamWorkshopUiPlugin::disconnectEvents() {
 void SteamWorkshopUiPlugin::toggleDownloadChecked(const QString& id,
                                                   const QString& title,
                                                   bool checked) {
-  const auto it =
-      std::ranges::find(m_checkedIds, id, &CheckedDownloads::value_type::first);
-  if (checked) {
-    if (it == m_checkedIds.end())
-      m_checkedIds.append({id, title});
-    else
-      it->second = title;
-  } else if (it != m_checkedIds.end()) {
-    m_checkedIds.erase(it);
-  }
-  notifySidebar();
+  batchToggleDownloadChecked({id}, {title}, checked);
 }
 
 void SteamWorkshopUiPlugin::batchToggleDownloadChecked(
@@ -134,14 +121,14 @@ void SteamWorkshopUiPlugin::batchToggleActive(const QStringList& ids,
 }
 
 QCoro::Task<void> SteamWorkshopUiPlugin::requestDownload() {
-  if (m_checkedIds.isEmpty()) co_return;
-  if (!m_core || m_core->config().paths.local.empty()) {
-    m_service->statusMessageChanged.notify(
+  if (m_checkedIds.isEmpty() || !m_core) co_return;
+  if (m_core->config().paths.local.empty()) {
+    m_core->downloads().statusMessageChanged.notify(
         QStringLiteral("Local mods path is not configured"));
     co_return;
   }
   if (m_service->isDownloading()) {
-    m_service->statusMessageChanged.notify(
+    m_core->downloads().statusMessageChanged.notify(
         QStringLiteral("A download is already running"));
     co_return;
   }
@@ -156,7 +143,8 @@ QCoro::Task<void> SteamWorkshopUiPlugin::requestDownload() {
   notifySidebar();
   auto result = co_await m_service->downloadMods(std::move(ids));
   m_ownDownload = false;
-  if (!result) m_service->statusMessageChanged.notify(result.error().message);
+  if (!result && m_core)
+    m_core->downloads().statusMessageChanged.notify(result.error().message);
 }
 
 void SteamWorkshopUiPlugin::stopDownload() { m_service->cancel(); }
@@ -164,9 +152,13 @@ bool SteamWorkshopUiPlugin::isDownloading() const {
   return m_service->isDownloading();
 }
 
-void SteamWorkshopUiPlugin::removeItem(const QString& id) {
+void SteamWorkshopUiPlugin::dropDownload(const QString& id) {
   m_checkedIds.removeIf([&id](const auto& item) { return item.first == id; });
   m_statuses.remove(id);
+}
+
+void SteamWorkshopUiPlugin::removeItem(const QString& id) {
+  dropDownload(id);
   notifySidebar();
   uncheckModRequested.notify(id);
 }
@@ -182,10 +174,14 @@ void SteamWorkshopUiPlugin::notifySidebar() {
   sidebarSyncRequested.notify(SidebarSync{m_checkedIds, m_statuses});
 }
 
-void SteamWorkshopUiPlugin::syncAll() {
+void SteamWorkshopUiPlugin::refreshBadges() {
   refreshCachedIds();
   badgesRefreshRequested.notify(m_installedIds.values());
   activeRefreshRequested.notify(m_activeIds.values());
+}
+
+void SteamWorkshopUiPlugin::syncAll() {
+  refreshBadges();
   notifySidebar();
 }
 
@@ -197,10 +193,7 @@ void SteamWorkshopUiPlugin::onItemStatus(const DownloadItemStatus& status) {
 
 void SteamWorkshopUiPlugin::onDownloadFinished(const DownloadResult& result) {
   if (!m_ownDownload) return;
-  for (const auto& id : result.succeeded) {
-    m_checkedIds.removeIf([&id](const auto& item) { return item.first == id; });
-    m_statuses.remove(id);
-  }
+  for (const auto& id : result.succeeded) dropDownload(id);
   for (auto it = m_statuses.begin(); it != m_statuses.end();) {
     if (it.value() == QLatin1String("queued") ||
         it.value() == QLatin1String("downloading"))
@@ -213,16 +206,9 @@ void SteamWorkshopUiPlugin::onDownloadFinished(const DownloadResult& result) {
 
 void SteamWorkshopUiPlugin::refreshCachedIds() {
   if (!m_core) return;
-  m_installedIds.clear();
-  m_activeIds.clear();
-  const QSet<QString> active(m_core->activeUuids().cbegin(),
-                             m_core->activeUuids().cend());
-  for (const auto& mod : m_core->allMods()) {
-    if (auto id = mod->publishedFileId()) {
-      m_installedIds.insert(*id);
-      if (active.contains(mod->uuid())) m_activeIds.insert(*id);
-    }
-  }
+  auto ids = publishedIds(*m_core);
+  m_installedIds = std::move(ids.installed);
+  m_activeIds = std::move(ids.active);
 }
 
 QCoro::Task<Result<QJsonValue>> SteamWorkshopUiPlugin::fetchModDeps(

@@ -16,8 +16,6 @@ struct CommunityRule {
   bool loadFirst = false;
   bool loadLast = false;
   CaseInsensitiveSet incompatibleWith;
-
-  bool operator==(const CommunityRule&) const = default;
 };
 
 using CommunityRules = QHash<PackageId, CommunityRule>;

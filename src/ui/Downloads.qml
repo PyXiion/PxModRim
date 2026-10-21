@@ -221,7 +221,7 @@ Rectangle {
                 spacing: 2
                 model: downloadsModel
                 visible: count > 0
-                ScrollBar.vertical: PxScrollBar { policy: ScrollBar.AsNeeded }
+                ScrollBar.vertical: PxScrollBar {}
 
                 delegate: Rectangle {
                     width: listView.width

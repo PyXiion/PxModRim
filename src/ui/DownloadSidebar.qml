@@ -14,7 +14,6 @@ Rectangle {
         spacing: 0
 
         Text {
-            id: titleLabel
             text: "Download queue" + (listView.count > 0 ? " (" + listView.count + ")" : "")
             color: Theme.textMain
             font.family: Theme.fontFamily
@@ -44,9 +43,7 @@ Rectangle {
                 spacing: 2
                 model: downloadQueueModel
 
-                ScrollBar.vertical: PxScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
+                ScrollBar.vertical: PxScrollBar {}
 
                 delegate: Rectangle {
                     width: listView.width
@@ -118,7 +115,6 @@ Rectangle {
         }
 
         PxButton {
-            id: clearButton
             Layout.fillWidth: true
             variant: "danger"
             text: "Clear queue"
@@ -127,7 +123,6 @@ Rectangle {
         }
 
         PxButton {
-            id: downloadButton
             Layout.fillWidth: true
             Layout.topMargin: visible ? 4 : 0
             variant: "success"
@@ -138,7 +133,6 @@ Rectangle {
         }
 
         PxButton {
-            id: stopButton
             Layout.fillWidth: true
             Layout.topMargin: 4
             variant: "dangerSolid"

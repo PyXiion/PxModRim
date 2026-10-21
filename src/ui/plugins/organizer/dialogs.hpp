@@ -15,13 +15,12 @@ struct FolderNode;
 
 namespace px::modrim {
 
-// Asks for a folder name. Enter confirms; the confirm button is disabled while
-// the name is blank. Without `verb`, the first word of `title` names the
-// confirm button.
+// Asks for a folder name. Enter confirms; the confirm button, labelled `verb`,
+// is disabled while the name is blank.
 class FolderNameDialog : public QDialog {
  public:
   FolderNameDialog(const QString& title, const QString& initial,
-                   QWidget* parent, const QString& verb = {});
+                   QWidget* parent, const QString& verb);
 
   // The entered name with surrounding whitespace removed.
   QString textValue() const;
@@ -44,8 +43,7 @@ class FolderPickerDialog : public QDialog {
  public:
   FolderPickerDialog(const px::modrim::organizer::FolderNode& tree,
                      const QString& title, const QSet<qint64>& allowed,
-                     QWidget* parent,
-                     const QString& verb = QStringLiteral("Move"));
+                     QWidget* parent);
 
   // The id of the highlighted folder. Only meaningful once the confirm button
   // is enabled.

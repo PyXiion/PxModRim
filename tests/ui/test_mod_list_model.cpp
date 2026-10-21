@@ -52,7 +52,6 @@ TEST_CASE("mod list check state emits role updates without resetting") {
   ListFixture f;
   QSignalSpy reset(&f.model, &QAbstractItemModel::modelReset);
   QSignalSpy changed(&f.model, &QAbstractItemModel::dataChanged);
-  QSignalSpy active(&f.model, &ModListModel::activeModsChanged);
   REQUIRE(f.model.setData(f.model.index(2), Qt::Checked,
                           ModListModel::kCheckStateRole));
   CHECK(f.model.getItem(2)->checked);
@@ -61,7 +60,6 @@ TEST_CASE("mod list check state emits role updates without resetting") {
   REQUIRE(changed.size() == 1);
   CHECK(changed.first()[2].value<QList<int>>().contains(
       ModListModel::kLoadIndexRole));
-  CHECK(active.size() == 1);
   changed.clear();
   REQUIRE(f.model.setData(f.model.index(2), Qt::Checked,
                           ModListModel::kCheckStateRole));
@@ -118,8 +116,6 @@ TEST_CASE("mod list provider labels and QML roles match the reference") {
         "startupImpactText");
   CHECK(f.model.data(f.model.index(0), ModListModel::kProviderColorRole)
             .toString() == "#abcdef");
-  CHECK(f.model.data(f.model.index(2), ModListModel::kSectionNameRole)
-            .toString() == "Inactive (3)");
 }
 TEST_CASE(
     "mod list startup impacts include presentation roles and empty input is "

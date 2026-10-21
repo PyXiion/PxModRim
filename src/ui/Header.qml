@@ -102,7 +102,6 @@ Rectangle {
 
             Rectangle {
                 id: bubble
-                property alias text: bubbleText.text
                 function show(message) {
                     bubbleText.text = message
                     opacity = 1

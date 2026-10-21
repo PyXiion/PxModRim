@@ -16,7 +16,6 @@ struct ModDiagnosticsView {
 };
 
 struct ModIssueView {
-  QString category;
   QString categoryDisplayName;
   std::optional<QString> detail;
   bool isError = false;

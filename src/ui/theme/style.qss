@@ -29,7 +29,6 @@ QWidget#modInfoPanel {
 
 /* ── Transparent overrides ── */
 QScrollArea,
-QWidget#accordionContent,
 QWidget#toastManager {
     background-color: transparent;
 }
@@ -110,7 +109,7 @@ QPushButton#primaryAction:hover {
     border-color: $PRIMARY_HOVER;
 }
 /* Platform themes (e.g. Breeze) add dark icons to standard dialog buttons that
-   vanish on our dark background; drop them and match AppButton sizing. */
+   vanish on our dark background; drop them and match the appBtn sizing. */
 QDialogButtonBox {
     dialogbuttonbox-buttons-have-icons: 0;
 }
@@ -308,77 +307,11 @@ QLabel#organizerStatus {
     padding: 5px 12px;
 }
 
-/* ── Info Panel ── */
-QWidget#infoArea {
-    background-color: $ELEVATE_2;
-}
-QWidget#depsSection {
-    background-color: transparent;
-}
-
 /* ── Placeholder ── */
 QLabel#placeholder {
     color: $TEXT_DIM;
     font-size: 14px;
     padding: 32px;
-}
-
-/* ── Description Browser ── */
-QTextBrowser#descriptionBrowser {
-    background: transparent;
-    border: none;
-    padding: 0;
-    font-size: 13px;
-    color: $TEXT_MUTED;
-    line-height: 1.5;
-}
-
-/* ── Meta Chip ── */
-QWidget#metaChip {
-    background-color: $ELEVATE_3;
-    border: 1px solid $BORDER;
-    border-radius: 6px;
-    padding: 0;
-    min-width: 120px;
-}
-QLabel#metaChipLabel {
-    color: $TEXT_DIM;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-QLabel#metaChipValue {
-    font-weight: 500;
-    font-size: 13px;
-    color: $TEXT_MAIN;
-}
-
-/* ── Issues Label ── */
-QLabel#issuesLabel {
-    color: $TEXT_DIM;
-    font-style: italic;
-    font-size: 12px;
-}
-
-/* ── Meta Labels ── */
-QLabel#metaLabel {
-    color: $TEXT_DIM;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-QLabel#metaValue {
-    font-weight: 500;
-    font-size: 13px;
-    color: $TEXT_MAIN;
-}
-QWidget#metaWidget {
-    background-color: $ELEVATE_3;
-    border: 1px solid $BORDER;
-    border-radius: 6px;
-    padding: 8px 12px;
 }
 
 /* ── Status Bar ── */
@@ -398,32 +331,6 @@ QToolTip {
     color: $TEXT_MAIN;
     padding: 6px 10px;
     font-size: 11px;
-}
-
-/* ── Accordion ── */
-QWidget#accordionHeader {
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid $BORDER;
-}
-QWidget#accordionHeader:hover {
-    background: $ELEVATE_3;
-}
-QLabel#accordionTitle {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: $TEXT_DIM;
-}
-QLabel#accordionChevron {
-    font-size: 10px;
-    font-weight: 600;
-    color: $TEXT_DIM;
-    background: transparent;
-}
-QWidget#accordionContent {
-    background: transparent;
 }
 
 /* ── Group Box ── */
@@ -514,27 +421,6 @@ QPushButton#dialogCloseBtn:hover {
     border-color: $DANGER;
 }
 
-/* ── Icon Buttons ── */
-QPushButton#iconBtn {
-    background-color: $ELEVATE_3;
-    border: 1px solid $BORDER;
-    border-radius: 6px;
-    padding: 0;
-    min-height: 0;
-}
-QPushButton#iconBtn:hover {
-    background-color: $ELEVATE_4;
-    border-color: $ELEVATE_4;
-}
-QPushButton#iconBtn[primary="true"] {
-    background-color: $PRIMARY;
-    border-color: $PRIMARY;
-}
-QPushButton#iconBtn[primary="true"]:hover {
-    background-color: $PRIMARY_HOVER;
-    border-color: $PRIMARY_HOVER;
-}
-
 /* ── Toast ── */
 QWidget#toast {
     background-color: $SURFACE;
@@ -586,18 +472,6 @@ QProgressBar {
 QProgressBar::chunk {
     background: $PRIMARY;
     border-radius: 3px;
-}
-QProgressBar#thinProgress {
-    border: none;
-    border-radius: 2px;
-    background: $ELEVATE_3;
-    height: 4px;
-    max-height: 4px;
-    min-height: 4px;
-    text-align: left;
-}
-QProgressBar#thinProgress::chunk {
-    border-radius: 2px;
 }
 
 /* ── About Dialog ── */

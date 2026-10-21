@@ -22,17 +22,13 @@ class CommunityRulesService {
   CommunityRulesService(const ConfigService& configService,
                         QNetworkAccessManager& network);
 
-  // Returns the rules file path, downloading first when it is missing or
-  // `force` is set. nullopt when the download or extraction failed, or the
-  // archive has no rules file; the failure is logged, not returned.
-  QCoro::Task<std::optional<QString>> ensureRules(LoadingState& loading,
-                                                  bool force = false);
-
-  Result<CommunityRules> loadRules() const;
+  // Returns the rules file path after downloading it. nullopt when the
+  // download or extraction failed, or the archive has no rules file; the
+  // failure is logged, not returned.
+  QCoro::Task<std::optional<QString>> ensureRules(LoadingState& loading);
 
  private:
-  QCoro::Task<Result<std::optional<QString>>> downloadRules(
-      LoadingState& loading);
+  QCoro::Task<Result<bool>> downloadRules(LoadingState& loading);
 
   QString m_cacheDir;
   QString m_jsonPath;

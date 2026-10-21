@@ -11,10 +11,8 @@ class CoreModProvider final : public BaseModProvider {
   explicit CoreModProvider(QString gamePath,
                            MetadataCacheStore* metadataCache = nullptr);
 
-  QCoro::Task<Result<ModMap>> discover(
-      QString targetVersion, Profiler* timer = nullptr,
-      MetadataCacheStore* metadataCache = nullptr,
-      bool forceReparse = false) override;
+ protected:
+  QList<ModDirectory> scanDirectories() const override;
 };
 
 }  // namespace px::modrim::providers

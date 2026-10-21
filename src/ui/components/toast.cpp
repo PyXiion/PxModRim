@@ -1,6 +1,5 @@
 #include "ui/components/toast.hpp"
 
-#include <QAbstractAnimation>
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -32,14 +31,6 @@ constexpr LevelStyle kLevelStyles[]{
     {u"error", u"DANGER"},
 };
 
-// Every icon name used here is in the icon table; a miss is a programming
-// error.
-QIcon requireIcon(QStringView name, int size, QStringView color) {
-  auto found = icon(name, size, color);
-  Q_ASSERT(found.has_value());
-  return found.value_or(QIcon());
-}
-
 }  // namespace
 
 Toast::Toast(const QString& message, ToastLevel level, QWidget* parent,
@@ -61,7 +52,7 @@ Toast::Toast(const QString& message, ToastLevel level, QWidget* parent,
 
   auto* iconLabel = new QLabel(this);
   iconLabel->setPixmap(
-      requireIcon(style.icon, 16, paletteValue(style.accent)).pixmap(16, 16));
+      icon(style.icon, 16, paletteValue(style.accent)).pixmap(16, 16));
   iconLabel->setFixedSize(16, 16);
   layout->addWidget(iconLabel);
 
@@ -84,7 +75,7 @@ Toast::Toast(const QString& message, ToastLevel level, QWidget* parent,
 
   auto* close = new QPushButton(this);
   close->setObjectName(QStringLiteral("toastClose"));
-  close->setIcon(requireIcon(u"close", 10, paletteValue(u"TEXT_DIM")));
+  close->setIcon(icon(u"close", 10, paletteValue(u"TEXT_DIM")));
   close->setFixedSize(20, 20);
   close->setToolTip(QStringLiteral("Dismiss"));
   connect(close, &QPushButton::clicked, this, &Toast::dismiss);
@@ -107,7 +98,6 @@ Toast::Toast(const QString& message, ToastLevel level, QWidget* parent,
 void Toast::showWithAnimation() {
   show();
   raise();
-  m_opacityAnim->setDirection(QAbstractAnimation::Direction::Forward);
   m_opacityAnim->start();
 }
 

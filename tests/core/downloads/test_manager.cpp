@@ -60,11 +60,11 @@ class FakeDownloader : public Downloader {
       QStringList modIds) override {
     calls.push_back(modIds);
     m_busy = true;
-    busyChanged.notify(true);
+    manager().notifyBusy(true);
     m_busy = false;
-    busyChanged.notify(false);
+    manager().notifyBusy(false);
     DownloadResult result{.succeeded = modIds, .failed = {}, .changed = {}};
-    downloadFinished.notify(result);
+    manager().downloadFinished.notify(result);
     co_return result;
   }
 
@@ -165,7 +165,7 @@ TEST_CASE("busy reflects any downloader and cancel stops the rest",
   manager.busyChanged.connect(
       [&busy](const bool& value) { busy.push_back(value); });
 
-  steam.downloadFinished.connect(
+  manager.downloadFinished.connect(
       [&manager](const DownloadResult&) { manager.cancel(); });
   auto result = runSync(manager.downloadMods({"s1", "g1"}));
 

@@ -108,21 +108,13 @@ TEST_CASE(
       {"v0.2.0-rc1", "0.2.0", false},     {"v0.2.0-rc2", "0.2.0-rc1", true},
       {"v0.2.0-rc1", "0.2.0-rc1", false}, {"v0.2.0-rc1", "0.1.9", true},
       {"v0.1.9", "0.2.0-rc1", false},     {"v0.2.0+build5", "0.2.0", false},
+      {" v1.2.3 ", "1.2.2", true},
   };
   for (const auto& [tag, current, expected] : cases) {
     CAPTURE(tag, current);
     CHECK(isNewer(QString::fromLatin1(tag), QString::fromLatin1(current)) ==
           expected);
   }
-}
-
-TEST_CASE(
-    "parse_version extracts leading numeric parts and rejects non-numeric "
-    "tags") {
-  CHECK(parseVersion(QStringLiteral("latest")) == std::nullopt);
-  const auto parsed = parseVersion(QStringLiteral(" v1.2.3 "));
-  REQUIRE(parsed.has_value());
-  CHECK(*parsed == std::vector<qint64>{1, 2, 3});
 }
 
 TEST_CASE("UpdateService returns a newer release") {

@@ -14,8 +14,22 @@
 namespace px::modrim::organizer {
 namespace {
 
-const QHash<QString, ListedModPtr> kEmptyMods;
-const QStringList kEmptyActive;
+const FolderNode* findNode(const FolderNode& root, qint64 folderId) {
+  for (const FolderNode* node : root.walk()) {
+    if (node->folder.id == folderId) {
+      return node;
+    }
+  }
+  return nullptr;
+}
+
+QStringList uuidsOf(const QList<ModLeaf>& leaves) {
+  QStringList uuids;
+  for (const ModLeaf& leaf : leaves) {
+    uuids.append(leaf.uuid);
+  }
+  return uuids;
+}
 
 Result<QString> cleanName(const QString& name, const QString& what) {
   const QString cleaned = name.trimmed();
@@ -29,7 +43,11 @@ Result<QString> cleanName(const QString& name, const QString& what) {
 }  // namespace
 
 OrganizerService::OrganizerService(CoreContext& ctx, OrganizerDb& db)
-    : Plugin(QStringLiteral("organizer")), m_ctx(&ctx), m_db(db) {}
+    : OrganizerService(
+          [&ctx]() -> const QHash<QString, ListedModPtr>& {
+            return ctx.allMods();
+          },
+          [&ctx]() -> const QStringList& { return ctx.activeUuids(); }, db) {}
 
 OrganizerService::OrganizerService(AllModsFn allMods, ActiveUuidsFn activeUuids,
                                    OrganizerDb& db)
@@ -39,36 +57,20 @@ OrganizerService::OrganizerService(AllModsFn allMods, ActiveUuidsFn activeUuids,
       m_db(db) {}
 
 const QHash<QString, ListedModPtr>& OrganizerService::allMods() const {
-  if (m_allModsFn) {
-    return m_allModsFn();
-  }
-  if (m_ctx) {
-    return m_ctx->allMods();
-  }
-  return kEmptyMods;
+  return m_allModsFn();
 }
 
 const QStringList& OrganizerService::activeUuids() const {
-  if (m_activeUuidsFn) {
-    return m_activeUuidsFn();
-  }
-  if (m_ctx) {
-    return m_ctx->activeUuids();
-  }
-  return kEmptyActive;
+  return m_activeUuidsFn();
 }
 
 QCoro::Task<void> OrganizerService::init() {
-  auto loaded = co_await m_db.load();
-  if (!loaded) {
+  if (auto loaded = co_await commit(); !loaded) {
     // Plugin::init cannot report failure, so the service stays not ready and
     // says why.
     spdlog::error("Cannot load organizer state: {}",
                   loaded.error().message.toStdString());
-    co_return;
   }
-  m_state = std::move(*loaded);
-  changed.notify({});
 }
 
 QCoro::Task<void> OrganizerService::init(CoreContext&) { co_await init(); }
@@ -240,18 +242,7 @@ QSet<QString> OrganizerService::activeSet() const {
 
 QCoro::Task<Result<Folder>> OrganizerService::createFolder(QString name,
                                                            qint64 parentId) {
-  auto cleaned = validateNewFolder(name, parentId);
-  if (!cleaned) {
-    co_return std::unexpected(cleaned.error());
-  }
-  auto created = co_await m_db.createFolder(parentId, *cleaned);
-  if (!created) {
-    co_return std::unexpected(created.error());
-  }
-  if (auto committed = co_await commit(); !committed) {
-    co_return std::unexpected(committed.error());
-  }
-  co_return *created;
+  return createFolderFrom(std::move(name), {}, parentId);
 }
 
 QCoro::Task<Result<Folder>> OrganizerService::createFolderFrom(
@@ -260,8 +251,8 @@ QCoro::Task<Result<Folder>> OrganizerService::createFolderFrom(
   if (!cleaned) {
     co_return std::unexpected(cleaned.error());
   }
-  auto created = co_await m_db.createFolderWith(parentId, *cleaned,
-                                                cleanPackageIds(packageIds));
+  auto created =
+      co_await m_db.createFolderWith(parentId, *cleaned, std::move(packageIds));
   if (!created) {
     co_return std::unexpected(created.error());
   }
@@ -373,11 +364,11 @@ QCoro::Task<Result<void>> OrganizerService::place(QStringList packageIds,
   if (auto folder = findFolder(folderId); !folder) {
     co_return std::unexpected(folder.error());
   }
-  const QStringList pids = cleanPackageIds(packageIds);
-  if (pids.isEmpty()) {
+  if (cleanPackageIds(packageIds).isEmpty()) {
     co_return {};
   }
-  if (auto placed = co_await m_db.place(pids, folderId); !placed) {
+  if (auto placed = co_await m_db.place(std::move(packageIds), folderId);
+      !placed) {
     co_return std::unexpected(placed.error());
   }
   co_return co_await commit();
@@ -389,11 +380,10 @@ QCoro::Task<Result<void>> OrganizerService::ungroup(QStringList packageIds) {
 
 QCoro::Task<Result<void>> OrganizerService::resetToRules(
     QStringList packageIds) {
-  const QStringList pids = cleanPackageIds(packageIds);
-  if (pids.isEmpty()) {
+  if (cleanPackageIds(packageIds).isEmpty()) {
     co_return {};
   }
-  if (auto unplaced = co_await m_db.unplace(pids); !unplaced) {
+  if (auto unplaced = co_await m_db.unplace(std::move(packageIds)); !unplaced) {
     co_return std::unexpected(unplaced.error());
   }
   co_return co_await commit();
@@ -447,7 +437,6 @@ QCoro::Task<Result<void>> OrganizerService::deleteTag(qint64 tagId) {
 QCoro::Task<Result<void>> OrganizerService::setModTags(QStringList packageIds,
                                                        QSet<qint64> add,
                                                        QSet<qint64> remove) {
-  const QStringList pids = cleanPackageIds(packageIds);
   if (add.intersects(remove)) {
     co_return std::unexpected(
         Error{QStringLiteral("A tag cannot be added and removed at once.")});
@@ -457,10 +446,13 @@ QCoro::Task<Result<void>> OrganizerService::setModTags(QStringList packageIds,
       co_return std::unexpected(tag.error());
     }
   }
-  if (pids.isEmpty() || (add.isEmpty() && remove.isEmpty())) {
+  if (cleanPackageIds(packageIds).isEmpty() ||
+      (add.isEmpty() && remove.isEmpty())) {
     co_return {};
   }
-  if (auto updated = co_await m_db.setModTags(pids, add, remove); !updated) {
+  if (auto updated =
+          co_await m_db.setModTags(std::move(packageIds), add, remove);
+      !updated) {
     co_return std::unexpected(updated.error());
   }
   co_return co_await commit();
@@ -494,7 +486,7 @@ QCoro::Task<Result<int>> OrganizerService::addStandardRules() {
   // position.
   using RuleKey = std::tuple<int, int, QString>;
   std::set<RuleKey> present;
-  for (const Rule& rule : state().rules) {
+  for (const RuleSpec& rule : state().rules) {
     present.emplace(static_cast<int>(rule.field), static_cast<int>(rule.op),
                     rule.pattern.toCaseFolded());
   }
@@ -516,8 +508,7 @@ QCoro::Task<Result<int>> OrganizerService::addStandardRules() {
     }
     present.insert(key);
     rules.append(rule);
-    // The first spelling of a missing top-level folder names it, as in the
-    // legacy service.
+    // The first spelling of a missing top-level folder names it.
     const QString folderKey = rule.folder.toCaseFolded();
     if (!knownFolders.contains(folderKey)) {
       knownFolders.insert(folderKey);
@@ -550,18 +541,8 @@ Result<QStringList> OrganizerService::folderModUuids(qint64 folderId,
     return std::unexpected(folder.error());
   }
   const FolderNode root = tree();
-  for (const FolderNode* node : root.walk()) {
-    if (node->folder.id != folderId) {
-      continue;
-    }
-    const QList<ModLeaf> leaves = recursive ? node->allMods() : node->mods;
-    QStringList uuids;
-    for (const ModLeaf& leaf : leaves) {
-      uuids.append(leaf.uuid);
-    }
-    return uuids;
-  }
-  return QStringList{};
+  const FolderNode* node = findNode(root, folderId);
+  return uuidsOf(recursive ? node->allMods() : node->mods);
 }
 
 Result<FolderToggle> OrganizerService::folderToggle(qint64 folderId,
@@ -570,22 +551,13 @@ Result<FolderToggle> OrganizerService::folderToggle(qint64 folderId,
     return std::unexpected(folder.error());
   }
   const FolderNode root = tree();
-  for (const FolderNode* node : root.walk()) {
-    if (node->folder.id != folderId) {
-      continue;
-    }
-    const QList<ModLeaf> leaves = recursive ? node->allMods() : node->mods;
-    QStringList uuids;
-    for (const ModLeaf& leaf : leaves) {
-      uuids.append(leaf.uuid);
-    }
-    const CheckState check = recursive ? node->check : node->ownCheck();
-    if (check == CheckState::kOn) {
-      return FolderToggle{QStringList{}, uuids};
-    }
-    return FolderToggle{uuids, QStringList{}};
+  const FolderNode* node = findNode(root, folderId);
+  const QStringList uuids = uuidsOf(recursive ? node->allMods() : node->mods);
+  const CheckState check = recursive ? node->check : node->ownCheck();
+  if (check == CheckState::kOn) {
+    return FolderToggle{QStringList{}, uuids};
   }
-  return FolderToggle{};
+  return FolderToggle{uuids, QStringList{}};
 }
 
 Result<QSet<qint64>> OrganizerService::folderMoveTargets(
@@ -596,23 +568,14 @@ Result<QSet<qint64>> OrganizerService::folderMoveTargets(
   }
   const QSet<qint64> subtree = subtreeIds(folderId);
   const int treeHeight = height(folderId);
-  const QString key = folder->name.toCaseFolded();
 
   QSet<qint64> targets;
   for (const Folder& candidate : state().folders) {
     if (subtree.contains(candidate.id) || candidate.id == folder->parentId) {
       continue;
     }
-    if (depth(candidate.id) + treeHeight > kMaxDepth) {
-      continue;
-    }
-    const auto& folders = state().folders;
-    const bool clash = std::any_of(folders.cbegin(), folders.cend(),
-                                   [&candidate, &key](const Folder& child) {
-                                     return child.parentId == candidate.id &&
-                                            child.name.toCaseFolded() == key;
-                                   });
-    if (!clash) {
+    if (checkDepth(candidate.id, treeHeight) &&
+        checkUniqueFolderName(candidate.id, folder->name)) {
       targets.insert(candidate.id);
     }
   }
@@ -620,7 +583,7 @@ Result<QSet<qint64>> OrganizerService::folderMoveTargets(
 }
 
 QList<TreeFilter> OrganizerService::treeFilters() const {
-  return organizer::treeFilters(allMods(), activeSet(), &state());
+  return organizer::treeFilters(allMods(), activeSet(), state());
 }
 
 }  // namespace px::modrim::organizer

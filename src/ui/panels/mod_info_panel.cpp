@@ -26,6 +26,7 @@
 #include "ui/config.hpp"
 #include "ui/models/impact.hpp"
 #include "ui/panels/mod_info_data.hpp"
+#include "ui/panels/startup_impact_data.hpp"
 #include "ui/panels/time_analytics_panel.hpp"
 #include "ui/theme/constants.hpp"
 #include "ui/theme/palette.hpp"
@@ -175,31 +176,25 @@ ModInfoPanel::~ModInfoPanel() {
 void ModInfoPanel::setQml(const char* name, const QVariant& value) {
   if (auto* root = m_qml->rootObject()) root->setProperty(name, value);
 }
-void ModInfoPanel::showMod(const ListedMod& mod,
+void ModInfoPanel::showMod(ListedModPtr mod,
                            const QList<view::ModIssueView>& issues) {
   const auto token = ++m_previewToken;
-  m_mod = m_ctx.allMods().value(mod.uuid());
-  if (!m_mod) {
-    if (const auto* about = dynamic_cast<const AboutXmlMod*>(&mod))
-      m_mod = std::make_shared<AboutXmlMod>(*about);
-    else
-      m_mod = std::make_shared<ListedMod>(mod);
-  }
+  m_mod = std::move(mod);
   m_placeholder->hide();
   m_banner->show();
   m_qml->show();
-  const auto* about = dynamic_cast<const AboutXmlMod*>(&mod);
-  m_banner->setTitle(mod.name, !mod.description.isEmpty()
-                                   ? firstSentence(mod.description)
-                               : about ? about->packageId.str()
-                                       : QString{});
+  const auto* about = dynamic_cast<const AboutXmlMod*>(m_mod.get());
+  m_banner->setTitle(m_mod->name, !m_mod->description.isEmpty()
+                                      ? firstSentence(m_mod->description)
+                                  : about ? about->packageId.str()
+                                          : QString{});
   ++m_startupToken;
   setQml("startup", QVariant{});
   setIssues(issues);
   syncUpdating();
   if (auto* root = m_qml->rootObject())
     QMetaObject::invokeMethod(root, "resetScroll");
-  loadPreview(mod.modPath(), mod.name, token);
+  loadPreview(m_mod->modPath(), m_mod->name, token);
 }
 void ModInfoPanel::setIssues(const QList<view::ModIssueView>& issues) {
   if (!m_mod) return;
@@ -302,9 +297,9 @@ QCoro::Task<void> ModInfoPanel::setTimeAnalytics(
     co_return;
   }
   const auto& report = *result->report;
-  const auto* mod = report.find(selectedPid, std::nullopt);
+  const auto* mod = report.find(selectedPid);
   const double own = result->selectedAvg;
-  if (!mod || own < .001) {
+  if (!mod || own < kMinSeconds) {
     guard->setQml(
         "startup",
         QVariantMap{{"available", false},
@@ -314,15 +309,10 @@ QCoro::Task<void> ModInfoPanel::setTimeAnalytics(
   }
   int rank = 1;
   for (const auto& entry : report.mods) rank += entry.totalImpactS > own;
-  QList<std::pair<QString, double>> metrics;
-  for (auto it = mod->metrics.cbegin(); it != mod->metrics.cend(); ++it)
-    metrics.append({it.key(), it.value()});
-  std::stable_sort(
-      metrics.begin(), metrics.end(),
-      [](const auto& a, const auto& b) { return a.second > b.second; });
+  const auto metrics = sortedMetrics(mod->metrics);
   QVariantList rows;
   for (qsizetype i = 0; i < std::min<qsizetype>(3, metrics.size()); ++i)
-    if (metrics[i].second >= .001)
+    if (metrics[i].second >= kMinSeconds)
       rows.append(
           QVariantMap{{"label", startup_impact::metricLabel(metrics[i].first)},
                       {"value", formatDuration(metrics[i].second)},
@@ -342,7 +332,7 @@ void ModInfoPanel::openStartupDetails() { showStartupDetails(); }
 QCoro::Task<void> ModInfoPanel::showStartupDetails() {
   if (!m_startupDialog)
     m_startupDialog = new StartupImpactDialog(
-        &m_ctx.modService().startupImpact(), m_engine, this);
+        m_ctx.modService().startupImpact(), m_engine, this);
   m_startupDialog->show();
   m_startupDialog->raise();
   m_startupDialog->activateWindow();

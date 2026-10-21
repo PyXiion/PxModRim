@@ -41,23 +41,6 @@ void LoadingState::step(int amount) {
   emitChanged();
 }
 
-void LoadingState::setTotal(int total) {
-  if (m_stack.empty()) {
-    return;
-  }
-  m_stack.back().totalSteps = std::max(1, total);
-  emitChanged();
-}
-
-void LoadingState::setProgress(int value) {
-  if (m_stack.empty()) {
-    return;
-  }
-  auto& frame = m_stack.back();
-  frame.currentStep = std::max(0, std::min(frame.totalSteps, value));
-  emitChanged();
-}
-
 LoadingState::TaskScope LoadingState::task(const QString& status,
                                            int totalSteps) {
   push(status, totalSteps);

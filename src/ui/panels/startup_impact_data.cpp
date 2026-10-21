@@ -14,8 +14,17 @@
 
 namespace px::modrim {
 using namespace startup_impact;
+QList<std::pair<QString, double>> sortedMetrics(
+    const QMap<QString, double>& metrics) {
+  QList<std::pair<QString, double>> sorted;
+  for (auto it = metrics.cbegin(); it != metrics.cend(); ++it)
+    sorted.append({it.key(), it.value()});
+  std::stable_sort(
+      sorted.begin(), sorted.end(),
+      [](const auto& a, const auto& b) { return a.second > b.second; });
+  return sorted;
+}
 namespace {
-constexpr double kMinSeconds = 0.001;
 QString phaseColor(std::size_t i) {
   static constexpr std::array<const char*, 6> kColors{
       "#b57bee", "#f06ba8", "#43b581", "#f0883e", "#4fb3e8", "#e8c547"};
@@ -23,12 +32,7 @@ QString phaseColor(std::size_t i) {
                             : paletteValue(u"TEXT_DIM");
 }
 QString tooltip(const QMap<QString, double>& metrics) {
-  QList<std::pair<QString, double>> sorted;
-  for (auto it = metrics.cbegin(); it != metrics.cend(); ++it)
-    sorted.append({it.key(), it.value()});
-  std::stable_sort(
-      sorted.begin(), sorted.end(),
-      [](const auto& a, const auto& b) { return a.second > b.second; });
+  const auto sorted = sortedMetrics(metrics);
   QStringList lines;
   for (qsizetype i = 0; i < std::min<qsizetype>(8, sorted.size()); ++i)
     if (sorted[i].second >= kMinSeconds)

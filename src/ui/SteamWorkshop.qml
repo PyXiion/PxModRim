@@ -29,6 +29,12 @@ Rectangle {
         }
     }
 
+    component NavButton: PxButton {
+        variant: "ghost"
+        implicitWidth: 28
+        implicitHeight: 28
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -44,44 +50,28 @@ Rectangle {
                 anchors.rightMargin: 4
                 spacing: 4
 
-                PxButton {
-                    id: homeBtn
-                    variant: "ghost"
+                NavButton {
                     iconName: "home"
-                    implicitWidth: 28
-                    implicitHeight: 28
                     ToolTip.text: "Home"
                     onClicked: steamWorkshopPanel.navigateHome()
                 }
 
-                PxButton {
-                    id: backBtn
-                    variant: "ghost"
+                NavButton {
                     iconName: "chevron-left"
-                    implicitWidth: 28
-                    implicitHeight: 28
                     ToolTip.text: "Back"
                     enabled: webView.canGoBack
                     onClicked: webView.goBack()
                 }
 
-                PxButton {
-                    id: fwdBtn
-                    variant: "ghost"
+                NavButton {
                     iconName: "chevron"
-                    implicitWidth: 28
-                    implicitHeight: 28
                     ToolTip.text: "Forward"
                     enabled: webView.canGoForward
                     onClicked: webView.goForward()
                 }
 
-                PxButton {
-                    id: clearCacheBtn
-                    variant: "ghost"
+                NavButton {
                     iconName: "trash"
-                    implicitWidth: 28
-                    implicitHeight: 28
                     ToolTip.text: "Clear cache"
                     onClicked: {
                         // Stale Steam SSR JS in the disk cache fails SRI and gets
@@ -91,18 +81,13 @@ Rectangle {
                     }
                 }
 
-                PxButton {
-                    id: reloadBtn
-                    variant: "ghost"
+                NavButton {
                     iconName: "refresh"
-                    implicitWidth: 28
-                    implicitHeight: 28
                     ToolTip.text: "Reload"
                     onClicked: webView.reload()
                 }
 
                 PxTextField {
-                    id: urlInput
                     Layout.fillWidth: true
                     implicitHeight: 24
                     font.pixelSize: Theme.fontSizeSm

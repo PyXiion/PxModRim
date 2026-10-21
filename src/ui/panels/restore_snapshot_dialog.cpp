@@ -12,9 +12,9 @@
 #include <QTime>
 #include <QTimeZone>
 #include <QVBoxLayout>
-#include <algorithm>
 
 #include "core/mods_config.hpp"
+#include "core/utils.hpp"
 
 namespace px::modrim {
 
@@ -26,11 +26,6 @@ QString snapshotStem(const QString& path) {
   const QString name = QFileInfo(path).fileName();
   const qsizetype dot = name.lastIndexOf(u'.');
   return dot > 0 ? name.left(dot) : name;
-}
-
-bool allAsciiDigits(QStringView text) {
-  return std::all_of(text.begin(), text.end(),
-                     [](QChar c) { return c >= u'0' && c <= u'9'; });
 }
 
 // The UTC time encoded in a snapshot name such as
@@ -46,7 +41,7 @@ std::optional<QDateTime> timestampFromStem(const QString& stem) {
   }
   const QString date = parts[0];
   const QString time = parts[1].left(6);
-  if (!allAsciiDigits(date) || !allAsciiDigits(time)) {
+  if (!isAsciiDigits(date) || !isAsciiDigits(time)) {
     return std::nullopt;
   }
   const QDate day(date.left(4).toInt(), date.mid(4, 2).toInt(),

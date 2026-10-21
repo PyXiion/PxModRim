@@ -93,10 +93,7 @@ std::optional<StartupImpactReport> parseStartupImpact(const QString& path) {
   report.path = path;
   report.loadingTimeS = durationSeconds(field(root, "loadingTime"));
   report.metrics = durationMap(field(root, "metrics"));
-  report.totalImpact = durationSeconds(field(root, "totalImpact"));
   report.offThreadMetrics = durationMap(field(root, "offThreadMetrics"));
-  report.offThreadTotalImpact =
-      durationSeconds(field(root, "offThreadTotalImpact"));
   const auto& timestamp = field(root, "timestamp");
   if (timestamp.is_string()) {
     report.timestamp = QString::fromStdString(timestamp.get_string());

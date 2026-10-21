@@ -24,7 +24,6 @@ class CatalogListModel : public QAbstractListModel {
   Q_OBJECT
   Q_PROPERTY(bool hasMore READ hasMore NOTIFY changed)
   Q_PROPERTY(int count READ count NOTIFY changed)
-  Q_PROPERTY(int total READ total NOTIFY changed)
 
  public:
   explicit CatalogListModel(QObject* parent = nullptr);

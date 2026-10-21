@@ -254,17 +254,10 @@ TEST_CASE(
                .pattern = QStringLiteral("ludeon.rimworld"),
                .folderId = f1.id},
   };
-  const QList<Rule> rules = expect(wait(db.replaceRules(specs)));
-  REQUIRE(rules.size() == 3);
-  CHECK(rules[0].position == 0);
-  CHECK(rules[1].position == 1);
-  CHECK(rules[2].position == 2);
-  CHECK(rules[0].field == RuleField::kName);
-  CHECK(rules[1].field == RuleField::kAuthor);
-  CHECK(rules[2].field == RuleField::kPackageId);
+  expect(wait(db.replaceRules(specs)));
 
   const OrganizerState st = expect(wait(db.load()));
-  CHECK(st.rules == rules);
+  CHECK(st.rules == specs);
 
   // A rule pointing at a missing folder fails the whole replacement.
   expectError(wait(db.replaceRules({RuleSpec{.field = RuleField::kName,
@@ -276,7 +269,7 @@ TEST_CASE(
   expect(wait(db.deleteFolder(f1.id)));
   const OrganizerState after = expect(wait(db.load()));
   REQUIRE(after.rules.size() == 1);
-  CHECK(after.rules[0].id == rules[1].id);
+  CHECK(after.rules[0] == specs[1]);
   CHECK(after.rules[0].folderId == f2.id);
 }
 
@@ -366,13 +359,10 @@ TEST_CASE(
     }
   }
   REQUIRE(st.rules.size() == 3);
-  CHECK(st.rules[0].position == 0);
   CHECK(st.rules[0].pattern == QStringLiteral("a"));
   CHECK(st.rules[0].folderId == existing.id);
-  CHECK(st.rules[1].position == 1);
   CHECK(st.rules[1].pattern == QStringLiteral("b"));
   CHECK(st.rules[1].folderId == existing.id);
-  CHECK(st.rules[2].position == 2);
   CHECK(st.rules[2].pattern == QStringLiteral("c"));
   CHECK(st.rules[2].folderId == newId);
 }

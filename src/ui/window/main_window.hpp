@@ -35,23 +35,13 @@ class UnsavedChangesDialog : public QMessageBox {
   explicit UnsavedChangesDialog(QWidget* parent);
 };
 
-class LaunchConfirmDialog : public QMessageBox {
- public:
-  LaunchConfirmDialog(QWidget* parent, const QString& title,
-                      const QString& text, const QString& info,
-                      const QString& accept);
-  bool dontAskAgain() const;
-};
-
 class MainWindow : public QMainWindow {
   Q_OBJECT
  public:
   explicit MainWindow(AppContext& app, QWidget* parent = nullptr);
   ~MainWindow() override;
 
-  QQmlEngine* qmlEngine() const noexcept { return m_engine; }
   void setAppQuitCallback(std::function<void()> callback);
-  void requestRestart();
   bool restartRequested() const noexcept { return m_restartRequested; }
   void startStartupUpdateCheck();
   void openRoute(const QString& url);
@@ -74,6 +64,7 @@ class MainWindow : public QMainWindow {
   void openDownloads();
   void focusSearch();
   void snapRail();
+  void requestRestart();
   void savePrefs();
   void onModsReloaded();
   void onDownloadsFinished(const DownloadResult& result);
@@ -82,9 +73,6 @@ class MainWindow : public QMainWindow {
   QCoro::Task<void> autoSort();
   QCoro::Task<void> updateMods();
   QCoro::Task<void> openSettings();
-  QCoro::Task<void> showAbout();
-  QCoro::Task<void> showShortcuts();
-  QCoro::Task<void> uploadReport();
   QCoro::Task<void> restoreSnapshot();
   QCoro::Task<void> checkUpdates(bool manual);
   QCoro::Task<std::optional<QStringList>> writeActiveLayout();
@@ -100,7 +88,6 @@ class MainWindow : public QMainWindow {
   const bool m_startedWithoutGamePath;
   QQmlEngine* m_engine;
   HeaderController* m_headerController = nullptr;
-  HeaderPanel* m_header = nullptr;
   MenuBar* m_menu = nullptr;
   ViewRailPanel* m_rail = nullptr;
   QStackedWidget* m_stack = nullptr;

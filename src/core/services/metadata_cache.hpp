@@ -21,7 +21,7 @@ QString metadataCachePath(const QString& configDir);
 // written.
 QString normalizePath(const QString& path);
 
-// normalize_path for many paths; each shared parent directory is resolved once.
+// normalizePath for many paths; each shared parent directory is resolved once.
 QStringList normalizePaths(const QStringList& paths);
 
 // Persistent SQLite cache of parsed About.xml metadata (metadata-cache.db). All
@@ -40,7 +40,7 @@ class MetadataCache final : public providers::MetadataCacheStore {
   QCoro::Task<void> putMods(QList<providers::CachedMod> entries,
                             QString targetVersion) override;
 
-  // Removes entries whose normalized mod path is not in `live_mod_paths`.
+  // Removes entries whose normalized mod path is not in `liveModPaths`.
   QCoro::Task<void> pruneDisappeared(QSet<QString> liveModPaths);
 
   // Closes the connection; the next operation reopens it.

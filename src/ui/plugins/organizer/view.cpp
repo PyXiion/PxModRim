@@ -176,7 +176,7 @@ OrganizerViewPanel::OrganizerViewPanel(CoreContext& ctx, QQmlEngine* engine,
     auto* item = button(label, m_selectionBar, bar);
     if (action == QStringLiteral("update")) m_updateButton = item;
     connect(item, &QPushButton::clicked, this,
-            [this, action] { selectionAction(action); });
+            [this, action] { runSelectionAction(action); });
   }
   m_selectionBar->hide();
   layout->addWidget(m_selectionBar);
@@ -448,52 +448,56 @@ void OrganizerViewPanel::openRules() {
 }
 void OrganizerViewPanel::closeRules() { m_rulesDialog->close(); }
 QCoro::QmlTask OrganizerViewPanel::createTag(QString name, QString color) {
-  return mutateTag(QStringLiteral("create"), 0, std::move(name),
-                   std::move(color));
+  return saveNewTag(std::move(name), std::move(color));
 }
 QCoro::QmlTask OrganizerViewPanel::updateTag(qint64 id, QString name,
                                              QString color) {
-  return mutateTag(QStringLiteral("update"), id, std::move(name),
-                   std::move(color));
+  return saveTag(id, std::move(name), std::move(color));
 }
 QCoro::QmlTask OrganizerViewPanel::deleteTag(qint64 id) {
-  return mutateTag(QStringLiteral("delete"), id);
+  return removeTag(id);
 }
 QCoro::QmlTask OrganizerViewPanel::assignTag(qint64 id, bool add) {
-  return mutateTag(QStringLiteral("assign"), id, {}, {}, add);
+  return setTagAssigned(id, add);
 }
-QCoro::Task<void> OrganizerViewPanel::mutateTag(QString operation, qint64 id,
-                                                QString name, QString color,
-                                                bool add) {
+QCoro::Task<void> OrganizerViewPanel::saveNewTag(QString name, QString color) {
   const QPointer<OrganizerViewPanel> alive(this);
-  if (operation == QStringLiteral("create")) {
-    const auto result =
-        co_await m_service.createTag(std::move(name), std::move(color));
-    if (!alive) co_return;
-    if (!result) {
-      setEditorError(result.error().message);
-      co_return;
-    }
-    Q_EMIT tagCreated();
-  } else {
-    Result<void> result;
-    if (operation == QStringLiteral("update"))
-      result =
-          co_await m_service.updateTag(id, std::move(name), std::move(color));
-    else if (operation == QStringLiteral("delete"))
-      result = co_await m_service.deleteTag(id);
-    else
-      result = co_await m_service.setModTags(
-          selectedPackageIds(), add ? QSet<qint64>{id} : QSet<qint64>{},
-          add ? QSet<qint64>{} : QSet<qint64>{id});
-    if (!alive) co_return;
-    if (!result) {
-      setEditorError(result.error().message);
-      co_return;
-    }
-    if (operation == QStringLiteral("update")) Q_EMIT tagUpdated(id);
+  const auto result =
+      co_await m_service.createTag(std::move(name), std::move(color));
+  if (!alive) co_return;
+  if (!result) {
+    setEditorError(result.error().message);
+    co_return;
   }
+  Q_EMIT tagCreated();
   setEditorError();
+}
+QCoro::Task<void> OrganizerViewPanel::saveTag(qint64 id, QString name,
+                                              QString color) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto result =
+      co_await m_service.updateTag(id, std::move(name), std::move(color));
+  if (!alive) co_return;
+  if (!result) {
+    setEditorError(result.error().message);
+    co_return;
+  }
+  Q_EMIT tagUpdated(id);
+  setEditorError();
+}
+QCoro::Task<void> OrganizerViewPanel::removeTag(qint64 id) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto result = co_await m_service.deleteTag(id);
+  if (!alive) co_return;
+  setEditorError(result ? QString{} : result.error().message);
+}
+QCoro::Task<void> OrganizerViewPanel::setTagAssigned(qint64 id, bool add) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto result = co_await m_service.setModTags(
+      selectedPackageIds(), add ? QSet<qint64>{id} : QSet<qint64>{},
+      add ? QSet<qint64>{} : QSet<qint64>{id});
+  if (!alive) co_return;
+  setEditorError(result ? QString{} : result.error().message);
 }
 QCoro::QmlTask OrganizerViewPanel::saveRules(QVariantList rows) {
   return persistRules(std::move(rows));
@@ -591,9 +595,6 @@ QCoro::Task<void> OrganizerViewPanel::toggle(QModelIndex index) {
       co_await applyActivation(m_ctx, this, change->enable, change->disable);
   }
 }
-QCoro::QmlTask OrganizerViewPanel::selectionAction(const QString& action) {
-  return runSelectionAction(action);
-}
 QCoro::Task<void> OrganizerViewPanel::runSelectionAction(QString action) {
   const auto uuids = selectedUuids();
   if (uuids.isEmpty()) co_return;
@@ -602,7 +603,11 @@ QCoro::Task<void> OrganizerViewPanel::runSelectionAction(QString action) {
   else if (action == QStringLiteral("move") ||
            action == QStringLiteral("create")) {
     const auto pids = selectedPackageIds();
-    if (!pids.isEmpty()) co_await editFolder(action, kRootId, pids);
+    if (pids.isEmpty()) co_return;
+    if (action == QStringLiteral("move"))
+      co_await moveMods(pids);
+    else
+      co_await createFolderFrom(pids);
   } else if (action == QStringLiteral("update"))
     co_await updateMods(m_ctx, uuids, this);
   else if (action == QStringLiteral("enable"))
@@ -610,84 +615,83 @@ QCoro::Task<void> OrganizerViewPanel::runSelectionAction(QString action) {
   else if (action == QStringLiteral("disable"))
     co_await applyActivation(m_ctx, this, QStringList{}, uuids);
 }
-QCoro::QmlTask OrganizerViewPanel::newFolder() {
-  return editFolder(QStringLiteral("new"));
+QCoro::Task<void> OrganizerViewPanel::newFolder() {
+  co_await createFolder(kRootId);
 }
-QCoro::Task<void> OrganizerViewPanel::editFolder(QString action, qint64 id,
-                                                 QStringList pids) {
+QCoro::Task<std::optional<QString>> OrganizerViewPanel::askFolderName(
+    QString title, QString initial, QString verb) {
   const QPointer<OrganizerViewPanel> alive(this);
-  Result<void> result;
-  if (action == QStringLiteral("new") || action == QStringLiteral("create") ||
-      action == QStringLiteral("rename")) {
-    const bool rename = action == QStringLiteral("rename");
-    const QString initial =
-        rename ? m_service.state().folders.value(id).name : QString{};
-    QString title;
-    if (rename)
-      title = QStringLiteral("Rename Folder");
-    else if (action == QStringLiteral("create"))
-      title = QStringLiteral("Create Folder from Selection");
-    else
-      title = QStringLiteral("New Folder");
-    const auto nameResult = co_await awaitDialog<FolderNameDialog>(
-        title, initial, this,
-        rename ? QStringLiteral("Rename") : QStringLiteral("Create"));
-    const int code = nameResult.first;
-    auto* const dialog = nameResult.second;
-    if (!alive) co_return;
-    if (code != QDialog::Accepted) co_return;
-    const auto name = dialog->textValue();
-    if (rename)
-      result = co_await m_service.renameFolder(id, name);
-    else {
-      Result<organizer::Folder> created;
-      if (action == QStringLiteral("create"))
-        created = co_await m_service.createFolderFrom(name, pids);
-      else
-        created = co_await m_service.createFolder(name, id);
-      if (!alive) co_return;
-      if (!created) reportError(created.error());
-      co_return;
-    }
-  } else if (action == QStringLiteral("move") ||
-             action == QStringLiteral("moveFolder")) {
-    QSet<qint64> allowed;
-    if (action == QStringLiteral("moveFolder")) {
-      const auto targets = m_service.folderMoveTargets(id);
-      if (!targets) {
-        reportError(targets.error());
-        co_return;
-      }
-      allowed = *targets;
-    } else {
-      for (auto it = m_service.state().folders.cbegin();
-           it != m_service.state().folders.cend(); ++it)
-        allowed.insert(it.key());
-    }
-    const auto pickerResult = co_await awaitDialog<FolderPickerDialog>(
-        m_service.tree(),
-        action == QStringLiteral("move") ? QStringLiteral("Move to Folder")
-                                         : QStringLiteral("Move Folder"),
-        allowed, this);
-    const int code = pickerResult.first;
-    auto* const dialog = pickerResult.second;
-    if (!alive) co_return;
-    if (code != QDialog::Accepted) co_return;
-    const auto destination = dialog->folderId();
-    if (action == QStringLiteral("moveFolder"))
-      result = co_await m_service.moveFolder(id, destination);
-    else {
-      co_await placeMods(pids, destination);
-      co_return;
-    }
-  } else if (action == QStringLiteral("delete")) {
-    const auto deleteResult = co_await awaitDialog<DeleteFolderDialog>(
-        m_service.state().folders.value(id).name, this);
-    const int code = deleteResult.first;
-    if (!alive) co_return;
-    if (code != QMessageBox::Yes) co_return;
-    result = co_await m_service.deleteFolder(id);
+  const auto [code, dialog] =
+      co_await awaitDialog<FolderNameDialog>(title, initial, this, verb);
+  if (!alive || code != QDialog::Accepted) co_return std::nullopt;
+  co_return dialog->textValue();
+}
+QCoro::Task<std::optional<qint64>> OrganizerViewPanel::askFolder(
+    QString title, QSet<qint64> allowed) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto [code, dialog] = co_await awaitDialog<FolderPickerDialog>(
+      m_service.tree(), title, allowed, this);
+  if (!alive || code != QDialog::Accepted) co_return std::nullopt;
+  co_return dialog->folderId();
+}
+QCoro::Task<void> OrganizerViewPanel::createFolder(qint64 parent) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto name = co_await askFolderName(QStringLiteral("New Folder"), {},
+                                           QStringLiteral("Create"));
+  if (!name) co_return;
+  const auto created = co_await m_service.createFolder(*name, parent);
+  if (!alive) co_return;
+  if (!created) reportError(created.error());
+}
+QCoro::Task<void> OrganizerViewPanel::createFolderFrom(QStringList pids) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto name =
+      co_await askFolderName(QStringLiteral("Create Folder from Selection"), {},
+                             QStringLiteral("Create"));
+  if (!name) co_return;
+  const auto created = co_await m_service.createFolderFrom(*name, pids);
+  if (!alive) co_return;
+  if (!created) reportError(created.error());
+}
+QCoro::Task<void> OrganizerViewPanel::renameFolder(qint64 id) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto name = co_await askFolderName(
+      QStringLiteral("Rename Folder"), m_service.state().folders.value(id).name,
+      QStringLiteral("Rename"));
+  if (!name) co_return;
+  const auto result = co_await m_service.renameFolder(id, *name);
+  if (!alive) co_return;
+  if (!result) reportError(result.error());
+}
+QCoro::Task<void> OrganizerViewPanel::moveMods(QStringList pids) {
+  QSet<qint64> allowed;
+  for (auto it = m_service.state().folders.cbegin();
+       it != m_service.state().folders.cend(); ++it)
+    allowed.insert(it.key());
+  const auto destination =
+      co_await askFolder(QStringLiteral("Move to Folder"), std::move(allowed));
+  if (destination) co_await placeMods(pids, *destination);
+}
+QCoro::Task<void> OrganizerViewPanel::moveFolder(qint64 id) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto targets = m_service.folderMoveTargets(id);
+  if (!targets) {
+    reportError(targets.error());
+    co_return;
   }
+  const auto destination =
+      co_await askFolder(QStringLiteral("Move Folder"), *targets);
+  if (!destination) co_return;
+  const auto result = co_await m_service.moveFolder(id, *destination);
+  if (!alive) co_return;
+  if (!result) reportError(result.error());
+}
+QCoro::Task<void> OrganizerViewPanel::deleteFolder(qint64 id) {
+  const QPointer<OrganizerViewPanel> alive(this);
+  const auto [code, dialog] = co_await awaitDialog<DeleteFolderDialog>(
+      m_service.state().folders.value(id).name, this);
+  if (!alive || code != QMessageBox::Yes) co_return;
+  const auto result = co_await m_service.deleteFolder(id);
   if (!alive) co_return;
   if (!result) reportError(result.error());
 }
@@ -756,14 +760,13 @@ void OrganizerViewPanel::modMenu() {
           !manual.contains(*node->leaf->packageId))
         manual.append(*node->leaf->packageId);
     }
-  auto* move = m_menu->addAction(
-      QStringLiteral("Move to folder…"), this,
-      [this, pids] { editFolder(QStringLiteral("move"), kRootId, pids); });
+  auto* move = m_menu->addAction(QStringLiteral("Move to folder…"), this,
+                                 [this, pids] { moveMods(pids); });
   auto* remove = m_menu->addAction(QStringLiteral("Remove from folder"), this,
                                    [this, pids] { placeMods(pids, kRootId); });
-  auto* create = m_menu->addAction(
-      QStringLiteral("Create folder from selection…"), this,
-      [this, pids] { editFolder(QStringLiteral("create"), kRootId, pids); });
+  auto* create =
+      m_menu->addAction(QStringLiteral("Create folder from selection…"), this,
+                        [this, pids] { createFolderFrom(pids); });
   for (auto* action : {move, remove, create}) {
     action->setEnabled(placeable);
     action->setToolTip(
@@ -808,16 +811,16 @@ void OrganizerViewPanel::folderMenu(const TreeNode& node) {
   }
   if (node.folder && node.folder->depth < kMaxDepth)
     m_menu->addAction(QStringLiteral("New subfolder…"), this,
-                      [this, id] { editFolder(QStringLiteral("new"), id); });
+                      [this, id] { createFolder(id); });
   m_menu->addAction(QStringLiteral("Rename…"), this,
-                    [this, id] { editFolder(QStringLiteral("rename"), id); });
+                    [this, id] { renameFolder(id); });
   const auto targets = m_service.folderMoveTargets(id);
   m_menu
       ->addAction(QStringLiteral("Move to…"), this,
-                  [this, id] { editFolder(QStringLiteral("moveFolder"), id); })
+                  [this, id] { moveFolder(id); })
       ->setEnabled(targets && !targets->isEmpty());
   m_menu->addAction(QStringLiteral("Delete…"), this,
-                    [this, id] { editFolder(QStringLiteral("delete"), id); });
+                    [this, id] { deleteFolder(id); });
 }
 bool OrganizerViewPanel::canDrop(const QModelIndex& source,
                                  const QModelIndex& target) const {

@@ -10,7 +10,6 @@
 {QLatin1StringView{"TEXT_MUTED"}, QLatin1StringView{"#949ba4"}},
 {QLatin1StringView{"TEXT_DIM"}, QLatin1StringView{"#6c737f"}},
 {QLatin1StringView{"TEXT_ON_ACCENT"}, QLatin1StringView{"#0b0d10"}},
-{QLatin1StringView{"NEUTRAL"}, QLatin1StringView{"#6b7280"}},
 {QLatin1StringView{"PRIMARY"}, QLatin1StringView{"#66c0f4"}},
 {QLatin1StringView{"PRIMARY_HOVER"}, QLatin1StringView{"#4aa8d8"}},
 {QLatin1StringView{"PRIMARY_BG"}, QLatin1StringView{"rgba(102,192,244,0.1)"}},

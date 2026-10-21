@@ -21,8 +21,7 @@ namespace px::modrim::services {
 class GameLauncher {
  public:
   // `ctx` is not owned and must outlive the launcher.
-  GameLauncher(CoreContext& ctx, ProcessLister lister = hostProcessLister,
-               MonitorTiming timing = {});
+  explicit GameLauncher(CoreContext& ctx);
 
   // Resolves to a status message when the launch was started, or to the reason
   // it was not.
@@ -44,7 +43,6 @@ class GameLauncher {
   QCoro::Task<Result<QString>> launchSteam();
 
   CoreContext& m_ctx;
-  ProcessLister m_lister;
   GameProcessMonitor m_monitor;
 };
 

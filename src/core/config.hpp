@@ -9,8 +9,6 @@
 #include <string>
 #include <string_view>
 
-#include <QCoro/QCoroTask>
-
 #include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
 
@@ -180,6 +178,9 @@ Result<void> ConfigService::save(const QString& filename, const T& data) const {
 }
 
 QString configDir();
+
+inline const QString kConfigFile = QStringLiteral("config.json");
+
 QString communityRulesFile();
 
 // The game version string from Version.txt, or nullopt when it is missing or
@@ -187,22 +188,5 @@ QString communityRulesFile();
 std::optional<QString> readGameVersion(const QString& gamePath);
 
 PathConfig detectGamePaths();
-
-// Owns the AppConfig lifecycle: load on setup, save on request.
-class AppConfigService {
- public:
-  explicit AppConfigService(ConfigService& svc);
-
-  QCoro::Task<Result<void>> setup();
-
-  // Valid only after a successful setup().
-  const AppConfig& cfg() const;
-
-  Result<void> saveCfg() const;
-
- private:
-  ConfigService& m_svc;
-  std::optional<AppConfig> m_cfg;
-};
 
 }  // namespace px::modrim

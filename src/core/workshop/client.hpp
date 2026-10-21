@@ -24,11 +24,6 @@ QString normalizeBaseUrl(QString url);
 // catalog: every call fails with a CatalogError and nothing is sent.
 class CatalogClient {
  public:
-  struct BatchResult {
-    std::vector<CatalogMod> items;
-    std::vector<std::string> unavailableIds;
-  };
-
   explicit CatalogClient(QString baseUrl);
   CatalogClient(const CatalogClient&) = delete;
   CatalogClient& operator=(const CatalogClient&) = delete;
@@ -45,7 +40,8 @@ class CatalogClient {
   // nullopt when the catalog does not know the collection (HTTP 404).
   QCoro::Task<CatalogResult<std::optional<CollectionDetail>>> collection(
       QString id);
-  QCoro::Task<CatalogResult<BatchResult>> modsBatch(QStringList ids);
+  QCoro::Task<CatalogResult<std::vector<CatalogMod>>> modsBatch(
+      QStringList ids);
   QCoro::Task<CatalogResult<ResolvedDownload>> resolve(
       QStringList ids, QStringList collectionIds);
 

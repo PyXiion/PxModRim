@@ -26,13 +26,11 @@ using services_test::runAsync;
 
 namespace {
 
-std::shared_ptr<AboutXmlMod> about(const QString& packageId,
-                                   bool valid = true) {
+std::shared_ptr<AboutXmlMod> about(const QString& packageId) {
   auto mod = std::make_shared<AboutXmlMod>();
   mod->name = packageId;
   mod->packageId = CaseInsensitiveStr(packageId);
   mod->providerId = QStringLiteral("local");
-  mod->valid = valid;
   return mod;
 }
 
@@ -104,25 +102,6 @@ TEST_CASE("setActive emits on every change and keeps the loaded list") {
   CHECK(ctx->loadedActiveUuids() == QStringList{"a"});
 
   CHECK(ctx->activeStateChanged().disconnect(id));
-}
-
-TEST_CASE("computeStats counts total, active, inactive and invalid mods") {
-  EventLoop loop;
-  auto ctx = makeContext();
-  ctx->load({{QStringLiteral("a"), about(QStringLiteral("a.mod"))},
-             {QStringLiteral("b"), about(QStringLiteral("b.mod"))},
-             {QStringLiteral("c"), about(QStringLiteral("c.mod"), false)}},
-            {QStringLiteral("a")});
-
-  const auto stats = ctx->computeStats();
-  CHECK(stats.total == 3);
-  CHECK(stats.active == 1);
-  CHECK(stats.inactive == 2);
-  CHECK(stats.errors == 1);
-
-  const auto overrideStats = ctx->computeStats(QStringList{"a", "b"});
-  CHECK(overrideStats.active == 2);
-  CHECK(overrideStats.inactive == 1);
 }
 
 TEST_CASE("autoSort enables a missing dependency and orders it first") {

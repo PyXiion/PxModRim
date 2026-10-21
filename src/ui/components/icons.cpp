@@ -26,7 +26,7 @@ constexpr QLatin1StringView kSvgNamespace{
 
 const IconEntry* findIcon(QStringView name) {
   for (const auto& entry : kIcons) {
-    if (QString(entry.name) == name) {
+    if (entry.name == name) {
       return &entry;
     }
   }
@@ -50,11 +50,10 @@ std::optional<QString> iconSvg(QStringView name, QStringView color) {
   return svg;
 }
 
-std::optional<QPixmap> iconPixmap(QStringView name, int size,
-                                  QStringView color) {
+QIcon icon(QStringView name, int size, QStringView color) {
   const auto svg = iconSvg(name, color);
   if (!svg) {
-    return std::nullopt;
+    return {};
   }
 
   const QScreen* screen = QGuiApplication::primaryScreen();
@@ -74,15 +73,7 @@ std::optional<QPixmap> iconPixmap(QStringView name, int size,
     renderer.render(&painter, QRectF(0, 0, size, size));
   }
   painter.end();
-  return pixmap;
-}
-
-std::optional<QIcon> icon(QStringView name, int size, QStringView color) {
-  auto pixmap = iconPixmap(name, size, color);
-  if (!pixmap) {
-    return std::nullopt;
-  }
-  return QIcon(*pixmap);
+  return QIcon(pixmap);
 }
 
 }  // namespace px::modrim

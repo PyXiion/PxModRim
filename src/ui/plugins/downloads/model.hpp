@@ -46,7 +46,7 @@ class DownloadsModel final : public QAbstractListModel {
   void apply(const DownloadItemStatus& status);
   void setTitle(const DownloadItemTitle& item);
   void setPhase(const QString& phase);
-  void finish(const DownloadResult& result);
+  void finish();
   void setBusy(bool busy);
   QStringList failedIds() const;
   void flush();

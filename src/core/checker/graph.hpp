@@ -50,20 +50,15 @@ class ConstraintGraph {
   using Alternatives = QHash<PackageId, PackageId>;
 
   const QSet<PackageId>& nodes() const noexcept { return m_nodes; }
-  bool hasNode(const PackageId& pid) const { return m_nodes.contains(pid); }
 
   // Union over all edge types. Returned by value: Qt containers are implicitly
   // shared.
   QSet<ConstraintEdge> outgoing(const PackageId& pid) const;
   QSet<ConstraintEdge> incoming(const PackageId& pid) const;
-  QSet<PackageId> neighbors(const PackageId& pid) const;
   QSet<ConstraintEdge> edgesOfType(const PackageId& pid, EdgeType type) const;
   QSet<ConstraintEdge> incomingOfType(const PackageId& pid,
                                       EdgeType type) const;
 
-  int indexOf(const PackageId& pid) const {
-    return m_pidToIndex.value(pid, -1);
-  }
   const QHash<PackageId, int>& pidToIndex() const noexcept {
     return m_pidToIndex;
   }
@@ -74,8 +69,6 @@ class ConstraintGraph {
              const QList<PackageId>& orderedPids,
              const sort::SortSettings& settings,
              const sort::CommunityRules* communityRules = nullptr);
-
-  void removeMod(const PackageId& pid);
 
   // Replaces the mod ordering without touching edges.
   void updateOrder(const QList<PackageId>& orderedPids);

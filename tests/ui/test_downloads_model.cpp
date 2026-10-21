@@ -31,7 +31,7 @@ TEST_CASE("download item events resolve states and cancel leftover rows") {
                                          {"4", "failed"},
                                          {"5", "queued"}};
   CHECK(states(model) == expected);
-  model.finish({{"1", "3"}, {"4"}, {"3"}});
+  model.finish();
   CHECK(states(model).value("2") == "cancelled");
   CHECK(states(model).value("5") == "cancelled");
   CHECK(model.updated() == 1);

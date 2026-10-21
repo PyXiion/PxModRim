@@ -139,21 +139,6 @@ QString CoreContext::targetVersion() const {
   return QStringLiteral("Unknown");
 }
 
-CollectionStats CoreContext::computeStats(
-    const std::optional<QStringList>& activeIds) const {
-  const QStringList& ids = activeIds ? *activeIds : m_activeUuids;
-  CollectionStats stats;
-  stats.total = m_mods.size();
-  stats.active = ids.size();
-  stats.inactive = stats.total - stats.active;
-  for (const auto& mod : m_mods) {
-    if (!mod->valid) {
-      ++stats.errors;
-    }
-  }
-  return stats;
-}
-
 ConfigService& CoreContext::configService() const {
   Q_ASSERT(m_configService != nullptr);
   return *m_configService;
@@ -164,10 +149,6 @@ DownloadManager& CoreContext::downloads() const {
       dynamic_cast<DownloadManager*>(m_plugins.get(kDownloadsManagerName));
   Q_ASSERT(manager != nullptr);
   return *manager;
-}
-
-QCoro::Task<Result<void>> CoreContext::initialize() {
-  co_return co_await m_modService->initialize();
 }
 
 QCoro::Task<void> CoreContext::close() {

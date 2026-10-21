@@ -8,9 +8,7 @@
 namespace px::modrim {
 
 // State and commands behind Header.qml, exposed to it as `headerController`.
-// The QML-facing names (properties and invokables) match the legacy
-// HeaderController; the C++ side uses camelCase signals and setters. Owned by
-// the caller.
+// Owned by the caller.
 class HeaderController : public QObject {
   Q_OBJECT
 

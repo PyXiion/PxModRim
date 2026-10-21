@@ -27,27 +27,33 @@ Rectangle {
         font.pixelSize: Theme.fontSizeLg
         font.bold: true
     }
-    component CatalogGrid: GridView {
-        property int columns: Math.max(1, Math.floor(width / 230))
+    component ThumbsUp: Image {
+        width: 16; height: 16
+        sourceSize.width: 16; sourceSize.height: 16
+        source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
+    }
+    component CardGrid: GridView {
+        required property int minCellWidth
+        property int columns: Math.max(1, Math.floor(width / minCellWidth))
+        cellWidth: width / columns
+        clip: true
+    }
+    component InlineGrid: CardGrid {
         Layout.fillWidth: true
         Layout.preferredHeight: Math.ceil(count / columns) * cellHeight
-        cellWidth: width / columns
-        cellHeight: 312
         interactive: false
-        clip: true
+    }
+    component CatalogGrid: InlineGrid {
+        minCellWidth: 230
+        cellHeight: 312
         delegate: CatalogCard {
             width: GridView.view.cellWidth - 12
             height: GridView.view.cellHeight - 12
         }
     }
-    component CollectionGrid: GridView {
-        property int columns: Math.max(1, Math.floor(width / 400))
-        Layout.fillWidth: true
-        Layout.preferredHeight: Math.ceil(count / columns) * cellHeight
-        cellWidth: width / columns
+    component CollectionGrid: InlineGrid {
+        minCellWidth: 400
         cellHeight: 162
-        interactive: false
-        clip: true
         delegate: CollectionBanner {
             width: GridView.view.cellWidth - 12
             height: GridView.view.cellHeight - 12
@@ -75,6 +81,15 @@ Rectangle {
             onClicked: workshopPanel.loadMore()
         }
         Item { implicitHeight: 12 }
+    }
+    component ListingGrid: CardGrid {
+        id: grid
+        property var listing
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        ScrollBar.vertical: PxScrollBar {}
+        header: ListingHeader { width: grid.width }
+        footer: ListingFooter { width: grid.width; listing: grid.listing }
     }
 
     ColumnLayout {
@@ -272,61 +287,40 @@ Rectangle {
                 }
             }
         }
-        GridView {
-            id: listingGrid
+        ListingGrid {
             objectName: "listingScroll"
             readonly property bool listingTab: workshopPanel.configured && workshopPanel.tab === "Mods"
-            property int columns: Math.max(1, Math.floor(width / 230))
             visible: !workshopPanel.hasDetail && listingTab
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            cellWidth: width / columns
+            minCellWidth: 230
             cellHeight: 312
             model: listingTab ? catalogMods : null
-            ScrollBar.vertical: PxScrollBar {}
-            header: ListingHeader { width: listingGrid.width }
-            footer: ListingFooter { width: listingGrid.width; listing: catalogMods }
+            listing: catalogMods
             delegate: CatalogCard {
                 width: GridView.view.cellWidth - 12
                 height: GridView.view.cellHeight - 12
             }
         }
-        GridView {
-            id: collectionsGrid
+        ListingGrid {
             objectName: "collectionsScroll"
             readonly property bool listingTab: workshopPanel.configured && (workshopPanel.tab === "Collections" || workshopPanel.tab === "Favourites")
-            property int columns: Math.max(1, Math.floor(width / 400))
             visible: !workshopPanel.hasDetail && listingTab
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            cellWidth: width / columns
+            minCellWidth: 400
             cellHeight: 162
             model: listingTab ? catalogCollections : null
-            ScrollBar.vertical: PxScrollBar {}
-            header: ListingHeader { width: collectionsGrid.width }
-            footer: ListingFooter { width: collectionsGrid.width; listing: catalogCollections }
+            listing: catalogCollections
             delegate: CollectionBanner {
                 width: GridView.view.cellWidth - 12
                 height: GridView.view.cellHeight - 12
             }
         }
-        GridView {
-            id: installedGrid
+        ListingGrid {
             objectName: "installedScroll"
             readonly property bool active: workshopPanel.configured && workshopPanel.tab === "Installed"
-            property int columns: Math.max(1, Math.floor(width / 340))
             visible: !workshopPanel.hasDetail && active
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            cellWidth: width / columns
+            minCellWidth: 340
             cellHeight: 62
             model: active ? catalogMods : null
-            ScrollBar.vertical: PxScrollBar {}
-            header: ListingHeader { width: installedGrid.width }
-            footer: ListingFooter { width: installedGrid.width; listing: catalogMods }
+            listing: catalogMods
             delegate: ModRow {
                 width: GridView.view.cellWidth - 8
                 height: GridView.view.cellHeight - 8
@@ -465,11 +459,7 @@ Rectangle {
                             RowLayout {
                                 visible: root.detail.kind === "mod"
                                 spacing: 8
-                                Image {
-                                    width: 16; height: 16
-                                    sourceSize.width: 16; sourceSize.height: 16
-                                    source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
-                                }
+                                ThumbsUp {}
                                 Copy { Layout.fillWidth: false; text: root.detail.votes || "Unrated" }
                                 Copy { Layout.fillWidth: false; text: (root.detail.fileSize || "Unknown") }
                             }
@@ -482,18 +472,9 @@ Rectangle {
                             RowLayout {
                                 visible: !!root.detail.votesUp
                                 spacing: 8
-                                Image {
-                                    width: 16; height: 16
-                                    sourceSize.width: 16; sourceSize.height: 16
-                                    source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
-                                }
+                                ThumbsUp {}
                                 Copy { Layout.fillWidth: false; text: root.detail.votesUp || ""; Accessible.name: text + " positive votes" }
-                                Image {
-                                    width: 16; height: 16
-                                    sourceSize.width: 16; sourceSize.height: 16
-                                    rotation: 180
-                                    source: "image://icons/thumbs-up?color=" + encodeURIComponent(Theme.textMuted)
-                                }
+                                ThumbsUp { rotation: 180 }
                                 Copy { Layout.fillWidth: false; text: root.detail.votesDown || ""; Accessible.name: text + " negative votes" }
                             }
                         }

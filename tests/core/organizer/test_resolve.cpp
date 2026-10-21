@@ -64,14 +64,9 @@ OrganizerState makeState(QList<Folder> folders = {},
   for (const Tag& tag : tags) {
     state.tags.insert(tag.id, tag);
   }
-  for (qsizetype i = 0; i < rules.size(); ++i) {
-    const auto& [fld, op, pat, fid] = rules[i];
-    state.rules.append(Rule{.id = static_cast<qint64>(i + 1),
-                            .position = static_cast<qint64>(i),
-                            .field = fld,
-                            .op = op,
-                            .pattern = pat,
-                            .folderId = fid});
+  for (const auto& [fld, op, pat, fid] : rules) {
+    state.rules.append(
+        RuleSpec{.field = fld, .op = op, .pattern = pat, .folderId = fid});
   }
   return state;
 }
@@ -511,7 +506,7 @@ TEST_CASE(
   };
 
   const QList<TreeFilter> filters =
-      treeFilters(mods, {QStringLiteral("u1")}, &state);
+      treeFilters(mods, {QStringLiteral("u1")}, state);
   REQUIRE(filters.size() >= 3);
   CHECK(filters[0].key == QStringLiteral("all"));
   CHECK(filters[0].count == 3);
@@ -571,7 +566,7 @@ TEST_CASE("tree_filters counts all copies sharing a package id") {
                QStringLiteral("other.mod"), {}, QStringLiteral("local"))},
   };
 
-  const QList<TreeFilter> filters = treeFilters(mods, {}, &state);
+  const QList<TreeFilter> filters = treeFilters(mods, {}, state);
   const auto it = std::find_if(
       filters.cbegin(), filters.cend(),
       [](const TreeFilter& f) { return f.key == QStringLiteral("tag:5"); });
@@ -581,29 +576,20 @@ TEST_CASE("tree_filters counts all copies sharing a package id") {
   CHECK(it->tagId == 5);
 }
 
-TEST_CASE(
-    "tree_filters without state or without tags only produces presets and "
-    "providers") {
+TEST_CASE("tree_filters without tags only produces presets and providers") {
   const ModsByUuid mods{{QStringLiteral("u1"),
                          makeMod(QStringLiteral("u1"), QStringLiteral("One"),
                                  QStringLiteral("a.one"))}};
 
-  const QList<TreeFilter> withoutState = treeFilters(mods, {}, nullptr);
+  const OrganizerState emptyState = makeState();
+  const QList<TreeFilter> filters = treeFilters(mods, {}, emptyState);
   QStringList keys;
-  for (const TreeFilter& f : withoutState) {
+  for (const TreeFilter& f : filters) {
     keys.append(f.key);
   }
   CHECK(keys == QStringList{QStringLiteral("all"), QStringLiteral("active"),
                             QStringLiteral("inactive"),
                             QStringLiteral("provider:local")});
-
-  const OrganizerState emptyState = makeState();
-  const QList<TreeFilter> withEmptyState = treeFilters(mods, {}, &emptyState);
-  QStringList emptyKeys;
-  for (const TreeFilter& f : withEmptyState) {
-    emptyKeys.append(f.key);
-  }
-  CHECK(emptyKeys == keys);
 }
 
 TEST_CASE("filtering tree with a tag query selects only tagged mods") {
@@ -630,7 +616,7 @@ TEST_CASE("filtering tree with a tag query selects only tagged mods") {
                QStringLiteral("a.three"))},
   };
 
-  const QList<TreeFilter> filters = treeFilters(mods, {}, &state);
+  const QList<TreeFilter> filters = treeFilters(mods, {}, state);
   const auto it1 = std::find_if(
       filters.cbegin(), filters.cend(),
       [](const TreeFilter& f) { return f.key == QStringLiteral("tag:1"); });

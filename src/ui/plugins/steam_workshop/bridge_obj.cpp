@@ -8,19 +8,15 @@
 #include <QJsonParseError>
 #include <QPointer>
 #include <QVariant>
-#include <algorithm>
 
+#include "core/utils.hpp"
 #include "ui/plugins/steam_workshop/plugin.hpp"
 #include "ui/plugins/steam_workshop/view.hpp"
 
 namespace px::modrim {
 namespace {
 bool isPublishedFileId(const QJsonValue& value) {
-  if (!value.isString()) return false;
-  const auto text = value.toString();
-  return !text.isEmpty() && std::ranges::all_of(text, [](QChar c) {
-    return c >= QLatin1Char('0') && c <= QLatin1Char('9');
-  });
+  return value.isString() && isAsciiDigits(value.toString());
 }
 }  // namespace
 

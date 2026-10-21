@@ -19,9 +19,9 @@ class DownloadSidebar final : public QWidget {
   Q_INVOKABLE void clearQueue();
   void setDownloadEnabled(bool enabled);
   void syncFrom(const CheckedDownloads& checked,
-                const QHash<QString, QString>& statuses = {});
-  void updateStatus(const QString& id, const QString& status, qint64 done = 0,
-                    qint64 total = 0);
+                const QHash<QString, QString>& statuses);
+  void updateStatus(const QString& id, const QString& status, qint64 done,
+                    qint64 total);
  signals:
   void downloadTriggered();
   void stopTriggered();

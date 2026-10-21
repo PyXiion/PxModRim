@@ -53,8 +53,7 @@ std::optional<QString> findExecutable(const QString& gamePath,
 // Writes steam_appid.txt containing the RimWorld Steam app id into the game
 // folder, unless it already exists. On macOS the file lives in the game
 // directory's parent.
-void ensureSteamAppid(const QString& gamePath,
-                      Platform platform = currentPlatform());
+void ensureSteamAppid(const QString& gamePath);
 
 // The steam:// URL that launches RimWorld with the given launch arguments.
 QString steamRunUrl(const QString& launchArgs);
@@ -78,9 +77,6 @@ std::vector<ProcessInfo> hostProcessLister();
 
 // Returns true when a non-zombie RimWorld game process is currently running.
 bool isGameRunning(const ProcessLister& lister = hostProcessLister);
-
-// Returns the set of non-zombie RimWorld PIDs found by `lister`.
-QSet<qint64> liveGamePids(const ProcessLister& lister = hostProcessLister);
 
 struct MonitorTiming {
   std::chrono::milliseconds pollStart{500};

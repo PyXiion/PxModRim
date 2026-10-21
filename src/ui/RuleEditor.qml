@@ -74,25 +74,22 @@ FocusScope {
         return true
     }
 
-    function findFieldIndex(val) {
-        return Math.max(0, fieldOptions.findIndex(option => option.value === val))
-    }
-
-    function findOpIndex(val) {
-        return Math.max(0, opOptions.findIndex(option => option.value === val))
-    }
-
     function findFolderIndex(fid) {
         return Math.max(0, ruleFolders.findIndex(folder => folder.id === fid))
     }
 
+    function markDraftDirty() {
+        if (!loadingDraft)
+            draftRevision++
+    }
+
     ListModel {
         id: draftModel
-        onDataChanged: { if (!root.loadingDraft) root.draftRevision++ }
-        onRowsInserted: { if (!root.loadingDraft) root.draftRevision++ }
-        onRowsRemoved: { if (!root.loadingDraft) root.draftRevision++ }
-        onRowsMoved: { if (!root.loadingDraft) root.draftRevision++ }
-        onModelReset: { if (!root.loadingDraft) root.draftRevision++ }
+        onDataChanged: root.markDraftDirty()
+        onRowsInserted: root.markDraftDirty()
+        onRowsRemoved: root.markDraftDirty()
+        onRowsMoved: root.markDraftDirty()
+        onModelReset: root.markDraftDirty()
     }
 
     function loadDraft() {
@@ -322,7 +319,7 @@ FocusScope {
                                     model: root.fieldOptions
                                     textRole: "text"
                                     valueRole: "value"
-                                    currentIndex: root.findFieldIndex(rowItem.field)
+                                    currentIndex: Math.max(0, indexOfValue(rowItem.field))
                                     onActivated: draftModel.setProperty(rowItem.index, "field", currentValue)
                                 }
 
@@ -332,7 +329,7 @@ FocusScope {
                                     model: root.opOptions
                                     textRole: "text"
                                     valueRole: "value"
-                                    currentIndex: root.findOpIndex(rowItem.op)
+                                    currentIndex: Math.max(0, indexOfValue(rowItem.op))
                                     onActivated: draftModel.setProperty(rowItem.index, "op", currentValue)
                                 }
 

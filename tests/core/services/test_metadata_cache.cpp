@@ -13,7 +13,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/models/metadata/parsing.hpp"
-#include "core/providers/local.hpp"
+#include "core/providers/folder.hpp"
 #include "core/services/metadata_cache.hpp"
 #include "services_support.hpp"
 
@@ -297,7 +297,9 @@ CREATE TABLE mod_metadata (
         runAsync(cache.getMods({candidate}, QStringLiteral("1.5")));
     CHECK(legacy.cached.isEmpty());
     REQUIRE(legacy.missing.size() == 1);
-    LocalModProvider provider(modsRoot, nullptr, &cache);
+    FolderModProvider provider(QStringLiteral("local"),
+                               QStringLiteral("#2ecc71"), modsRoot, false,
+                               nullptr, &cache);
     for (int pass = 0; pass < 2; ++pass) {
       const auto discovered =
           runAsync(provider.discover(QStringLiteral("1.5")));
@@ -401,7 +403,8 @@ TEST_CASE("providers reuse cached metadata and reparse when the file changes") {
       QDir(modDir).filePath(QStringLiteral("About/About.xml"));
   const ModCandidate original = candidateFor(modDir);
   MetadataCache cache(metadataCachePath(root.path()));
-  LocalModProvider provider(modsRoot, nullptr, &cache);
+  FolderModProvider provider(QStringLiteral("local"), QStringLiteral("#2ecc71"),
+                             modsRoot, false, nullptr, &cache);
 
   auto first = runAsync(provider.discover(QStringLiteral("1.5")));
   REQUIRE(first.has_value());
@@ -445,8 +448,11 @@ TEST_CASE("providers keep their identity when they share one cache") {
       createMod(QDir(downloadedRoot).filePath(QStringLiteral("SteamMod")),
                 kAboutTwo, true);
   MetadataCache cache(metadataCachePath(root.path()));
-  LocalModProvider local(localRoot, nullptr, &cache);
-  DownloadedModProvider downloaded(downloadedRoot, nullptr, &cache);
+  FolderModProvider local(QStringLiteral("local"), QStringLiteral("#2ecc71"),
+                          localRoot, false, nullptr, &cache);
+  FolderModProvider downloaded(QStringLiteral("downloaded"),
+                               QStringLiteral("#3498db"), downloadedRoot, true,
+                               nullptr, &cache);
 
   for (int pass = 0; pass < 2; ++pass) {
     auto localMods = runAsync(local.discover(QStringLiteral("1.5")));

@@ -25,6 +25,9 @@ QString sectionName(bool checked, int activeCount, int inactiveCount) {
              ? QString{}
              : QStringLiteral("Inactive (%1)").arg(inactiveCount);
 }
+static bool nameLess(const ModItem& a, const ModItem& b) {
+  return a.mod->name.toLower() < b.mod->name.toLower();
+}
 ModListModel::ModListModel(QHash<QString, QString> colors,
                            DiagnosticsService* diagnostics, QObject* parent)
     : QAbstractListModel(parent),
@@ -44,11 +47,6 @@ int ModListModel::rowCount(const QModelIndex& parent) const {
 }
 const ModItem* ModListModel::getItem(int row) const {
   return row >= 0 && row < m_items.size() ? &m_items[row] : nullptr;
-}
-const ModItem* ModListModel::getItemByUuid(const QString& uuid) const {
-  for (const auto& item : m_items)
-    if (item.uuid == uuid) return &item;
-  return nullptr;
 }
 QVariant ModListModel::data(const QModelIndex& index, int role) const {
   const auto* item = index.isValid() ? getItem(index.row()) : nullptr;
@@ -79,9 +77,6 @@ QVariant ModListModel::data(const QModelIndex& index, int role) const {
       return item->loadIndex;
     case kIsActiveRole:
       return item->checked;
-    case kSectionNameRole:
-      return sectionName(item->checked, m_activeCount,
-                         static_cast<int>(m_items.size()) - m_activeCount);
     case kProviderLabelRole:
       return item->providerLabel;
     case kHasErrorRole:
@@ -160,10 +155,7 @@ void ModListModel::loadMods(const QHash<QString, ListedModPtr>& mods,
   for (auto it = mods.cbegin(); it != mods.cend(); ++it)
     if (!active.contains(it.key()))
       inactive.append(makeItem(it.key(), it.value(), false));
-  std::stable_sort(inactive.begin(), inactive.end(),
-                   [](const auto& a, const auto& b) {
-                     return a.mod->name.toLower() < b.mod->name.toLower();
-                   });
+  std::stable_sort(inactive.begin(), inactive.end(), nameLess);
   m_items.append(std::move(inactive));
   updateLoadIndices();
   endResetModel();
@@ -187,10 +179,7 @@ std::pair<int, int> ModListModel::updateLoadIndices() {
       last = row;
     }
   }
-  if (m_activeCount != count) {
-    m_activeCount = count;
-    emit activeCountChanged();
-  }
+  m_activeCount = count;
   return {first, last};
 }
 bool ModListModel::moveRow(int source, int target) {
@@ -225,7 +214,7 @@ void ModListModel::commitOrder(const QStringList& uuids) {
         inactive.append(row);
     }
   std::stable_sort(inactive.begin(), inactive.end(), [this](int a, int b) {
-    return m_items[a].mod->name.toLower() < m_items[b].mod->name.toLower();
+    return nameLess(m_items[a], m_items[b]);
   });
   order.append(inactive);
   bool same = order.size() == m_items.size();
@@ -268,7 +257,6 @@ void ModListModel::setCheckStates(const QList<int>& rows, bool checked) {
   emit dataChanged(
       index(first), index(rowCount() - 1),
       {kCheckStateRole, kLoadIndexRole, kIsActiveRole, kSectionNameRole});
-  emit activeModsChanged();
 }
 void ModListModel::setStartupImpact(const QHash<QString, double>& impacts) {
   if (m_items.isEmpty()) return;

@@ -27,6 +27,16 @@ DependentModsDialog::DependentModsDialog(const QStringList& dependents,
   button(QMessageBox::No)->setText(QStringLiteral("Disable selected only"));
   button(QMessageBox::Yes)->setObjectName(QStringLiteral("primaryAction"));
 }
+PublishedIds publishedIds(const CoreContext& ctx) {
+  PublishedIds ids;
+  const auto& mods = ctx.allMods();
+  for (const auto& mod : mods)
+    if (auto id = mod->publishedFileId()) ids.installed.insert(*id);
+  for (const auto& uuid : ctx.activeUuids())
+    if (const auto mod = mods.value(uuid))
+      if (auto id = mod->publishedFileId()) ids.active.insert(*id);
+  return ids;
+}
 QCoro::Task<bool> applyActivation(CoreContext& ctx, QWidget* parent,
                                   const QStringList& enable,
                                   const QStringList& disable) {

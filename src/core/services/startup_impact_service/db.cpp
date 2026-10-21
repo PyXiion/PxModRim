@@ -271,6 +271,20 @@ Result<QSqlDatabase> openConnection(StartupImpactDb::Connection& conn,
 // Read paths return empty results for a missing file rather than creating one.
 bool fileExists(const QString& path) { return QFileInfo::exists(path); }
 
+template <class T, class Fn>
+Result<T> withExistingDb(StartupImpactDb::Connection& conn, const QString& path,
+                         T empty, Fn&& fn) {
+  if (!fileExists(path)) {
+    return empty;
+  }
+  auto opened = openConnection(conn, path);
+  if (!opened) {
+    return std::unexpected(opened.error());
+  }
+  QSqlDatabase db = *opened;
+  return fn(db);
+}
+
 Result<void> ensureParentDir(const QString& path) {
   if (fileExists(path)) {
     return {};
@@ -374,17 +388,7 @@ Result<void> storeReportSync(StartupImpactDb::Connection& conn,
   return compact(db, path);
 }
 
-Result<std::optional<StartupImpactReport>> getLatestReportSync(
-    StartupImpactDb::Connection& conn, const QString& path) {
-  if (!fileExists(path)) {
-    return std::nullopt;
-  }
-  auto opened = openConnection(conn, path);
-  if (!opened) {
-    return std::unexpected(opened.error());
-  }
-  QSqlDatabase db = *opened;
-
+Result<std::optional<StartupImpactReport>> latestReportFrom(QSqlDatabase& db) {
   auto session = exec(db,
                       "SELECT id, loading_time_s, timestamp"
                       " FROM startup_impact_sessions ORDER BY id DESC LIMIT 1");
@@ -522,45 +526,10 @@ QCoro::Task<Result<void>> StartupImpactDb::storeReport(
 QCoro::Task<Result<std::optional<StartupImpactReport>>>
 StartupImpactDb::getLatestReport(QString path) {
   co_return co_await QtConcurrent::run(&m_pool, [this, path = std::move(path)] {
-    return getLatestReportSync(m_conn, path);
+    return withExistingDb<std::optional<StartupImpactReport>>(
+        m_conn, path, std::nullopt,
+        [](QSqlDatabase& db) { return latestReportFrom(db); });
   });
-}
-
-QCoro::Task<Result<double>> StartupImpactDb::getAverage(QString path,
-                                                        QString packageId) {
-  co_return co_await QtConcurrent::run(
-      &m_pool,
-      [this, path = std::move(path),
-       packageId = std::move(packageId)]() -> Result<double> {
-        if (!fileExists(path)) {
-          return 0.0;
-        }
-        auto opened = openConnection(m_conn, path);
-        if (!opened) {
-          return std::unexpected(opened.error());
-        }
-        QSqlDatabase db = *opened;
-        return averageFor(db, packageId);
-      });
-}
-
-QCoro::Task<Result<QHash<QString, ThreadAverages>>>
-StartupImpactDb::getTotalsFor(QString path, QStringList packageIds) {
-  co_return co_await QtConcurrent::run(
-      &m_pool,
-      [this, path = std::move(path), packageIds = std::move(packageIds)]()
-          -> Result<QHash<QString, ThreadAverages>> {
-        // Ids without history are left out, so callers treat them as zero.
-        if (packageIds.isEmpty() || !fileExists(path)) {
-          return QHash<QString, ThreadAverages>{};
-        }
-        auto opened = openConnection(m_conn, path);
-        if (!opened) {
-          return std::unexpected(opened.error());
-        }
-        QSqlDatabase db = *opened;
-        return totalsFor(db, packageIds);
-      });
 }
 
 QCoro::Task<Result<QHash<QString, double>>> StartupImpactDb::getAllAverages(
@@ -568,15 +537,9 @@ QCoro::Task<Result<QHash<QString, double>>> StartupImpactDb::getAllAverages(
   co_return co_await QtConcurrent::run(
       &m_pool,
       [this, path = std::move(path)]() -> Result<QHash<QString, double>> {
-        if (!fileExists(path)) {
-          return QHash<QString, double>{};
-        }
-        auto opened = openConnection(m_conn, path);
-        if (!opened) {
-          return std::unexpected(opened.error());
-        }
-        QSqlDatabase db = *opened;
-        return allAveragesFor(db);
+        return withExistingDb<QHash<QString, double>>(
+            m_conn, path, {},
+            [](QSqlDatabase& db) { return allAveragesFor(db); });
       });
 }
 
@@ -594,17 +557,17 @@ QCoro::Task<Result<LatestWithAverages>> StartupImpactDb::getLatestWithAverages(
           return result;
         }
 
-        auto latest = getLatestReportSync(m_conn, path);
-        if (!latest) {
-          return std::unexpected(latest.error());
-        }
-        result.report = std::move(*latest);
-
         auto opened = openConnection(m_conn, path);
         if (!opened) {
           return std::unexpected(opened.error());
         }
         QSqlDatabase db = *opened;
+
+        auto latest = latestReportFrom(db);
+        if (!latest) {
+          return std::unexpected(latest.error());
+        }
+        result.report = std::move(*latest);
 
         auto base = averageFor(db, QString(kBaseGamePid));
         if (!base) {

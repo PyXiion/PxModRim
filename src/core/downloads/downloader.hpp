@@ -49,18 +49,8 @@ class Downloader : public Plugin {
       QStringList modIds) = 0;
   virtual void cancel() = 0;
 
-  // Distinct updatable ids among `mods`, in first-seen order.
-  QStringList updatableIds(const QList<ListedModPtr>& mods) const;
-
-  Event<QString> statusMessageChanged;
-  Event<DownloadProgress> downloadProgress;
-  Event<DownloadItemStatus> downloadItemStatusChanged;
-  Event<DownloadItemTitle> downloadItemTitled;
-  // "login" -> "query" (item details) -> "run" (all items resolved).
-  Event<QString> downloadPhaseChanged;
-  Event<DownloadResult> downloadFinished;
-  Event<bool> busyChanged;
-  Event<QStringList> batchStarted;
+ protected:
+  DownloadManager& manager() const noexcept { return m_manager; }
 
  private:
   QString m_label;

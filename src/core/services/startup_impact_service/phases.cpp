@@ -65,9 +65,7 @@ QString phaseLabel(Phase phase) {
 }
 
 Phase metricPhase(const QString& key) {
-  const QString stripped = stripMetricPrefix(key);
-  const qsizetype bar = stripped.indexOf(u'|');
-  const QString name = bar < 0 ? stripped : stripped.left(bar);
+  const QString name = splitMetricKey(key).name;
 
   if (const auto found = exactPhases().constFind(name);
       found != exactPhases().cend()) {

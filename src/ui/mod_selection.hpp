@@ -21,7 +21,7 @@ class ModInfoSink {
   virtual ~ModInfoSink() = default;
 
   virtual void clear() = 0;
-  virtual void showMod(const ListedMod& mod,
+  virtual void showMod(ListedModPtr mod,
                        const QList<view::ModIssueView>& issues) = 0;
   // `packageId` is nullopt for mods that have no package id (non-About.xml
   // mods).

@@ -95,12 +95,11 @@ Result<void> writeCached(const QString& directory, const QString& path,
 // installed mods itself.
 class WorkshopCatalog : public Plugin {
  public:
-  WorkshopCatalog();
-  void setup(CoreContext& ctx) override;
   // `config` may be null: settings, favourites and the response cache then stay
   // in memory.
   WorkshopCatalog(ConfigService* config, DownloadManager& downloads,
                   InstalledModsProvider installedMods);
+  void setup(CoreContext& ctx) override;
   ~WorkshopCatalog();
 
   WorkshopCatalog(const WorkshopCatalog&) = delete;
@@ -146,7 +145,6 @@ class WorkshopCatalog : public Plugin {
   // Resolves ids into the mods to fetch, skipping those already current.
   QCoro::Task<CatalogResult<DownloadPlan>> plan(QStringList modIds,
                                                 QStringList collectionIds);
-  QCoro::Task<Result<DownloadResult>> download(DownloadPlan downloadPlan);
 
   // Ids waiting in the queue or downloading.
   QSet<QString> queuedIds() const { return m_queued; }
@@ -175,7 +173,6 @@ class WorkshopCatalog : public Plugin {
 
   CatalogClient& client();
   const InstalledIndex& installed();
-  void bindDownloads(DownloadManager& downloads);
   void disconnectEvents();
   InstallState installStateOf(const CatalogMod& mod,
                               const InstalledIndex& installed) const;

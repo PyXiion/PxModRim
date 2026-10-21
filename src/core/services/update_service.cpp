@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <algorithm>
 #include <memory>
+#include <vector>
 
 #include <QCoro/QCoroNetworkReply>
 
@@ -91,14 +92,6 @@ QString stringField(const QJsonObject& object, const char* key) {
 }
 
 }  // namespace
-
-std::optional<std::vector<qint64>> parseVersion(const QString& text) {
-  const auto parsed = splitVersion(text);
-  if (!parsed) {
-    return std::nullopt;
-  }
-  return parsed->numbers;
-}
 
 bool isNewer(const QString& tag, const QString& current) {
   const auto latest = splitVersion(tag);

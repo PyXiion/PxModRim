@@ -53,7 +53,7 @@ struct PanelFixture {
     engine->rootContext()->setContextProperty(QStringLiteral("Theme"),
                                               new px::modrim::Theme(engine));
     panel = std::make_unique<ModListPanel>(*ctx, engine, &parent);
-    panel->loadMods(mods, ctx->activeUuids());
+    panel->model()->loadMods(mods, ctx->activeUuids());
   }
   QObject* root() const { return panel->qmlWidget()->rootObject(); }
   QObject* view() const {

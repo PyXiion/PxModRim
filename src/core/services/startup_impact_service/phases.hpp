@@ -20,7 +20,7 @@ enum class Phase : std::uint8_t {
 
 inline constexpr std::size_t kPhaseCount = 7;
 
-// Seconds per phase, indexed by `phase_index`.
+// Seconds per phase, indexed by `phaseIndex`.
 using PhaseTotals = std::array<double, kPhaseCount>;
 
 constexpr std::size_t phaseIndex(Phase phase) {

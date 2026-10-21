@@ -250,7 +250,7 @@ TEST_CASE(
   main->authors = {"Ann"};
   auto other = makeMod("Other", "o.other");
   ModInfoContext context({dep, main, other}, {other->uuid(), main->uuid()});
-  const view::ModIssueView issue{"c", "Cat", std::nullopt, false};
+  const view::ModIssueView issue{"Cat", std::nullopt, false};
   const auto info = buildModInfo(*context.ctx, *main, {issue});
   CHECK(info.value("name").toString() == "Main");
   CHECK(info.value("author").toString() == "Ann");

@@ -123,6 +123,18 @@ void addUnique(std::vector<std::string>& out,
   }
 }
 
+// A missing entry is not an error.
+template <class T>
+CatalogResult<std::optional<T>> optionalOn404(CatalogResult<T> found) {
+  if (found) {
+    return std::optional<T>(std::move(*found));
+  }
+  if (found.error().status == 404) {
+    return std::optional<T>{};
+  }
+  return std::unexpected(found.error());
+}
+
 }  // namespace
 
 QString normalizeBaseUrl(QString url) {
@@ -243,13 +255,7 @@ QCoro::Task<CatalogResult<std::optional<CatalogMod>>> CatalogClient::mod(
     QString id) {
   auto found = co_await call<CatalogMod>(
       false, endpoint(QStringLiteral("mods/") + encodeSegment(id)));
-  if (found) {
-    co_return std::optional<CatalogMod>(std::move(*found));
-  }
-  if (found.error().status == 404) {
-    co_return std::optional<CatalogMod>{};
-  }
-  co_return std::unexpected(found.error());
+  co_return optionalOn404(std::move(found));
 }
 
 QCoro::Task<CatalogResult<std::optional<CollectionDetail>>>
@@ -268,18 +274,12 @@ CatalogClient::collection(QString id) {
   auto found = co_await call<CollectionDetail>(
       false, endpoint(QStringLiteral("collections/") + source +
                       QLatin1Char('/') + encodeSegment(key)));
-  if (found) {
-    co_return std::optional<CollectionDetail>(std::move(*found));
-  }
-  if (found.error().status == 404) {
-    co_return std::optional<CollectionDetail>{};
-  }
-  co_return std::unexpected(found.error());
+  co_return optionalOn404(std::move(found));
 }
 
-QCoro::Task<CatalogResult<CatalogClient::BatchResult>> CatalogClient::modsBatch(
+QCoro::Task<CatalogResult<std::vector<CatalogMod>>> CatalogClient::modsBatch(
     QStringList ids) {
-  BatchResult result;
+  std::vector<CatalogMod> items;
   for (qsizetype start = 0; start < ids.size(); start += kIdsPerBatch) {
     auto batch = co_await call<BatchWire>(
         true, endpoint(QStringLiteral("mods/batch")),
@@ -287,14 +287,10 @@ QCoro::Task<CatalogResult<CatalogClient::BatchResult>> CatalogClient::modsBatch(
     if (!batch) {
       co_return std::unexpected(batch.error());
     }
-    result.items.insert(result.items.end(),
-                        std::make_move_iterator(batch->items.begin()),
-                        std::make_move_iterator(batch->items.end()));
-    result.unavailableIds.insert(result.unavailableIds.end(),
-                                 batch->unavailable_ids.begin(),
-                                 batch->unavailable_ids.end());
+    items.insert(items.end(), std::make_move_iterator(batch->items.begin()),
+                 std::make_move_iterator(batch->items.end()));
   }
-  co_return result;
+  co_return items;
 }
 
 QCoro::Task<CatalogResult<ResolvedDownload>> CatalogClient::resolve(

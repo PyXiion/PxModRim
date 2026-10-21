@@ -16,14 +16,11 @@ struct Route {
   QString viewId;
   QStringList path;
 
-  QString url() const;
-
   bool operator==(const Route&) const = default;
 };
 
 // Each path part is percent-encoded with nothing left unescaped, so ids
-// containing
-// '/' or ':' round-trip.
+// containing '/' or ':' round-trip.
 QString buildRoute(const QString& viewId, const QStringList& path = {});
 
 // Parses `modrim://<view>[/<part>…]`; anything else is not a route.

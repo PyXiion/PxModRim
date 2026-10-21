@@ -18,7 +18,6 @@ namespace config_test {
 
 using namespace px::modrim;
 using test_support::readBytes;
-using test_support::runSync;
 using test_support::writeBytes;
 
 // Stands in for ui_prefs.json's struct: these tests exercise ConfigService's
@@ -109,10 +108,10 @@ TEST_CASE("legacy app config migrates with a backup") {
   REQUIRE(writeBytes(path, legacy));
 
   ConfigService service(dir.path());
-  AppConfigService app(service);
-  REQUIRE(runSync(app.setup()).has_value());
+  const auto app = service.load<AppConfig>(kConfigFile);
+  REQUIRE(app.has_value());
 
-  REQUIRE(app.cfg() == legacyExpectedConfig());
+  REQUIRE(*app == legacyExpectedConfig());
   REQUIRE(schemaVersionOf(path) == 1);
   const auto backups = backupsOf(dir, "config.json");
   REQUIRE(backups.size() == 1);
@@ -143,10 +142,10 @@ TEST_CASE("fresh services return defaults without creating files") {
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
   ConfigService service(dir.path());
-  AppConfigService app(service);
-  REQUIRE(runSync(app.setup()).has_value());
+  const auto app = service.load<AppConfig>(kConfigFile);
+  REQUIRE(app.has_value());
 
-  REQUIRE(app.cfg() == AppConfig{});
+  REQUIRE(*app == AppConfig{});
   REQUIRE(service.load<TestPrefs>("ui_prefs.json") == TestPrefs{});
   REQUIRE_FALSE(QFileInfo::exists(pathIn(dir, "config.json")));
   REQUIRE_FALSE(QFileInfo::exists(pathIn(dir, "ui_prefs.json")));

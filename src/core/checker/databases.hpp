@@ -26,63 +26,50 @@ struct FileStamp {
   bool operator==(const FileStamp&) const = default;
 };
 
-// Caches the NoVersionWarning package-id list under the config directory and
-// refreshes it from GitHub when the cache is missing or a refresh is forced.
-class NoVersionWarningService {
+// Caches a database file under the config directory and refreshes it from
+// GitHub when the cache is missing or a refresh is forced. `Entries` selects
+// the database: QSet<PackageId> for NoVersionWarning, the replacement map for
+// UseThisInstead.
+template <typename Entries>
+class CachedDatabase {
  public:
-  NoVersionWarningService(const ConfigService& configService,
-                          QNetworkAccessManager& network);
+  CachedDatabase(const ConfigService& configService,
+                 QNetworkAccessManager& network);
 
-  // Cached ids, reloaded when the file changed on disk. Downloads when the
-  // cache is missing or `force` is set. A failed download yields an empty set
-  // and keeps the previous ids.
-  QCoro::Task<QSet<PackageId>> ensure(bool force = false);
+  // Cached entries, reloaded when the file changed on disk. Downloads when the
+  // cache is missing or `force` is set. A failed download yields empty entries
+  // and keeps the previous ones.
+  QCoro::Task<Entries> ensure(bool force = false);
 
   // Seconds since the cache file was written, or nullopt when there is no
   // cache.
   std::optional<double> cacheAgeS() const;
 
   // Loads the cache synchronously when it exists; otherwise returns the current
-  // ids.
-  QSet<PackageId> loadIfExists();
+  // entries.
+  Entries loadIfExists();
 
  private:
-  QCoro::Task<QSet<PackageId>> download();
+  struct Source {
+    QString label;
+    QString url;
+    QString fileName;
+    Entries (*parse)(const QString& path);
+  };
+  static const Source& source();
+
+  QCoro::Task<Entries> download();
 
   QNetworkAccessManager& m_network;
   QString m_cacheDir;
-  QString m_xmlPath;
-  QSet<PackageId> m_pids;
-  // Stamp of the file the current `pids_` were parsed from.
+  QString m_path;
+  Entries m_entries;
+  // Stamp of the file the current `m_entries` were parsed from.
   std::optional<FileStamp> m_loadedStamp;
 };
 
-// Caches the UseThisInstead replacement database (gzipped JSON) under the
-// config directory and refreshes it from GitHub when the cache is missing or a
-// refresh is forced.
-class UseThisInsteadService {
- public:
-  UseThisInsteadService(const ConfigService& configService,
-                        QNetworkAccessManager& network);
-
-  // Cached entries, reloaded when the file changed on disk. Downloads when the
-  // cache is missing or `force` is set. A failed download yields an empty map
-  // and keeps the previous entries.
-  QCoro::Task<QHash<QString, ReplacementInfo>> ensure(bool force = false);
-
-  std::optional<double> cacheAgeS() const;
-
-  QHash<QString, ReplacementInfo> loadIfExists();
-
- private:
-  QCoro::Task<QHash<QString, ReplacementInfo>> download();
-
-  QNetworkAccessManager& m_network;
-  QString m_cacheDir;
-  QString m_jsonPath;
-  QHash<QString, ReplacementInfo> m_entries;
-  std::optional<FileStamp> m_loadedStamp;
-};
+using NoVersionWarningDb = CachedDatabase<QSet<PackageId>>;
+using UseThisInsteadDb = CachedDatabase<QHash<QString, ReplacementInfo>>;
 
 }  // namespace checker
 }  // namespace px::modrim

@@ -28,19 +28,12 @@ struct StartupImpactReport {
   QList<StartupImpactMod> mods;
   QString timestamp;
   QMap<QString, double> metrics;
-  double totalImpact = 0.0;
   QMap<QString, double> offThreadMetrics;
-  double offThreadTotalImpact = 0.0;
 
-  double totalTime() const;
-  double offThreadTotalTime() const;
-  double modsTotalTime() const;
   double baseGameTime() const;
-  const StartupImpactMod* find(const std::optional<QString>& packageId,
-                               const std::optional<QString>& modName) const;
+  const StartupImpactMod* find(const std::optional<QString>& packageId) const;
 };
 
 QString normalizePackageId(QStringView packageId);
-QString formatImpact(double seconds);
 
 }  // namespace px::modrim::startup_impact
