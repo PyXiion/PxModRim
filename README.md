@@ -38,7 +38,7 @@ Other formats — portable `.zip` archives, `.deb`, `.rpm`, `.tar.gz`, and Flatp
 - **Dependency and conflict checks:** Flags missing dependencies, incompatibilities, and load-order issues directly in the list.
 - **Automatic and custom sorting:** Sorts your active load order using dependencies, community rules, and your own custom rules.
 - **Safe `ModsConfig.xml` writes:** Saves your active mod list back to RimWorld and keeps automatic timestamped snapshots so you can roll back if needed.
-- **Workshop browsing & downloading without SteamCMD:** Browse mods and collections, resolve dependencies automatically, and save favourite collections. Downloads go through [PxSteamDL](https://github.com/PyXiion/PxSteamDL) (up to 10x faster than SteamCMD) straight into RimWorld's Local mods folder, so it never touches your Steam config (`libraryfolders.vdf`, `.acf` manifests), Steam login, or Workshop subscriptions.
+- **Fast Workshop browsing & downloading without SteamCMD:** Browse mods and collections, resolve dependencies automatically, and save favourite collections. Downloads go through [PxSteamDL](https://github.com/PyXiion/PxSteamDL) straight into RimWorld's Local mods folder—not SteamCMD—so it saturates your connection (much faster than SteamCMD; e.g. 24 mods / 610 MB in 9.4 s cold) and never touches your Steam config (`libraryfolders.vdf`, `.acf` manifests), Steam login, or Workshop subscriptions.
 - **Flexible game launching:** Launch RimWorld through Steam, directly (including 1.7 Waylith builds), or with custom wrapper commands.
 - **Interface scaling:** Scale the UI from 100% to 250% in Settings. If you set it too large, launch with `--ui-scale 100` (or `PX_UI_SCALE=100`) to reset it for that run.
 
