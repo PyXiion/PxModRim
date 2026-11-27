@@ -2,7 +2,9 @@
   <img src="src/pxmodrim/ui/assets/logo_nobg_4.svg" alt="PxModRim" width="240">
 </p>
 
-A friendly, modern mod manager for RimWorld. NOw with fast Steam downloading
+<p align="center">
+  A RimWorld mod manager with load-order sorting, conflict checks, and built-in Steam Workshop downloading.
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12-blue?logo=python" alt="Python 3.12" />
@@ -11,82 +13,50 @@ A friendly, modern mod manager for RimWorld. NOw with fast Steam downloading
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20win%20%7C%20macOS-lightgrey" alt="Platforms" />
 </p>
 
-## Downloads
-
-Choose a version, then download it for your system:
-
-| Version | What you get | Windows | Linux | macOS |
-|---|---|---|---|---|
-| **NativeWorkshop** | Mod manager with a native Workshop browser and mod downloader. | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-NativeWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-NativeWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-NativeWorkshop.dmg) |
-| **SteamWorkshop** | Mod manager with the familiar Steam web browser and mod downloader. | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-SteamWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-SteamWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-SteamWorkshop.dmg) |
-| **NoWorkshop** | Just sorting and organizing mods, without Workshop browsing or downloading. | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-NoWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-NoWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-NoWorkshop.dmg) |
-
-[All downloads](https://github.com/PyXiion/PxModRim/releases/latest), including portable ZIPs, Linux packages and Flatpak.
-
----
-
 ![Screenshot](screenshot.png)
 
----
+## Downloads
 
-## What it does
+Pick the build that fits how you play. **NativeWorkshop** is the recommended version for most people.
 
-- **Scans everything in one place** — Steam, local, and core mods all show up together.
-- **Instant warm startup** — persistent SQLite metadata cache skips re-parsing unchanged mods.
-- **Catches problems for you** — missing dependencies, load-order conflicts, and other issues appear right in the list.
-- **Sorts your load order automatically** — one click and your active mods are ordered by dependencies and community
-  rules.
-- **Saves back to RimWorld** — writes your final mod list to `ModsConfig.xml` so the game sees exactly what you picked.
-- **Safeguards your configuration** — automatic timestamped snapshots with one-click rollback if something breaks.
+| Build | What's included | Windows | Linux | macOS |
+|---|---|---|---|---|
+| **NativeWorkshop** | Mod sorter + native Workshop browser and downloader | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-NativeWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-NativeWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-NativeWorkshop.dmg) |
+| **SteamWorkshop** | Mod sorter + embedded Steam web browser and downloader | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-SteamWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-SteamWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-SteamWorkshop.dmg) |
+| **NoWorkshop** | Mod sorting and management only, no Workshop or downloader | [Installer](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Windows-NoWorkshop-Setup.exe) | [AppImage](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-Linux-x86_64-NoWorkshop.AppImage) | [DMG](https://github.com/PyXiion/PxModRim/releases/latest/download/PxModRim-macOS-NoWorkshop.dmg) |
 
----
+Other formats — portable `.zip` archives, `.deb`, `.rpm`, `.tar.gz`, and Flatpak (`com.github.PyXiion.PxModRim`) — are on the [latest release page](https://github.com/PyXiion/PxModRim/releases/latest).
 
-## Installation
+### Platform notes
 
-Pre-built packages are generated automatically for tagged releases on GitHub:
+- **Linux (Flatpak):** The Flatpak has access to standard Steam paths and the RimWorld config folder. If your Steam library is on another drive or custom path, grant access to it in Flatseal.
+- **macOS:** Builds are ad-hoc signed unless release signing keys are configured, so Gatekeeper may ask you to allow the app manually on first launch.
 
-- **Linux:** AppImage, `.tar.gz`, `.deb`, `.rpm`, and Flatpak (`com.github.PyXiion.PxModRim`)
-- **Windows:** NSIS Installer (`.exe`) and portable `.zip`
-- **macOS:** Application bundle `.zip` and `.dmg`
+## Features
 
-Download the appropriate package from the [Releases](https://github.com/PyXiion/PxModRim/releases) page for your platform.
+- **All mods in one list:** Discovers Steam Workshop, local, and core/DLC mods together, with a persistent SQLite cache so subsequent startups are fast.
+- **Dependency and conflict checks:** Flags missing dependencies, incompatibilities, and load-order issues directly in the list.
+- **Automatic and custom sorting:** Sorts your active load order using dependencies, community rules, and your own custom rules.
+- **Safe `ModsConfig.xml` writes:** Saves your active mod list back to RimWorld and keeps automatic timestamped snapshots so you can roll back if needed.
+- **Workshop browsing & downloading without Steam:** Browse mods and collections, resolve dependencies automatically, save favourite collections, and download via [PxSteamDL](https://github.com/PyXiion/PxSteamDL) straight into Local mods without running Steam or touching your subscriptions.
+- **Flexible game launching:** Launch RimWorld through Steam, directly (including 1.7 Waylith builds), or with custom wrapper commands.
+- **Interface scaling:** Scale the UI from 100% to 250% in Settings. If you set it too large, launch with `--ui-scale 100` (or `PX_UI_SCALE=100`) to reset it for that run.
 
-Flatpak can access common Steam locations and the RimWorld config directory. If a Steam library is stored
-elsewhere, grant that folder to PxModRim in Flatseal; the app does not receive broad host-filesystem
-access.
+## Running from source
 
-macOS builds are ad-hoc signed by default. Developer ID signing and notarization are enabled only when
-release signing secrets are configured; otherwise, macOS may require manual Gatekeeper approval.
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/) (plus [just](https://github.com/casey/just) if you want the task shortcuts, and Node.js if you're building the `SteamWorkshop` injected JS).
 
-If you prefer to run or build from source, see the developer notes in [`AGENTS.md`](./AGENTS.md).
+```bash
+uv sync --dev
+uv run python -m pxmodrim
+```
 
----
+Or with `just`:
 
-## Roadmap / TODO
-
-The checklist below tracks major feature areas at a glance. For the detailed, prioritised
-engineering plan — release blockers, quality gates, milestone scope, and acceptance criteria —
-see [`ROADMAP.md`](./ROADMAP.md).
-
-- [x] Core mod discovery (Steam, local, core)
-- [x] Responsive three-panel UI with sidebar filters
-- [x] Dependency and conflict diagnostics
-- [x] Automatic load-order sorting
-- [x] Save active mod list to `ModsConfig.xml`
-- [x] Game launching (Steam, standalone, with optional wrappers)
-- [x] Steam Workshop integration (browse, subscribe, update)
-- [x] Downloading Workshop mods without the Steam client (via [PxSteamDL](https://github.com/PyXiion/PxSteamDL), whose backend supports Linux, macOS, and Windows)
-- [ ] Launch presets (mods/configs/etc)
-- [ ] Player log viewer with filtering and colorization
-- [ ] File search across all installed mods (maybe?)
-- [ ] Custom sort rules editor
-- [ ] Theme and appearance options
-- [ ] Translations
-- [ ] CLI
-
-Features from RimSort will be adopted slowly and only when they genuinely improve the player experience.
----
+```bash
+just run
+```
 
 ## License
 
-GPL-3.0-or-later. Portions are derived from [RimSort](https://github.com/RimSort/RimSort) (GPL-3.0); see `NOTICE`.
+GPL-3.0-or-later. Portions are derived from [RimSort](https://github.com/RimSort/RimSort) (GPL-3.0); see [NOTICE](NOTICE).
